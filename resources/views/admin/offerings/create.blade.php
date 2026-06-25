@@ -1,0 +1,164 @@
+@extends('layouts.admin')
+
+@section('title', 'New Offering')
+@section('page-title', 'New Offering')
+
+@section('content')
+<div class="card" style="max-width: 760px;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Create Offering</h6>
+        <a href="{{ route('admin.offerings.index') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ route('admin.offerings.store') }}">
+            @csrf
+
+            {{-- Basic Info --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Basic Information</h6>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Offering Name <span class="text-danger">*</span></label>
+                    <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
+                           value="{{ old('name') }}" placeholder="e.g. Semaglutide 0.5mg Weekly" required>
+                    @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
+                    <select name="type" class="form-select @error('type') is-invalid @enderror" required>
+                        <option value="">Select type...</option>
+                        <option value="medication" {{ old('type') === 'medication' ? 'selected' : '' }}>Medication</option>
+                        <option value="compound"   {{ old('type') === 'compound'   ? 'selected' : '' }}>Compound</option>
+                        <option value="supply"     {{ old('type') === 'supply'     ? 'selected' : '' }}>Supply</option>
+                    </select>
+                    @error('type')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Partner <span class="text-danger">*</span></label>
+                    <select name="partner_id" class="form-select @error('partner_id') is-invalid @enderror" required>
+                        <option value="">Select partner...</option>
+                        @foreach($partners as $partner)
+                            <option value="{{ $partner->id }}" {{ old('partner_id') == $partner->id ? 'selected' : '' }}>
+                                {{ $partner->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('partner_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Price (USD)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" name="price" step="0.01" min="0"
+                               class="form-control @error('price') is-invalid @enderror"
+                               value="{{ old('price') }}" placeholder="0.00">
+                    </div>
+                    @error('price')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">SKU</label>
+                    <input type="text" name="sku" class="form-control" value="{{ old('sku') }}" placeholder="Optional">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Description</label>
+                <textarea name="description" class="form-control" rows="3"
+                          placeholder="Describe the offering — dosage form, strength, indications...">{{ old('description') }}</textarea>
+            </div>
+
+            {{-- Pharmacy / Integration --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Pharmacy & Integration IDs</h6>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Pharmacy Type</label>
+                    <select name="pharmacy_type" class="form-select">
+                        <option value="">Not specified</option>
+                        <option value="boothwyn" {{ old('pharmacy_type') === 'boothwyn' ? 'selected' : '' }}>Boothwyn</option>
+                        <option value="curexa"   {{ old('pharmacy_type') === 'curexa'   ? 'selected' : '' }}>Curexa</option>
+                        <option value="custom"   {{ old('pharmacy_type') === 'custom'   ? 'selected' : '' }}>Custom</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">DoseSpot Medication ID</label>
+                    <input type="text" name="dosespot_medication_id" class="form-control"
+                           value="{{ old('dosespot_medication_id') }}" placeholder="DoseSpot ID">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Boothwyn Compound ID</label>
+                    <input type="text" name="boothwyn_compound_id" class="form-control"
+                           value="{{ old('boothwyn_compound_id') }}" placeholder="Boothwyn ID">
+                </div>
+            </div>
+
+            {{-- State Availability --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">
+                State Availability
+                <span class="text-muted fw-normal normal-case" style="text-transform:none; font-size:.8rem;">
+                    — leave all unchecked to allow all states
+                </span>
+            </h6>
+
+            <div class="mb-3">
+                <div class="d-flex gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="selectAll">Select All</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAll">Clear All</button>
+                </div>
+                <div class="row row-cols-6 g-1" id="stateCheckboxes">
+                    @foreach($usStates as $state)
+                    <div class="col">
+                        <div class="form-check">
+                            <input class="form-check-input state-cb" type="checkbox"
+                                   name="available_states[]" value="{{ $state }}"
+                                   id="state_{{ $state }}"
+                                   {{ in_array($state, old('available_states', [])) ? 'checked' : '' }}>
+                            <label class="form-check-label small" for="state_{{ $state }}">{{ $state }}</label>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Flags --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Flags</h6>
+
+            <div class="d-flex gap-4 mb-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="is_active" value="1" id="isActive"
+                           {{ old('is_active', '1') ? 'checked' : '' }}>
+                    <label class="form-check-label fw-semibold" for="isActive">Active</label>
+                    <div class="text-muted small">Visible and orderable by partners</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="is_controlled_substance" value="1" id="isControlled"
+                           {{ old('is_controlled_substance') ? 'checked' : '' }}>
+                    <label class="form-check-label fw-semibold" for="isControlled">Controlled Substance</label>
+                    <div class="text-muted small">Requires additional DEA compliance</div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 pt-2 border-top">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-1"></i>Create Offering
+                </button>
+                <a href="{{ route('admin.offerings.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
+<script>
+    document.getElementById('selectAll').addEventListener('click', () =>
+        document.querySelectorAll('.state-cb').forEach(cb => cb.checked = true));
+    document.getElementById('clearAll').addEventListener('click', () =>
+        document.querySelectorAll('.state-cb').forEach(cb => cb.checked = false));
+</script>
+@endsection
