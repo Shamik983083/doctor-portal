@@ -28,6 +28,7 @@
             <div class="card-body pt-0 border-top">
                 <table class="table table-sm table-borderless small mb-0">
                     <tr><th class="text-muted">Partner</th><td>{{ $offering->partner->name ?? '—' }}</td></tr>
+                    <tr><th class="text-muted">Category</th><td>{{ $offering->category?->name ?? '—' }}</td></tr>
                     <tr><th class="text-muted">Price</th><td>{{ $offering->price ? '$'.number_format($offering->price, 2) : '—' }}</td></tr>
                     <tr><th class="text-muted">SKU</th><td>{{ $offering->sku ?? '—' }}</td></tr>
                     <tr><th class="text-muted">Pharmacy</th><td>{{ $offering->pharmacy_type ? ucfirst($offering->pharmacy_type) : '—' }}</td></tr>
@@ -56,9 +57,16 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Edit Offering</h6>
-                <a href="{{ route('admin.offerings.index') }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-arrow-left me-1"></i>Back to list
-                </a>
+                <div class="d-flex gap-2">
+                    <form method="POST" action="{{ route('admin.offerings.destroy', $offering->id) }}"
+                          onsubmit="return confirm('Delete {{ addslashes($offering->name) }}?')">
+                        @csrf @method('DELETE')
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
+                    </form>
+                    <a href="{{ route('admin.offerings.index') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Back to list
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ route('admin.offerings.update', $offering->id) }}">
@@ -67,23 +75,30 @@
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Basic Information</h6>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-md-8">
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">Offering Name</label>
                             <input type="text" name="name" class="form-control" value="{{ old('name', $offering->name) }}" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Price (USD)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" name="price" step="0.01" min="0" class="form-control"
-                                       value="{{ old('price', $offering->price) }}" placeholder="0.00">
-                            </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Internal Name</label>
+                            <input type="text" name="internal_name" class="form-control"
+                                   value="{{ old('internal_name', $offering->internal_name) }}" placeholder="Internal label">
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Description</label>
-                        <textarea name="description" class="form-control" rows="3">{{ old('description', $offering->description) }}</textarea>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Category</label>
+                            <select name="category_id" class="form-select">
+                                <option value="">No category</option>
+                                @foreach($categories as $cat)
+                                    <option value="{{ $cat->id }}"
+                                        {{ old('category_id', $offering->category_id) == $cat->id ? 'selected' : '' }}>
+                                        {{ $cat->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Pharmacy & Integration</h6>
@@ -110,6 +125,66 @@
                             <input type="text" name="boothwyn_compound_id" class="form-control"
                                    value="{{ old('boothwyn_compound_id', $offering->boothwyn_compound_id) }}">
                         </div>
+                    </div>
+
+                    <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Prescription &amp; Dispensing</h6>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Compound Formula</label>
+                        <input type="text" name="compound_formula" class="form-control"
+                               value="{{ old('compound_formula', $offering->compound_formula) }}"
+                               placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial">
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Refills</label>
+                            <input type="number" name="refills" min="0" class="form-control"
+                                   value="{{ old('refills', $offering->refills) }}" placeholder="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Quantity</label>
+                            <input type="number" name="quantity" min="0" step="0.01" class="form-control"
+                                   value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
+                            <input type="number" name="days_supply" min="0" class="form-control"
+                                   value="{{ old('days_supply', $offering->days_supply) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Dispense Unit</label>
+                            <input type="text" name="dispense_unit" class="form-control"
+                                   value="{{ old('dispense_unit', $offering->dispense_unit) }}"
+                                   placeholder="e.g. Each, Vial, mL">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Days Until Dispense <span class="text-muted fw-normal">(opt)</span></label>
+                            <input type="number" name="days_until_dispense" min="0" class="form-control"
+                                   value="{{ old('days_until_dispense', $offering->days_until_dispense) }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Directions</label>
+                        <textarea name="directions" class="form-control" rows="3"
+                                  placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…">{{ old('directions', $offering->directions) }}</textarea>
+                        <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Pharmacy Name <span class="text-muted fw-normal">(opt)</span></label>
+                            <input type="text" name="pharmacy_name" class="form-control"
+                                   value="{{ old('pharmacy_name', $offering->pharmacy_name) }}"
+                                   placeholder="e.g. THE PHARMACY HUB LLC (271328)">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Pharmacy Notes <span class="text-muted fw-normal">(opt)</span></label>
+                        <textarea name="pharmacy_notes" class="form-control" rows="2"
+                                  placeholder="e.g. Bill to partner, Ship to Patient">{{ old('pharmacy_notes', $offering->pharmacy_notes) }}</textarea>
                     </div>
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">

@@ -15,6 +15,17 @@
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link ps-4 {{ request()->routeIs('admin.form-submissions.*') ? 'active' : '' }}"
+           href="{{ route('admin.form-submissions.index') }}" style="font-size:.85rem">
+            <i class="bi bi-file-earmark-check me-1"></i> Form Submissions
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.patients.*') ? 'active' : '' }}" href="{{ route('admin.patients.index') }}">
+            <i class="bi bi-people"></i> Patients
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.partners.*') ? 'active' : '' }}" href="{{ route('admin.partners.index') }}">
             <i class="bi bi-building"></i> Partners
         </a>
@@ -27,6 +38,21 @@
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.offerings.*') ? 'active' : '' }}" href="{{ route('admin.offerings.index') }}">
             <i class="bi bi-capsule"></i> Offerings
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link ps-4 {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}" style="font-size:.85rem">
+            <i class="bi bi-tags me-1"></i> Categories
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.questionnaires.*') ? 'active' : '' }}" href="{{ route('admin.questionnaires.index') }}">
+            <i class="bi bi-ui-checks"></i> Questionnaires
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link ps-4 {{ request()->routeIs('admin.questions.*') ? 'active' : '' }}" href="{{ route('admin.questions.index') }}" style="font-size:.85rem">
+            <i class="bi bi-question-circle me-1"></i> Question Bank
         </a>
     </li>
     <hr class="border-secondary my-2">

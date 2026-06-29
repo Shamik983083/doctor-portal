@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Web\Clinician;
 
 use App\Http\Controllers\Controller;
-use App\Models\PatientCase;
+use App\Models\CasePrescription;
 use App\Models\ClinicalNote;
 use App\Models\Message;
+use App\Models\Offering;
+use App\Models\PatientCase;
 use App\Services\CaseStateMachine;
 use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class CaseController extends Controller
 {
@@ -38,6 +41,10 @@ class CaseController extends Controller
             'caseOfferings.offering', 'caseQuestions',
             'diseases', 'clinicalNotes.clinician.user',
             'orders.pharmacy', 'messages', 'files', 'tags',
+            'questionnaireResponses.questionnaire',
+            'questionnaireResponses.answers',
+            'casePrescriptions.clinician.user',
+            'casePrescriptions.medications',
         ])->where('uuid', $uuid)->firstOrFail();
 
         return view('clinician.cases.show', compact('case'));
@@ -55,6 +62,86 @@ class CaseController extends Controller
         $this->stateMachine->assignToClinician($case, $clinician);
 
         return redirect()->route('clinician.cases.show', $uuid)->with('success', 'Case assigned to you.');
+    }
+
+    public function prescribeForm(string $uuid)
+    {
+        $case = PatientCase::with([
+            'patient', 'partner', 'clinician.user',
+            'caseOfferings.offering.category',
+        ])->where('uuid', $uuid)->firstOrFail();
+
+        // Filter offerings by categories already on the case; if none, show all
+        $categoryIds = $case->caseOfferings
+            ->pluck('offering.category_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $offerings = Offering::with('category')
+            ->where('is_active', true)
+            ->when($categoryIds->count(), fn($q) => $q->whereIn('category_id', $categoryIds))
+            ->orderBy('name')
+            ->get(['id', 'name', 'internal_name', 'compound_formula', 'refills',
+                   'quantity', 'days_supply', 'dispense_unit', 'days_until_dispense']);
+
+        return view('clinician.cases.prescribe', compact('case', 'offerings'));
+    }
+
+    public function prescribe(Request $request, string $uuid)
+    {
+        $request->validate([
+            'diagnoses'                              => 'required|string',
+            'directions'                             => 'nullable|string',
+            'medical_necessity'                      => 'nullable|string',
+            'medications'                            => 'nullable|array',
+            'medications.*.offering_id'              => 'nullable|exists:offerings,id',
+            'medications.*.name'                     => 'required_with:medications|string|max:255',
+            'medications.*.compound_formula'         => 'nullable|string',
+            'medications.*.refills'                  => 'nullable|integer|min:0',
+            'medications.*.quantity'                 => 'nullable|numeric|min:0',
+            'medications.*.days_supply'              => 'nullable|integer|min:0',
+            'medications.*.dispense_unit'            => 'nullable|string|max:100',
+            'medications.*.days_until_dispense'      => 'nullable|integer|min:0',
+        ]);
+
+        $case      = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $clinician = Auth::user()->clinician;
+
+        DB::transaction(function () use ($request, $case, $clinician) {
+            $prescription = CasePrescription::create([
+                'case_id'          => $case->id,
+                'clinician_id'     => $clinician->id,
+                'diagnoses'        => $request->input('diagnoses'),
+                'directions'       => $request->input('directions'),
+                'medical_necessity'=> $request->input('medical_necessity'),
+                'prescribed_at'    => now(),
+            ]);
+
+            foreach ($request->input('medications', []) as $med) {
+                $prescription->medications()->create([
+                    'offering_id'        => $med['offering_id'] ?? null,
+                    'name'               => $med['name'],
+                    'compound_formula'   => $med['compound_formula'] ?? null,
+                    'refills'            => $med['refills'] ?? null,
+                    'quantity'           => $med['quantity'] ?? null,
+                    'days_supply'        => $med['days_supply'] ?? null,
+                    'dispense_unit'      => $med['dispense_unit'] ?? null,
+                    'days_until_dispense'=> $med['days_until_dispense'] ?? null,
+                ]);
+            }
+
+            $this->stateMachine->approve($case, $clinician->id);
+        });
+
+        $this->webhooks->dispatch($case->partner_id, 'case_approved', [
+            'case_id'      => $case->uuid,
+            'clinician_id' => $clinician->uuid ?? null,
+            'timestamp'    => now()->timestamp,
+        ]);
+
+        return redirect()->route('clinician.cases.show', $uuid)
+            ->with('success', 'Case approved and prescription submitted.');
     }
 
     public function approve(Request $request, string $uuid)

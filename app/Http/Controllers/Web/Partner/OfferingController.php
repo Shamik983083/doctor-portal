@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Partner;
 
 use App\Http\Controllers\Controller;
 use App\Models\Offering;
+use App\Models\OfferingCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,29 +22,42 @@ class OfferingController extends Controller
 
     public function index(Request $request)
     {
-        $offerings = $this->partner()->offerings()
+        $offerings = $this->partner()->offerings()->with('category')
             ->when($request->type, fn($q, $t) => $q->where('type', $t))
             ->when($request->search, fn($q, $s) => $q->where('name', 'like', "%{$s}%"))
-            ->latest()->paginate(20);
+            ->when($request->active !== null && $request->active !== '', fn($q) => $q->where('is_active', (bool) $request->active))
+            ->latest()->paginate(20)->withQueryString();
 
         return view('partner.offerings.index', compact('offerings'));
     }
 
     public function create()
     {
-        $usStates = $this->usStates;
-        return view('partner.offerings.create', compact('usStates'));
+        $usStates   = $this->usStates;
+        $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        return view('partner.offerings.create', compact('usStates', 'categories'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'name'                    => 'required|string|max:255',
+            'internal_name'           => 'nullable|string|max:255',
             'type'                    => 'required|in:medication,compound,supply',
+            'category_id'             => 'nullable|exists:offering_categories,id',
             'description'             => 'nullable|string',
             'sku'                     => 'nullable|string|max:100',
             'price'                   => 'nullable|numeric|min:0',
+            'compound_formula'        => 'nullable|string',
+            'refills'                 => 'nullable|integer|min:0',
+            'quantity'                => 'nullable|numeric|min:0',
+            'days_supply'             => 'nullable|integer|min:0',
+            'dispense_unit'           => 'nullable|string|max:100',
+            'days_until_dispense'     => 'nullable|integer|min:0',
+            'directions'              => 'nullable|string',
             'pharmacy_type'           => 'nullable|in:boothwyn,curexa,custom',
+            'pharmacy_name'           => 'nullable|string|max:255',
+            'pharmacy_notes'          => 'nullable|string',
             'dosespot_medication_id'  => 'nullable|string|max:100',
             'boothwyn_compound_id'    => 'nullable|string|max:100',
             'available_states'        => 'nullable|array',
@@ -54,6 +68,7 @@ class OfferingController extends Controller
 
         $data['is_active']               = $request->boolean('is_active');
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
+        $data['category_id']             = $request->input('category_id') ?: null;
 
         $offering = $this->partner()->offerings()->create($data);
 
@@ -63,9 +78,10 @@ class OfferingController extends Controller
 
     public function show(int $id)
     {
-        $offering = $this->partner()->offerings()->findOrFail($id);
-        $usStates = $this->usStates;
-        return view('partner.offerings.show', compact('offering', 'usStates'));
+        $offering   = $this->partner()->offerings()->with('category')->findOrFail($id);
+        $usStates   = $this->usStates;
+        $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        return view('partner.offerings.show', compact('offering', 'usStates', 'categories'));
     }
 
     public function update(Request $request, int $id)
@@ -74,9 +90,20 @@ class OfferingController extends Controller
 
         $data = $request->validate([
             'name'                    => 'sometimes|string|max:255',
+            'internal_name'           => 'nullable|string|max:255',
+            'category_id'             => 'nullable|exists:offering_categories,id',
             'description'             => 'nullable|string',
             'price'                   => 'nullable|numeric|min:0',
+            'compound_formula'        => 'nullable|string',
+            'refills'                 => 'nullable|integer|min:0',
+            'quantity'                => 'nullable|numeric|min:0',
+            'days_supply'             => 'nullable|integer|min:0',
+            'dispense_unit'           => 'nullable|string|max:100',
+            'days_until_dispense'     => 'nullable|integer|min:0',
+            'directions'              => 'nullable|string',
             'pharmacy_type'           => 'nullable|in:boothwyn,curexa,custom',
+            'pharmacy_name'           => 'nullable|string|max:255',
+            'pharmacy_notes'          => 'nullable|string',
             'dosespot_medication_id'  => 'nullable|string|max:100',
             'boothwyn_compound_id'    => 'nullable|string|max:100',
             'available_states'        => 'nullable|array',
@@ -86,10 +113,19 @@ class OfferingController extends Controller
 
         $data['is_active']               = $request->boolean('is_active');
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
+        $data['category_id']             = $request->input('category_id') ?: null;
 
         $offering->update($data);
 
         return back()->with('success', 'Offering updated.');
+    }
+
+    public function toggleStatus(int $id)
+    {
+        $offering = $this->partner()->offerings()->findOrFail($id);
+        $offering->update(['is_active' => !$offering->is_active]);
+
+        return back()->with('success', "\"{$offering->name}\" marked " . ($offering->is_active ? 'active' : 'inactive') . '.');
     }
 
     public function destroy(int $id)

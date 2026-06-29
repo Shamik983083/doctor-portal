@@ -62,6 +62,8 @@ class PatientCase extends Model
     public function files() { return $this->hasMany(PatientFile::class, 'case_id'); }
     public function tags() { return $this->belongsToMany(Tag::class, 'case_tags')->withPivot('notes'); }
     public function events() { return $this->hasMany(CaseEvent::class, 'case_id'); }
+    public function questionnaireResponses() { return $this->hasMany(QuestionnaireResponse::class, 'case_id'); }
+    public function casePrescriptions()      { return $this->hasMany(CasePrescription::class, 'case_id'); }
 
     public function isInStatus(string $status): bool { return $this->status === $status; }
     public function canTransitionTo(string $status): bool { return in_array($status, $this->getAllowedTransitions()); }

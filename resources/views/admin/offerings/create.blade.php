@@ -19,13 +19,18 @@
             <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Basic Information</h6>
 
             <div class="row g-3 mb-3">
-                <div class="col-md-8">
+                <div class="col-md-6">
                     <label class="form-label fw-semibold">Offering Name <span class="text-danger">*</span></label>
                     <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
                            value="{{ old('name') }}" placeholder="e.g. Semaglutide 0.5mg Weekly" required>
                     @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Internal Name</label>
+                    <input type="text" name="internal_name" class="form-control"
+                           value="{{ old('internal_name') }}" placeholder="Internal label">
+                </div>
+                <div class="col-md-3">
                     <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
                     <select name="type" class="form-select @error('type') is-invalid @enderror" required>
                         <option value="">Select type...</option>
@@ -34,6 +39,20 @@
                         <option value="supply"     {{ old('type') === 'supply'     ? 'selected' : '' }}>Supply</option>
                     </select>
                     @error('type')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Category</label>
+                    <select name="category_id" class="form-select">
+                        <option value="">No category</option>
+                        @foreach($categories as $cat)
+                            <option value="{{ $cat->id }}" {{ old('category_id') == $cat->id ? 'selected' : '' }}>
+                                {{ $cat->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
@@ -50,26 +69,6 @@
                     </select>
                     @error('partner_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Price (USD)</label>
-                    <div class="input-group">
-                        <span class="input-group-text">$</span>
-                        <input type="number" name="price" step="0.01" min="0"
-                               class="form-control @error('price') is-invalid @enderror"
-                               value="{{ old('price') }}" placeholder="0.00">
-                    </div>
-                    @error('price')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">SKU</label>
-                    <input type="text" name="sku" class="form-control" value="{{ old('sku') }}" placeholder="Optional">
-                </div>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Description</label>
-                <textarea name="description" class="form-control" rows="3"
-                          placeholder="Describe the offering — dosage form, strength, indications...">{{ old('description') }}</textarea>
             </div>
 
             {{-- Pharmacy / Integration --}}
@@ -95,6 +94,64 @@
                     <input type="text" name="boothwyn_compound_id" class="form-control"
                            value="{{ old('boothwyn_compound_id') }}" placeholder="Boothwyn ID">
                 </div>
+            </div>
+
+            {{-- Prescription & Dispensing --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Prescription &amp; Dispensing</h6>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Compound Formula</label>
+                <input type="text" name="compound_formula" class="form-control"
+                       value="{{ old('compound_formula') }}" placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial">
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Refills</label>
+                    <input type="number" name="refills" min="0" class="form-control"
+                           value="{{ old('refills') }}" placeholder="0">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Quantity</label>
+                    <input type="number" name="quantity" min="0" step="0.01" class="form-control"
+                           value="{{ old('quantity') }}" placeholder="1.00">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
+                    <input type="number" name="days_supply" min="0" class="form-control"
+                           value="{{ old('days_supply') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Dispense Unit</label>
+                    <input type="text" name="dispense_unit" class="form-control"
+                           value="{{ old('dispense_unit') }}" placeholder="e.g. Each, Vial, mL">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Days Until Dispense <span class="text-muted fw-normal">(opt)</span></label>
+                    <input type="number" name="days_until_dispense" min="0" class="form-control"
+                           value="{{ old('days_until_dispense') }}">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Directions</label>
+                <textarea name="directions" class="form-control" rows="3"
+                          placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…">{{ old('directions') }}</textarea>
+                <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Pharmacy Name <span class="text-muted fw-normal">(opt)</span></label>
+                    <input type="text" name="pharmacy_name" class="form-control"
+                           value="{{ old('pharmacy_name') }}" placeholder="e.g. THE PHARMACY HUB LLC (271328)">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Pharmacy Notes <span class="text-muted fw-normal">(opt)</span></label>
+                <textarea name="pharmacy_notes" class="form-control" rows="2"
+                          placeholder="e.g. Bill to partner, Ship to Patient">{{ old('pharmacy_notes') }}</textarea>
             </div>
 
             {{-- State Availability --}}

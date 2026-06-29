@@ -16,7 +16,7 @@
             <div class="col-md-5">
                 <input type="text" name="search" class="form-control form-control-sm" placeholder="Search by name…" value="{{ request('search') }}">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="type" class="form-select form-select-sm">
                     <option value="">All types</option>
                     <option value="medication" @selected(request('type') === 'medication')>Medication</option>
@@ -24,9 +24,18 @@
                     <option value="supply"     @selected(request('type') === 'supply')>Supply</option>
                 </select>
             </div>
+            <div class="col-md-2">
+                <select name="active" class="form-select form-select-sm">
+                    <option value="">All statuses</option>
+                    <option value="1" @selected(request('active') === '1')>Active</option>
+                    <option value="0" @selected(request('active') === '0')>Inactive</option>
+                </select>
+            </div>
             <div class="col-auto">
                 <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i> Filter</button>
-                <a href="{{ route('partner.offerings.index') }}" class="btn btn-sm btn-link text-muted">Clear</a>
+                @if(request()->hasAny(['search','type','active']))
+                    <a href="{{ route('partner.offerings.index') }}" class="btn btn-sm btn-link text-muted">Clear</a>
+                @endif
             </div>
         </form>
     </div>
@@ -38,9 +47,9 @@
             <thead class="table-light">
                 <tr>
                     <th>Name</th>
-                    <th>SKU</th>
+                    <th>Internal Name</th>
                     <th>Type</th>
-                    <th>Price</th>
+                    <th>Category</th>
                     <th>States</th>
                     <th>Status</th>
                     <th></th>
@@ -50,9 +59,9 @@
                 @forelse($offerings as $offering)
                 <tr>
                     <td class="fw-medium">{{ $offering->name }}</td>
-                    <td><code>{{ $offering->sku ?? '—' }}</code></td>
+                    <td><span class="text-muted small">{{ $offering->internal_name ?? '—' }}</span></td>
                     <td><span class="badge bg-light text-dark border text-capitalize">{{ $offering->type }}</span></td>
-                    <td>{{ $offering->price ? '$'.number_format($offering->price, 2) : '—' }}</td>
+                    <td><span class="text-muted small">{{ $offering->category?->name ?? '—' }}</span></td>
                     <td>
                         @if(empty($offering->available_states))
                             <span class="badge bg-success bg-opacity-10 text-success">All States</span>
@@ -61,21 +70,31 @@
                         @endif
                     </td>
                     <td>
-                        @if($offering->is_active)
-                            <span class="badge bg-success bg-opacity-10 text-success">Active</span>
-                        @else
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary">Inactive</span>
-                        @endif
+                        <form method="POST" action="{{ route('partner.offerings.toggle-status', $offering->id) }}" class="d-inline">
+                            @csrf @method('PATCH')
+                            <button type="submit" class="btn btn-sm border-0 p-0">
+                                @if($offering->is_active)
+                                    <span class="badge bg-success bg-opacity-10 text-success">Active</span>
+                                @else
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary">Inactive</span>
+                                @endif
+                            </button>
+                        </form>
                     </td>
-                    <td>
+                    <td class="text-end">
                         <a href="{{ route('partner.offerings.show', $offering->id) }}" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-pencil"></i>
                         </a>
+                        <form method="POST" action="{{ route('partner.offerings.destroy', $offering->id) }}"
+                              class="d-inline" onsubmit="return confirm('Delete {{ addslashes($offering->name) }}?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
+                    <td colspan="7" class="text-center py-5 text-muted" style="min-height:200px">
                         <i class="bi bi-box-seam fs-3 d-block mb-2 opacity-25"></i>
                         No offerings yet. <a href="{{ route('partner.offerings.create') }}">Create your first one.</a>
                     </td>

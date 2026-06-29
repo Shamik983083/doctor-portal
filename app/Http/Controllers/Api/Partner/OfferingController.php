@@ -80,4 +80,46 @@ class OfferingController extends Controller
 
         return response()->json(['message' => 'Offering deleted.']);
     }
+
+    public function questionnaires(Request $request, string $id)
+    {
+        $offering = $this->partner($request)->offerings()
+            ->with(['questionnaires' => function ($q) {
+                $q->where('is_active', true)
+                  ->orderByPivot('sort_order')
+                  ->with(['questions' => fn($q) => $q->where('is_active', true)
+                      ->orderBy('step_number')->orderBy('sort_order')]);
+            }])
+            ->where('uuid', $id)
+            ->firstOrFail();
+
+        $questionnaires = $offering->questionnaires->map(function ($questionnaire) {
+            return [
+                'id'          => $questionnaire->uuid,
+                'name'        => $questionnaire->name,
+                'description' => $questionnaire->description,
+                'mode'        => $questionnaire->mode,
+                'is_required' => (bool) $questionnaire->pivot->is_required,
+                'sort_order'  => $questionnaire->pivot->sort_order,
+                'questions'   => $questionnaire->questions->map(fn($q) => [
+                    'id'          => $q->id,
+                    'key'         => $q->key,
+                    'question'    => $q->question,
+                    'type'        => $q->type,
+                    'placeholder' => $q->placeholder,
+                    'is_required' => $q->is_required,
+                    'is_readonly' => $q->is_readonly,
+                    'step_number' => $q->step_number,
+                    'sort_order'  => $q->sort_order,
+                    'options'     => $q->options,
+                ]),
+            ];
+        });
+
+        return response()->json([
+            'offering_id'    => $offering->uuid,
+            'offering_name'  => $offering->name,
+            'questionnaires' => $questionnaires,
+        ]);
+    }
 }

@@ -29,34 +29,34 @@
             <div class="card mb-4">
                 <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Basic Information</h6></div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-medium">Name</label>
-                        <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
-                               value="{{ old('name', $offering->name) }}" required>
-                        @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-8">
+                            <label class="form-label fw-medium">Name</label>
+                            <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
+                                   value="{{ old('name', $offering->name) }}" required>
+                            @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label fw-medium">Internal Name</label>
+                            <input type="text" name="internal_name" class="form-control"
+                                   value="{{ old('internal_name', $offering->internal_name) }}" placeholder="Internal label">
+                        </div>
                     </div>
-                    <div class="row g-3">
+                    <div class="row g-3 mt-1">
                         <div class="col-sm-4">
                             <label class="form-label fw-medium">Type</label>
                             <input type="text" class="form-control bg-light" value="{{ ucfirst($offering->type) }}" readonly>
                             <div class="form-text">Type cannot be changed after creation.</div>
                         </div>
                         <div class="col-sm-4">
-                            <label class="form-label fw-medium">SKU</label>
-                            <input type="text" class="form-control bg-light" value="{{ $offering->sku ?? '—' }}" readonly>
+                            <label class="form-label fw-medium">Category</label>
+                            <select name="category_id" class="form-select">
+                                <option value="">No category</option>
+                                @foreach($categories as $cat)
+                                    <option value="{{ $cat->id }}" @selected(old('category_id', $offering->category_id) == $cat->id)>{{ $cat->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
-                        <div class="col-sm-4">
-                            <label class="form-label fw-medium">Price (USD)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" name="price" step="0.01" min="0" class="form-control"
-                                       value="{{ old('price', $offering->price) }}">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <label class="form-label fw-medium">Description</label>
-                        <textarea name="description" class="form-control" rows="3">{{ old('description', $offering->description) }}</textarea>
                     </div>
                 </div>
             </div>
@@ -84,6 +84,63 @@
                             <input type="text" name="boothwyn_compound_id" class="form-control"
                                    value="{{ old('boothwyn_compound_id', $offering->boothwyn_compound_id) }}">
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Prescription &amp; Dispensing</h6></div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Compound Formula</label>
+                        <input type="text" name="compound_formula" class="form-control"
+                               value="{{ old('compound_formula', $offering->compound_formula) }}"
+                               placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial">
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-2">
+                            <label class="form-label fw-medium">Refills</label>
+                            <input type="number" name="refills" min="0" class="form-control"
+                                   value="{{ old('refills', $offering->refills) }}" placeholder="0">
+                        </div>
+                        <div class="col-sm-2">
+                            <label class="form-label fw-medium">Quantity</label>
+                            <input type="number" name="quantity" min="0" step="0.01" class="form-control"
+                                   value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00">
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label fw-medium">Days Supply <small class="text-muted">(opt)</small></label>
+                            <input type="number" name="days_supply" min="0" class="form-control"
+                                   value="{{ old('days_supply', $offering->days_supply) }}">
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label fw-medium">Dispense Unit</label>
+                            <input type="text" name="dispense_unit" class="form-control"
+                                   value="{{ old('dispense_unit', $offering->dispense_unit) }}"
+                                   placeholder="Each, Vial, mL…">
+                        </div>
+                        <div class="col-sm-2">
+                            <label class="form-label fw-medium">Days Until Dispense <small class="text-muted">(opt)</small></label>
+                            <input type="number" name="days_until_dispense" min="0" class="form-control"
+                                   value="{{ old('days_until_dispense', $offering->days_until_dispense) }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Directions</label>
+                        <textarea name="directions" class="form-control" rows="3"
+                                  placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…">{{ old('directions', $offering->directions) }}</textarea>
+                        <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Pharmacy Name <small class="text-muted">(opt)</small></label>
+                        <input type="text" name="pharmacy_name" class="form-control"
+                               value="{{ old('pharmacy_name', $offering->pharmacy_name) }}"
+                               placeholder="e.g. THE PHARMACY HUB LLC (271328)">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-medium">Pharmacy Notes <small class="text-muted">(opt)</small></label>
+                        <textarea name="pharmacy_notes" class="form-control" rows="2"
+                                  placeholder="e.g. Bill to partner, Ship to Patient">{{ old('pharmacy_notes', $offering->pharmacy_notes) }}</textarea>
                     </div>
                 </div>
             </div>

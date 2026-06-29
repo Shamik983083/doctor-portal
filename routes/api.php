@@ -14,14 +14,11 @@ Route::post('/partner/auth/token', [AuthController::class, 'token']);
 // Protected Partner API
 Route::prefix('partner')->middleware(['auth:api', 'partner.auth'])->group(function () {
 
-    // Patients
+    // Patients — read-only; patients are created by the external system via case submission
     Route::prefix('patients')->group(function () {
         Route::get('/', [PatientController::class, 'index']);
-        Route::post('/', [PatientController::class, 'store']);
         Route::get('/by-external-id/{externalId}', [PatientController::class, 'showByExternalId']);
         Route::get('/{id}', [PatientController::class, 'show']);
-        Route::put('/{id}', [PatientController::class, 'update']);
-        Route::delete('/{id}', [PatientController::class, 'destroy']);
     });
 
     // Cases
@@ -42,6 +39,7 @@ Route::prefix('partner')->middleware(['auth:api', 'partner.auth'])->group(functi
         Route::get('/', [OfferingController::class, 'index']);
         Route::post('/', [OfferingController::class, 'store']);
         Route::get('/{id}', [OfferingController::class, 'show']);
+        Route::get('/{id}/questionnaires', [OfferingController::class, 'questionnaires']);
         Route::put('/{id}', [OfferingController::class, 'update']);
         Route::delete('/{id}', [OfferingController::class, 'destroy']);
     });

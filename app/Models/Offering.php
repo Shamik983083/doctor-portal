@@ -12,10 +12,12 @@ class Offering extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'uuid', 'partner_id', 'name', 'type', 'description', 'sku',
+        'uuid', 'partner_id', 'category_id', 'name', 'internal_name', 'type', 'description', 'sku',
         'price', 'dosespot_medication_id', 'boothwyn_compound_id',
-        'pharmacy_type', 'available_states', 'dispense_units', 'images',
-        'faqs', 'is_active', 'is_controlled_substance', 'metadata',
+        'pharmacy_type', 'pharmacy_name', 'pharmacy_notes',
+        'compound_formula', 'refills', 'quantity', 'days_supply',
+        'dispense_unit', 'dispense_units', 'days_until_dispense', 'directions',
+        'available_states', 'images', 'faqs', 'is_active', 'is_controlled_substance', 'metadata',
     ];
 
     protected $casts = [
@@ -32,16 +34,24 @@ class Offering extends Model
     protected static function boot(): void
     {
         parent::boot();
-        static::creating(fn($m) => $m->uuid = $m->uuid ?? (string) Str::uuid());
+        static::creating(fn($m) => $m->uuid ??= (string) Str::uuid());
     }
 
-    public function partner() { return $this->belongsTo(Partner::class); }
+    public function partner()       { return $this->belongsTo(Partner::class); }
+    public function category()      { return $this->belongsTo(OfferingCategory::class, 'category_id'); }
     public function caseOfferings() { return $this->hasMany(CaseOffering::class); }
-    public function cases() { return $this->belongsToMany(PatientCase::class, 'case_offerings', 'offering_id', 'case_id'); }
+    public function cases()         { return $this->belongsToMany(PatientCase::class, 'case_offerings', 'offering_id', 'case_id'); }
+
+    public function questionnaires()
+    {
+        return $this->belongsToMany(Questionnaire::class, 'offering_questionnaire')
+                    ->withPivot('is_required', 'sort_order')
+                    ->orderByPivot('sort_order');
+    }
 
     public function isAvailableInState(string $state): bool
     {
         if (empty($this->available_states)) return true;
-        return in_array(strtoupper($state), array_map('strtoupper', $this->available_states));
+        return \in_array(strtoupper($state), array_map('strtoupper', $this->available_states));
     }
 }

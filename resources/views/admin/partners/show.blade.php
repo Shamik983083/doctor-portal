@@ -141,7 +141,7 @@
         <div class="card mb-4">
             <div class="card-header"><h6 class="mb-0"><i class="bi bi-code-slash me-2"></i>Partner Integration Quick-Start</h6></div>
             <div class="card-body">
-                <p class="text-muted small mb-3">Share this guide with the partner so they can start creating offerings and cases via the API.</p>
+                <p class="text-muted small mb-3">Share this guide with the partner so they can start creating offerings and submitting cases via the API. Patient records are created automatically from the data sent with each case.</p>
 
                 <p class="fw-semibold small mb-1">Step 1 — Get a Bearer token</p>
                 <pre class="bg-dark text-light rounded p-3 small mb-3"><code>POST {{ url('/api/partner/auth/token') }}
@@ -167,26 +167,23 @@ Content-Type: application/json
   "is_active": true
 }</code></pre>
 
-                <p class="fw-semibold small mb-1">Step 3 — Create a Patient</p>
-                <pre class="bg-dark text-light rounded p-3 small mb-3"><code>POST {{ url('/api/partner/patients') }}
-Authorization: Bearer &lt;access_token&gt;
-Content-Type: application/json
-
-{
-  "first_name": "John",
-  "last_name": "Doe",
-  "email": "john@example.com",
-  "state": "CA",
-  "external_id": "your-system-id-123"
-}</code></pre>
-
-                <p class="fw-semibold small mb-1">Step 4 — Open a Case</p>
+                <p class="fw-semibold small mb-1">Step 3 — Submit a Case (patient data included inline)</p>
                 <pre class="bg-dark text-light rounded p-3 small mb-0"><code>POST {{ url('/api/partner/cases') }}
 Authorization: Bearer &lt;access_token&gt;
 Content-Type: application/json
 
 {
-  "patient_id": "&lt;patient_uuid&gt;",
+  "patient": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john@example.com",
+    "phone": "5551234567",
+    "date_of_birth": "1985-03-15",
+    "gender": "male",
+    "state": "CA",
+    "external_id": "your-system-patient-id"
+  },
+  "external_id": "your-system-case-id",
   "offerings": [{ "offering_id": "&lt;offering_uuid&gt;", "quantity": 1 }],
   "questions": [{ "question": "Any allergies?", "answer": "None" }]
 }</code></pre>

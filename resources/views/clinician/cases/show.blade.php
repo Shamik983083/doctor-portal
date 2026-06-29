@@ -48,9 +48,9 @@
                 @endif
 
                 @if($case->status === 'assigned')
-                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveModal">
-                    <i class="bi bi-check-lg me-1"></i>Approve Case
-                </button>
+                <a href="{{ route('clinician.cases.prescribe.form', $case->uuid) }}" class="btn btn-success">
+                    <i class="bi bi-clipboard2-pulse me-1"></i>Approve &amp; Prescribe
+                </a>
                 <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#supportModal">
                     <i class="bi bi-headset me-1"></i>Escalate to Support
                 </button>
@@ -66,7 +66,23 @@
     <div class="col-lg-8">
         <ul class="nav nav-tabs mb-3" id="caseTabs">
             <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-offerings">Offerings</a></li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-prescriptions">
+                    Prescriptions
+                    @if($case->casePrescriptions->count())
+                        <span class="badge bg-success">{{ $case->casePrescriptions->count() }}</span>
+                    @endif
+                </a>
+            </li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-intake">Intake</a></li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-questionnaires">
+                    Questionnaires
+                    @if($case->questionnaireResponses->count())
+                        <span class="badge bg-primary">{{ $case->questionnaireResponses->count() }}</span>
+                    @endif
+                </a>
+            </li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-notes">Notes <span class="badge bg-secondary">{{ $case->clinicalNotes->count() }}</span></a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-messages">Messages <span class="badge bg-secondary">{{ $case->messages->count() }}</span></a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-files">Files <span class="badge bg-secondary">{{ $case->files->count() }}</span></a></li>
@@ -94,6 +110,75 @@
                 @endforelse
             </div>
 
+            {{-- Prescriptions --}}
+            <div class="tab-pane fade" id="tab-prescriptions">
+                @forelse($case->casePrescriptions->sortByDesc('prescribed_at') as $rx)
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-semibold">Prescription</span>
+                            <small class="text-muted ms-2">by {{ $rx->clinician->full_name ?? '—' }}</small>
+                        </div>
+                        <small class="text-muted">{{ $rx->prescribed_at->format('M d, Y H:i') }}</small>
+                    </div>
+                    <div class="card-body pb-2">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <p class="text-muted small fw-semibold mb-1 text-uppercase" style="font-size:.7rem;">Diagnoses</p>
+                                <p class="small mb-0" style="white-space:pre-line;">{{ $rx->diagnoses }}</p>
+                            </div>
+                            @if($rx->directions)
+                            <div class="col-md-6">
+                                <p class="text-muted small fw-semibold mb-1 text-uppercase" style="font-size:.7rem;">Directions</p>
+                                <p class="small mb-0" style="white-space:pre-line;">{{ $rx->directions }}</p>
+                            </div>
+                            @endif
+                            @if($rx->medical_necessity)
+                            <div class="col-12">
+                                <p class="text-muted small fw-semibold mb-1 text-uppercase" style="font-size:.7rem;">Medical Necessity</p>
+                                <p class="small mb-0" style="white-space:pre-line;">{{ $rx->medical_necessity }}</p>
+                            </div>
+                            @endif
+                        </div>
+
+                        @if($rx->medications->count())
+                        <p class="text-muted small fw-semibold mb-2 text-uppercase" style="font-size:.7rem;">Medications</p>
+                        @foreach($rx->medications as $med)
+                        <div class="border rounded p-3 mb-2 bg-light">
+                            <div class="fw-semibold mb-1">{{ $med->name }}</div>
+                            @if($med->compound_formula)
+                                <div class="small text-muted mb-2">{{ $med->compound_formula }}</div>
+                            @endif
+                            <div class="d-flex flex-wrap gap-3 small">
+                                @if($med->refills !== null)
+                                    <span><span class="text-muted">Refills:</span> {{ $med->refills }}</span>
+                                @endif
+                                @if($med->quantity !== null)
+                                    <span><span class="text-muted">Qty:</span> {{ $med->quantity }}</span>
+                                @endif
+                                @if($med->days_supply !== null)
+                                    <span><span class="text-muted">Days Supply:</span> {{ $med->days_supply }}</span>
+                                @endif
+                                @if($med->dispense_unit)
+                                    <span><span class="text-muted">Unit:</span> {{ $med->dispense_unit }}</span>
+                                @endif
+                                @if($med->days_until_dispense !== null)
+                                    <span><span class="text-muted">Days Until Dispense:</span> {{ $med->days_until_dispense }}</span>
+                                @endif
+                            </div>
+                        </div>
+                        @endforeach
+                        @endif
+                    </div>
+                </div>
+                @empty
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-clipboard2-pulse fs-2 d-block mb-2 opacity-25"></i>
+                    No prescription submitted yet.
+                </div>
+                @endforelse
+            </div>
+
             {{-- Intake Questions --}}
             <div class="tab-pane fade" id="tab-intake">
                 @forelse($case->caseQuestions as $q)
@@ -103,6 +188,62 @@
                 </div>
                 @empty
                 <p class="text-muted">No intake questions.</p>
+                @endforelse
+            </div>
+
+            {{-- Questionnaires --}}
+            <div class="tab-pane fade" id="tab-questionnaires">
+                @forelse($case->questionnaireResponses as $response)
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-semibold">{{ $response->questionnaire->name ?? 'Questionnaire' }}</span>
+                            <small class="text-muted ms-2">
+                                {{ ($response->completed_at ?? $response->created_at)->format('M d, Y H:i') }}
+                            </small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            @if($response->is_disqualified)
+                                <span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Disqualified</span>
+                                @if($response->disqualified_on)
+                                    <small class="text-danger">trigger: {{ $response->disqualified_on }}</small>
+                                @endif
+                            @else
+                                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Qualified</span>
+                            @endif
+                        </div>
+                    </div>
+                    @forelse($response->answers as $answer)
+                    <div class="d-flex px-3 py-2 {{ !$loop->last ? 'border-bottom' : '' }}
+                                {{ $answer->is_disqualified ? 'bg-danger bg-opacity-5' : '' }}">
+                        <div class="text-muted small" style="min-width:45%; max-width:45%; padding-right:1rem; line-height:1.4;">
+                            {{ $answer->question_text }}
+                            @if($answer->is_disqualified)
+                                <span class="badge bg-danger ms-1" style="font-size:.6rem">
+                                    <i class="bi bi-slash-circle"></i> Disqualifying
+                                </span>
+                            @endif
+                        </div>
+                        <div class="small fw-semibold">
+                            @php $decoded = json_decode($answer->answer, true); @endphp
+                            @if(is_array($decoded))
+                                {{ implode(', ', $decoded) }}
+                            @elseif($answer->answer !== '' && $answer->answer !== null)
+                                {{ $answer->answer }}
+                            @else
+                                <span class="text-muted fst-italic">—</span>
+                            @endif
+                        </div>
+                    </div>
+                    @empty
+                    <p class="text-muted small px-3 py-2 mb-0">No answers recorded.</p>
+                    @endforelse
+                </div>
+                @empty
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-ui-checks fs-2 d-block mb-2 opacity-25"></i>
+                    No questionnaire responses linked to this case.
+                </div>
                 @endforelse
             </div>
 
@@ -180,28 +321,6 @@
                 <p class="text-muted">No files attached.</p>
                 @endforelse
             </div>
-        </div>
-    </div>
-</div>
-
-{{-- Approve Modal --}}
-<div class="modal fade" id="approveModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="POST" action="{{ route('clinician.cases.approve', $case->uuid) }}">
-                @csrf
-                <div class="modal-header"><h5 class="modal-title text-success"><i class="bi bi-check-circle me-2"></i>Approve Case</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Approval Note (optional)</label>
-                        <textarea name="note" class="form-control" rows="3" placeholder="Add approval notes..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success">Confirm Approval</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>

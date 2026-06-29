@@ -35,6 +35,10 @@ class CaseController extends Controller
             'caseOfferings.offering', 'caseQuestions',
             'diseases', 'clinicalNotes.clinician.user',
             'orders.pharmacy', 'messages', 'files', 'events',
+            'questionnaireResponses.questionnaire',
+            'questionnaireResponses.answers',
+            'casePrescriptions.clinician.user',
+            'casePrescriptions.medications',
         ])->where('uuid', $uuid)->firstOrFail();
 
         $clinicians = Clinician::with('user')->get();

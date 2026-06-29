@@ -5,9 +5,15 @@ use App\Http\Controllers\Web\Clinician\DashboardController as ClinicianDashboard
 use App\Http\Controllers\Web\Clinician\CaseController as ClinicianCaseController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Web\Admin\CaseController as AdminCaseController;
+use App\Http\Controllers\Web\Admin\PatientController as AdminPatientController;
 use App\Http\Controllers\Web\Admin\PartnerController as AdminPartnerController;
 use App\Http\Controllers\Web\Admin\ClinicianController as AdminClinicianController;
 use App\Http\Controllers\Web\Admin\OfferingController as AdminOfferingController;
+use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCategoryController;
+use App\Http\Controllers\Web\Admin\QuestionnaireController as AdminQuestionnaireController;
+use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController;
+use App\Http\Controllers\Web\Admin\FormSubmissionController as AdminFormSubmissionController;
+use App\Http\Controllers\Web\Form\QuestionnaireFormController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
 use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingController;
 use App\Http\Controllers\Web\Partner\PatientController as PartnerPatientController;
@@ -22,6 +28,12 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::get('/', fn() => redirect('/login'));
 
+// Public questionnaire form renderer — no auth required
+Route::prefix('forms')->name('forms.')->group(function () {
+    Route::get('/{uuid}',  [QuestionnaireFormController::class, 'show'])->name('show');
+    Route::post('/{uuid}', [QuestionnaireFormController::class, 'submit'])->name('submit');
+});
+
 // Clinician Portal
 Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('clinician.')->group(function () {
     Route::get('/dashboard', [ClinicianDashboard::class, 'index'])->name('dashboard');
@@ -30,6 +42,8 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('
         Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
         Route::get('/{uuid}', [ClinicianCaseController::class, 'show'])->name('show');
         Route::post('/{uuid}/assign', [ClinicianCaseController::class, 'assign'])->name('assign');
+        Route::get('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribeForm'])->name('prescribe.form');
+        Route::post('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribe'])->name('prescribe');
         Route::post('/{uuid}/approve', [ClinicianCaseController::class, 'approve'])->name('approve');
         Route::post('/{uuid}/cancel', [ClinicianCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/support', [ClinicianCaseController::class, 'escalateToSupport'])->name('support');
@@ -43,6 +57,12 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('
 // Admin Console
 Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
+
+    // Patients
+    Route::prefix('patients')->name('patients.')->group(function () {
+        Route::get('/', [AdminPatientController::class, 'index'])->name('index');
+        Route::get('/{id}', [AdminPatientController::class, 'show'])->name('show');
+    });
 
     // Cases
     Route::prefix('cases')->name('cases.')->group(function () {
@@ -73,6 +93,28 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::put('/{id}', [AdminClinicianController::class, 'update'])->name('update');
     });
 
+    // Questions (individual question library)
+    Route::prefix('questions')->name('questions.')->group(function () {
+        Route::get('/', [AdminQuestionController::class, 'index'])->name('index');
+        Route::get('/{id}', [AdminQuestionController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [AdminQuestionController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [AdminQuestionController::class, 'update'])->name('update');
+        Route::delete('/{id}', [AdminQuestionController::class, 'destroy'])->name('destroy');
+        Route::post('/bulk-delete', [AdminQuestionController::class, 'bulkDestroy'])->name('bulk-destroy');
+        Route::patch('/{id}/toggle-status', [AdminQuestionController::class, 'toggleStatus'])->name('toggle-status');
+    });
+
+    // Questionnaires
+    Route::prefix('questionnaires')->name('questionnaires.')->group(function () {
+        Route::get('/', [AdminQuestionnaireController::class, 'index'])->name('index');
+        Route::get('/create', [AdminQuestionnaireController::class, 'create'])->name('create');
+        Route::post('/', [AdminQuestionnaireController::class, 'store'])->name('store');
+        Route::get('/{id}', [AdminQuestionnaireController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [AdminQuestionnaireController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [AdminQuestionnaireController::class, 'update'])->name('update');
+        Route::delete('/{id}', [AdminQuestionnaireController::class, 'destroy'])->name('destroy');
+    });
+
     // Offerings
     Route::prefix('offerings')->name('offerings.')->group(function () {
         Route::get('/', [AdminOfferingController::class, 'index'])->name('index');
@@ -80,6 +122,24 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::post('/', [AdminOfferingController::class, 'store'])->name('store');
         Route::get('/{id}', [AdminOfferingController::class, 'show'])->name('show');
         Route::put('/{id}', [AdminOfferingController::class, 'update'])->name('update');
+        Route::delete('/{id}', [AdminOfferingController::class, 'destroy'])->name('destroy');
+        Route::patch('/{id}/toggle-status', [AdminOfferingController::class, 'toggleStatus'])->name('toggle-status');
+    });
+
+    // Form Submissions (standalone questionnaire responses without a case)
+    Route::prefix('form-submissions')->name('form-submissions.')->group(function () {
+        Route::get('/', [AdminFormSubmissionController::class, 'index'])->name('index');
+        Route::get('/{id}', [AdminFormSubmissionController::class, 'show'])->name('show');
+        Route::get('/{id}/create-case', [AdminFormSubmissionController::class, 'createCase'])->name('create-case');
+        Route::post('/{id}/create-case', [AdminFormSubmissionController::class, 'storeCase'])->name('store-case');
+    });
+
+    // Offering Categories
+    Route::prefix('categories')->name('categories.')->group(function () {
+        Route::get('/', [AdminOfferingCategoryController::class, 'index'])->name('index');
+        Route::post('/', [AdminOfferingCategoryController::class, 'store'])->name('store');
+        Route::patch('/{category}/toggle', [AdminOfferingCategoryController::class, 'toggleStatus'])->name('toggle');
+        Route::delete('/{category}', [AdminOfferingCategoryController::class, 'destroy'])->name('destroy');
     });
 });
 
@@ -95,6 +155,7 @@ Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])
         Route::get('/{id}', [PartnerOfferingController::class, 'show'])->name('show');
         Route::put('/{id}', [PartnerOfferingController::class, 'update'])->name('update');
         Route::delete('/{id}', [PartnerOfferingController::class, 'destroy'])->name('destroy');
+        Route::patch('/{id}/toggle-status', [PartnerOfferingController::class, 'toggleStatus'])->name('toggle-status');
     });
 
     // Patients
