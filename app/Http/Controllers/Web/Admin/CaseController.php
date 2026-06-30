@@ -50,18 +50,29 @@ class CaseController extends Controller
     {
         $request->validate(['clinician_id' => 'required|exists:clinicians,id']);
 
-        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case      = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $clinician = Clinician::findOrFail($request->input('clinician_id'));
+
+        // Reassign an already-assigned case without a status change
+        if ($case->status === PatientCase::STATUS_ASSIGNED) {
+            $this->stateMachine->reassign($case, $clinician);
+            return back()->with('success', "Case reassigned to {$clinician->full_name}.");
+        }
 
         if (!in_array($case->status, [PatientCase::STATUS_CREATED, PatientCase::STATUS_WAITING])) {
-            return back()->with('error', 'Case must be in created or waiting status to assign a clinician.');
+            return back()->with('error', 'Case cannot be assigned in its current status.');
         }
 
-        // Auto-advance created → waiting before assigning
+        // Auto-advance created → waiting; pass skip_auto_assign so the auto-assigner
+        // does not immediately grab the case before the admin's choice can be applied.
         if ($case->status === PatientCase::STATUS_CREATED) {
-            $this->stateMachine->transition($case, PatientCase::STATUS_WAITING, ['actor_type' => 'admin']);
+            $this->stateMachine->transition($case, PatientCase::STATUS_WAITING, [
+                'actor_type'       => 'admin',
+                'skip_auto_assign' => true,
+            ]);
+            $case->refresh();
         }
 
-        $clinician = Clinician::findOrFail($request->input('clinician_id'));
         $this->stateMachine->assignToClinician($case, $clinician);
 
         return back()->with('success', "Case assigned to {$clinician->full_name}.");

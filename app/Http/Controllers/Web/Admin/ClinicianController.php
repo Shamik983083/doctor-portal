@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Clinician;
+use App\Models\PatientCase;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -81,5 +82,41 @@ class ClinicianController extends Controller
         $clinician->update($data);
 
         return back()->with('success', 'Clinician updated.');
+    }
+
+    public function priorityIndex()
+    {
+        $clinicians = Clinician::with('user')
+            ->withCount([
+                'cases as active_cases_count' => fn($q) => $q->whereIn('status', [
+                    PatientCase::STATUS_ASSIGNED,
+                    PatientCase::STATUS_APPROVED,
+                ]),
+            ])
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get();
+
+        return view('admin.clinicians.priority', compact('clinicians'));
+    }
+
+    public function reorder(Request $request)
+    {
+        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer|exists:clinicians,id']);
+
+        foreach ($request->ids as $rank => $id) {
+            Clinician::where('id', $id)->update(['priority' => $rank]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function updateCaseLoad(Request $request, int $id)
+    {
+        $request->validate(['max_daily_cases' => 'required|integer|min:1|max:999']);
+
+        Clinician::findOrFail($id)->update(['max_daily_cases' => $request->max_daily_cases]);
+
+        return response()->json(['success' => true]);
     }
 }

@@ -6,12 +6,16 @@ use App\Models\PatientCase;
 use App\Models\Clinician;
 use App\Models\CaseEvent;
 use App\Services\WebhookDispatcher;
+use App\Services\CaseAutoAssigner;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class CaseStateMachine
 {
-    public function __construct(private WebhookDispatcher $webhookDispatcher) {}
+    public function __construct(
+        private WebhookDispatcher $webhookDispatcher,
+        private CaseAutoAssigner $autoAssigner,
+    ) {}
 
     public function transition(PatientCase $case, string $toStatus, array $context = []): PatientCase
     {
@@ -66,7 +70,37 @@ class CaseStateMachine
         $case->refresh();
         $this->dispatchWebhookEvent($case, $toStatus);
 
+        // Auto-assign when entering the waiting queue, unless the caller is about to manually assign
+        if ($toStatus === PatientCase::STATUS_WAITING && empty($context['skip_auto_assign'])) {
+            $clinician = $this->autoAssigner->findNext($case);
+            if ($clinician) {
+                $this->assignToClinician($case, $clinician);
+            }
+        }
+
         return $case;
+    }
+
+    /**
+     * Reassign an already-assigned case to a different clinician without a status change.
+     * Used by admin to override both manual and auto-assignments.
+     */
+    public function reassign(PatientCase $case, Clinician $clinician): PatientCase
+    {
+        DB::transaction(function () use ($case, $clinician) {
+            $case->update(['clinician_id' => $clinician->id]);
+
+            CaseEvent::create([
+                'case_id'    => $case->id,
+                'event_type' => 'clinician_reassigned',
+                'actor_type' => 'admin',
+                'actor_id'   => null,
+                'payload'    => ['clinician_id' => $clinician->id],
+                'notes'      => "Reassigned to {$clinician->full_name}",
+            ]);
+        });
+
+        return $case->refresh();
     }
 
     public function release(PatientCase $case): PatientCase

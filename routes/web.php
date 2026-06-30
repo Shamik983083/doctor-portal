@@ -89,6 +89,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::get('/', [AdminClinicianController::class, 'index'])->name('index');
         Route::get('/create', [AdminClinicianController::class, 'create'])->name('create');
         Route::post('/', [AdminClinicianController::class, 'store'])->name('store');
+        // Priority management — must be before /{id} wildcard
+        Route::get('/priority', [AdminClinicianController::class, 'priorityIndex'])->name('priority');
+        Route::patch('/reorder', [AdminClinicianController::class, 'reorder'])->name('reorder');
+        Route::patch('/{id}/case-load', [AdminClinicianController::class, 'updateCaseLoad'])->name('case-load');
         Route::get('/{id}', [AdminClinicianController::class, 'show'])->name('show');
         Route::put('/{id}', [AdminClinicianController::class, 'update'])->name('update');
     });

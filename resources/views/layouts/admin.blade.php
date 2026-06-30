@@ -36,6 +36,12 @@
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link ps-4 {{ request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
+           href="{{ route('admin.clinicians.priority') }}" style="font-size:.85rem">
+            <i class="bi bi-sort-numeric-down me-1"></i> Assignment Priority
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.offerings.*') ? 'active' : '' }}" href="{{ route('admin.offerings.index') }}">
             <i class="bi bi-capsule"></i> Offerings
         </a>

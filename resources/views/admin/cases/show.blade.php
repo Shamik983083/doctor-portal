@@ -41,11 +41,18 @@
             </div>
         </div>
 
-        {{-- Assign Clinician --}}
-        @if(in_array($case->status, ['created','waiting']))
+        {{-- Assign / Reassign Clinician --}}
+        @if(in_array($case->status, ['created','waiting','assigned']))
+        @php $isReassign = $case->status === 'assigned'; @endphp
         <div class="card border-warning mb-3">
-            <div class="card-header bg-warning bg-opacity-10 border-warning">
-                <h6 class="mb-0"><i class="bi bi-person-check me-2"></i>Assign to Clinician</h6>
+            <div class="card-header bg-warning bg-opacity-10 border-warning d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="bi bi-person-check me-2"></i>
+                    {{ $isReassign ? 'Reassign Clinician' : 'Assign to Clinician' }}
+                </h6>
+                @if($isReassign)
+                    <span class="badge bg-info text-dark small">Auto-assigned</span>
+                @endif
             </div>
             <div class="card-body">
                 @if(session('success'))
@@ -53,6 +60,12 @@
                 @endif
                 @if(session('error'))
                     <div class="alert alert-danger py-1 small">{{ session('error') }}</div>
+                @endif
+                @if($isReassign)
+                    <p class="text-muted small mb-2">
+                        Currently assigned to <strong>{{ $case->clinician?->full_name ?? '—' }}</strong>.
+                        Select a different clinician to reassign.
+                    </p>
                 @endif
                 <form method="POST" action="{{ route('admin.cases.assign', $case->uuid) }}">
                     @csrf
@@ -70,7 +83,8 @@
                         </select>
                     </div>
                     <button type="submit" class="btn btn-warning btn-sm w-100">
-                        <i class="bi bi-person-check me-1"></i>Assign Clinician
+                        <i class="bi bi-person-check me-1"></i>
+                        {{ $isReassign ? 'Reassign Clinician' : 'Assign Clinician' }}
                     </button>
                 </form>
             </div>

@@ -14,7 +14,7 @@ class Clinician extends Model
     protected $fillable = [
         'uuid', 'user_id', 'npi', 'license_number', 'license_state',
         'specialty', 'credentials', 'status', 'is_available',
-        'max_daily_cases', 'licensed_states',
+        'max_daily_cases', 'priority', 'licensed_states',
     ];
 
     protected $casts = [
