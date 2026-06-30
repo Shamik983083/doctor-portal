@@ -102,21 +102,6 @@
         </div>
         @endif
 
-        {{-- Offerings --}}
-        <div class="card">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-capsule me-2"></i>Offerings</h6></div>
-            <div class="card-body small">
-                @forelse($case->caseOfferings as $co)
-                <div class="mb-2 pb-2 border-bottom">
-                    <strong>{{ $co->offering->name ?? 'Unknown' }}</strong>
-                    <div class="text-muted">{{ ucfirst($co->offering->type ?? '') }} &bull; Qty: {{ $co->quantity }}</div>
-                    @if($co->dosage)<div>Dosage: {{ $co->dosage }}</div>@endif
-                </div>
-                @empty
-                <p class="text-muted mb-0">No offerings.</p>
-                @endforelse
-            </div>
-        </div>
     </div>
 
     {{-- Right: Tabs --}}

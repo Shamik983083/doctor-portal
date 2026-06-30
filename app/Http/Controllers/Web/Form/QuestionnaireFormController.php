@@ -4,13 +4,19 @@ namespace App\Http\Controllers\Web\Form;
 
 use App\Http\Controllers\Controller;
 use App\Models\Partner;
+use App\Models\Patient;
+use App\Models\PatientCase;
 use App\Models\Questionnaire;
 use App\Models\QuestionnaireResponse;
+use App\Services\CaseStateMachine;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class QuestionnaireFormController extends Controller
 {
     private const OPTION_TYPES = ['select', 'multiselect', 'radio', 'checkbox'];
+
+    public function __construct(private CaseStateMachine $stateMachine) {}
 
     public function show(string $uuid)
     {
@@ -51,6 +57,7 @@ class QuestionnaireFormController extends Controller
         $isDisqualified = false;
         $disqualifiedOn = null;
         $answersToSave  = [];
+        $keyedAnswers   = [];  // patient field map, keyed by question key
 
         foreach ($questionnaire->questions as $q) {
             $raw    = $request->input('answers.' . $q->id);
@@ -71,6 +78,11 @@ class QuestionnaireFormController extends Controller
                 }
             }
 
+            // Collect keyed answers for patient field extraction
+            if ($q->key && $raw !== null && $raw !== '') {
+                $keyedAnswers[$q->key] = is_array($raw) ? implode(', ', $raw) : $raw;
+            }
+
             $answersToSave[] = [
                 'question_id'    => $q->id,
                 'question_text'  => $q->question,
@@ -86,7 +98,7 @@ class QuestionnaireFormController extends Controller
 
         $response = QuestionnaireResponse::create([
             'questionnaire_id'    => $questionnaire->id,
-            'partner_id'          => $partner?->id,
+            'partner_id'          => $partner?->id ?? $questionnaire->partner_id,
             'external_patient_id' => $request->input('external_id'),
             'is_disqualified'     => $isDisqualified,
             'disqualified_on'     => $disqualifiedOn,
@@ -94,6 +106,43 @@ class QuestionnaireFormController extends Controller
         ]);
 
         $response->answers()->createMany($answersToSave);
+
+        // Auto-create a case for qualified submissions
+        if (!$isDisqualified) {
+            $partnerId = $response->partner_id;
+            $email     = $keyedAnswers['email'] ?? null;
+
+            if ($partnerId && $email) {
+                $caseRef = null;
+
+                DB::transaction(function () use ($response, $partnerId, $keyedAnswers, $email, &$caseRef) {
+                    $patient = Patient::firstOrCreate(
+                        ['email' => $email, 'partner_id' => $partnerId],
+                        [
+                            'first_name'    => $keyedAnswers['first_name'] ?? 'Unknown',
+                            'last_name'     => $keyedAnswers['last_name'] ?? 'Unknown',
+                            'phone'         => $keyedAnswers['phone'] ?? null,
+                            'date_of_birth' => $keyedAnswers['date_of_birth'] ?? null,
+                            'gender'        => $keyedAnswers['gender'] ?? null,
+                            'state'         => $keyedAnswers['state'] ?? null,
+                            'status'        => 'active',
+                        ]
+                    );
+
+                    $caseRef = PatientCase::create([
+                        'partner_id'    => $partnerId,
+                        'patient_id'    => $patient->id,
+                        'patient_state' => $keyedAnswers['state'] ?? null,
+                        'status'        => PatientCase::STATUS_CREATED,
+                    ]);
+
+                    $response->update(['case_id' => $caseRef->id, 'patient_id' => $patient->id]);
+                });
+
+                // Transition outside the transaction so webhooks fire cleanly after commit
+                $this->stateMachine->transition($caseRef, PatientCase::STATUS_WAITING, ['actor_type' => 'system']);
+            }
+        }
 
         $postMessagePayload = json_encode([
             'event'           => 'questionnaire_completed',
