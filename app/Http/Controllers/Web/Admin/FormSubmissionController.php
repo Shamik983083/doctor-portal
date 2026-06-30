@@ -131,11 +131,18 @@ class FormSubmissionController extends Controller
             // Link this form submission to the new case and patient
             $submission->update(['case_id' => $case->id, 'patient_id' => $patient->id]);
 
-            // Assign clinician if selected
             if ($request->filled('clinician_id')) {
+                // Manual choice: skip auto-assigner so it doesn't race the admin's selection
                 $clinician = Clinician::findOrFail($request->input('clinician_id'));
-                $this->stateMachine->transition($case, PatientCase::STATUS_WAITING, ['actor_type' => 'admin']);
+                $this->stateMachine->transition($case, PatientCase::STATUS_WAITING, [
+                    'actor_type'       => 'admin',
+                    'skip_auto_assign' => true,
+                ]);
+                $case->refresh();
                 $this->stateMachine->assignToClinician($case, $clinician);
+            } else {
+                // No manual choice: enter waiting queue and let auto-assigner run
+                $this->stateMachine->transition($case, PatientCase::STATUS_WAITING, ['actor_type' => 'admin']);
             }
 
             $caseUuid = $case->uuid;
