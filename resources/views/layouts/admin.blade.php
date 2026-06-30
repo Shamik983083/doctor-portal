@@ -15,12 +15,6 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link ps-4 {{ request()->routeIs('admin.form-submissions.*') ? 'active' : '' }}"
-           href="{{ route('admin.form-submissions.index') }}" style="font-size:.85rem">
-            <i class="bi bi-file-earmark-check me-1"></i> Form Submissions
-        </a>
-    </li>
-    <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.patients.*') ? 'active' : '' }}" href="{{ route('admin.patients.index') }}">
             <i class="bi bi-people"></i> Patients
         </a>

@@ -12,7 +12,6 @@ use App\Http\Controllers\Web\Admin\OfferingController as AdminOfferingController
 use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCategoryController;
 use App\Http\Controllers\Web\Admin\QuestionnaireController as AdminQuestionnaireController;
 use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController;
-use App\Http\Controllers\Web\Admin\FormSubmissionController as AdminFormSubmissionController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
 use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingController;
@@ -128,14 +127,6 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::put('/{id}', [AdminOfferingController::class, 'update'])->name('update');
         Route::delete('/{id}', [AdminOfferingController::class, 'destroy'])->name('destroy');
         Route::patch('/{id}/toggle-status', [AdminOfferingController::class, 'toggleStatus'])->name('toggle-status');
-    });
-
-    // Form Submissions (standalone questionnaire responses without a case)
-    Route::prefix('form-submissions')->name('form-submissions.')->group(function () {
-        Route::get('/', [AdminFormSubmissionController::class, 'index'])->name('index');
-        Route::get('/{id}', [AdminFormSubmissionController::class, 'show'])->name('show');
-        Route::get('/{id}/create-case', [AdminFormSubmissionController::class, 'createCase'])->name('create-case');
-        Route::post('/{id}/create-case', [AdminFormSubmissionController::class, 'storeCase'])->name('store-case');
     });
 
     // Offering Categories
