@@ -38,7 +38,8 @@ class ClinicianController extends Controller
             'license_state'   => 'nullable|string|size:2',
             'specialty'       => 'nullable|string',
             'credentials'     => 'nullable|in:MD,DO,NP,PA',
-            'licensed_states' => 'nullable|array',
+            'licensed_states'   => 'nullable|array',
+            'licensed_states.*' => 'string|size:2',
         ]);
 
         $user = User::create([
