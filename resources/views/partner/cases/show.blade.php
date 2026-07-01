@@ -75,23 +75,40 @@
             </div>
         </div>
 
-        <!-- Cancel action -->
-        @if(in_array($case->status, ['created','waiting','support','assigned','approved']))
-        <div class="card border-danger">
-            <div class="card-header bg-danger bg-opacity-10 py-2">
-                <h6 class="mb-0 fw-semibold text-danger">Cancel Case</h6>
+        {{-- Support note from clinician --}}
+        @if($case->support_note)
+        <div class="card border-warning mb-4">
+            <div class="card-header bg-warning bg-opacity-10 py-2">
+                <h6 class="mb-0 fw-semibold text-warning"><i class="bi bi-headset me-1"></i>Support Note from Clinician</h6>
+            </div>
+            <div class="card-body small">
+                <p class="mb-0" style="white-space:pre-line;">{{ $case->support_note }}</p>
+                @if($case->clinician)
+                <p class="text-muted mb-0 mt-2">— {{ $case->clinician->user->name }}</p>
+                @endif
+            </div>
+        </div>
+        @endif
+
+        {{-- Return to clinician --}}
+        @if($case->status === 'support')
+        <div class="card border-primary mb-4">
+            <div class="card-header bg-primary bg-opacity-10 py-2">
+                <h6 class="mb-0 fw-semibold text-primary"><i class="bi bi-arrow-return-left me-1"></i>Return to Clinician</h6>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ route('partner.cases.cancel', $case->uuid) }}">
+                @if($errors->has('partner_note'))
+                    <div class="alert alert-danger py-2 small">{{ $errors->first('partner_note') }}</div>
+                @endif
+                <form method="POST" action="{{ route('partner.cases.return-to-clinician', $case->uuid) }}">
                     @csrf
                     <div class="mb-2">
-                        <textarea name="reason" class="form-control form-control-sm @error('reason') is-invalid @enderror"
-                                  rows="2" placeholder="Reason for cancellation…" required></textarea>
-                        @error('reason')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        <label class="form-label small fw-semibold">Your response / note <span class="text-danger">*</span></label>
+                        <textarea name="partner_note" class="form-control form-control-sm" rows="3"
+                                  placeholder="Provide the information requested by the clinician…" required>{{ old('partner_note') }}</textarea>
                     </div>
-                    <button class="btn btn-sm btn-danger w-100"
-                            onclick="return confirm('Cancel this case?')">
-                        <i class="bi bi-x-circle me-1"></i> Cancel Case
+                    <button class="btn btn-sm btn-primary w-100">
+                        <i class="bi bi-arrow-return-left me-1"></i> Return to Clinician
                     </button>
                 </form>
             </div>

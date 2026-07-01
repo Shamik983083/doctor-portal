@@ -27,23 +27,26 @@ A Telehealth & E-Prescribing Integration Platform. Healthcare partners embed a p
 
 ```
 CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
-                  ↘                     ↗
-                  SUPPORT → WAITING
+                  ↘         ↗ ↑
+                  SUPPORT ──┘  (partner returns to same clinician with note)
 (CANCELLED is reachable from any state except COMPLETED)
 ```
 
 | Transition | Who Triggers |
 |-----------|-------------|
-| Created → Waiting | Auto on form submit (system) or admin manual assign |
+| Created → Waiting | Auto on form submit (system) |
 | Waiting → Assigned | **Auto-assigner** (priority queue) or Admin (manual assign) or Clinician (self-claim) |
 | Assigned → Approved | Clinician (via Approve & Prescribe flow) |
-| Assigned → Support | Clinician (with a note) |
-| Support → Waiting | Returns to queue after support review |
-| Approved → Processing | Partner (web or API) |
-| Processing → Completed | Partner (API order update) |
+| Assigned → Support | Clinician (with a note explaining what is needed) |
+| Support → Assigned | **Partner** (writes a response note; case returns to the **same clinician**) |
+| Approved → Processing | **Clinician** (Send to Pharmacy) |
+| Processing → Completed | System / Admin |
 | Any → Cancelled | Admin / Clinician / Partner |
 
-**Key rule:** Partners only see cases where `support_at IS NOT NULL` — i.e. cases the clinician has explicitly escalated to support.
+**Key rules:**
+- Partners only see cases where `support_at IS NOT NULL` — i.e. cases the clinician has explicitly escalated to support.
+- When a partner returns a support case, it goes directly back to the **assigned clinician** (not back to the waiting queue). The `clinician_id` is preserved.
+- Partners cannot move cases to Processing or Completed. Clinicians control the pharmacy handoff.
 
 ---
 
@@ -282,7 +285,7 @@ If any selected answer has `is_disqualify = true`:
 ### Web Portal
 - **Offerings** — full CRUD on own offerings
 - **Patients** — read-only list and detail
-- **Cases** — view support-escalated cases; move `approved → processing`; cancel with reason
+- **Cases** — view support-escalated cases only; read the clinician's support note; write a response note and return the case to the assigned clinician; cancel with reason
 - **Credentials** — view client ID / secret / webhook list
 
 ### Patient Portal Integration (Hosted Form)
@@ -345,11 +348,12 @@ GET    /api/partner/cases
 GET    /api/partner/cases/{uuid}
 GET    /api/partner/cases/by-external-id/{id}
 POST   /api/partner/cases/{uuid}/cancel        { reason }
-POST   /api/partner/cases/{uuid}/processing
 POST   /api/partner/cases/{uuid}/hold          { hold: bool }
 POST   /api/partner/cases/{uuid}/support       { note }
 GET    /api/partner/cases/{uuid}/events
 ```
+
+> `POST /api/partner/cases/{uuid}/processing` has been removed. Processing is now initiated by the clinician via the web portal (Send to Pharmacy).
 
 **Patients (read-only)**
 ```
@@ -398,8 +402,9 @@ All webhooks signed with HMAC-SHA256. Up to 5 retry attempts with exponential ba
 | View prescriptions | ✓ | ✓ | — | — |
 | View questionnaire responses | ✓ | ✓ | — | — |
 | Escalate to support | — | ✓ | — | ✓ |
+| Return support case to clinician (with note) | — | — | ✓ | — |
 | Cancel case | ✓ | ✓ | ✓ | ✓ |
-| Move to processing | — | — | ✓ | ✓ |
+| Move to processing (Send to Pharmacy) | — | ✓ | — | — |
 | Add clinical note / message | — | ✓ | — | — |
 | Update order / tracking | — | — | — | ✓ |
 | Manage webhooks | — | — | ✓ | ✓ |

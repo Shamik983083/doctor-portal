@@ -243,15 +243,6 @@ class CaseController extends Controller
         return response()->json(['message' => 'Case cancelled.', 'case' => $case->fresh()]);
     }
 
-    public function processing(Request $request, string $id)
-    {
-        $case = $this->partner($request)->cases()->where('uuid', $id)->firstOrFail();
-
-        $this->stateMachine->startProcessing($case);
-
-        return response()->json(['message' => 'Case moved to processing.', 'case' => $case->fresh()]);
-    }
-
     public function setHold(Request $request, string $id)
     {
         $request->validate(['hold' => 'required|boolean']);

@@ -236,6 +236,19 @@ class CaseController extends Controller
         return back()->with('success', 'Case escalated to support. Partner has been notified.');
     }
 
+    public function sendToPharmacy(string $uuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        if ($case->status !== PatientCase::STATUS_APPROVED) {
+            return back()->with('error', 'Case must be approved before sending to pharmacy.');
+        }
+
+        $this->stateMachine->startProcessing($case);
+
+        return back()->with('success', 'Case sent to pharmacy for processing.');
+    }
+
     public function sendMessage(Request $request, string $uuid)
     {
         $request->validate(['body' => 'required|string']);

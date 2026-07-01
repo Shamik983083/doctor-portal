@@ -110,8 +110,8 @@ Cases originate **exclusively** from the public questionnaire form. There is no 
 
 ```
 CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
-                 ↘                      ↗
-                 SUPPORT → WAITING
+                 ↘          ↗ ↑
+                 SUPPORT ───┘  (partner returns to same clinician with note)
 (CANCELLED reachable from any state except COMPLETED)
 ```
 
@@ -120,11 +120,17 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 | Created → Waiting | Auto on form submit |
 | Waiting → Assigned | Auto-assigner, admin manual assign, or clinician self-claim |
 | Assigned → Approved | Clinician (via Approve & Prescribe) |
-| Assigned → Support | Clinician (with a note) |
-| Support → Waiting | Returns to queue after support review |
-| Approved → Processing | Partner (web or API) |
-| Processing → Completed | Partner (API order update) |
+| Assigned → Support | Clinician (with a note explaining what info is needed) |
+| **Support → Assigned** | **Partner** — writes a response note; case returns to the **same clinician** (not re-queued) |
+| **Approved → Processing** | **Clinician** — Send to Pharmacy button |
+| Processing → Completed | System / Admin |
 | Any → Cancelled | Admin / Clinician / Partner |
+
+**Partner role in the lifecycle:**
+- Partners only see cases escalated to support (`support_at IS NOT NULL`)
+- They read the clinician's support note, write a response, and click **Return to Clinician**
+- The case goes directly back to the assigned clinician — `clinician_id` is preserved, no re-queueing
+- Partners have no control over Processing or Completion — those are clinician-owned
 
 ---
 
@@ -157,7 +163,7 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 |--------|-----|-------------|
 | Offerings | `/partner/offerings` | CRUD on own offerings |
 | Patients | `/partner/patients` | Read-only |
-| Cases | `/partner/cases` | Support-escalated cases only; move to processing; cancel |
+| Cases | `/partner/cases` | View support-escalated cases only; read clinician's support note; return to clinician with a response note; cancel |
 | Credentials | `/partner/credentials` | View client ID / secret / webhook list |
 
 ---

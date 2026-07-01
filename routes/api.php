@@ -28,7 +28,6 @@ Route::prefix('partner')->middleware(['auth:api', 'partner.auth'])->group(functi
         Route::get('/by-external-id/{externalId}', [CaseController::class, 'showByExternalId']);
         Route::get('/{id}', [CaseController::class, 'show']);
         Route::post('/{id}/cancel', [CaseController::class, 'cancel']);
-        Route::post('/{id}/processing', [CaseController::class, 'processing']);
         Route::post('/{id}/hold', [CaseController::class, 'setHold']);
         Route::post('/{id}/support', [CaseController::class, 'support']);
         Route::get('/{id}/events', [CaseController::class, 'events']);

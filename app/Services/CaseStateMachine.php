@@ -137,9 +137,17 @@ class CaseStateMachine
         ]);
     }
 
+    public function returnToClinicianFromSupport(PatientCase $case, string $partnerNote): PatientCase
+    {
+        return $this->transition($case, PatientCase::STATUS_ASSIGNED, [
+            'actor_type' => 'partner',
+            'notes'      => $partnerNote,
+        ]);
+    }
+
     public function startProcessing(PatientCase $case): PatientCase
     {
-        return $this->transition($case, PatientCase::STATUS_PROCESSING, ['actor_type' => 'partner']);
+        return $this->transition($case, PatientCase::STATUS_PROCESSING, ['actor_type' => 'clinician']);
     }
 
     public function complete(PatientCase $case): PatientCase

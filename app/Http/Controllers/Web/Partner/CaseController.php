@@ -48,12 +48,18 @@ class CaseController extends Controller
             ->with('success', 'Case cancelled.');
     }
 
-    public function processing(string $uuid)
+    public function returnToClinician(Request $request, string $uuid)
     {
-        $case = $this->partner()->cases()->where('uuid', $uuid)->firstOrFail();
+        $request->validate(['partner_note' => 'required|string|max:1000']);
 
-        $this->stateMachine->startProcessing($case);
+        $case = $this->partner()->cases()
+            ->whereNotNull('support_at')
+            ->where('status', 'support')
+            ->where('uuid', $uuid)
+            ->firstOrFail();
 
-        return back()->with('success', 'Case moved to processing.');
+        $this->stateMachine->returnToClinicianFromSupport($case, $request->input('partner_note'));
+
+        return back()->with('success', 'Case returned to clinician.');
     }
 }

@@ -73,7 +73,7 @@ class PatientCase extends Model
         return match($this->status) {
             self::STATUS_CREATED    => [self::STATUS_WAITING, self::STATUS_SUPPORT, self::STATUS_CANCELLED],
             self::STATUS_WAITING    => [self::STATUS_ASSIGNED, self::STATUS_CANCELLED],
-            self::STATUS_SUPPORT    => [self::STATUS_WAITING, self::STATUS_CANCELLED],
+            self::STATUS_SUPPORT    => [self::STATUS_ASSIGNED, self::STATUS_CANCELLED],
             self::STATUS_ASSIGNED   => [self::STATUS_APPROVED, self::STATUS_SUPPORT, self::STATUS_CANCELLED],
             self::STATUS_APPROVED   => [self::STATUS_PROCESSING, self::STATUS_CANCELLED],
             self::STATUS_PROCESSING => [self::STATUS_COMPLETED],
