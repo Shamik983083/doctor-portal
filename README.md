@@ -178,6 +178,7 @@ The question builder at `/admin/questionnaires/create` (and `/edit`) supports:
 - **Disqualify toggle** per option on Select / Radio / Checkbox types — sets `is_disqualify = true`; triggers disqualification on submission
 - **Conditional logic** — each question can be set to "Show only if [prior question] [operator] [value]"
   - Operators: `equals`, `does not equal`, `contains`, `is answered`
+  - The questionnaire **show page** displays an amber pill badge (`↳ Shows only if: ...`) for each conditional question so the dependency is visible at a glance
 - **Multi-step mode** — questions grouped by step number; renders as paginated steps on the patient form
 
 ### Patient Form Features
@@ -227,6 +228,28 @@ All webhooks are signed with HMAC-SHA256 and retried up to 5 times with exponent
 
 ---
 
+## Partner API — Quick Reference
+
+```
+POST   /api/partner/auth/token                   Obtain bearer token (client_credentials grant)
+GET    /api/partner/questionnaires/{uuid}        Discover question IDs before submitting cases
+POST   /api/partner/cases                        Submit a new case
+GET    /api/partner/cases                        List own cases
+GET    /api/partner/cases/{uuid}                 Case detail
+GET    /api/partner/cases/by-external-id/{id}    Lookup by partner's own reference
+POST   /api/partner/cases/{uuid}/cancel          Cancel a case
+POST   /api/partner/cases/{uuid}/hold            Toggle hold status
+POST   /api/partner/cases/{uuid}/support         Escalate with a note
+GET    /api/partner/cases/{uuid}/events          Audit trail
+GET    /api/partner/patients                     List own patients
+GET    /api/partner/patients/{id}                Patient detail
+GET    /api/partner/patients/by-external-id/{id} Lookup by partner's patient ID
+```
+
+The questionnaire detail page (`/admin/questionnaires/{id}`) has an **API Integration panel** with a step-by-step guide (auth payload, annotated case JSON, question ID reference table) ready to share with partners.
+
+---
+
 ## Key Architectural Notes
 
 - **Auto-assignment**: `CaseAutoAssigner` selects the highest-priority (`ORDER BY priority ASC`) active, available clinician below their `max_daily_cases` limit. Fires automatically on transition to `waiting`.
@@ -234,6 +257,7 @@ All webhooks are signed with HMAC-SHA256 and retried up to 5 times with exponent
 - **Two-pass `syncQuestions()`**: Conditional logic uses a self-referencing FK (`depends_on_question_id`). Pass 1 creates all questions and captures `idx → DB id` map; Pass 2 resolves and writes the FK.
 - **Patient deduplication**: `Patient::firstOrCreate([email, partner_id])` — same patient submitting again updates their record rather than creating a duplicate.
 - **`case_prescriptions` vs `prescriptions`**: Doctor-submitted prescriptions use the `case_` prefix to coexist independently alongside the DoseSpot `prescriptions` table.
+- **Passport 13 compatibility**: `createClientCredentialsGrantClient()` no longer accepts `$userId` as the first param — only the name string is passed. Client IDs are now ULIDs, so `partners.oauth_client_id` is `string(100)`.
 - **No Vite**: All assets loaded from CDN. JS is vanilla, written inline in Blade `@section('scripts')` blocks.
 
 ---

@@ -44,9 +44,7 @@ class PartnerController extends Controller
         // Create Passport client for this partner
         $clientRepo = app(ClientRepository::class);
         $client = $clientRepo->createClientCredentialsGrantClient(
-            null,
-            $partner->name . ' API Client',
-            'http://localhost'
+            $partner->name . ' API Client'
         );
 
         $partner->update([
@@ -130,9 +128,7 @@ class PartnerController extends Controller
 
         $clientRepo = app(ClientRepository::class);
         $client = $clientRepo->createClientCredentialsGrantClient(
-            null,
-            $partner->name . ' API Client',
-            'http://localhost'
+            $partner->name . ' API Client'
         );
 
         $partner->update([

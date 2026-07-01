@@ -1,6 +1,6 @@
 # Doctor Portal — Product Requirements Document
 
-**Last Updated:** 2026-07-01
+**Last Updated:** 2026-07-01 (rev 2)
 **Status:** In Development
 **Stack:** Laravel 12, PHP 8.2, Bootstrap 5, MySQL (XAMPP), Laravel Passport 13.7, Spatie Permission 6.25
 
@@ -164,7 +164,12 @@ The questionnaire builder **auto-populates the field key** as the admin types th
 - Per-question configuration: label, field key (auto-populated from label keywords), placeholder, is_required, is_readonly
 - Option-based types (Select, Multi Select, Radio, Checkbox) support a **Disqualify** toggle per option
 - **Drag-and-drop question reordering** — grip handle on each question card; order is preserved on save via `sort_order` column
-- **Share & Embed panel** on questionnaire detail page: partner selector generates the ready-to-use iFrame embed code with correct `partner_token`; includes postMessage listener snippet for the partner
+- **Conditional logic visual indicator** — questions with a `depends_on_question_id` show an amber pill badge: `↳ Shows only if: "[parent question]" [operator] "[value]"` so admins can see the dependency at a glance on the show page
+- **API Integration panel** on questionnaire detail page (replaces Share & Embed): three-step guide for partners integrating via API
+  - Step 0: Discover question IDs (`GET /api/partner/questionnaires/{uuid}`)
+  - Step 1: Get access token (auth payload with copy button)
+  - Step 2: Submit case (annotated JSON with `// Q{id}: question [type]` comment lines, copy button, note to strip comments before sending)
+  - Question ID reference table mapping ID → question text → type → required
 
 ### Question Bank (`/admin/questions`)
 - Standalone library of all questions across all questionnaires
@@ -362,6 +367,12 @@ GET    /api/partner/patients/{id}
 GET    /api/partner/patients/by-external-id/{id}
 ```
 
+**Questionnaires (read-only — question ID discovery)**
+```
+GET    /api/partner/questionnaires/{uuid}
+```
+Returns the questionnaire with all questions (id, question, key, type, is_required, placeholder, options). Partners call this once to build their `question_id → question` mapping before submitting cases. Response includes only active questionnaires.
+
 ---
 
 ## Module 7: Webhooks
@@ -467,3 +478,7 @@ All webhooks signed with HMAC-SHA256. Up to 5 retry attempts with exponential ba
 11. **Soft deletes**: Patients, cases, offerings, and files are logically deleted (not removed from DB).
 
 12. **Clinician scope**: Clinicians only action cases in their queue; they cannot see unrelated partner data.
+
+13. **Laravel Passport 13 compatibility**: Passport 13 changed `createClientCredentialsGrantClient()` — the `$userId` first parameter was removed. Both `PartnerController::store()` and `regenerateCredentials()` call it with only the name string. Passport 13 also generates ULID/UUID client IDs instead of auto-increment integers, so `partners.oauth_client_id` is stored as `string(100)` (not `unsignedBigInteger`).
+
+14. **Question ID discoverability for API partners**: Partners building integrations against the case submission API (`POST /api/partner/cases`) need to know which `question_id` maps to which question. They call `GET /api/partner/questionnaires/{uuid}` once to retrieve the mapping, then cache it locally. The questionnaire show page also displays an annotated case JSON example with `// Q{id}: question [type]` comment lines so question IDs are visible without needing an API call during development.

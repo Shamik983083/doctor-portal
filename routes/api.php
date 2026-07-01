@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Partner\CaseController;
 use App\Http\Controllers\Api\Partner\OfferingController;
 use App\Http\Controllers\Api\Partner\OrderController;
 use App\Http\Controllers\Api\Partner\PatientController;
+use App\Http\Controllers\Api\Partner\QuestionnaireController;
 use App\Http\Controllers\Api\Partner\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +21,9 @@ Route::prefix('partner')->middleware(['auth:api', 'partner.auth'])->group(functi
         Route::get('/by-external-id/{externalId}', [PatientController::class, 'showByExternalId']);
         Route::get('/{id}', [PatientController::class, 'show']);
     });
+
+    // Questionnaires — read-only; lets partners discover question IDs before submitting cases
+    Route::get('/questionnaires/{uuid}', [QuestionnaireController::class, 'show']);
 
     // Cases
     Route::prefix('cases')->group(function () {

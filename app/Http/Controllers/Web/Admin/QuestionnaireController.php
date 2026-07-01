@@ -67,7 +67,7 @@ class QuestionnaireController extends Controller
 
     public function show(int $id)
     {
-        $questionnaire = Questionnaire::with(['partner', 'questions'])->findOrFail($id);
+        $questionnaire = Questionnaire::with(['partner', 'questions.dependsOn'])->findOrFail($id);
         $partners      = Partner::where('status', 'active')->orderBy('name')->get(['id', 'name', 'uuid']);
         return view('admin.questionnaires.show', compact('questionnaire', 'partners'));
     }
