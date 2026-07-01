@@ -139,8 +139,17 @@ $typeMap = [
                     <ol class="mb-0 mt-1 ps-3">
                         <li>The <strong>iFrame embed code</strong> above (with their patient ID variable substituted)</li>
                         <li>OR the <strong>public URL</strong> to link directly</li>
-                        <li>OR use the <strong>API</strong>: <code>GET /api/partner/offerings/{uuid}/questionnaires</code> to fetch the question schema and render their own UI</li>
                     </ol>
+                    <p class="mt-2 mb-1">To detect when the patient finishes (e.g. show a thank-you or redirect), listen for a <code>postMessage</code> event on the parent page:</p>
+<pre class="bg-white border rounded p-2 mb-0" style="font-size:.68rem; overflow-x:auto; white-space:pre-wrap">window.addEventListener('message', function(event) {
+    if (event.data.event === 'questionnaire_completed') {
+        if (event.data.disqualified) {
+            // patient didn't qualify
+        } else {
+            // case created — show success or redirect
+        }
+    }
+});</pre>
                 </div>
             </div>
         </div>

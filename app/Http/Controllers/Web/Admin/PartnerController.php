@@ -60,8 +60,9 @@ class PartnerController extends Controller
 
     public function show(int $id)
     {
-        $partner = Partner::withCount(['patients', 'cases', 'offerings'])->findOrFail($id);
-        // Make client_secret visible for admin credential display
+        $partner = Partner::withCount(['patients', 'cases', 'offerings'])
+            ->with('users')
+            ->findOrFail($id);
         $partner->makeVisible('client_secret');
         return view('admin.partners.show', compact('partner'));
     }

@@ -32,6 +32,7 @@ class Partner extends Model
         });
     }
 
+    public function users() { return $this->hasMany(User::class); }
     public function patients() { return $this->hasMany(Patient::class); }
     public function cases() { return $this->hasMany(PatientCase::class); }
     public function offerings() { return $this->hasMany(Offering::class); }

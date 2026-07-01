@@ -46,6 +46,9 @@ class QuestionnaireController extends Controller
             'questions.*.step_number'           => 'nullable|integer|min:1',
             'questions.*.options'               => 'nullable|array',
             'questions.*.options.*.value'       => 'nullable|string|max:255',
+            'questions.*.depends_on_idx'        => 'nullable|integer|min:0',
+            'questions.*.depends_on_operator'   => 'nullable|in:equals,not_equals,is_answered,contains',
+            'questions.*.depends_on_value'      => 'nullable|string|max:500',
         ]);
 
         $questionnaire = Questionnaire::create([
@@ -91,6 +94,9 @@ class QuestionnaireController extends Controller
             'questions.*.step_number'           => 'nullable|integer|min:1',
             'questions.*.options'               => 'nullable|array',
             'questions.*.options.*.value'       => 'nullable|string|max:255',
+            'questions.*.depends_on_idx'        => 'nullable|integer|min:0',
+            'questions.*.depends_on_operator'   => 'nullable|in:equals,not_equals,is_answered,contains',
+            'questions.*.depends_on_value'      => 'nullable|string|max:500',
         ]);
 
         $questionnaire = Questionnaire::findOrFail($id);
@@ -119,11 +125,14 @@ class QuestionnaireController extends Controller
     private function syncQuestions(Questionnaire $questionnaire, array $questions): void
     {
         $optionTypes = ['select', 'multiselect', 'radio', 'checkbox'];
+        $questions   = array_values($questions);
 
-        foreach (array_values($questions) as $i => $q) {
+        // Pass 1 — create all questions without depends_on; capture idx → DB id map
+        $idxToId = [];
+        foreach ($questions as $i => $q) {
             if (empty($q['question'])) continue;
 
-            $type = $q['type'] ?? 'input';
+            $type    = $q['type'] ?? 'input';
             $options = null;
 
             if (\in_array($type, $optionTypes, true) && !empty($q['options'])) {
@@ -139,7 +148,7 @@ class QuestionnaireController extends Controller
                 $options = empty($options) ? null : $options;
             }
 
-            $questionnaire->questions()->create([
+            $created = $questionnaire->questions()->create([
                 'question'    => $q['question'],
                 'key'         => $q['key'] ?? null,
                 'type'        => $type,
@@ -150,6 +159,24 @@ class QuestionnaireController extends Controller
                 'sort_order'  => $i,
                 'step_number' => (int) ($q['step_number'] ?? 1),
             ]);
+
+            $idxToId[$i] = $created->id;
+        }
+
+        // Pass 2 — resolve depends_on_idx → real question id and persist
+        foreach ($questions as $i => $q) {
+            if (empty($q['question'])) continue;
+            $depIdx    = isset($q['depends_on_idx']) && $q['depends_on_idx'] !== '' ? (int) $q['depends_on_idx'] : null;
+            $depOp     = $q['depends_on_operator'] ?? null;
+            $depVal    = $q['depends_on_value'] ?? null;
+
+            if ($depIdx !== null && isset($idxToId[$depIdx]) && $depOp) {
+                \App\Models\QuestionnaireQuestion::where('id', $idxToId[$i])->update([
+                    'depends_on_question_id' => $idxToId[$depIdx],
+                    'depends_on_operator'    => $depOp,
+                    'depends_on_value'       => ($depOp === 'is_answered') ? null : $depVal,
+                ]);
+            }
         }
     }
 }

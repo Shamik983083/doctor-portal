@@ -1,3 +1,4 @@
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script>
 (function () {
     var qIdx  = 0;
@@ -22,6 +23,13 @@
 
     var OPTION_TYPES      = ['select', 'multiselect', 'radio', 'checkbox'];
     var PLACEHOLDER_TYPES = ['input', 'email', 'textarea', 'number'];
+
+    var OPERATORS = [
+        { id: 'equals',       label: 'equals' },
+        { id: 'not_equals',   label: 'does not equal' },
+        { id: 'contains',     label: 'contains' },
+        { id: 'is_answered',  label: 'is answered' },
+    ];
 
     function esc(str) {
         return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -53,6 +61,45 @@
             + '</div>';
     }
 
+    /* ── Condition section HTML ──────────────────────────────────── */
+    function conditionHtml(idx, dep) {
+        var hasCondition  = dep && dep.idx !== null && dep.idx !== undefined;
+        var operator      = (dep && dep.operator) ? dep.operator : 'equals';
+        var value         = (dep && dep.value)    ? dep.value    : '';
+        var hideValue     = operator === 'is_answered' ? ' d-none' : '';
+
+        var operatorOpts = '';
+        OPERATORS.forEach(function (op) {
+            operatorOpts += '<option value="' + op.id + '"' + (operator === op.id ? ' selected' : '') + '>'
+                          + op.label + '</option>';
+        });
+
+        return '<div class="col-12 condition-section border-top pt-3 mt-1">'
+            + '<div class="d-flex align-items-center gap-2 mb-2">'
+            +   '<div class="form-check mb-0">'
+            +     '<input type="checkbox" class="form-check-input condition-toggle" id="cond_' + idx + '"'
+            +            (hasCondition ? ' checked' : '') + '>'
+            +     '<label class="form-check-label small fw-semibold text-secondary" for="cond_' + idx + '">'
+            +       '<i class="bi bi-arrow-right-circle me-1"></i>Show only if…'
+            +     '</label>'
+            +   '</div>'
+            + '</div>'
+            + '<div class="condition-fields d-flex flex-wrap gap-2 align-items-center' + (hasCondition ? '' : ' d-none') + '">'
+            +   '<select class="form-select form-select-sm cond-question-select" style="max-width:220px">'
+            +     '<option value="">— select question —</option>'
+            +   '</select>'
+            +   '<select class="form-select form-select-sm cond-operator-select" style="max-width:160px">'
+            +     operatorOpts
+            +   '</select>'
+            +   '<input type="text" class="form-control form-control-sm cond-value-input' + hideValue + '"'
+            +          ' placeholder="value…" value="' + esc(value) + '" style="max-width:160px">'
+            +   '<input type="hidden" name="questions[' + idx + '][depends_on_idx]"      class="cond-hidden-idx"     value="' + (hasCondition && dep.idx !== null ? dep.idx : '') + '">'
+            +   '<input type="hidden" name="questions[' + idx + '][depends_on_operator]" class="cond-hidden-operator" value="' + esc(operator) + '">'
+            +   '<input type="hidden" name="questions[' + idx + '][depends_on_value]"    class="cond-hidden-value"    value="' + esc(value) + '">'
+            + '</div>'
+            + '</div>';
+    }
+
     /* ── Question card HTML ──────────────────────────────────────── */
     function buildQuestionHtml(idx, data) {
         var d           = data || {};
@@ -66,6 +113,12 @@
         var showOptions = OPTION_TYPES.indexOf(type) !== -1;
         var showPh      = PLACEHOLDER_TYPES.indexOf(type) !== -1;
         var multiHidden = isMultiMode() ? '' : ' d-none';
+
+        var dep = (d.depends_on_idx !== undefined && d.depends_on_idx !== null) ? {
+            idx:      d.depends_on_idx,
+            operator: d.depends_on_operator || 'equals',
+            value:    d.depends_on_value    || '',
+        } : null;
 
         /* type <select> */
         var typeOpts = '';
@@ -87,6 +140,7 @@
             /* header */
             + '<div class="card-header d-flex justify-content-between align-items-center py-2 bg-light">'
             +   '<div class="d-flex align-items-center gap-3">'
+            +     '<i class="bi bi-grip-vertical drag-handle text-muted" style="cursor:grab;font-size:1.1rem" title="Drag to reorder"></i>'
             +     '<span class="fw-semibold small text-secondary question-label">Question ' + (idx + 1) + '</span>'
             +     '<div class="step-field d-flex align-items-center gap-1' + multiHidden + '">'
             +       '<label class="form-label small mb-0 text-muted">Step</label>'
@@ -166,6 +220,9 @@
             +       '</button>'
             +     '</div>'
 
+            /* Condition section */
+            +     conditionHtml(idx, dep)
+
             +   '</div>'  /* /row */
             + '</div>'    /* /card-body */
             + '</div>';   /* /card */
@@ -175,6 +232,44 @@
     function attachOptionRemove(row) {
         row.querySelector('.remove-option').addEventListener('click', function () {
             row.remove();
+        });
+    }
+
+    /* ── Build <option> list for condition question dropdown ────── */
+    function buildConditionOptions(selfIdx) {
+        var html = '<option value="">— select question —</option>';
+        document.querySelectorAll('.question-card').forEach(function (card) {
+            var cardIdx = parseInt(card.dataset.idx);
+            if (cardIdx === selfIdx) return;
+            var label = card.querySelector('.question-label').textContent;
+            var qText = card.querySelector('input[name="questions[' + cardIdx + '][question]"]');
+            var preview = qText ? (qText.value.trim().substring(0, 40) || label) : label;
+            html += '<option value="' + cardIdx + '">' + esc(preview) + '</option>';
+        });
+        return html;
+    }
+
+    /* ── Rebuild all condition dropdowns (after add/remove/reorder) */
+    function refreshAllConditionDropdowns() {
+        document.querySelectorAll('.question-card').forEach(function (card) {
+            var selfIdx  = parseInt(card.dataset.idx);
+            var sel      = card.querySelector('.cond-question-select');
+            var hidden   = card.querySelector('.cond-hidden-idx');
+            if (!sel) return;
+
+            var currentVal = hidden ? hidden.value : '';
+            sel.innerHTML  = buildConditionOptions(selfIdx);
+
+            // Re-select previously chosen question if it still exists
+            if (currentVal !== '') {
+                var opt = sel.querySelector('option[value="' + currentVal + '"]');
+                if (opt) {
+                    opt.selected = true;
+                } else {
+                    // Referenced card no longer exists — clear condition
+                    if (hidden) hidden.value = '';
+                }
+            }
         });
     }
 
@@ -197,6 +292,7 @@
             card.remove();
             updateNumbers();
             syncEmptyMsg();
+            refreshAllConditionDropdowns();
         });
 
         /* add option */
@@ -209,6 +305,84 @@
 
         /* attach remove to pre-existing options */
         card.querySelectorAll('.option-row').forEach(attachOptionRemove);
+
+        /* ── Condition logic ─────────────────────────────────────── */
+        var condToggle   = card.querySelector('.condition-toggle');
+        var condFields   = card.querySelector('.condition-fields');
+        var condQSel     = card.querySelector('.cond-question-select');
+        var condOpSel    = card.querySelector('.cond-operator-select');
+        var condValInput = card.querySelector('.cond-value-input');
+        var condHidIdx   = card.querySelector('.cond-hidden-idx');
+        var condHidOp    = card.querySelector('.cond-hidden-operator');
+        var condHidVal   = card.querySelector('.cond-hidden-value');
+
+        condToggle.addEventListener('change', function () {
+            condFields.classList.toggle('d-none', !this.checked);
+            if (!this.checked) {
+                condHidIdx.value = '';
+                condHidOp.value  = '';
+                condHidVal.value = '';
+            }
+        });
+
+        condQSel.addEventListener('change', function () {
+            condHidIdx.value = this.value;
+        });
+
+        condOpSel.addEventListener('change', function () {
+            condHidOp.value = this.value;
+            condValInput.classList.toggle('d-none', this.value === 'is_answered');
+            if (this.value === 'is_answered') condHidVal.value = '';
+        });
+
+        condValInput.addEventListener('input', function () {
+            condHidVal.value = this.value;
+        });
+
+        /* auto-populate field key from question label keywords */
+        var KEY_MAP = [
+            { patterns: ['email'],                             key: 'email' },
+            { patterns: ['first name', 'firstname'],           key: 'first_name' },
+            { patterns: ['last name', 'lastname', 'surname'],  key: 'last_name' },
+            { patterns: ['phone', 'mobile', 'cell'],           key: 'phone' },
+            { patterns: ['date of birth', 'dob', 'birth'],     key: 'date_of_birth' },
+            { patterns: ['gender', 'sex'],                     key: 'gender' },
+            { patterns: ['address line 2', 'address 2', 'apt','suite'], key: 'address2' },
+            { patterns: ['address', 'street'],                 key: 'address' },
+            { patterns: ['city', 'town'],                      key: 'city' },
+            { patterns: ['state', 'province'],                 key: 'state' },
+            { patterns: ['zip', 'postal'],                     key: 'zip' },
+            { patterns: ['country'],                           key: 'country' },
+            { patterns: ['age'],                               key: 'age' },
+            { patterns: ['height'],                            key: 'height' },
+            { patterns: ['weight'],                            key: 'weight' },
+            { patterns: ['bmi', 'body mass'],                  key: 'bmi' },
+            { patterns: ['name'],                              key: 'first_name' }, // fallback — after last_name rule
+        ];
+
+        var questionInput = card.querySelector('input[name="questions[' + idx + '][question]"]');
+        var keyInput      = card.querySelector('input[name="questions[' + idx + '][key]"]');
+
+        questionInput.addEventListener('input', function () {
+            if (keyInput.value.trim() !== '') return; // never overwrite manual entry
+            var lower = this.value.toLowerCase();
+            var matched = '';
+            KEY_MAP.some(function (rule) {
+                return rule.patterns.some(function (p) {
+                    if (lower.indexOf(p) !== -1) { matched = rule.key; return true; }
+                });
+            });
+            keyInput.value = matched;
+            keyInput.style.background = matched ? '#fff9e6' : '';
+
+            // Also refresh condition dropdowns so question text previews stay current
+            refreshAllConditionDropdowns();
+        });
+
+        /* clear highlight when user manually edits the key */
+        keyInput.addEventListener('input', function () {
+            this.style.background = '';
+        });
     }
 
     function updateNumbers() {
@@ -236,6 +410,7 @@
         initCard(container.lastElementChild);
         qIdx++;
         syncEmptyMsg();
+        refreshAllConditionDropdowns();
     }
 
     /* Mode radio toggle */
@@ -248,8 +423,91 @@
         addQuestion(null);
     });
 
+    /* ── Reindex all field names after drag-reorder ─────────────────── */
+    function reindexCards() {
+        document.querySelectorAll('.question-card').forEach(function (card, newIdx) {
+            var oldIdx = parseInt(card.dataset.idx);
+            if (oldIdx === newIdx) return;
+
+            // Rename all [name] attributes: questions[old] → questions[new]
+            card.querySelectorAll('[name]').forEach(function (el) {
+                el.setAttribute('name', el.getAttribute('name').replace(
+                    'questions[' + oldIdx + ']',
+                    'questions[' + newIdx + ']'
+                ));
+            });
+
+            // Update Required checkbox id + label
+            var reqEl = card.querySelector('#req_' + oldIdx);
+            if (reqEl) {
+                var reqLabel = card.querySelector('label[for="req_' + oldIdx + '"]');
+                reqEl.id = 'req_' + newIdx;
+                if (reqLabel) reqLabel.htmlFor = 'req_' + newIdx;
+            }
+
+            // Update Read-only checkbox id + label
+            var roEl = card.querySelector('#ro_' + oldIdx);
+            if (roEl) {
+                var roLabel = card.querySelector('label[for="ro_' + oldIdx + '"]');
+                roEl.id = 'ro_' + newIdx;
+                if (roLabel) roLabel.htmlFor = 'ro_' + newIdx;
+            }
+
+            // Update disqualify option ids + labels
+            card.querySelectorAll('[id^="disq_' + oldIdx + '_"]').forEach(function (el) {
+                var suffix    = el.id.slice(('disq_' + oldIdx + '_').length);
+                var oldDId    = 'disq_' + oldIdx + '_' + suffix;
+                var newDId    = 'disq_' + newIdx + '_' + suffix;
+                var dLabel    = card.querySelector('label[for="' + oldDId + '"]');
+                el.id = newDId;
+                if (dLabel) dLabel.htmlFor = newDId;
+            });
+
+            // Update condition toggle id + label
+            var condEl = card.querySelector('#cond_' + oldIdx);
+            if (condEl) {
+                var condLabel = card.querySelector('label[for="cond_' + oldIdx + '"]');
+                condEl.id = 'cond_' + newIdx;
+                if (condLabel) condLabel.htmlFor = 'cond_' + newIdx;
+            }
+
+            card.dataset.idx = newIdx;
+        });
+
+        // Keep qIdx ahead so new additions don't collide
+        qIdx = document.querySelectorAll('.question-card').length;
+        updateNumbers();
+        // Rebuild condition dropdowns — indices changed so all option values need updating
+        refreshAllConditionDropdowns();
+    }
+
+    /* ── SortableJS drag-and-drop on questions container ────────────── */
+    Sortable.create(document.getElementById('questions-container'), {
+        handle:     '.drag-handle',
+        animation:  150,
+        ghostClass: 'border-primary',
+        onEnd: function () { reindexCards(); },
+    });
+
     /* Pre-populate existing questions (edit mode) */
     existingQuestions.forEach(function (q) { addQuestion(q); });
     syncEmptyMsg();
+
+    /* ── Post-load: pre-select condition dropdowns in edit mode ──────── */
+    // addQuestion() calls refreshAllConditionDropdowns() per card, but the
+    // target card may not exist yet when an early card is added.
+    // Do one final pass after all cards are rendered.
+    existingQuestions.forEach(function (q, i) {
+        if (q.depends_on_idx === null || q.depends_on_idx === undefined) return;
+        var cards = document.querySelectorAll('.question-card');
+        var card  = cards[i];
+        if (!card) return;
+        var sel = card.querySelector('.cond-question-select');
+        if (!sel) return;
+        var opt = sel.querySelector('option[value="' + q.depends_on_idx + '"]');
+        if (opt) opt.selected = true;
+        var hidIdx = card.querySelector('.cond-hidden-idx');
+        if (hidIdx) hidIdx.value = q.depends_on_idx;
+    });
 })();
 </script>

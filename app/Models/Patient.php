@@ -14,7 +14,8 @@ class Patient extends Model
     protected $fillable = [
         'uuid', 'partner_id', 'user_id', 'external_id',
         'first_name', 'last_name', 'email', 'phone',
-        'date_of_birth', 'gender', 'address', 'address2',
+        'date_of_birth', 'age', 'height', 'weight', 'bmi',
+        'gender', 'address', 'address2',
         'city', 'state', 'zip', 'country', 'status',
         'dosespot_patient_id', 'email_opt_in', 'sms_opt_in',
         'id_verified_status', 'id_verified_at', 'settings',

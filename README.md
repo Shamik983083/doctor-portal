@@ -1,59 +1,246 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Doctor Portal — Telehealth & E-Prescribing Integration Platform
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A multi-role telehealth platform where healthcare partners embed a public intake questionnaire into their patient portal. On submission, a case is auto-created and routed to a clinician via priority queue for review, approval, and e-prescribing.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Tech Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Layer | Technology |
+|-------|-----------|
+| Framework | Laravel 12, PHP 8.2 |
+| Database | MySQL (XAMPP) |
+| Auth | Laravel Passport 13.7 (OAuth2 for API), session auth for web |
+| Roles | Spatie Permission 6.25 |
+| PDF | barryvdh/laravel-dompdf |
+| Frontend | Bootstrap 5 + Bootstrap Icons (CDN), SortableJS, vanilla JS — no Vite build step |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Roles
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+| Role | Login URL | Auth Method |
+|------|-----------|-------------|
+| Admin | `/admin/dashboard` | Email + password |
+| Clinician | `/clinician/dashboard` | Email + password |
+| Partner (web) | `/partner/dashboard` | Email + password |
+| Partner (API) | `POST /api/partner/auth/token` | OAuth2 client credentials |
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+## Local Setup
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Prerequisites
+- PHP 8.2+
+- MySQL running via XAMPP (or equivalent)
+- Composer
 
-### Premium Partners
+### Install
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+git clone <repo-url> doctor-portal
+cd doctor-portal
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-## Contributing
+Configure your `.env`:
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=doctor_portal
+DB_USERNAME=root
+DB_PASSWORD=
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Database
 
-## Code of Conduct
+```bash
+php artisan migrate
+php artisan db:seed       # optional — seeds roles, admin user
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Passport (API auth)
 
-## Security Vulnerabilities
+```bash
+php artisan passport:install
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Run
 
-## License
+Using XAMPP, point the virtual host at the `public/` directory, or:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+php artisan serve
+```
+
+---
+
+## How Cases Enter the System
+
+Cases originate **exclusively** from the public questionnaire form. There is no manual case creation step.
+
+1. Admin creates a Questionnaire and copies the iFrame embed code from the **Share & Embed** panel
+2. Partner embeds the iFrame on their patient portal:
+   ```html
+   <iframe
+     src="https://yourdomain.com/forms/{questionnaire_uuid}?partner_token={partner_uuid}&external_id={PATIENT_ID}"
+     width="100%" height="680" frameborder="0" allow="camera">
+   </iframe>
+   ```
+3. Patient submits the form → `Patient::firstOrCreate` runs → `PatientCase` created → auto-assigned to the highest-priority available clinician
+4. The form page fires a `postMessage` to the parent frame on completion:
+   ```js
+   window.addEventListener('message', function(event) {
+       if (event.data.event === 'questionnaire_completed') {
+           if (event.data.disqualified) {
+               // patient didn't qualify — no case created
+           } else {
+               // case is live in the queue
+           }
+       }
+   });
+   ```
+
+---
+
+## Case Lifecycle
+
+```
+CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
+                 ↘                      ↗
+                 SUPPORT → WAITING
+(CANCELLED reachable from any state except COMPLETED)
+```
+
+| Transition | Triggered By |
+|-----------|-------------|
+| Created → Waiting | Auto on form submit |
+| Waiting → Assigned | Auto-assigner, admin manual assign, or clinician self-claim |
+| Assigned → Approved | Clinician (via Approve & Prescribe) |
+| Assigned → Support | Clinician (with a note) |
+| Support → Waiting | Returns to queue after support review |
+| Approved → Processing | Partner (web or API) |
+| Processing → Completed | Partner (API order update) |
+| Any → Cancelled | Admin / Clinician / Partner |
+
+---
+
+## Modules
+
+### Admin
+
+| Module | URL | Description |
+|--------|-----|-------------|
+| Partners | `/admin/partners` | Create partners; generates OAuth2 client ID + secret; manage portal users |
+| Clinicians | `/admin/clinicians` | Create clinicians; set specialty, credentials, licensed states, availability |
+| Priority Queue | `/admin/clinicians/priority` | Drag-and-drop assignment priority; inline max daily case load; live capacity badge |
+| Cases | `/admin/cases` | Full case list with filters; assign / reassign clinicians; view all tabs |
+| Patients | `/admin/patients` | Read-only patient list and detail (created automatically from form submissions) |
+| Offerings | `/admin/offerings` | Full CRUD on medications/compounds/supplies; state availability; dispensing fields |
+| Questionnaires | `/admin/questionnaires` | Visual question builder; 14 field types; drag-and-drop reorder; conditional logic; share & embed |
+| Question Bank | `/admin/questions` | Standalone question library across all questionnaires; bulk delete; inline toggle |
+
+### Clinician
+
+| Module | URL | Description |
+|--------|-----|-------------|
+| Queue | `/clinician/cases/queue` | See waiting cases; self-claim |
+| Case Detail | `/clinician/cases/{uuid}` | Tabs: Intake, Questionnaires, Prescriptions, Notes, Messages, Files, Timeline |
+| Prescribe | `/clinician/cases/{uuid}/prescribe` | Full prescription form with medication search; transitions case to `approved` |
+
+### Partner (Web)
+
+| Module | URL | Description |
+|--------|-----|-------------|
+| Offerings | `/partner/offerings` | CRUD on own offerings |
+| Patients | `/partner/patients` | Read-only |
+| Cases | `/partner/cases` | Support-escalated cases only; move to processing; cancel |
+| Credentials | `/partner/credentials` | View client ID / secret / webhook list |
+
+---
+
+## Questionnaire Builder
+
+The question builder at `/admin/questionnaires/create` (and `/edit`) supports:
+
+- **14 field types**: Hidden, Input, Email, Textarea, Date, Select, Multi Select, Radio, Checkbox, File, Number, Height, Weight, BMI
+- **Drag-and-drop reorder** via SortableJS
+- **Field key auto-population** — typing "Email Address" auto-fills key `email` with yellow background (overridable)
+- **Disqualify toggle** per option on Select / Radio / Checkbox types — sets `is_disqualify = true`; triggers disqualification on submission
+- **Conditional logic** — each question can be set to "Show only if [prior question] [operator] [value]"
+  - Operators: `equals`, `does not equal`, `contains`, `is answered`
+- **Multi-step mode** — questions grouped by step number; renders as paginated steps on the patient form
+
+### Patient Form Features
+
+- **Height** renders as two inputs (ft + in); combined total inches stored in the hidden field
+- **BMI** auto-calculates from height + weight using the imperial formula: `(weight_lbs ÷ height_in²) × 703`; auto-filled with yellow highlight
+- **Conditional questions** hide/show in real time; required validation skips hidden questions
+
+---
+
+## Patient Field Mapping
+
+Questions whose `key` matches a patient column are automatically written to the patient record on form submission:
+
+| Key | Patient Column |
+|-----|---------------|
+| `email` | `email` (required) |
+| `first_name` | `first_name` |
+| `last_name` | `last_name` |
+| `phone` | `phone` |
+| `date_of_birth` | `date_of_birth` |
+| `age` | `age` |
+| `height` | `height` (decimal, inches) |
+| `weight` | `weight` (decimal, lbs) |
+| `bmi` | `bmi` (decimal) |
+| `gender` | `gender` |
+| `address`, `address2`, `city`, `state`, `zip`, `country` | address fields |
+
+---
+
+## Webhooks
+
+All webhooks are signed with HMAC-SHA256 and retried up to 5 times with exponential backoff.
+
+| Event | Fired When |
+|-------|-----------|
+| `case_created` | Case auto-created from form submission |
+| `case_waiting` | Case enters waiting queue |
+| `case_assigned_to_clinician` | Clinician assigned (auto or manual) |
+| `case_support` | Clinician escalates to support |
+| `case_approved` | Clinician submits prescription |
+| `case_processing` | Partner moves to processing |
+| `case_completed` | Case completed |
+| `case_cancelled` | Any cancellation |
+| `clinical_note_added` | Clinician adds a note |
+| `message_created` | Clinician sends a message |
+
+---
+
+## Key Architectural Notes
+
+- **Auto-assignment**: `CaseAutoAssigner` selects the highest-priority (`ORDER BY priority ASC`) active, available clinician below their `max_daily_cases` limit. Fires automatically on transition to `waiting`.
+- **`skip_auto_assign` flag**: Admin manual assignment passes this context flag so the auto-assigner does not race and double-assign.
+- **Two-pass `syncQuestions()`**: Conditional logic uses a self-referencing FK (`depends_on_question_id`). Pass 1 creates all questions and captures `idx → DB id` map; Pass 2 resolves and writes the FK.
+- **Patient deduplication**: `Patient::firstOrCreate([email, partner_id])` — same patient submitting again updates their record rather than creating a duplicate.
+- **`case_prescriptions` vs `prescriptions`**: Doctor-submitted prescriptions use the `case_` prefix to coexist independently alongside the DoseSpot `prescriptions` table.
+- **No Vite**: All assets loaded from CDN. JS is vanilla, written inline in Blade `@section('scripts')` blocks.
+
+---
+
+## Running Artisan Commands
+
+```bash
+# Clear caches after changes
+php artisan route:clear && php artisan view:clear && php artisan config:clear
+
+# Run pending migrations
+php artisan migrate
+
+# Run tests
+php artisan test
+```

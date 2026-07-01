@@ -68,7 +68,12 @@
 
                     @foreach($stepQuestions as $q)
                     @php $fieldName = 'answers[' . $q->id . ']'; @endphp
-                    <div class="mb-4">
+                    <div class="mb-4 q-wrapper"
+                         data-q-id="{{ $q->id }}"
+                         data-field-type="{{ $q->type }}"
+                         data-depends-on="{{ $q->depends_on_question_id ?? '' }}"
+                         data-depends-op="{{ $q->depends_on_operator ?? '' }}"
+                         data-depends-val="{{ $q->depends_on_value ?? '' }}">
                         <label class="form-label fw-semibold">
                             {{ $q->question }}
                             @if($q->is_required)
@@ -157,7 +162,6 @@
                                 @break
 
                             @case('number')
-                            @case('height')
                             @case('weight')
                             @case('bmi')
                                 <input type="number"
@@ -168,6 +172,39 @@
                                        step="any"
                                        {{ $q->is_required ? 'required' : '' }}
                                        {{ $q->is_readonly ? 'readonly' : '' }}>
+                                @break
+
+                            @case('height')
+                                @php
+                                    $oldHeight = old('answers.' . $q->id);
+                                    $oldFt = '';
+                                    $oldIn = '';
+                                    if ($oldHeight !== null && $oldHeight !== '') {
+                                        $totalIn = (float) $oldHeight;
+                                        $oldFt   = (int) floor($totalIn / 12);
+                                        $oldIn   = (int) round(fmod($totalIn, 12));
+                                    }
+                                @endphp
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="number"
+                                           class="form-control @error('answers.' . $q->id) is-invalid @enderror height-ft-input"
+                                           placeholder="0" min="0" max="9" step="1"
+                                           value="{{ $oldFt }}"
+                                           style="width:90px"
+                                           {{ $q->is_required ? 'required' : '' }}
+                                           {{ $q->is_readonly ? 'readonly' : '' }}>
+                                    <span class="fw-semibold text-secondary">ft</span>
+                                    <input type="number"
+                                           class="form-control @error('answers.' . $q->id) is-invalid @enderror height-in-input"
+                                           placeholder="0" min="0" max="11" step="1"
+                                           value="{{ $oldIn }}"
+                                           style="width:90px"
+                                           {{ $q->is_readonly ? 'readonly' : '' }}>
+                                    <span class="fw-semibold text-secondary">in</span>
+                                    <input type="hidden" name="{{ $fieldName }}"
+                                           class="height-combined-input"
+                                           value="{{ $oldHeight }}">
+                                </div>
                                 @break
 
                             @case('email')
@@ -278,6 +315,10 @@
         });
 
         step.querySelectorAll('input[required], select[required], textarea[required]').forEach(function (inp) {
+            // Skip inputs inside conditionally hidden question wrappers
+            var wrapper = inp.closest('.q-wrapper');
+            if (wrapper && wrapper.style.display === 'none') return;
+
             var ok;
             if (inp.type === 'radio') {
                 ok = !!step.querySelector('input[name="' + inp.name + '"]:checked');
@@ -302,6 +343,118 @@
     btnPrev.addEventListener('click', function () { showStep(--current); });
 
     showStep(0);
+})();
+</script>
+<script>
+(function () {
+    function getAnswer(qId) {
+        var radios = document.querySelectorAll('[name="answers[' + qId + ']"]');
+        if (radios.length && radios[0].type === 'radio') {
+            var checked = document.querySelector('[name="answers[' + qId + ']"]:checked');
+            return checked ? checked.value : '';
+        }
+        var checkboxes = document.querySelectorAll('[name="answers[' + qId + '][]"]');
+        if (checkboxes.length) {
+            var vals = [];
+            checkboxes.forEach(function (cb) { if (cb.checked) vals.push(cb.value); });
+            return vals;
+        }
+        var sel = document.querySelector('select[name="answers[' + qId + '][]"]');
+        if (sel && sel.multiple) {
+            var selected = [];
+            Array.from(sel.selectedOptions).forEach(function (o) { selected.push(o.value); });
+            return selected;
+        }
+        var single = document.querySelector('[name="answers[' + qId + ']"]');
+        return single ? single.value : '';
+    }
+
+    function checkCondition(answer, operator, depVal) {
+        if (operator === 'is_answered') {
+            return Array.isArray(answer) ? answer.length > 0 : String(answer).trim() !== '';
+        }
+        if (operator === 'equals') {
+            return Array.isArray(answer) ? answer.indexOf(depVal) !== -1 : answer === depVal;
+        }
+        if (operator === 'not_equals') {
+            return Array.isArray(answer) ? answer.indexOf(depVal) === -1 : answer !== depVal;
+        }
+        if (operator === 'contains') {
+            if (Array.isArray(answer)) return answer.indexOf(depVal) !== -1;
+            return String(answer).toLowerCase().indexOf(String(depVal || '').toLowerCase()) !== -1;
+        }
+        return true;
+    }
+
+    function evaluateConditions() {
+        document.querySelectorAll('.q-wrapper[data-depends-on]').forEach(function (wrapper) {
+            var dependsOn = wrapper.getAttribute('data-depends-on');
+            var operator  = wrapper.getAttribute('data-depends-op');
+            var depVal    = wrapper.getAttribute('data-depends-val');
+            if (!dependsOn || !operator) return;
+
+            var visible = checkCondition(getAnswer(dependsOn), operator, depVal);
+
+            if (visible) {
+                wrapper.style.display = '';
+                wrapper.querySelectorAll('[data-was-required]').forEach(function (el) {
+                    el.setAttribute('required', '');
+                    el.removeAttribute('data-was-required');
+                });
+            } else {
+                wrapper.querySelectorAll('[required]').forEach(function (el) {
+                    el.setAttribute('data-was-required', '1');
+                    el.removeAttribute('required');
+                });
+                wrapper.style.display = 'none';
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        evaluateConditions();
+        var form = document.getElementById('questionnaire-form');
+        form.addEventListener('change', evaluateConditions);
+        form.addEventListener('input',  evaluateConditions);
+
+        // Height: combine ft + in into total inches in the hidden field
+        var heightWrapper = document.querySelector('.q-wrapper[data-field-type="height"]');
+        var weightWrapper = document.querySelector('.q-wrapper[data-field-type="weight"]');
+        var bmiWrapper    = document.querySelector('.q-wrapper[data-field-type="bmi"]');
+
+        var ftInput      = heightWrapper ? heightWrapper.querySelector('.height-ft-input')       : null;
+        var inInput      = heightWrapper ? heightWrapper.querySelector('.height-in-input')       : null;
+        var combinedH    = heightWrapper ? heightWrapper.querySelector('.height-combined-input') : null;
+        var weightInput  = weightWrapper ? weightWrapper.querySelector('input[type="number"]')   : null;
+        var bmiInput     = bmiWrapper    ? bmiWrapper.querySelector('input[type="number"]')      : null;
+
+        function updateHeight() {
+            if (!ftInput || !inInput || !combinedH) return;
+            var ft  = parseFloat(ftInput.value);
+            var inc = parseFloat(inInput.value);
+            combinedH.value = (isNaN(ft) && isNaN(inc))
+                ? ''
+                : (((isNaN(ft) ? 0 : ft) * 12) + (isNaN(inc) ? 0 : inc)).toFixed(2);
+            updateBmi();
+        }
+
+        function updateBmi() {
+            if (!bmiInput) return;
+            var heightIn = combinedH ? parseFloat(combinedH.value) : NaN;
+            var weightLb = weightInput ? parseFloat(weightInput.value) : NaN;
+            if (!isNaN(heightIn) && heightIn > 0 && !isNaN(weightLb) && weightLb > 0) {
+                bmiInput.value = ((weightLb / (heightIn * heightIn)) * 703).toFixed(1);
+                bmiInput.style.background = '#fff9e6';
+            } else {
+                bmiInput.value = '';
+                bmiInput.style.background = '';
+            }
+        }
+
+        if (ftInput)     ftInput.addEventListener('input', updateHeight);
+        if (inInput)     inInput.addEventListener('input', updateHeight);
+        if (weightInput) weightInput.addEventListener('input', updateBmi);
+    });
 })();
 </script>
 </body>

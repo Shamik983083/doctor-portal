@@ -105,15 +105,23 @@
 
 @section('scripts')
 @php
-$existingQuestions = $questionnaire->questions->map(fn($q) => [
-    'question'    => $q->question,
-    'key'         => $q->key,
-    'type'        => $q->type,
-    'placeholder' => $q->placeholder,
-    'is_required' => $q->is_required,
-    'is_readonly' => $q->is_readonly,
-    'step_number' => $q->step_number ?? 1,
-    'options'     => $q->options ?? [],
+$sortedQuestions = $questionnaire->questions->sortBy('sort_order')->values();
+
+// Build a map of question DB id → array index so we can resolve depends_on_question_id
+$idToIdx = $sortedQuestions->pluck(null)->mapWithKeys(fn($q, $i) => [$q->id => $i])->all();
+
+$existingQuestions = $sortedQuestions->map(fn($q, $i) => [
+    'question'           => $q->question,
+    'key'                => $q->key,
+    'type'               => $q->type,
+    'placeholder'        => $q->placeholder,
+    'is_required'        => $q->is_required,
+    'is_readonly'        => $q->is_readonly,
+    'step_number'        => $q->step_number ?? 1,
+    'options'            => $q->options ?? [],
+    'depends_on_idx'     => $q->depends_on_question_id ? ($idToIdx[$q->depends_on_question_id] ?? null) : null,
+    'depends_on_operator'=> $q->depends_on_operator,
+    'depends_on_value'   => $q->depends_on_value,
 ])->values()->all();
 @endphp
 @include('admin.questionnaires._builder_js', ['existingQuestions' => $existingQuestions])

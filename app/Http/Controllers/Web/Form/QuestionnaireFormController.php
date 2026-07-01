@@ -123,8 +123,17 @@ class QuestionnaireFormController extends Controller
                             'last_name'     => $keyedAnswers['last_name'] ?? 'Unknown',
                             'phone'         => $keyedAnswers['phone'] ?? null,
                             'date_of_birth' => $keyedAnswers['date_of_birth'] ?? null,
+                            'age'           => $keyedAnswers['age'] ?? null,
+                            'height'        => $keyedAnswers['height'] ?? null,
+                            'weight'        => $keyedAnswers['weight'] ?? null,
+                            'bmi'           => $keyedAnswers['bmi'] ?? null,
                             'gender'        => $keyedAnswers['gender'] ?? null,
+                            'address'       => $keyedAnswers['address'] ?? null,
+                            'address2'      => $keyedAnswers['address2'] ?? null,
+                            'city'          => $keyedAnswers['city'] ?? null,
                             'state'         => $keyedAnswers['state'] ?? null,
+                            'zip'           => $keyedAnswers['zip'] ?? null,
+                            'country'       => $keyedAnswers['country'] ?? null,
                             'status'        => 'active',
                         ]
                     );
@@ -140,7 +149,9 @@ class QuestionnaireFormController extends Controller
                 });
 
                 // Transition outside the transaction so webhooks fire cleanly after commit
-                $this->stateMachine->transition($caseRef, PatientCase::STATUS_WAITING, ['actor_type' => 'system']);
+                if ($caseRef) {
+                    $this->stateMachine->transition($caseRef, PatientCase::STATUS_WAITING, ['actor_type' => 'system']);
+                }
             }
         }
 

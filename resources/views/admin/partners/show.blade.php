@@ -34,12 +34,9 @@
                     <tr><th class="text-muted">Created</th><td>{{ $partner->created_at->format('M d, Y') }}</td></tr>
                 </table>
             </div>
-            <div class="card-footer d-flex gap-2">
-                <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-outline-primary btn-sm flex-grow-1">
+            <div class="card-footer">
+                <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-outline-primary btn-sm w-100">
                     <i class="bi bi-pencil me-1"></i>Edit
-                </a>
-                <a href="{{ route('admin.partners.users.create', $partner->id) }}" class="btn btn-outline-success btn-sm flex-grow-1">
-                    <i class="bi bi-person-plus me-1"></i>Add User
                 </a>
             </div>
         </div>
@@ -130,6 +127,41 @@
                     </form>
                 @endif
             </div>
+        </div>
+
+        {{-- Partner Users --}}
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Portal Users</h6>
+                <a href="{{ route('admin.partners.users.create', $partner->id) }}" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-person-plus me-1"></i>Add User
+                </a>
+            </div>
+            @if($partner->users->isEmpty())
+                <div class="card-body text-center text-muted small py-4">
+                    <i class="bi bi-person-x fs-3 d-block mb-2 opacity-25"></i>
+                    No users yet. Add one so the partner can log in to the portal.
+                </div>
+            @else
+                <ul class="list-group list-group-flush">
+                    @foreach($partner->users as $user)
+                    <li class="list-group-item px-3 py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold small">{{ $user->name }}</div>
+                                <div class="text-muted" style="font-size:.78rem">{{ $user->email }}</div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 small">partner</span>
+                                <div class="text-muted mt-1" style="font-size:.72rem">
+                                    Joined {{ $user->created_at->format('M d, Y') }}
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
 
     </div>
