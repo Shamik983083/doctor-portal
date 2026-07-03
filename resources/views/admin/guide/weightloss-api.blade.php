@@ -289,6 +289,7 @@ Content-Type: application/json
   },
   "patient_state":  "TX",
   "external_id":    "order-wl-20240701-001",
+  "visit_type":     "weightloss",
   "is_chargeable":  true,
   "hold_status":    false,
 

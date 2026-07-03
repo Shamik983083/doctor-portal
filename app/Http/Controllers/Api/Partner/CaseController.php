@@ -51,6 +51,7 @@ class CaseController extends Controller
             'patient.zip'                                     => 'nullable|string|max:10',
             'patient.external_id'                             => 'nullable|string|max:255',
             'external_id'                                     => 'nullable|string|max:255',
+            'visit_type'                                      => 'nullable|string|max:100',
             'hold_status'                                     => 'boolean',
             'is_chargeable'                                   => 'boolean',
             'patient_state'                                   => 'nullable|string|size:2',
@@ -159,6 +160,7 @@ class CaseController extends Controller
             $case = $partner->cases()->create([
                 'patient_id'    => $patient->id,
                 'external_id'   => $data['external_id'] ?? null,
+                'visit_type'    => $data['visit_type'] ?? null,
                 'hold_status'   => $data['hold_status'] ?? false,
                 'is_chargeable' => $data['is_chargeable'] ?? true,
                 'patient_state' => $data['patient_state'] ?? $patient->state,

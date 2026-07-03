@@ -16,7 +16,7 @@ class PatientCase extends Model
     protected $fillable = [
         'uuid', 'partner_id', 'patient_id', 'clinician_id', 'external_id',
         'status', 'hold_status', 'is_chargeable', 'charge_amount',
-        'support_note', 'support_at', 'cancellation_reason', 'patient_state',
+        'support_note', 'support_at', 'cancellation_reason', 'patient_state', 'visit_type',
         'assigned_at', 'approved_at', 'processing_at', 'completed_at', 'cancelled_at',
         'metadata',
     ];

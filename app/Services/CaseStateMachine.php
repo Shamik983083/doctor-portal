@@ -182,6 +182,7 @@ class CaseStateMachine
             'case_id'    => $case->uuid,
             'patient_id' => $case->patient->uuid ?? null,
             'status'     => $status,
+            'visit_type' => $case->visit_type,
             'timestamp'  => now()->timestamp,
         ]);
     }

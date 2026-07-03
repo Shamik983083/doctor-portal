@@ -15,6 +15,12 @@
             <div class="card-body small">
                 <table class="table table-sm table-borderless mb-0">
                     <tr><th>Status</th><td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td></tr>
+                    @if($case->visit_type)
+                    <tr>
+                        <th>Visit Type</th>
+                        <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size:.75rem">{{ $case->visit_type }}</span></td>
+                    </tr>
+                    @endif
                     <tr><th>Partner</th><td>{{ $case->partner->name ?? '—' }}</td></tr>
                     <tr><th>Clinician</th><td>{{ $case->clinician?->full_name ?? '—' }}</td></tr>
                     <tr><th>Created</th><td>{{ $case->created_at->format('M d, Y H:i') }}</td></tr>
