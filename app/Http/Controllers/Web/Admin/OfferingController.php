@@ -35,11 +35,24 @@ class OfferingController extends Controller
         return view('admin.offerings.index', compact('offerings', 'partners'));
     }
 
+    private function attachableQuestionnaires()
+    {
+        // Exclude questionnaires that are embedded inside another via linked_questionnaire_id
+        // — they are pulled in automatically and should never be attached directly to an offering.
+        $embeddedIds = Questionnaire::whereNotNull('linked_questionnaire_id')
+            ->pluck('linked_questionnaire_id');
+
+        return Questionnaire::where('is_active', true)
+            ->whereNotIn('id', $embeddedIds)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
     public function create()
     {
         $partners          = Partner::where('status', 'active')->get(['id', 'name']);
         $categories        = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $allQuestionnaires = Questionnaire::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $allQuestionnaires = $this->attachableQuestionnaires();
         $usStates          = $this->usStates;
         return view('admin.offerings.create', compact('partners', 'usStates', 'categories', 'allQuestionnaires'));
     }
@@ -104,7 +117,7 @@ class OfferingController extends Controller
         $offering          = Offering::with(['partner', 'category', 'questionnaires'])->findOrFail($id);
         $usStates          = $this->usStates;
         $categories        = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $allQuestionnaires = Questionnaire::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $allQuestionnaires = $this->attachableQuestionnaires();
         return view('admin.offerings.show', compact('offering', 'usStates', 'categories', 'allQuestionnaires'));
     }
 
