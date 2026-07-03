@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PatientCase;
 use App\Models\Partner;
 use App\Models\Questionnaire;
+use App\Models\PatientFile;
 use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireQuestion;
 use App\Models\QuestionnaireResponse;
@@ -62,7 +63,7 @@ class CaseController extends Controller
             'questionnaire_responses.*.questionnaire_id'      => 'required_with:questionnaire_responses|string|exists:questionnaires,uuid',
             'questionnaire_responses.*.answers'               => 'nullable|array',
             'questionnaire_responses.*.answers.*.question_id' => 'required|integer|exists:questionnaire_questions,id',
-            'questionnaire_responses.*.answers.*.answer'      => 'nullable|string|max:5000',
+            'questionnaire_responses.*.answers.*.answer'      => 'nullable',
         ]);
 
         $partner     = $this->partner($request);
@@ -150,11 +151,11 @@ class CaseController extends Controller
                         $question = $questionMap[$answerData['question_id']] ?? null;
                         if (!$question) continue;
 
-                        if (\in_array($question->type, ['radio', 'select', 'checkbox'])) {
+                        if (\in_array($question->type, ['radio', 'select', 'checkbox', 'choice', 'multi'])) {
                             $options      = $question->options ?? [];
                             $answerValues = (array) ($answerData['answer'] ?? []);
                             foreach ($options as $opt) {
-                                if (($opt['is_disqualify'] ?? false) && \in_array($opt['value'] ?? $opt['label'], $answerValues)) {
+                                if (($opt['is_disqualify'] ?? $opt['disqualifies'] ?? false) && \in_array($opt['value'] ?? $opt['label'], $answerValues)) {
                                     if (!$isDisqualified) {
                                         $disqualifiedOn = $question->key ?: "question_{$question->id}";
                                     }
@@ -179,11 +180,38 @@ class CaseController extends Controller
                         $question = $questionMap[$answerData['question_id']] ?? null;
                         if (!$question) continue;
 
-                        $ansVal        = $answerData['answer'] ?? null;
+                        $ansVal = $answerData['answer'] ?? null;
+
+                        // File questions: answer is a file_token UUID from POST /api/partner/files
+                        if ($question->type === 'file') {
+                            $displayName = '';
+                            if ($ansVal) {
+                                $fileRecord = PatientFile::where('uuid', $ansVal)
+                                    ->where('partner_id', $partner->id)
+                                    ->whereNull('case_id')
+                                    ->first();
+                                if ($fileRecord) {
+                                    $fileRecord->update([
+                                        'case_id'    => $case->id,
+                                        'patient_id' => $patient->id,
+                                    ]);
+                                    $displayName = $fileRecord->original_name;
+                                }
+                            }
+                            QuestionnaireAnswer::create([
+                                'response_id'     => $response->id,
+                                'question_id'     => $question->id,
+                                'question_text'   => $question->question,
+                                'answer'          => $displayName,
+                                'is_disqualified' => false,
+                            ]);
+                            continue;
+                        }
+
                         $ansDisqualify = false;
-                        if (\in_array($question->type, ['radio', 'select', 'checkbox'])) {
+                        if (\in_array($question->type, ['radio', 'select', 'checkbox', 'choice', 'multi'])) {
                             foreach ($question->options ?? [] as $opt) {
-                                if (($opt['is_disqualify'] ?? false) && \in_array($opt['value'] ?? $opt['label'], (array) $ansVal)) {
+                                if (($opt['is_disqualify'] ?? $opt['disqualifies'] ?? false) && \in_array($opt['value'] ?? $opt['label'], (array) $ansVal)) {
                                     $ansDisqualify = true;
                                     break;
                                 }
@@ -191,10 +219,10 @@ class CaseController extends Controller
                         }
 
                         QuestionnaireAnswer::create([
-                            'response_id'   => $response->id,
-                            'question_id'   => $question->id,
-                            'question_text' => $question->question,
-                            'answer'        => is_array($ansVal) ? implode(', ', $ansVal) : $ansVal,
+                            'response_id'     => $response->id,
+                            'question_id'     => $question->id,
+                            'question_text'   => $question->question,
+                            'answer'          => is_array($ansVal) ? implode(', ', $ansVal) : $ansVal,
                             'is_disqualified' => $ansDisqualify,
                         ]);
                     }

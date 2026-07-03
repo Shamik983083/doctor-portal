@@ -69,11 +69,12 @@ class OfferingController extends Controller
         $data['is_active']               = $request->boolean('is_active');
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
         $data['category_id']             = $request->input('category_id') ?: null;
+        $data['approval_status']         = 'pending';
 
         $offering = $this->partner()->offerings()->create($data);
 
         return redirect()->route('partner.offerings.show', $offering->id)
-            ->with('success', "Offering \"{$offering->name}\" created successfully.");
+            ->with('success', "Offering \"{$offering->name}\" created and submitted for admin approval.");
     }
 
     public function show(int $id)
@@ -115,9 +116,21 @@ class OfferingController extends Controller
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
         $data['category_id']             = $request->input('category_id') ?: null;
 
+        // Re-submit for review when partner edits a rejected offering
+        if ($offering->approval_status === 'rejected') {
+            $data['approval_status'] = 'pending';
+            $data['approved_by']     = null;
+            $data['approved_at']     = null;
+            $data['rejection_note']  = null;
+        }
+
         $offering->update($data);
 
-        return back()->with('success', 'Offering updated.');
+        $message = $offering->approval_status === 'pending'
+            ? 'Offering updated and re-submitted for admin approval.'
+            : 'Offering updated.';
+
+        return back()->with('success', $message);
     }
 
     public function toggleStatus(int $id)

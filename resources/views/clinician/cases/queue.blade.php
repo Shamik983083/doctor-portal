@@ -36,8 +36,11 @@
                     <tr>
                         <td><small class="text-muted font-monospace">{{ substr($case->uuid, 0, 8) }}</small></td>
                         <td>
-                            <strong>{{ $case->patient->full_name ?? 'N/A' }}</strong><br>
-                            <small class="text-muted">{{ $case->patient->state ?? '' }}</small>
+                            <strong>{{ $case->patient->full_name ?? 'N/A' }}</strong>
+                            @if($case->unread_messages_count > 0)
+                                <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">{{ $case->unread_messages_count }} new msg</span>
+                            @endif
+                            <br><small class="text-muted">{{ $case->patient->state ?? '' }}</small>
                         </td>
                         <td>{{ $case->patient_state ?? $case->patient->state ?? '—' }}</td>
                         <td>{{ $case->partner->name ?? '—' }}</td>

@@ -133,7 +133,25 @@
                 </a>
             </li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-notes">Clinical Notes <span class="badge bg-secondary">{{ $case->clinicalNotes->count() }}</span></a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-messages">Messages <span class="badge bg-secondary">{{ $case->messages->count() }}</span></a></li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-messages">
+                    <i class="bi bi-chat-dots me-1"></i>Communication
+                    @php $unreadPatientMsgs = $case->messages->where('direction','inbound')->where('is_read',false)->count(); @endphp
+                    @if($unreadPatientMsgs > 0)
+                        <span class="badge bg-warning text-dark ms-1">{{ $unreadPatientMsgs }} new</span>
+                    @elseif($case->messages->count())
+                        <span class="badge bg-secondary ms-1">{{ $case->messages->count() }}</span>
+                    @endif
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-files">
+                    Files
+                    @if($case->files->count())
+                        <span class="badge bg-secondary">{{ $case->files->count() }}</span>
+                    @endif
+                </a>
+            </li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-timeline">Timeline</a></li>
         </ul>
 
@@ -300,20 +318,169 @@
 
             {{-- Messages --}}
             <div class="tab-pane fade" id="tab-messages">
-                <div style="max-height:400px; overflow-y:auto;">
-                    @forelse($case->messages->sortBy('created_at') as $msg)
-                    <div class="d-flex mb-2 {{ $msg->sender_type === 'clinician' ? 'justify-content-end' : '' }}">
-                        <div class="card p-2 px-3 {{ $msg->sender_type === 'clinician' ? 'bg-primary text-white' : 'bg-light' }}"
-                             style="max-width:80%; border-radius:12px;">
-                            <small class="fw-semibold d-block">{{ ucfirst($msg->sender_type ?? 'System') }}</small>
-                            <p class="mb-0 small">{{ $msg->body }}</p>
-                            <small class="opacity-75">{{ $msg->created_at->format('M d H:i') }}</small>
+                @if($case->messages->isEmpty())
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-chat-dots" style="font-size:2rem;opacity:.3"></i>
+                        <p class="mt-2 mb-0">No messages yet on this case.</p>
+                    </div>
+                @else
+                {{-- Summary bar --}}
+                @php
+                    $msgs          = $case->messages->sortBy('created_at');
+                    $totalMsgs     = $msgs->count();
+                    $clinicianMsgs = $msgs->where('sender_type','clinician')->count();
+                    $patientMsgs   = $msgs->where('sender_type','patient')->count();
+                    $unreadCount   = $msgs->where('direction','inbound')->where('is_read',false)->count();
+                @endphp
+                <div class="d-flex gap-3 mb-3 pb-2 border-bottom flex-wrap" style="font-size:.8rem">
+                    <span class="text-muted"><i class="bi bi-chat-square-dots me-1"></i>{{ $totalMsgs }} total</span>
+                    <span class="text-primary"><i class="bi bi-person-badge me-1"></i>{{ $clinicianMsgs }} from clinician</span>
+                    <span class="text-success"><i class="bi bi-person me-1"></i>{{ $patientMsgs }} from patient</span>
+                    @if($unreadCount > 0)
+                        <span class="text-warning fw-semibold"><i class="bi bi-envelope me-1"></i>{{ $unreadCount }} unread by clinician</span>
+                    @endif
+                </div>
+
+                {{-- Thread --}}
+                <div style="max-height:480px; overflow-y:auto; padding-right:4px;" id="commThread">
+                    @php $prevDate = null; @endphp
+                    @foreach($msgs as $msg)
+                        @php
+                            $msgDate     = $msg->created_at->format('Y-m-d');
+                            $isClinic    = $msg->sender_type === 'clinician';
+                            $isPatient   = $msg->sender_type === 'patient';
+                            $bubbleAlign = $isClinic ? 'justify-content-end' : 'justify-content-start';
+                            $bubbleBg    = $isClinic ? 'bg-primary text-white' : ($isPatient ? 'bg-light border' : 'bg-warning-subtle border');
+                            $senderLabel = match($msg->sender_type) {
+                                'clinician' => '🩺 ' . ($case->clinician?->user->name ?? 'Clinician'),
+                                'patient'   => '👤 Patient',
+                                default     => '⚙ System',
+                            };
+                        @endphp
+
+                        {{-- Date separator --}}
+                        @if($msgDate !== $prevDate)
+                        <div class="text-center my-2">
+                            <span class="badge bg-light text-muted border" style="font-size:.72rem">
+                                {{ $msg->created_at->isToday() ? 'Today' : ($msg->created_at->isYesterday() ? 'Yesterday' : $msg->created_at->format('M j, Y')) }}
+                            </span>
+                        </div>
+                        @php $prevDate = $msgDate; @endphp
+                        @endif
+
+                        <div class="d-flex {{ $bubbleAlign }} mb-2">
+                            <div style="max-width:75%">
+                                {{-- Sender label --}}
+                                <div class="mb-1 {{ $isClinic ? 'text-end' : '' }}" style="font-size:.72rem; color:#6c757d">
+                                    {{ $senderLabel }}
+                                    &nbsp;·&nbsp;{{ $msg->created_at->format('H:i') }}
+                                    @if($isPatient)
+                                        @if($msg->is_read)
+                                            &nbsp;<i class="bi bi-check2-all text-primary" title="Read by clinician at {{ $msg->read_at?->format('M j H:i') }}"></i>
+                                        @else
+                                            &nbsp;<i class="bi bi-check2 text-muted" title="Not yet read by clinician"></i>
+                                        @endif
+                                    @endif
+                                </div>
+                                {{-- Bubble --}}
+                                <div class="{{ $bubbleBg }} p-2 px-3" style="border-radius:12px; font-size:.875rem; word-break:break-word">
+                                    {{ $msg->body }}
+                                </div>
+                                {{-- Channel badge --}}
+                                @if($msg->channel && $msg->channel !== 'portal')
+                                <div class="{{ $isClinic ? 'text-end' : '' }} mt-1" style="font-size:.68rem;color:#adb5bd">
+                                    via {{ $msg->channel }}
+                                </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                @endif
+            </div>
+
+            {{-- Files --}}
+            <div class="tab-pane fade" id="tab-files">
+
+                {{-- Upload form --}}
+                <div class="card mb-3">
+                    <div class="card-header py-2"><h6 class="mb-0"><i class="bi bi-upload me-2"></i>Upload File</h6></div>
+                    <div class="card-body">
+                        <form method="POST"
+                              action="{{ route('admin.cases.files.store', $case->uuid) }}"
+                              enctype="multipart/form-data"
+                              class="row g-2 align-items-end">
+                            @csrf
+                            <div class="col-md-5">
+                                <label class="form-label small fw-semibold mb-1">File <span class="text-danger">*</span></label>
+                                <input type="file" name="file" class="form-control form-control-sm"
+                                       accept=".pdf,.jpg,.jpeg,.png" required>
+                                <div class="form-text">PDF, JPG or PNG — max 10 MB</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold mb-1">Type</label>
+                                <select name="type" class="form-select form-select-sm">
+                                    <option value="other">Other</option>
+                                    <option value="lab_result">Lab Result</option>
+                                    <option value="id_doc">ID Document</option>
+                                    <option value="consent">Consent</option>
+                                    <option value="medical_necessity">Medical Necessity</option>
+                                    <option value="intake">Intake</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold mb-1">Notes</label>
+                                <input type="text" name="notes" class="form-control form-control-sm" placeholder="Optional note">
+                            </div>
+                            <div class="col-md-1">
+                                <button type="submit" class="btn btn-primary btn-sm w-100">
+                                    <i class="bi bi-upload"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                {{-- File list --}}
+                @forelse($case->files->sortByDesc('created_at') as $file)
+                <div class="d-flex align-items-center gap-3 border rounded px-3 py-2 mb-2 bg-white">
+                    <i class="bi bi-{{ str_ends_with($file->original_name, '.pdf') ? 'file-earmark-pdf text-danger' : 'file-earmark-image text-primary' }} fs-5 flex-shrink-0"></i>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold small text-truncate">{{ $file->original_name }}</div>
+                        <div class="text-muted" style="font-size:.72rem;">
+                            {{ ucfirst(str_replace('_', ' ', $file->type)) }}
+                            &bull; {{ number_format($file->size / 1024, 1) }} KB
+                            &bull; {{ $file->created_at->format('M d, Y H:i') }}
+                            &bull; <span class="badge
+                                @if($file->status === 'processed') bg-success
+                                @elseif($file->status === 'failed') bg-danger
+                                @elseif($file->status === 'processing') bg-warning text-dark
+                                @else bg-secondary
+                                @endif" style="font-size:.65rem;">{{ ucfirst($file->status) }}</span>
+                            @if($file->notes) &bull; {{ $file->notes }} @endif
                         </div>
                     </div>
-                    @empty
-                    <p class="text-muted text-center py-3">No messages.</p>
-                    @endforelse
+                    <div class="d-flex gap-2 flex-shrink-0">
+                        @if($file->status !== 'failed')
+                        <a href="{{ Storage::url($file->path) }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-2">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        @endif
+                        <form method="POST" action="{{ route('admin.cases.files.destroy', [$case->uuid, $file->uuid]) }}"
+                              onsubmit="return confirm('Delete this file?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-outline-danger btn-sm py-0 px-2">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
                 </div>
+                @empty
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-folder2-open fs-2 d-block mb-2 opacity-25"></i>
+                    No files attached to this case yet.
+                </div>
+                @endforelse
             </div>
 
             {{-- Timeline --}}
@@ -339,4 +506,16 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+// Scroll communication thread to bottom when the tab is shown
+document.querySelectorAll('[href="#tab-messages"]').forEach(function(tab) {
+    tab.addEventListener('shown.bs.tab', function () {
+        var thread = document.getElementById('commThread');
+        if (thread) thread.scrollTop = thread.scrollHeight;
+    });
+});
+</script>
 @endsection

@@ -24,6 +24,32 @@
         </div>
     @endif
 
+    @if($offering->approval_status === 'pending')
+        <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
+            <i class="bi bi-clock-history fs-5"></i>
+            <div>
+                <strong>Awaiting admin approval.</strong>
+                This offering is not yet visible to clinicians. You will be notified once it is reviewed.
+            </div>
+        </div>
+    @elseif($offering->approval_status === 'rejected')
+        <div class="alert alert-danger mb-4">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-x-octagon fs-5 flex-shrink-0"></i>
+                <div>
+                    <strong>This offering was rejected by an admin.</strong>
+                    You can edit it and save to automatically re-submit it for review.
+                </div>
+            </div>
+            @if($offering->rejection_note)
+                <div class="mt-2 pt-2 border-top border-danger border-opacity-25">
+                    <div class="small fw-semibold mb-1">Admin's note:</div>
+                    <p class="mb-0 small">{{ $offering->rejection_note }}</p>
+                </div>
+            @endif
+        </div>
+    @endif
+
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="card mb-4">

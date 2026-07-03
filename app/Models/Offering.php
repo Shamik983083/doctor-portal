@@ -18,6 +18,7 @@ class Offering extends Model
         'compound_formula', 'refills', 'quantity', 'days_supply',
         'dispense_unit', 'dispense_units', 'days_until_dispense', 'directions',
         'available_states', 'images', 'faqs', 'is_active', 'is_controlled_substance', 'metadata',
+        'approval_status', 'approved_by', 'approved_at', 'rejection_note',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Offering extends Model
         'images' => 'array',
         'faqs' => 'array',
         'metadata' => 'array',
+        'approved_at' => 'datetime',
     ];
 
     protected static function boot(): void
@@ -41,6 +43,9 @@ class Offering extends Model
     public function category()      { return $this->belongsTo(OfferingCategory::class, 'category_id'); }
     public function caseOfferings() { return $this->hasMany(CaseOffering::class); }
     public function cases()         { return $this->belongsToMany(PatientCase::class, 'case_offerings', 'offering_id', 'case_id'); }
+    public function approvedBy()    { return $this->belongsTo(User::class, 'approved_by'); }
+
+    public function scopeApproved($query) { return $query->where('approval_status', 'approved'); }
 
     public function questionnaires()
     {

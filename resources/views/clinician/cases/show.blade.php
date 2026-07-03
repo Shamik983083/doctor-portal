@@ -94,7 +94,13 @@
                 </a>
             </li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-notes">Notes <span class="badge bg-secondary">{{ $case->clinicalNotes->count() }}</span></a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-messages">Messages <span class="badge bg-secondary">{{ $case->messages->count() }}</span></a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-messages">Messages
+    @if($unreadMessageCount > 0)
+        <span class="badge bg-warning text-dark">{{ $unreadMessageCount }} new</span>
+    @elseif($case->messages->count() > 0)
+        <span class="badge bg-secondary">{{ $case->messages->count() }}</span>
+    @endif
+</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-files">Files <span class="badge bg-secondary">{{ $case->files->count() }}</span></a></li>
         </ul>
 
@@ -318,17 +324,85 @@
 
             {{-- Files --}}
             <div class="tab-pane fade" id="tab-files">
-                @forelse($case->files as $file)
-                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                    <div>
-                        <i class="bi bi-file-earmark me-2"></i>
-                        <span>{{ $file->original_name }}</span>
-                        <span class="badge bg-secondary ms-2">{{ $file->type }}</span>
+
+                {{-- Upload form --}}
+                <div class="card mb-3">
+                    <div class="card-header py-2"><h6 class="mb-0"><i class="bi bi-upload me-2"></i>Upload File</h6></div>
+                    <div class="card-body">
+                        <form method="POST"
+                              action="{{ route('clinician.cases.files.store', $case->uuid) }}"
+                              enctype="multipart/form-data"
+                              class="row g-2 align-items-end">
+                            @csrf
+                            <div class="col-md-5">
+                                <label class="form-label small fw-semibold mb-1">File <span class="text-danger">*</span></label>
+                                <input type="file" name="file" class="form-control form-control-sm"
+                                       accept=".pdf,.jpg,.jpeg,.png" required>
+                                <div class="form-text">PDF, JPG or PNG — max 10 MB</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold mb-1">Type</label>
+                                <select name="type" class="form-select form-select-sm">
+                                    <option value="other">Other</option>
+                                    <option value="lab_result">Lab Result</option>
+                                    <option value="id_doc">ID Document</option>
+                                    <option value="consent">Consent</option>
+                                    <option value="medical_necessity">Medical Necessity</option>
+                                    <option value="intake">Intake</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold mb-1">Notes</label>
+                                <input type="text" name="notes" class="form-control form-control-sm" placeholder="Optional note">
+                            </div>
+                            <div class="col-md-1">
+                                <button type="submit" class="btn btn-primary btn-sm w-100">
+                                    <i class="bi bi-upload"></i>
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    <small class="text-muted">{{ number_format($file->size / 1024, 1) }} KB</small>
+                </div>
+
+                {{-- File list --}}
+                @forelse($case->files->sortByDesc('created_at') as $file)
+                <div class="d-flex align-items-center gap-3 border rounded px-3 py-2 mb-2 bg-white">
+                    <i class="bi bi-{{ str_ends_with($file->original_name, '.pdf') ? 'file-earmark-pdf text-danger' : 'file-earmark-image text-primary' }} fs-5 flex-shrink-0"></i>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold small text-truncate">{{ $file->original_name }}</div>
+                        <div class="text-muted" style="font-size:.72rem;">
+                            {{ ucfirst(str_replace('_', ' ', $file->type)) }}
+                            &bull; {{ number_format($file->size / 1024, 1) }} KB
+                            &bull; {{ $file->created_at->format('M d, Y H:i') }}
+                            &bull; <span class="badge
+                                @if($file->status === 'processed') bg-success
+                                @elseif($file->status === 'failed') bg-danger
+                                @elseif($file->status === 'processing') bg-warning text-dark
+                                @else bg-secondary
+                                @endif" style="font-size:.65rem;">{{ ucfirst($file->status) }}</span>
+                            @if($file->notes) &bull; {{ $file->notes }} @endif
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-shrink-0">
+                        @if($file->status !== 'failed')
+                        <a href="{{ Storage::url($file->path) }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-2">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        @endif
+                        <form method="POST" action="{{ route('clinician.cases.files.destroy', [$case->uuid, $file->uuid]) }}"
+                              onsubmit="return confirm('Delete this file?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-outline-danger btn-sm py-0 px-2">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 @empty
-                <p class="text-muted">No files attached.</p>
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-folder2-open fs-2 d-block mb-2 opacity-25"></i>
+                    No files attached to this case yet.
+                </div>
                 @endforelse
             </div>
         </div>

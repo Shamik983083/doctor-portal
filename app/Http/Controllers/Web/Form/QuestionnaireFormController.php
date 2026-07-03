@@ -9,14 +9,18 @@ use App\Models\PatientCase;
 use App\Models\Questionnaire;
 use App\Models\QuestionnaireResponse;
 use App\Services\CaseStateMachine;
+use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class QuestionnaireFormController extends Controller
 {
-    private const OPTION_TYPES = ['select', 'multiselect', 'radio', 'checkbox'];
+    private const OPTION_TYPES = ['select', 'multiselect', 'radio', 'checkbox', 'choice', 'multi'];
 
-    public function __construct(private CaseStateMachine $stateMachine) {}
+    public function __construct(
+        private CaseStateMachine  $stateMachine,
+        private FileUploadService $fileUploader,
+    ) {}
 
     public function show(string $uuid)
     {
@@ -42,15 +46,19 @@ class QuestionnaireFormController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        // Build validation rules dynamically from question definitions
+        // Build validation rules dynamically — file questions get file rules, others get string rules
         $rules = [];
         foreach ($questionnaire->questions as $q) {
             $key  = 'answers.' . $q->id;
             $base = $q->is_required ? 'required' : 'nullable';
 
-            $rules[$key] = in_array($q->type, ['multiselect', 'checkbox'])
-                ? "{$base}|array"
-                : "{$base}|string|max:5000";
+            if ($q->type === 'file') {
+                $rules[$key] = "{$base}|file|mimes:pdf,jpg,jpeg,png|max:" . FileUploadService::MAX_SIZE_KB;
+            } elseif (in_array($q->type, ['multiselect', 'checkbox', 'multi'])) {
+                $rules[$key] = "{$base}|array";
+            } else {
+                $rules[$key] = "{$base}|string";
+            }
         }
         $request->validate($rules);
 
@@ -59,15 +67,41 @@ class QuestionnaireFormController extends Controller
         $answersToSave  = [];
         $keyedAnswers   = [];  // patient field map, keyed by question key
 
+        // Track uploaded PatientFile IDs to link to the response after it is created
+        $pendingFiles = []; // [question_id => PatientFile]
+
         foreach ($questionnaire->questions as $q) {
+            $disq = false;
+
+            if ($q->type === 'file') {
+                $uploadedFile = $request->file('answers.' . $q->id);
+                if ($uploadedFile) {
+                    $fileRecord = $this->fileUploader->store(
+                        $uploadedFile,
+                        'intake',
+                    );
+                    $pendingFiles[$q->id] = $fileRecord;
+                    $answer = $fileRecord->original_name;
+                } else {
+                    $answer = '';
+                }
+
+                $answersToSave[] = [
+                    'question_id'     => $q->id,
+                    'question_text'   => $q->question,
+                    'answer'          => $answer,
+                    'is_disqualified' => false,
+                ];
+                continue;
+            }
+
             $raw    = $request->input('answers.' . $q->id);
             $answer = is_array($raw) ? json_encode($raw) : ($raw ?? '');
-            $disq   = false;
 
             if (in_array($q->type, self::OPTION_TYPES) && $q->options) {
                 $selected = is_array($raw) ? $raw : [$raw];
                 foreach ($q->options as $opt) {
-                    if (!empty($opt['is_disqualify']) && in_array($opt['value'], $selected, true)) {
+                    if ((!empty($opt['is_disqualify']) || !empty($opt['disqualifies'])) && in_array($opt['value'], $selected, true)) {
                         if (!$isDisqualified) {
                             $isDisqualified = true;
                             $disqualifiedOn = $q->key ?: 'question_' . $q->id;
@@ -84,10 +118,10 @@ class QuestionnaireFormController extends Controller
             }
 
             $answersToSave[] = [
-                'question_id'    => $q->id,
-                'question_text'  => $q->question,
-                'answer'         => $answer,
-                'is_disqualified'=> $disq,
+                'question_id'     => $q->id,
+                'question_text'   => $q->question,
+                'answer'          => $answer,
+                'is_disqualified' => $disq,
             ];
         }
 
@@ -115,7 +149,7 @@ class QuestionnaireFormController extends Controller
             if ($partnerId && $email) {
                 $caseRef = null;
 
-                DB::transaction(function () use ($response, $partnerId, $keyedAnswers, $email, &$caseRef) {
+                DB::transaction(function () use ($response, $partnerId, $keyedAnswers, $email, $pendingFiles, &$caseRef) {
                     $patient = Patient::firstOrCreate(
                         ['email' => $email, 'partner_id' => $partnerId],
                         [
@@ -146,6 +180,15 @@ class QuestionnaireFormController extends Controller
                     ]);
 
                     $response->update(['case_id' => $caseRef->id, 'patient_id' => $patient->id]);
+
+                    // Link any uploaded files to the new case + patient
+                    foreach ($pendingFiles as $fileRecord) {
+                        $fileRecord->update([
+                            'case_id'    => $caseRef->id,
+                            'patient_id' => $patient->id,
+                            'partner_id' => $partnerId,
+                        ]);
+                    }
                 });
 
                 // Transition outside the transaction so webhooks fire cleanly after commit

@@ -30,15 +30,52 @@
         </div>
         <div class="card">
             <div class="card-header"><h6 class="mb-0">Licensed States</h6></div>
-            <div class="card-body">
-                @if($clinician->licensed_states)
-                    @foreach($clinician->licensed_states as $state)
-                        <span class="badge bg-light text-dark border me-1 mb-1">{{ $state }}</span>
-                    @endforeach
-                @else
-                    <p class="text-muted small mb-0">No states configured.</p>
-                @endif
+            @php
+                $licStates = $clinician->licensed_states ?? [];
+                $isRich = count($licStates) && is_array($licStates[0]);
+            @endphp
+            @if($isRich)
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:60px;">State</th>
+                            <th>License #</th>
+                            <th>Expires</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($licStates as $lic)
+                        <tr>
+                            <td><span class="badge bg-primary">{{ $lic['state'] }}</span></td>
+                            <td><code class="small">{{ $lic['license_number'] ?? '—' }}</code></td>
+                            <td>
+                                @if(!empty($lic['expiry_date']))
+                                    @php $exp = \Carbon\Carbon::parse($lic['expiry_date']); @endphp
+                                    <span @class(['small', 'text-danger fw-semibold' => $exp->isPast(), 'text-warning fw-semibold' => !$exp->isPast() && $exp->diffInDays() < 90])>
+                                        {{ $exp->format('M j, Y') }}
+                                        @if($exp->isPast()) <i class="bi bi-exclamation-circle ms-1"></i>@endif
+                                    </span>
+                                @else
+                                    —
+                                @endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
+            @elseif(count($licStates))
+            <div class="card-body">
+                @foreach($licStates as $state)
+                    <span class="badge bg-light text-dark border me-1 mb-1">{{ $state }}</span>
+                @endforeach
+            </div>
+            @else
+            <div class="card-body">
+                <p class="text-muted small mb-0">No states configured.</p>
+            </div>
+            @endif
         </div>
     </div>
     <div class="col-lg-8">

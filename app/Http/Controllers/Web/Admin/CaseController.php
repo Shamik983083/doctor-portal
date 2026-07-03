@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Clinician;
 use App\Models\Partner;
 use App\Models\PatientCase;
+use App\Models\PatientFile;
 use App\Services\CaseStateMachine;
+use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 
 class CaseController extends Controller
 {
-    public function __construct(private CaseStateMachine $stateMachine) {}
+    public function __construct(
+        private CaseStateMachine  $stateMachine,
+        private FileUploadService $fileUploader,
+    ) {}
 
     public function index(Request $request)
     {
@@ -76,5 +81,40 @@ class CaseController extends Controller
         $this->stateMachine->assignToClinician($case, $clinician);
 
         return back()->with('success', "Case assigned to {$clinician->full_name}.");
+    }
+
+    public function uploadFile(Request $request, string $uuid)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:' . FileUploadService::MAX_SIZE_KB,
+            'type' => 'nullable|in:lab_result,id_doc,consent,medical_necessity,intake,other',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $this->fileUploader->store(
+            $request->file('file'),
+            $request->input('type', 'other'),
+            caseId:    $case->id,
+            patientId: $case->patient_id,
+            partnerId: $case->partner_id,
+            notes:     $request->input('notes'),
+        );
+
+        return back()->with('success', 'File uploaded successfully.');
+    }
+
+    public function deleteFile(string $uuid, string $fileUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $file = PatientFile::where('uuid', $fileUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        $this->fileUploader->delete($file);
+
+        return back()->with('success', 'File deleted.');
     }
 }

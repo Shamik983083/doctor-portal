@@ -1,0 +1,608 @@
+@extends('layouts.admin')
+@section('title', 'Weight Loss API Integration Guide')
+@section('page-title', 'Weight Loss API — Integration Guide')
+
+@section('content')
+@php
+    $base    = rtrim(config('app.url'), '/');
+
+    // ── MWL – Weight Loss ─────────────────────────────────────────────────────
+    $questions = $questionnaire ? $questionnaire->questions->sortBy('sort_order')->values() : collect();
+    $byKey = $questions->keyBy('key');
+
+    $qMedCond  = $byKey['mwl_medical_conditions']   ?? null;
+    $qGbConsent= $byKey['mwl_gallbladder_consent']   ?? null;
+    $qTConsent = $byKey['mwl_thyroid_consent']        ?? null;
+    $qBypass   = $byKey['mwl_gastric_bypass']         ?? null;
+    $qAllergy  = $byKey['mwl_glp1_brand_allergy']     ?? null;
+    $qCurGlp1  = $byKey['mwl_current_glp1']           ?? null;
+    $qSideFx   = $byKey['mwl_glp1_side_effects']      ?? null;
+    $qDose     = $byKey['mwl_current_dose']            ?? null;
+    $qContinu  = $byKey['mwl_treatment_continuation']  ?? null;
+    $qHasPic   = $byKey['mwl_has_prescription_pic']    ?? null;
+    $qPicUp    = $byKey['mwl_prescription_pic_upload'] ?? null;
+    $qTruth    = $byKey['mwl_consent_truthfulness']    ?? null;
+    $qGlp1Con  = $byKey['mwl_consent_glp1']            ?? null;
+    $qUuid     = $questionnaire->uuid ?? '';
+
+    // ── Standard Intake 1 ────────────────────────────────────────────────────
+    $siQuestions = $standardIntake ? $standardIntake->questions->sortBy('sort_order')->values() : collect();
+    $siBk = $siQuestions->keyBy('key');
+
+    $siPregnant      = $siBk['pregnant_breastfeeding']        ?? null;
+    $siBP            = $siBk['blood_pressure_range']           ?? null;
+    $siMeds          = $siBk['prescription_medications']       ?? null;
+    $siMedsList      = $siBk['prescription_medications_list']  ?? null;
+    $siAllergies     = $siBk['medication_allergies']           ?? null;
+    $siAllergiesList = $siBk['medication_allergies_list']      ?? null;
+    $siConditions    = $siBk['medical_conditions']             ?? null;
+    $siCondsList     = $siBk['medical_conditions_list']        ?? null;
+    $siInjuries      = $siBk['injuries_surgeries']             ?? null;
+    $siInjuriesDet   = $siBk['injuries_surgeries_details']     ?? null;
+    $siActivity      = $siBk['physical_activity']              ?? null;
+    $siLastEval      = $siBk['last_medical_evaluation']        ?? null;
+    $siLastLab       = $siBk['last_lab_tests']                 ?? null;
+    $siMessage       = $siBk['first_message_to_doctor']        ?? null;
+    $siConsent       = $siBk['telehealth_informed_consent']    ?? null;
+    $siUuid          = $standardIntake->uuid ?? '';
+@endphp
+
+<style>
+pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3rem; font-size:.82rem; overflow-x:auto; position:relative }
+.copy-btn { position:absolute; top:.5rem; right:.6rem; font-size:.7rem; padding:2px 8px; opacity:.7 }
+.copy-btn:hover { opacity:1 }
+.badge-method { font-size:.72rem; font-weight:700; padding:2px 7px; border-radius:4px }
+.method-post { background:#e8f5e9; color:#2e7d32 }
+.method-get  { background:#e3f2fd; color:#1565c0 }
+.section-anchor { scroll-margin-top:80px }
+.toc-link { font-size:.85rem }
+.q-table td:first-child { font-family:monospace; font-size:.8rem; white-space:nowrap }
+.err-table td { font-size:.85rem; vertical-align:top }
+.step-badge { width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; flex-shrink:0 }
+
+@media print {
+    /* Hide admin chrome */
+    nav.sidebar,
+    .topbar,
+    .col-lg-3,
+    button, .copy-btn { display: none !important; }
+
+    /* Remove sidebar margin so content fills the page */
+    .main-content { margin-left: 0 !important; }
+    .p-4 { padding: 0.5rem !important; }
+
+    /* Expand main content column to full width */
+    .col-lg-9 { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; }
+
+    /* Print-friendly code blocks */
+    pre { background: #f5f5f5 !important; color: #111 !important; border: 1px solid #ccc !important; page-break-inside: avoid; }
+
+    /* Keep cards on one page where possible */
+    .card { page-break-inside: avoid; border: 1px solid #ccc !important; margin-bottom: 1rem !important; }
+
+    a { color: inherit !important; text-decoration: none !important; }
+
+    /* Print title at top */
+    body::before {
+        content: "Weight Loss API — Integration Guide";
+        display: block;
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #333;
+        padding-bottom: .5rem;
+    }
+}
+</style>
+
+<div class="row g-4">
+
+{{-- ── TOC ────────────────────────────────────────────────── --}}
+<div class="col-lg-3 d-none d-lg-block">
+<div class="card sticky-top" style="top:1rem">
+<div class="card-header py-2"><strong class="small">Contents</strong></div>
+<div class="card-body py-2 px-3">
+<ol class="mb-0 ps-3" style="line-height:2">
+    <li><a class="toc-link text-decoration-none" href="#auth">Authentication</a></li>
+    <li><a class="toc-link text-decoration-none" href="#discover">Discover Question IDs (both)</a></li>
+    <li><a class="toc-link text-decoration-none" href="#upload">Upload Prescription Image</a></li>
+    <li><a class="toc-link text-decoration-none" href="#create">Create Case (Full Payload)</a></li>
+    <li><a class="toc-link text-decoration-none" href="#questions">Question Reference</a></li>
+    <li><a class="toc-link text-decoration-none" href="#errors">Error Responses</a></li>
+    <li><a class="toc-link text-decoration-none" href="#db">What Gets Created in DB</a></li>
+    <li><a class="toc-link text-decoration-none" href="#checklist">Integration Checklist</a></li>
+</ol>
+</div>
+<div class="card-footer py-2 px-3">
+<button class="btn btn-sm btn-outline-secondary w-100" onclick="window.print()">
+    <i class="bi bi-printer me-1"></i>Print
+</button>
+</div>
+</div>
+</div>
+
+{{-- ── Main content ────────────────────────────────────────── --}}
+<div class="col-lg-9">
+
+{{-- INTRO --}}
+<div class="alert alert-primary border-0 mb-4">
+    <strong><i class="bi bi-info-circle me-2"></i>Overview</strong><br>
+    This guide walks your patient portal developer through submitting a <strong>Weight Loss (MWL)</strong> case via the Partner REST API. Every submission must include answers for <strong>two questionnaires</strong>:
+    <ul class="mb-0 mt-1">
+        <li><strong>Standard Intake 1</strong> — shared baseline intake used for all programs (general health history, medications, consents)</li>
+        <li><strong>MWL – Weight Loss</strong> — program-specific questions (medical conditions, GLP-1 history, prescription image)</li>
+    </ul>
+    A single <code>POST /api/partner/cases</code> call creates the <strong>Patient</strong>, <strong>Case</strong>, and all linked <strong>Questionnaire Answers</strong> in one atomic transaction.
+</div>
+
+{{-- ── 1. AUTH ──────────────────────────────────────────────── --}}
+<div id="auth" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">1</span>Authentication</div>
+<div class="card-body">
+<p class="mb-2">All endpoints require a Bearer token obtained via the OAuth2 <strong>client_credentials</strong> flow.</p>
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge-method method-post">POST</span>
+    <code>{{ $base }}/api/partner/auth/token</code>
+</div>
+<pre id="code-auth">POST {{ $base }}/api/partner/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&client_id=YOUR_CLIENT_ID
+&client_secret=YOUR_CLIENT_SECRET</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-auth')">Copy</button>
+
+<p class="mt-3 mb-1"><strong>Success 200</strong></p>
+<pre id="code-auth-resp">{
+  "token_type": "Bearer",
+  "expires_in": 31536000,
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGci..."
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-auth-resp')">Copy</button>
+
+<p class="mt-3 mb-0 text-muted small">Add the token to every subsequent request as: <code>Authorization: Bearer &lt;access_token&gt;</code></p>
+</div>
+</div>
+
+{{-- ── 2. DISCOVER ──────────────────────────────────────────── --}}
+<div id="discover" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">2</span>Discover Question IDs <span class="text-muted fw-normal small">(do once per environment)</span></div>
+<div class="card-body">
+<p class="mb-3">Fetch each questionnaire once to confirm live question IDs. Use those <code>id</code> values in the <code>answers</code> array of the case creation call. The <strong>Question Reference</strong> table in Section 5 below already lists current IDs — this step lets you verify them against the live database.</p>
+
+<p class="mb-1 fw-semibold small">Standard Intake 1</p>
+<div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge-method method-get">GET</span>
+    <code>{{ $base }}/api/partner/questionnaires/{{ $siUuid }}</code>
+</div>
+<pre id="code-discover-si">GET {{ $base }}/api/partner/questionnaires/{{ $siUuid }}
+Authorization: Bearer &lt;access_token&gt;</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-discover-si')">Copy</button>
+
+<p class="mb-1 fw-semibold small mt-3">MWL – Weight Loss</p>
+<div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge-method method-get">GET</span>
+    <code>{{ $base }}/api/partner/questionnaires/{{ $qUuid }}</code>
+</div>
+<pre id="code-discover">GET {{ $base }}/api/partner/questionnaires/{{ $qUuid }}
+Authorization: Bearer &lt;access_token&gt;</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-discover')">Copy</button>
+</div>
+</div>
+
+{{-- ── 3. UPLOAD ────────────────────────────────────────────── --}}
+<div id="upload" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">3</span>Upload Prescription Image <span class="text-muted fw-normal small">(only if patient has GLP-1 prescription photo)</span></div>
+<div class="card-body">
+<p class="mb-2">Upload the image first and receive a <code>file_token</code>. Pass that token as the answer to question <code>{{ $qPicUp->id ?? 'ID' }}</code> (<code>mwl_prescription_pic_upload</code>) in the case payload. Skip this step entirely if the patient answered <strong>No</strong> to having a prescription picture.</p>
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge-method method-post">POST</span>
+    <code>{{ $base }}/api/partner/files</code>
+</div>
+<pre id="code-upload">POST {{ $base }}/api/partner/files
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: multipart/form-data
+
+file=&lt;binary image — JPG, PNG, or PDF, max 10 MB&gt;</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-upload')">Copy</button>
+
+<p class="mt-3 mb-1"><strong>Success 201</strong></p>
+<pre id="code-upload-resp">{
+  "file_token":    "3f2a1b4c-...",   ← use this as the answer value
+  "original_name": "prescription.jpg",
+  "size":          204800,
+  "mime_type":     "image/jpeg"
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-upload-resp')">Copy</button>
+</div>
+</div>
+
+{{-- ── 4. CREATE CASE ───────────────────────────────────────── --}}
+<div id="create" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">4</span>Create Case — Full Payload</div>
+<div class="card-body">
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge-method method-post">POST</span>
+    <code>{{ $base }}/api/partner/cases</code>
+</div>
+<pre id="code-create">POST {{ $base }}/api/partner/cases
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "patient": {
+    "first_name":    "Jane",
+    "last_name":     "Doe",
+    "email":         "jane.doe@example.com",
+    "phone":         "+15551234567",
+    "date_of_birth": "1985-06-15",
+    "gender":        "female",
+    "address":       "123 Main St",
+    "city":          "Austin",
+    "state":         "TX",
+    "zip":           "78701",
+    "external_id":   "portal-user-9001"
+  },
+  "patient_state":  "TX",
+  "external_id":    "order-wl-20240701-001",
+  "is_chargeable":  true,
+  "hold_status":    false,
+
+  "questionnaire_responses": [
+
+    // ── Standard Intake 1 ────────────────────────────────────────
+    {
+      "questionnaire_id": "{{ $siUuid }}",
+      "answers": [
+
+        {{ $siPregnant      ? '// Q' . $siPregnant->id      . ' – Pregnant / breastfeeding?' : '' }}
+        { "question_id": {{ $siPregnant->id      ?? 0 }}, "answer": "no" },
+
+        {{ $siBP            ? '// Q' . $siBP->id            . ' – Blood pressure range' : '' }}
+        { "question_id": {{ $siBP->id            ?? 0 }}, "answer": "normal" },
+
+        {{ $siMeds          ? '// Q' . $siMeds->id          . ' – Currently on prescription medications?' : '' }}
+        { "question_id": {{ $siMeds->id          ?? 0 }}, "answer": "yes" },
+
+        {{ $siMedsList      ? '// Q' . $siMedsList->id      . ' – Medication list (include only if "yes" above)' : '' }}
+        { "question_id": {{ $siMedsList->id      ?? 0 }}, "answer": "Metformin 500mg twice daily" },
+
+        {{ $siAllergies     ? '// Q' . $siAllergies->id     . ' – Medication allergies?' : '' }}
+        { "question_id": {{ $siAllergies->id     ?? 0 }}, "answer": "no" },
+
+        // (omit mwl_medication_allergies_list if "no" above)
+
+        {{ $siConditions    ? '// Q' . $siConditions->id    . ' – Any medical conditions?' : '' }}
+        { "question_id": {{ $siConditions->id    ?? 0 }}, "answer": "no" },
+
+        // (omit medical_conditions_list if "no" above)
+
+        {{ $siInjuries      ? '// Q' . $siInjuries->id      . ' – Injuries / surgeries in last 6 months?' : '' }}
+        { "question_id": {{ $siInjuries->id      ?? 0 }}, "answer": "no" },
+
+        // (omit injuries_surgeries_details if "no" above)
+
+        {{ $siActivity      ? '// Q' . $siActivity->id      . ' – Physical activity level' : '' }}
+        { "question_id": {{ $siActivity->id      ?? 0 }}, "answer": "somewhat_active" },
+
+        {{ $siLastEval      ? '// Q' . $siLastEval->id      . ' – Last in-person medical evaluation' : '' }}
+        { "question_id": {{ $siLastEval->id      ?? 0 }}, "answer": "less_than_1_year" },
+
+        {{ $siLastLab       ? '// Q' . $siLastLab->id       . ' – Last lab tests' : '' }}
+        { "question_id": {{ $siLastLab->id       ?? 0 }}, "answer": "less_than_1_year" },
+
+        {{ $siMessage       ? '// Q' . $siMessage->id       . ' – First message to doctor (optional)' : '' }}
+        { "question_id": {{ $siMessage->id       ?? 0 }}, "answer": "Starting my weight loss journey." },
+
+        {{ $siConsent       ? '// Q' . $siConsent->id       . ' – Telehealth informed consent' : '' }}
+        { "question_id": {{ $siConsent->id       ?? 0 }}, "answer": "agree" }
+      ]
+    },
+
+    // ── MWL – Weight Loss ────────────────────────────────────────
+    {
+      "questionnaire_id": "{{ $qUuid }}",
+      "answers": [
+
+        {{ $qMedCond  ? '// Q' . $qMedCond->id  . ' – Medical conditions (multi, select all that apply)' : '' }}
+        { "question_id": {{ $qMedCond->id  ?? 0 }}, "answer": ["gallbladder_disease", "hypertension"] },
+
+        {{ $qGbConsent ? '// Q' . $qGbConsent->id . ' – Gallbladder consent (only include if gallbladder_disease selected above)' : '' }}
+        { "question_id": {{ $qGbConsent->id ?? 0 }}, "answer": "agree" },
+
+        {{ $qTConsent  ? '// Q' . $qTConsent->id  . ' – Thyroid consent (only include if thyroid_issues selected above)' : '' }}
+        // (omit this question if thyroid_issues was NOT selected)
+
+        {{ $qBypass   ? '// Q' . $qBypass->id   . ' – Gastric bypass in last 6 months' : '' }}
+        { "question_id": {{ $qBypass->id   ?? 0 }}, "answer": "no" },
+
+        {{ $qAllergy  ? '// Q' . $qAllergy->id  . ' – GLP-1 brand allergies (multi)' : '' }}
+        { "question_id": {{ $qAllergy->id  ?? 0 }}, "answer": ["none"] },
+
+        {{ $qCurGlp1  ? '// Q' . $qCurGlp1->id  . ' – Currently on GLP-1 medication?' : '' }}
+        { "question_id": {{ $qCurGlp1->id  ?? 0 }}, "answer": "semaglutide" },
+
+        {{ $qSideFx   ? '// Q' . $qSideFx->id   . ' – Side effects? (include only if not "none" above)' : '' }}
+        { "question_id": {{ $qSideFx->id   ?? 0 }}, "answer": "no" },
+
+        {{ $qDose     ? '// Q' . $qDose->id     . ' – Current dose (include only if not "none" above)' : '' }}
+        { "question_id": {{ $qDose->id     ?? 0 }}, "answer": "sema_0_5" },
+
+        {{ $qContinu  ? '// Q' . $qContinu->id  . ' – Treatment continuation (include only if not "none" above)' : '' }}
+        { "question_id": {{ $qContinu->id  ?? 0 }}, "answer": "same_dose" },
+
+        {{ $qHasPic   ? '// Q' . $qHasPic->id   . ' – Has prescription picture? (include only if not "none" above)' : '' }}
+        { "question_id": {{ $qHasPic->id   ?? 0 }}, "answer": "yes" },
+
+        {{ $qPicUp    ? '// Q' . $qPicUp->id    . ' – Prescription image (file_token from Step 3; include only if "yes" above)' : '' }}
+        { "question_id": {{ $qPicUp->id    ?? 0 }}, "answer": "3f2a1b4c-..." },
+
+        {{ $qTruth    ? '// Q' . $qTruth->id    . ' – Truthfulness consent' : '' }}
+        { "question_id": {{ $qTruth->id    ?? 0 }}, "answer": "agree" },
+
+        {{ $qGlp1Con  ? '// Q' . $qGlp1Con->id  . ' – GLP-1 informed consent' : '' }}
+        { "question_id": {{ $qGlp1Con->id  ?? 0 }}, "answer": "agree" }
+      ]
+    }
+  ]
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create')">Copy</button>
+
+<p class="mt-3 mb-1"><strong>Success 201</strong></p>
+<pre id="code-create-resp">{
+  "uuid":       "case-uuid-here",
+  "status":     "waiting",
+  "patient": {
+    "uuid":       "patient-uuid",
+    "first_name": "Jane",
+    "last_name":  "Doe",
+    "email":      "jane.doe@example.com"
+  },
+  "case_offerings": [...],
+  "created_at": "2026-07-03T10:00:00.000000Z"
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create-resp')">Copy</button>
+
+<div class="alert alert-warning mt-3 mb-0 small">
+    <strong><i class="bi bi-exclamation-triangle me-1"></i>Conditional answers</strong> — Only send answers for questions the patient actually answered. Conditional questions (GLP-1 follow-ups, prescription image, gallbladder/thyroid consents) should be <strong>omitted entirely</strong> if the condition was not met. The system does not error on missing optional answers — it silently skips them.
+</div>
+</div>
+</div>
+
+{{-- ── 5. QUESTION REFERENCE ───────────────────────────────── --}}
+<div id="questions" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">5</span>Question Reference</div>
+<div class="card-body p-0">
+
+@php
+function renderQRows($rows, $allRows) {
+    $out = '';
+    foreach ($rows as $q) {
+        $depQ = $allRows->firstWhere('id', $q->depends_on_question_id);
+        $cond = $depQ
+            ? 'Show if Q' . $depQ->id . ' ' . $q->depends_on_operator . ' "' . $q->depends_on_value . '"'
+            : '—';
+        $optVals = collect($q->options ?? [])->pluck('value')->implode(', ');
+        if (strlen($optVals) > 60) $optVals = substr($optVals, 0, 58) . '…';
+        if (in_array($q->type, ['multi', 'checkbox', 'multiselect'])) {
+            $typeBadge = '<span class="badge bg-info text-dark">' . $q->type . '</span>';
+        } elseif ($q->type === 'file') {
+            $typeBadge = '<span class="badge bg-warning text-dark">file</span>';
+        } elseif ($q->type === 'hidden') {
+            $typeBadge = '<span class="badge bg-secondary">hidden</span>';
+        } else {
+            $typeBadge = '<span class="badge bg-light text-dark border">' . $q->type . '</span>';
+        }
+        $valueCell = $q->type === 'file'
+            ? 'file_token (UUID)'
+            : (in_array($q->type, ['multi', 'checkbox']) ? 'array of: ' . $optVals : ($optVals ?: '(free text)'));
+        $rowClass = $q->depends_on_question_id ? 'table-warning' : '';
+        $out .= '<tr class="' . $rowClass . '">'
+            . '<td><strong>' . $q->id . '</strong></td>'
+            . '<td><code style="font-size:.75rem">' . e($q->key) . '</code></td>'
+            . '<td>' . $typeBadge . '</td>'
+            . '<td>' . $q->step_number . '</td>'
+            . '<td class="small text-muted" style="font-size:.78rem">' . e($cond) . '</td>'
+            . '<td class="small text-muted" style="font-size:.78rem">' . e($valueCell) . '</td>'
+            . '</tr>';
+    }
+    return $out;
+}
+@endphp
+
+{{-- Standard Intake 1 --}}
+<div class="px-3 pt-3 pb-1 small fw-semibold text-muted text-uppercase" style="letter-spacing:.04em">
+    Standard Intake 1 &nbsp;<span class="badge bg-secondary fw-normal" style="font-size:.65rem;letter-spacing:0">{{ $siUuid }}</span>
+</div>
+<div class="table-responsive">
+<table class="table table-sm table-hover mb-0 q-table">
+<thead class="table-light">
+<tr><th>Question ID</th><th>Key</th><th>Type</th><th>Step</th><th>Condition</th><th>Accepted Values</th></tr>
+</thead>
+<tbody>{!! renderQRows($siQuestions, $siQuestions) !!}</tbody>
+</table>
+</div>
+
+{{-- MWL – Weight Loss --}}
+<div class="px-3 pt-3 pb-1 small fw-semibold text-muted text-uppercase border-top" style="letter-spacing:.04em">
+    MWL – Weight Loss &nbsp;<span class="badge bg-secondary fw-normal" style="font-size:.65rem;letter-spacing:0">{{ $qUuid }}</span>
+</div>
+<div class="table-responsive">
+<table class="table table-sm table-hover mb-0 q-table">
+<thead class="table-light">
+<tr><th>Question ID</th><th>Key</th><th>Type</th><th>Step</th><th>Condition</th><th>Accepted Values</th></tr>
+</thead>
+<tbody>{!! renderQRows($questions, $questions) !!}</tbody>
+</table>
+</div>
+
+<div class="px-3 py-2 small text-muted bg-light rounded-bottom border-top">
+    <i class="bi bi-exclamation-circle me-1"></i><strong>Yellow rows</strong> are conditional — only send them when their condition is met.
+    &nbsp;|&nbsp;<span class="badge bg-info text-dark">multi</span> answers must be JSON arrays even for a single selection.
+    &nbsp;|&nbsp;<strong>Disqualifying</strong> answers will mark the case as disqualified — the case is still created but the doctor will see a disqualification flag.
+</div>
+</div>
+</div>
+
+{{-- ── 6. ERRORS ───────────────────────────────────────────── --}}
+<div id="errors" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-danger text-white me-2">6</span>Error Responses</div>
+<div class="card-body p-0">
+<table class="table table-sm mb-0 err-table">
+<thead class="table-light">
+    <tr><th>HTTP</th><th>When</th><th>Example body</th></tr>
+</thead>
+<tbody>
+<tr>
+    <td><span class="badge bg-danger">401</span></td>
+    <td>Token missing, expired, or malformed</td>
+    <td><code>{"message":"Unauthenticated."}</code></td>
+</tr>
+<tr>
+    <td><span class="badge bg-danger">403</span></td>
+    <td>Token is valid but partner account is inactive or suspended</td>
+    <td><code>{"message":"Partner account is not active."}</code></td>
+</tr>
+<tr>
+    <td><span class="badge bg-warning text-dark">409</span></td>
+    <td><code>external_id</code> already exists for this partner</td>
+    <td><code>{"message":"Case with this external_id already exists."}</code></td>
+</tr>
+<tr>
+    <td><span class="badge bg-warning text-dark">422</span></td>
+    <td>Validation failed (missing required field, wrong type, unknown question ID, etc.)</td>
+    <td><pre class="mt-1 mb-0" style="font-size:.75rem">{
+  "message": "The patient.email field is required.",
+  "errors": {
+    "patient.email": ["The patient.email field is required."],
+    "questionnaire_responses.0.answers.2.answer": ["..."]
+  }
+}</pre></td>
+</tr>
+<tr>
+    <td><span class="badge bg-warning text-dark">422</span></td>
+    <td>Required questionnaire not submitted for an attached offering</td>
+    <td><pre class="mt-1 mb-0" style="font-size:.75rem">{
+  "message": "The given data was invalid.",
+  "errors": {
+    "questionnaire_responses": ["Required questionnaires not submitted: {{ $qUuid }}"]
+  }
+}</pre></td>
+</tr>
+<tr>
+    <td><span class="badge bg-secondary">422</span></td>
+    <td>File upload — wrong type or too large</td>
+    <td><pre class="mt-1 mb-0" style="font-size:.75rem">{
+  "message": "The file field must be a file of type: pdf, jpg, jpeg, png.",
+  "errors": { "file": ["..."] }
+}</pre></td>
+</tr>
+<tr>
+    <td><span class="badge bg-danger">500</span></td>
+    <td>Unexpected server error (rare)</td>
+    <td><code>{"message":"Server Error"}</code> — contact the portal team with the request timestamp.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+{{-- ── 7. DB RESULT ─────────────────────────────────────────── --}}
+<div id="db" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-success text-white me-2">7</span>What Gets Created in the Database</div>
+<div class="card-body">
+<p class="mb-3">A single successful <code>POST /api/partner/cases</code> call atomically creates:</p>
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="border rounded p-3 h-100">
+            <h6 class="fw-semibold mb-2"><i class="bi bi-person-circle me-2 text-primary"></i>Patient</h6>
+            <ul class="small mb-0 ps-3">
+                <li>Looked up by <code>external_id</code> first, then by <code>email</code></li>
+                <li>Created if no match; fields updated if a match is found</li>
+                <li>Linked to the partner account</li>
+            </ul>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="border rounded p-3 h-100">
+            <h6 class="fw-semibold mb-2"><i class="bi bi-folder2 me-2 text-primary"></i>Case</h6>
+            <ul class="small mb-0 ps-3">
+                <li>Status set to <strong>waiting</strong> immediately (unless <code>hold_status: true</code>)</li>
+                <li>Linked to patient and partner</li>
+                <li>Your <code>external_id</code> stored for idempotency</li>
+            </ul>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="border rounded p-3 h-100">
+            <h6 class="fw-semibold mb-2"><i class="bi bi-ui-checks me-2 text-primary"></i>Questionnaire Response + Answers</h6>
+            <ul class="small mb-0 ps-3">
+                <li>One <code>QuestionnaireResponse</code> record per questionnaire submitted</li>
+                <li>One <code>QuestionnaireAnswer</code> row per question, with the question text <strong>frozen at submission time</strong></li>
+                <li>Disqualification flag set automatically if any disqualifying option was selected</li>
+            </ul>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="border rounded p-3 h-100">
+            <h6 class="fw-semibold mb-2"><i class="bi bi-image me-2 text-primary"></i>Prescription Image</h6>
+            <ul class="small mb-0 ps-3">
+                <li>File saved to <code>storage/app/patient-files/YYYY/MM/</code></li>
+                <li>ClamAV virus scan queued automatically (non-blocking)</li>
+                <li>File record linked to the patient, case, and partner</li>
+                <li>Accessible to the reviewing clinician from the case view</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-3 mb-0 small">
+    <i class="bi bi-arrow-right-circle me-1"></i>
+    After the case is created with status <strong>waiting</strong>, a clinician will pick it up from their queue, review the questionnaire answers and prescription image, and either approve or request more information. You will receive webhook events at each status change if you have registered a webhook endpoint.
+</div>
+</div>
+</div>
+
+{{-- ── 8. CHECKLIST ─────────────────────────────────────────── --}}
+<div id="checklist" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">8</span>Integration Checklist</div>
+<div class="card-body">
+<ul class="list-unstyled mb-0">
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code> and <code>client_secret</code> from the admin — Partner → Credentials</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $siUuid }}</code> once to confirm Standard Intake 1 question IDs</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> once to confirm MWL Weight Loss question IDs</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>If patient has a prescription image: <code>POST /api/partner/files</code> → store <code>file_token</code></li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with patient data + <strong>both</strong> questionnaire answer blocks (Standard Intake 1 and MWL)</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Register a webhook at <code>POST /api/partner/webhooks</code> to receive <code>case.status_changed</code> and <code>patient_message_received</code> events</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify HMAC signature on incoming webhooks: <code>X-Webhook-Signature: sha256=&lt;digest&gt;</code></li>
+    <li class="mb-0"><i class="bi bi-check-square text-success me-2"></i>Use <code>external_id</code> on every case submission for safe retries (409 = already created, treat as success)</li>
+</ul>
+</div>
+</div>
+
+</div>{{-- /col-lg-9 --}}
+</div>{{-- /row --}}
+
+@endsection
+
+@section('scripts')
+<script>
+function copyCode(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.innerText).then(function () {
+        var btns = document.querySelectorAll('button[onclick="copyCode(\'' + id + '\')"]');
+        btns.forEach(function (b) {
+            var orig = b.textContent;
+            b.textContent = 'Copied!';
+            setTimeout(function () { b.textContent = orig; }, 1500);
+        });
+    });
+}
+</script>
+@endsection

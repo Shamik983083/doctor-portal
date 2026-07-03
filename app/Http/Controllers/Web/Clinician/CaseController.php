@@ -8,7 +8,9 @@ use App\Models\ClinicalNote;
 use App\Models\Message;
 use App\Models\Offering;
 use App\Models\PatientCase;
+use App\Models\PatientFile;
 use App\Services\CaseStateMachine;
+use App\Services\FileUploadService;
 use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,8 +19,9 @@ use Illuminate\Support\Facades\DB;
 class CaseController extends Controller
 {
     public function __construct(
-        private CaseStateMachine $stateMachine,
+        private CaseStateMachine  $stateMachine,
         private WebhookDispatcher $webhooks,
+        private FileUploadService $fileUploader,
     ) {}
 
     public function queue(Request $request)
@@ -26,6 +29,9 @@ class CaseController extends Controller
         $clinician = Auth::user()->clinician;
 
         $cases = PatientCase::with(['patient', 'partner', 'caseOfferings.offering'])
+            ->withCount(['messages as unread_messages_count' => fn($q) =>
+                $q->where('direction', 'inbound')->where('is_read', false)
+            ])
             ->when($request->status, fn($q, $s) => $q->where('status', $s), fn($q) => $q->where('status', PatientCase::STATUS_WAITING))
             ->when($request->partner_id, fn($q, $id) => $q->where('partner_id', $id))
             ->orderBy('created_at')
@@ -47,7 +53,20 @@ class CaseController extends Controller
             'casePrescriptions.medications',
         ])->where('uuid', $uuid)->firstOrFail();
 
-        return view('clinician.cases.show', compact('case'));
+        // Count unread patient messages before marking them read
+        $unreadMessageCount = $case->messages
+            ->where('direction', 'inbound')
+            ->where('is_read', false)
+            ->count();
+
+        if ($unreadMessageCount > 0) {
+            $case->messages()
+                ->where('direction', 'inbound')
+                ->where('is_read', false)
+                ->update(['is_read' => true, 'read_at' => now()]);
+        }
+
+        return view('clinician.cases.show', compact('case', 'unreadMessageCount'));
     }
 
     public function assign(Request $request, string $uuid)
@@ -80,6 +99,7 @@ class CaseController extends Controller
 
         $offerings = Offering::with('category')
             ->where('is_active', true)
+            ->approved()
             ->when($categoryIds->count(), fn($q) => $q->whereIn('category_id', $categoryIds))
             ->orderBy('name')
             ->get(['id', 'name', 'internal_name', 'compound_formula', 'refills',
@@ -274,5 +294,40 @@ class CaseController extends Controller
         ]);
 
         return back()->with('success', 'Message sent.');
+    }
+
+    public function uploadFile(Request $request, string $uuid)
+    {
+        $request->validate([
+            'file'  => 'required|file|mimes:pdf,jpg,jpeg,png|max:' . FileUploadService::MAX_SIZE_KB,
+            'type'  => 'nullable|in:lab_result,id_doc,consent,medical_necessity,intake,other',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $this->fileUploader->store(
+            $request->file('file'),
+            $request->input('type', 'other'),
+            caseId:    $case->id,
+            patientId: $case->patient_id,
+            partnerId: $case->partner_id,
+            notes:     $request->input('notes'),
+        );
+
+        return back()->with('success', 'File uploaded successfully.');
+    }
+
+    public function deleteFile(string $uuid, string $fileUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $file = PatientFile::where('uuid', $fileUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        $this->fileUploader->delete($file);
+
+        return back()->with('success', 'File deleted.');
     }
 }

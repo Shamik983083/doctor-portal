@@ -38,6 +38,10 @@
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.offerings.*') ? 'active' : '' }}" href="{{ route('admin.offerings.index') }}">
             <i class="bi bi-capsule"></i> Offerings
+            @php $pendingOfferingsCount = \App\Models\Offering::where('approval_status', 'pending')->count(); @endphp
+            @if($pendingOfferingsCount > 0)
+                <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">{{ $pendingOfferingsCount }}</span>
+            @endif
         </a>
     </li>
     <li class="nav-item">
@@ -55,6 +59,25 @@
             <i class="bi bi-question-circle me-1"></i> Question Bank
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.guide.messaging') ? 'active' : '' }}" href="{{ route('admin.guide.messaging') }}">
+            <i class="bi bi-chat-dots"></i> Guide: Messaging API
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.guide.weightloss-api') ? 'active' : '' }}" href="{{ route('admin.guide.weightloss-api') }}">
+            <i class="bi bi-journal-medical"></i> Guide: Weight Loss API
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.webhooks.*') ? 'active' : '' }}" href="{{ route('admin.webhooks.index') }}">
+            <i class="bi bi-broadcast"></i> Webhooks
+            @php $failedWebhooksCount = \App\Models\WebhookDelivery::where('status', 'failed')->count(); @endphp
+            @if($failedWebhooksCount > 0)
+                <span class="badge bg-danger ms-1" style="font-size:.65rem;">{{ $failedWebhooksCount }}</span>
+            @endif
+        </a>
+    </li>
     <hr class="border-secondary my-2">
     <li><span class="px-3 text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;">Clinician View</span></li>
     <li class="nav-item">
@@ -63,7 +86,7 @@
         </a>
     </li>
 </ul>
-<div class="mt-auto px-3 py-3 border-top border-secondary" style="position:absolute; bottom:0; width:100%;">
+<div class="px-3 py-3 border-top border-secondary mt-3">
     <small class="text-muted">Admin Console</small>
 </div>
 @endsection

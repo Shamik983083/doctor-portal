@@ -39,8 +39,8 @@ class QuestionnaireController extends Controller
             'partner_id'                        => 'nullable|exists:partners,id',
             'mode'                              => 'nullable|in:single,multi',
             'questions'                         => 'nullable|array',
-            'questions.*.question'              => 'required|string|max:500',
-            'questions.*.type'                  => 'required|in:hidden,input,email,textarea,date,select,multiselect,radio,checkbox,file,number,height,weight,bmi',
+            'questions.*.question'              => 'required|string|max:5000',
+            'questions.*.type'                  => 'required|in:hidden,input,email,textarea,date,select,multiselect,radio,checkbox,choice,multi,file,number,height,weight,bmi',
             'questions.*.key'                   => 'nullable|string|max:100',
             'questions.*.placeholder'           => 'nullable|string|max:255',
             'questions.*.step_number'           => 'nullable|integer|min:1',
@@ -87,8 +87,8 @@ class QuestionnaireController extends Controller
             'partner_id'                        => 'nullable|exists:partners,id',
             'mode'                              => 'nullable|in:single,multi',
             'questions'                         => 'nullable|array',
-            'questions.*.question'              => 'required|string|max:500',
-            'questions.*.type'                  => 'required|in:hidden,input,email,textarea,date,select,multiselect,radio,checkbox,file,number,height,weight,bmi',
+            'questions.*.question'              => 'required|string|max:5000',
+            'questions.*.type'                  => 'required|in:hidden,input,email,textarea,date,select,multiselect,radio,checkbox,choice,multi,file,number,height,weight,bmi',
             'questions.*.key'                   => 'nullable|string|max:100',
             'questions.*.placeholder'           => 'nullable|string|max:255',
             'questions.*.step_number'           => 'nullable|integer|min:1',
@@ -124,7 +124,7 @@ class QuestionnaireController extends Controller
 
     private function syncQuestions(Questionnaire $questionnaire, array $questions): void
     {
-        $optionTypes = ['select', 'multiselect', 'radio', 'checkbox'];
+        $optionTypes = ['select', 'multiselect', 'radio', 'checkbox', 'choice', 'multi'];
         $questions   = array_values($questions);
 
         // Pass 1 — create all questions without depends_on; capture idx → DB id map

@@ -30,16 +30,16 @@ class ClinicianController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'            => 'required|string',
-            'email'           => 'required|email|unique:users',
-            'password'        => 'required|min:8|confirmed',
-            'npi'             => 'nullable|string',
-            'license_number'  => 'nullable|string',
-            'license_state'   => 'nullable|string|size:2',
-            'specialty'       => 'nullable|string',
-            'credentials'     => 'nullable|in:MD,DO,NP,PA',
-            'licensed_states'   => 'nullable|array',
-            'licensed_states.*' => 'string|size:2',
+            'name'                      => 'required|string',
+            'email'                     => 'required|email|unique:users',
+            'password'                  => 'required|min:8|confirmed',
+            'npi'                       => 'nullable|string',
+            'specialty'                 => 'nullable|string',
+            'credentials'               => 'nullable|in:MD,DO,NP,PA',
+            'license_info'              => 'nullable|array',
+            'license_info.*.state'      => 'required|string|size:2',
+            'license_info.*.number'     => 'required|string|max:100',
+            'license_info.*.expiry'     => 'required|date',
         ]);
 
         $user = User::create([
@@ -49,14 +49,21 @@ class ClinicianController extends Controller
         ]);
         $user->assignRole('clinician');
 
-        $clinician = Clinician::create([
+        $licensedStates = [];
+        foreach ($request->input('license_info', []) as $abbr => $info) {
+            $licensedStates[] = [
+                'state'          => strtoupper($abbr),
+                'license_number' => $info['number'],
+                'expiry_date'    => $info['expiry'],
+            ];
+        }
+
+        Clinician::create([
             'user_id'         => $user->id,
             'npi'             => $data['npi'] ?? null,
-            'license_number'  => $data['license_number'] ?? null,
-            'license_state'   => $data['license_state'] ?? null,
             'specialty'       => $data['specialty'] ?? null,
             'credentials'     => $data['credentials'] ?? null,
-            'licensed_states' => $data['licensed_states'] ?? [],
+            'licensed_states' => $licensedStates,
         ]);
 
         return redirect()->route('admin.clinicians.index')->with('success', 'Clinician created.');

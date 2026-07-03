@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\Partner\OfferingController;
 use App\Http\Controllers\Api\Partner\OrderController;
 use App\Http\Controllers\Api\Partner\PatientController;
 use App\Http\Controllers\Api\Partner\QuestionnaireController;
+use App\Http\Controllers\Api\Partner\FileController;
+use App\Http\Controllers\Api\Partner\MessageController;
 use App\Http\Controllers\Api\Partner\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +27,9 @@ Route::prefix('partner')->middleware(['auth:api', 'partner.auth'])->group(functi
     // Questionnaires — read-only; lets partners discover question IDs before submitting cases
     Route::get('/questionnaires/{uuid}', [QuestionnaireController::class, 'show']);
 
+    // File upload — upload a prescription image, get a file_token to use in case creation
+    Route::post('/files', [FileController::class, 'upload']);
+
     // Cases
     Route::prefix('cases')->group(function () {
         Route::get('/', [CaseController::class, 'index']);
@@ -35,6 +40,8 @@ Route::prefix('partner')->middleware(['auth:api', 'partner.auth'])->group(functi
         Route::post('/{id}/hold', [CaseController::class, 'setHold']);
         Route::post('/{id}/support', [CaseController::class, 'support']);
         Route::get('/{id}/events', [CaseController::class, 'events']);
+        Route::get('/{id}/messages', [MessageController::class, 'index']);
+        Route::post('/{id}/messages', [MessageController::class, 'store']);
     });
 
     // Offerings

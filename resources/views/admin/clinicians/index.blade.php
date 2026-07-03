@@ -45,9 +45,13 @@
                         <td>{{ $clinician->credentials ?? '—' }}</td>
                         <td><code class="small">{{ $clinician->npi ?? '—' }}</code></td>
                         <td>
-                            @if($clinician->licensed_states)
-                                {{ implode(', ', array_slice($clinician->licensed_states, 0, 4)) }}
-                                @if(count($clinician->licensed_states) > 4) <small class="text-muted">+{{ count($clinician->licensed_states) - 4 }}</small>@endif
+                            @php
+                                $ls = $clinician->licensed_states ?? [];
+                                $codes = count($ls) && is_array($ls[0]) ? array_column($ls, 'state') : $ls;
+                            @endphp
+                            @if(count($codes))
+                                {{ implode(', ', array_slice($codes, 0, 4)) }}
+                                @if(count($codes) > 4) <small class="text-muted">+{{ count($codes) - 4 }}</small>@endif
                             @else —
                             @endif
                         </td>

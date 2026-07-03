@@ -7,6 +7,7 @@ use App\Models\Offering;
 use App\Models\OfferingCategory;
 use App\Models\Partner;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class OfferingController extends Controller
 {
@@ -25,6 +26,7 @@ class OfferingController extends Controller
             ->when($request->type, fn($q, $t) => $q->where('type', $t))
             ->when($request->search, fn($q, $s) => $q->where('name', 'like', "%{$s}%"))
             ->when($request->active !== null && $request->active !== '', fn($q) => $q->where('is_active', (bool) $request->active))
+            ->when($request->approval, fn($q, $a) => $q->where('approval_status', $a))
             ->latest()->paginate(20)->withQueryString();
 
         $partners = Partner::where('status', 'active')->get(['id', 'name']);
@@ -72,8 +74,11 @@ class OfferingController extends Controller
         $data['is_active']               = $request->boolean('is_active');
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
         $data['category_id']             = $request->input('category_id') ?: null;
+        $data['approval_status']         = 'approved';
+        $data['approved_by']             = Auth::id();
+        $data['approved_at']             = now();
 
-        $offering = Offering::create($data);
+        Offering::create($data);
 
         return redirect()->route('admin.offerings.index')
             ->with('success', "Offering \"{$data['name']}\" created successfully.");
@@ -85,6 +90,36 @@ class OfferingController extends Controller
         $usStates   = $this->usStates;
         $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         return view('admin.offerings.show', compact('offering', 'usStates', 'categories'));
+    }
+
+    public function approve(int $id)
+    {
+        $offering = Offering::findOrFail($id);
+        $offering->update([
+            'approval_status' => 'approved',
+            'approved_by'     => Auth::id(),
+            'approved_at'     => now(),
+            'rejection_note'  => null,
+        ]);
+
+        return back()->with('success', "\"{$offering->name}\" has been approved and is now available to clinicians.");
+    }
+
+    public function reject(Request $request, int $id)
+    {
+        $request->validate([
+            'rejection_note' => 'required|string|max:1000',
+        ]);
+
+        $offering = Offering::findOrFail($id);
+        $offering->update([
+            'approval_status' => 'rejected',
+            'approved_by'     => null,
+            'approved_at'     => null,
+            'rejection_note'  => $request->rejection_note,
+        ]);
+
+        return back()->with('success', "\"{$offering->name}\" has been rejected. The partner can edit and re-submit.");
     }
 
     public function toggleStatus(int $id)

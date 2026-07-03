@@ -51,6 +51,7 @@
                     <th>Type</th>
                     <th>Category</th>
                     <th>States</th>
+                    <th>Approval</th>
                     <th>Status</th>
                     <th></th>
                 </tr>
@@ -67,6 +68,21 @@
                             <span class="badge bg-success bg-opacity-10 text-success">All States</span>
                         @else
                             <span class="badge bg-light text-dark border">{{ count($offering->available_states) }} states</span>
+                        @endif
+                    </td>
+                    <td>
+                        @if($offering->approval_status === 'approved')
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                <i class="bi bi-check-circle me-1"></i>Approved
+                            </span>
+                        @elseif($offering->approval_status === 'rejected')
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">
+                                <i class="bi bi-x-circle me-1"></i>Rejected
+                            </span>
+                        @else
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25">
+                                <i class="bi bi-clock me-1"></i>Pending
+                            </span>
                         @endif
                     </td>
                     <td>
@@ -94,7 +110,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted" style="min-height:200px">
+                    <td colspan="8" class="text-center py-5 text-muted" style="min-height:200px">
                         <i class="bi bi-box-seam fs-3 d-block mb-2 opacity-25"></i>
                         No offerings yet. <a href="{{ route('partner.offerings.create') }}">Create your first one.</a>
                     </td>

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Jobs\SendWebhookJob;
-use App\Models\Partner;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
 
@@ -27,7 +26,7 @@ class WebhookDispatcher
                 'max_attempts' => 5,
             ]);
 
-            SendWebhookJob::dispatch($delivery->id)->onQueue('webhooks');
+            SendWebhookJob::dispatch($delivery->id)->onQueue('webhooks')->afterCommit();
         }
     }
 

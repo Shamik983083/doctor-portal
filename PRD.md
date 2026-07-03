@@ -1,6 +1,6 @@
 # Doctor Portal — Product Requirements Document
 
-**Last Updated:** 2026-07-01 (rev 2)
+**Last Updated:** 2026-07-03 (rev 3)
 **Status:** In Development
 **Stack:** Laravel 12, PHP 8.2, Bootstrap 5, MySQL (XAMPP), Laravel Passport 13.7, Spatie Permission 6.25
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-A Telehealth & E-Prescribing Integration Platform. Healthcare partners embed a public questionnaire form on their own patient portal. When a patient submits the form, a case is automatically created and enters the clinician queue for auto-assignment. Clinicians review, approve, and prescribe medications. Admins oversee the entire system.
+A Telehealth & E-Prescribing Integration Platform. Healthcare partners can submit patient cases either by embedding a public questionnaire form on their patient portal (hosted form path) or by calling the Partner REST API directly (API path). Cases enter a clinician queue for auto-assignment. Clinicians review, approve, and prescribe medications. Admins oversee the entire system.
 
 ---
 
@@ -34,7 +34,7 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 
 | Transition | Who Triggers |
 |-----------|-------------|
-| Created → Waiting | Auto on form submit (system) |
+| Created → Waiting | Auto on form submit or API case creation (system) |
 | Waiting → Assigned | **Auto-assigner** (priority queue) or Admin (manual assign) or Clinician (self-claim) |
 | Assigned → Approved | Clinician (via Approve & Prescribe flow) |
 | Assigned → Support | Clinician (with a note explaining what is needed) |
@@ -52,9 +52,9 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 
 ## How Cases Enter the System
 
-Cases originate exclusively from the **public questionnaire form** hosted on this portal and embedded in the partner's patient-facing website via iFrame. There is no manual admin step to create a case.
+Two paths exist. Both ultimately create a `PatientCase` in the database.
 
-### Flow
+### Path A — Hosted Form (iFrame Embed)
 
 1. Partner embeds the form URL in their portal:
    ```
@@ -62,11 +62,11 @@ Cases originate exclusively from the **public questionnaire form** hosted on thi
    ```
 2. Patient fills the form on the embedded page.
 3. On submit:
-   - All answers are saved as a `QuestionnaireResponse`
+   - All answers saved as a `QuestionnaireResponse`
    - If **disqualified** (any answer with `is_disqualify = true`): response saved, no case created, `disqualified: true` sent via `postMessage`
    - If **qualified**: `Patient::firstOrCreate([email, partner_id])` runs, a `PatientCase` is created in `CREATED` status, then immediately transitioned to `WAITING`
-4. Auto-assigner fires: the highest-priority available clinician under their max daily case load is assigned automatically
-5. The form result page fires a `window.postMessage` to the parent frame:
+4. Auto-assigner fires: highest-priority available clinician under their max daily case load is assigned automatically
+5. The form fires a `window.postMessage` to the parent frame:
    ```json
    {
      "event": "questionnaire_completed",
@@ -76,8 +76,7 @@ Cases originate exclusively from the **public questionnaire form** hosted on thi
    }
    ```
 
-### Partner Embed Snippet
-
+**Partner Embed Snippet:**
 ```html
 <iframe
   src="https://yourdomain.com/forms/{questionnaire_uuid}?partner_token={partner_uuid}&external_id={PATIENT_ID}"
@@ -88,7 +87,13 @@ Cases originate exclusively from the **public questionnaire form** hosted on thi
 </iframe>
 ```
 
-Replace `PATIENT_ID` dynamically with the partner's internal patient ID. On the partner's side, listen for `postMessage` to detect completion.
+### Path B — Partner REST API
+
+The partner submits patient data and questionnaire answers programmatically. A single `POST /api/partner/cases` call atomically creates the patient, case, and all questionnaire answers. See **Module 6: Partner API** for the full payload format.
+
+For MWL Weight Loss cases, **two questionnaires must be submitted** in a single call:
+1. **Standard Intake 1** — shared baseline health intake (all programs)
+2. **MWL – Weight Loss** — program-specific questions (GLP-1 history, medical conditions, prescription image)
 
 ### Patient Field Extraction from Form Answers
 
@@ -113,21 +118,21 @@ Questions whose `key` field matches a patient model column are automatically use
 | `zip` | `zip` | Optional |
 | `country` | `country` | Optional (2-letter, default US) |
 
-The questionnaire builder **auto-populates the field key** as the admin types the question label (e.g. typing "What is your Email?" auto-fills `email`). The auto-suggested key has a yellow background and is overridable.
+The questionnaire builder **auto-populates the field key** as the admin types the question label. The auto-suggested key has a yellow background and is overridable.
 
 ---
 
 ## Module 1: Admin Flows
 
 ### Partners (`/admin/partners`)
-- Create partner → auto-generates OAuth2 client ID + secret
-- Add portal users to a partner (role: `partner`) — visible in **Portal Users** card on partner detail page
+- Create partner → auto-generates OAuth2 client ID + secret (Passport 13 client_credentials grant)
+- Add portal users to a partner (role: `partner`)
 - Regenerate API credentials
 - Suspend / reactivate partners
 
 ### Clinicians (`/admin/clinicians`)
 - Create clinician (creates user, assigns role `clinician`)
-- Set specialty, credentials (MD / DO / NP / PA), licensed states
+- Set specialty, credentials (MD / DO / NP / PA), licensed states (multi-checkbox US state grid)
 - Toggle availability and max daily case load
 
 ### Clinician Assignment Priority (`/admin/clinicians/priority`)
@@ -139,42 +144,62 @@ The questionnaire builder **auto-populates the field key** as the admin types th
 ### Cases (`/admin/cases`)
 - List all cases across all partners/clinicians with filters (status, partner, clinician)
 - **Assign** clinician to any `created` or `waiting` case
-  - `created` → auto-advances to `waiting` with `skip_auto_assign: true`, then assigns directly
-  - `waiting` → assigns directly
 - **Reassign** clinician to an already-`assigned` case (no status change, logged as `clinician_reassigned` event)
 - Case detail tabs: **Intake, Questionnaires, Prescriptions, Clinical Notes, Messages, Files, Timeline**
-- Read-only Prescriptions tab: all prescriptions submitted by clinicians (diagnoses, medications, dispensing details)
-- Read-only Questionnaires tab: all linked questionnaire responses with full Q&A
-
-> **Note:** Admin cannot assign offerings to a case. Only clinicians assign offerings when creating a prescription.
+- Upload / delete files on a case (prescription images, lab results, etc.)
 
 ### Patients (`/admin/patients`)
 - Browse all patients with case counts, filter by partner/status/search
 - View patient detail: demographics, all cases, QA responses
-- **Read-only** — patients are created automatically when form submissions qualify
+- **Read-only** — patients are created automatically from form submissions or API case creation
 
 ### Offerings (`/admin/offerings`)
 - Full CRUD on offerings on behalf of any partner
+- **Approval workflow**: partner-created offerings start as `pending`; admin approves or rejects with an optional rejection note
+  - Pending badge counter shown in sidebar
+  - Admin uses `POST /admin/offerings/{id}/approve` and `POST /admin/offerings/{id}/reject`
 - Toggle Active/Inactive per offering
 - Delete offering (soft-delete with confirm dialog)
+- State availability: multi-checkbox US state grid (empty = all states)
 
 ### Questionnaires (`/admin/questionnaires`)
 - Create dynamic questionnaire forms with a visual question builder
-- Supported field types (14 total): Hidden, Input, Email, Textarea, Date, Select, Multi Select, Radio, Checkbox, File, Number, Height, Weight, BMI
-- Per-question configuration: label, field key (auto-populated from label keywords), placeholder, is_required, is_readonly
-- Option-based types (Select, Multi Select, Radio, Checkbox) support a **Disqualify** toggle per option
-- **Drag-and-drop question reordering** — grip handle on each question card; order is preserved on save via `sort_order` column
-- **Conditional logic visual indicator** — questions with a `depends_on_question_id` show an amber pill badge: `↳ Shows only if: "[parent question]" [operator] "[value]"` so admins can see the dependency at a glance on the show page
-- **API Integration panel** on questionnaire detail page (replaces Share & Embed): three-step guide for partners integrating via API
-  - Step 0: Discover question IDs (`GET /api/partner/questionnaires/{uuid}`)
-  - Step 1: Get access token (auth payload with copy button)
-  - Step 2: Submit case (annotated JSON with `// Q{id}: question [type]` comment lines, copy button, note to strip comments before sending)
-  - Question ID reference table mapping ID → question text → type → required
+- Supported field types (**16 total**): Hidden, Input, Email, Textarea, Date, Select, Multi Select, Radio, Checkbox, File, Number, Height, Weight, BMI, **Radio (Choice)**, **Checkbox (Multi)**
+  - `choice` — single-select radio rendered as a choice list (alias for `radio`, distinguishable in conditional logic)
+  - `multi` — multi-select checkbox rendered as a choice list (alias for `checkbox multiselect`)
+- Per-question configuration: label (textarea for long consent texts), field key (auto-populated), placeholder, is_required, is_readonly
+- Option-based types support a **Disqualify** toggle per option
+- **Drag-and-drop question reordering** via SortableJS
+- **Conditional logic** — each question can show/hide based on a prior question's answer
+  - Amber pill badge on the questionnaire show page: `↳ Shows only if: "[parent question]" [operator] "[value]"`
+- **Multi-step mode** — questions grouped by `step_number`; renders as paginated steps on the patient form; conditional logic evaluated across steps
+- **API Integration panel** on questionnaire detail page: step-by-step guide for partners integrating via API (question ID reference table, annotated JSON payload)
 
 ### Question Bank (`/admin/questions`)
 - Standalone library of all questions across all questionnaires
 - Filters: keyword search, field type, questionnaire, active/inactive status
 - Inline status toggle, view modal, standalone edit form, bulk delete
+
+### Webhook Deliveries (`/admin/webhooks`)
+- View all outbound webhook delivery attempts across all partners
+- Failed count badge in sidebar
+- Manually resend failed deliveries
+
+### Developer Guides (`/admin/guide/*`)
+Two built-in integration guides for sharing with partner developers:
+
+- **Guide: Messaging API** (`/admin/guide/messaging`) — explains how to send and receive case messages via the API
+- **Guide: Weight Loss API** (`/admin/guide/weightloss-api`) — comprehensive 8-section guide:
+  1. Authentication (OAuth2 token)
+  2. Discover Question IDs (both Standard Intake 1 and MWL questionnaires)
+  3. Upload Prescription Image (file_token flow)
+  4. Create Case — full annotated JSON payload with live question IDs pulled from DB
+  5. Question Reference table for both questionnaires
+  6. Error Responses
+  7. What Gets Created in the Database
+  8. Integration Checklist
+  - Dynamic — question IDs auto-update when questionnaire is edited
+  - Print-optimized: `@media print` hides admin chrome; content fills full page width
 
 ---
 
@@ -182,57 +207,58 @@ The questionnaire builder **auto-populates the field key** as the admin types th
 
 ### Queue (`/clinician/cases/queue`)
 - See all `waiting` cases; claim one to self-assign (→ `assigned`)
-- Auto-assigner may have already assigned the case; clinicians can still self-claim from the queue
 
 ### Case Detail Tabs
-Prescriptions, Questionnaires, Clinical Notes, Messages, Files
+Prescriptions, Questionnaires, Clinical Notes, Messages, Files, Timeline
 
 ### Assigned Case Actions
 
 | Action | Route | Result |
 |--------|-------|--------|
 | **Approve & Prescribe** | `GET /clinician/cases/{uuid}/prescribe` | Opens full-page prescription form |
-| Submit Prescription | `POST /clinician/cases/{uuid}/prescribe` | Saves prescription → transitions `assigned → approved`; webhook fired |
+| Submit Prescription | `POST /clinician/cases/{uuid}/prescribe` | Saves prescription → `assigned → approved`; webhook fired |
 | Escalate to Support | `POST /clinician/cases/{uuid}/support` | → `support`; `support_at` stamped; partner gains visibility |
-| Cancel / Decline | `POST /clinician/cases/{uuid}/cancel` | → `cancelled`; reason logged as clinical note |
-| Add Clinical Note | `POST /clinician/cases/{uuid}/notes` | Note attached (general / SOAP / progress); webhook fired |
+| Cancel / Decline | `POST /clinician/cases/{uuid}/cancel` | → `cancelled`; reason logged |
+| Add Clinical Note | `POST /clinician/cases/{uuid}/notes` | Note attached; webhook fired |
 | Send Message | `POST /clinician/cases/{uuid}/messages` | Outbound portal message; webhook fired |
+| Send to Pharmacy | `POST /clinician/cases/{uuid}/processing` | → `processing` |
+| Upload File | `POST /clinician/cases/{uuid}/files` | File saved to storage; virus scan queued |
+| Delete File | `DELETE /clinician/cases/{uuid}/files/{fileUuid}` | File removed from storage and DB |
 
 ---
 
 ## Module 3: Prescriptions
 
 ### Flow
-When a clinician clicks **"Approve & Prescribe"** on an assigned case, they are routed to a dedicated full-page prescription form: `GET /clinician/cases/{uuid}/prescribe`
+Clinician clicks **"Approve & Prescribe"** → full-page form → submit → case transitions to `approved`.
 
 ### Prescription Form Fields
 
 | Field | Type | Required |
 |-------|------|----------|
 | Diagnoses | Textarea | Yes |
-| Medications | Dynamic search/select | No |
+| Medications | Dynamic search/select from offerings | No |
 | Directions | Textarea | No |
 | Medical Necessity | Textarea | No |
 
 ### Medication Search
 - Offerings pre-loaded as JSON; filtered client-side by name
-- Category filtering: only offerings whose `category_id` matches offerings already on the case
-- Selecting an offering auto-populates an editable medication card (compound formula, refills, quantity, days supply, dispense unit, days until dispense)
+- Category filtering: only offerings whose `category_id` matches case offerings
+- Selecting an offering auto-populates an editable medication card
 - Multiple medications supported; each card has an individual Remove button
-
-### Submission (`POST /clinician/cases/{uuid}/prescribe`)
-- DB transaction: creates `case_prescriptions` record + `case_prescription_medications` rows + transitions case to `approved`
-- Dispatches `case_approved` webhook to partner
-
-### Prescription Visibility
-- **Clinician**: Prescriptions tab on case detail — read-only
-- **Admin**: Identical read-only Prescriptions tab on admin case detail
-
-> `case_prescriptions` / `case_prescription_medications` are separate from the DoseSpot `prescriptions` table.
 
 ---
 
 ## Module 4: Offerings
+
+### Approval Workflow
+Partner-created offerings require admin approval before they are active:
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Just created by partner; not yet visible to clinicians |
+| `approved` | Admin approved; active and available |
+| `rejected` | Admin rejected with a rejection note; partner can revise |
 
 ### Offering Form Fields (Admin & Partner)
 
@@ -255,7 +281,7 @@ When a clinician clicks **"Approve & Prescribe"** on an assigned case, they are 
 | Directions | Prescription & Dispensing | Sent to pharmacy |
 | Pharmacy Name | Prescription & Dispensing | |
 | Pharmacy Notes | Prescription & Dispensing | |
-| State Availability | State Availability | Multi-checkbox; empty = all states |
+| State Availability | State Availability | Multi-checkbox US state grid; empty = all states |
 | Active | Flags | Toggle |
 | Controlled Substance | Flags | DEA compliance flag |
 
@@ -263,121 +289,143 @@ When a clinician clicks **"Approve & Prescribe"** on an assigned case, they are 
 
 ## Module 5: Questionnaires
 
-### Public Form Flow (Primary Case Entry Path)
-See **"How Cases Enter the System"** section above for the complete flow.
+### Seeded Questionnaires
+
+| Name | Mode | Steps | Purpose |
+|------|------|-------|---------|
+| Standard Intake 1 | single | 1 | Shared baseline for all programs: general health, medications, allergies, conditions, telehealth consent |
+| MWL – Weight Loss | multi | 2 | Step 1: medical history, GLP-1 history, prescription image upload. Step 2: conditional consents (gallbladder, thyroid) + GLP-1 informed consent |
+| Anti-Aging | multi | 2 | Step 1: prior treatments, symptoms, contraindications. Step 2: truthfulness + informed consent |
+
+### Public Form Features
+- **Height** renders as ft + in inputs; total inches stored in hidden field
+- **BMI** auto-calculates from height + weight; auto-filled with yellow highlight
+- **Conditional questions** hide/show in real time across all steps
+- **Multi-step navigation**: Next/Back buttons; `showStep()` re-evaluates all conditions on every step change
+- **File upload** questions rendered as file picker; prescription images saved via `FileUploadService`
 
 ### Disqualification Logic
 If any selected answer has `is_disqualify = true`:
 - `QuestionnaireResponse.is_disqualified = true`
 - `disqualified_on` set to the question key that triggered it
-- No case or patient is created
-- `disqualified: true` sent in the `postMessage` event to the parent frame
-
-### QA Visibility on Cases
-- **Admin** case detail → Questionnaires tab: all linked responses, qualified/disqualified badge, all Q&A pairs, disqualifying answers highlighted
-- **Clinician** case detail → Questionnaires tab: identical read-only view
-
-### Question Builder Features
-- Drag-and-drop reordering via SortableJS (grip handle on each card)
-- Field key auto-population from question label (keyword detection: "email" → `email`, "first name" → `first_name`, "state" → `state`, etc.)
-- Auto-suggested key shown with yellow background; admin can override manually
-- 14 field types including Height, Weight, BMI (render as number inputs)
+- No case or patient is created (form path) / case is flagged (API path)
+- `disqualified: true` sent in the `postMessage` event
 
 ---
 
 ## Module 6: Partner Flows
 
 ### Web Portal
-- **Offerings** — full CRUD on own offerings
+- **Offerings** — full CRUD on own offerings (submitted as `pending` for admin approval)
 - **Patients** — read-only list and detail
 - **Cases** — view support-escalated cases only; read the clinician's support note; write a response note and return the case to the assigned clinician; cancel with reason
 - **Credentials** — view client ID / secret / webhook list
 
-### Patient Portal Integration (Hosted Form)
-
-The primary integration path. No API credentials needed.
-
-**Partner receives:**
-1. The iFrame embed code from Admin → Questionnaires → [questionnaire] → Share & Embed
-2. Their `partner_token` (partner UUID) and the `questionnaire_uuid`
-
-**Partner embeds:**
-```html
-<iframe src="/forms/{uuid}?partner_token={partner_uuid}&external_id={PATIENT_ID}"
-        width="100%" height="680" frameborder="0" allow="camera"></iframe>
-```
-
-**Partner listens for completion:**
-```js
-window.addEventListener('message', function(event) {
-    if (event.data.event === 'questionnaire_completed') {
-        if (event.data.disqualified) {
-            // patient didn't qualify
-        } else {
-            // case created — show success or redirect
-        }
-    }
-});
-```
-
-### API (Alternative Integration Path)
-
-Used when the partner has their own intake form UI and wants to push data programmatically.
+### Partner REST API
 
 **Authentication**
 ```
 POST /api/partner/auth/token
-{ grant_type, client_id, client_secret }
-→ Bearer token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id=…&client_secret=…
+→ { token_type, expires_in, access_token }
 ```
+
+**File Upload** (before case creation, if patient has a prescription image)
+```
+POST /api/partner/files
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+file=<binary — JPG, PNG, or PDF, max 10 MB>
+
+→ 201 { file_token, original_name, size, mime_type }
+```
+Use the returned `file_token` (UUID) as the answer value for `file`-type questions in the case payload.
 
 **Submit a Case**
 ```
 POST /api/partner/cases
 {
-  patient: { first_name, last_name, email, phone, date_of_birth, gender, state, external_id },
-  external_id,
-  hold_status,
-  patient_state,
-  offerings: [{ offering_id, quantity }],
-  questionnaire_responses: [{ questionnaire_id, answers: [{ question_id, answer }] }]
+  "patient": { first_name, last_name, email, phone, date_of_birth, gender, state, external_id },
+  "external_id": "order-ref-001",
+  "patient_state": "TX",
+  "hold_status": false,
+  "is_chargeable": true,
+  "offerings": [{ "offering_id": "uuid", "quantity": 1 }],
+  "questionnaire_responses": [
+    {
+      "questionnaire_id": "<standard-intake-1-uuid>",
+      "answers": [{ "question_id": 1, "answer": "no" }, ...]
+    },
+    {
+      "questionnaire_id": "<mwl-weight-loss-uuid>",
+      "answers": [
+        { "question_id": 252, "answer": ["hypertension"] },
+        { "question_id": 264, "answer": "3f2a1b4c-..." }  // file_token for prescription image
+      ]
+    }
+  ]
 }
 ```
 - Patient deduplication: `external_id` → `email` → create new
+- `file`-type question answers must be `file_token` UUIDs from `POST /api/partner/files`
+- `multi` / `checkbox` type answers must be JSON arrays
 - Case auto-advances to `waiting` (and auto-assigns) unless `hold_status: true`
-- Returns `409` if `external_id` already exists
+- Returns `409` if `external_id` already exists for this partner
 
-**Other Case Endpoints**
+**Case Endpoints**
 ```
 GET    /api/partner/cases
 GET    /api/partner/cases/{uuid}
 GET    /api/partner/cases/by-external-id/{id}
-POST   /api/partner/cases/{uuid}/cancel        { reason }
-POST   /api/partner/cases/{uuid}/hold          { hold: bool }
-POST   /api/partner/cases/{uuid}/support       { note }
+POST   /api/partner/cases/{uuid}/cancel          { reason }
+POST   /api/partner/cases/{uuid}/hold            { hold: bool }
+POST   /api/partner/cases/{uuid}/support         { note }
 GET    /api/partner/cases/{uuid}/events
+GET    /api/partner/cases/{uuid}/messages
+POST   /api/partner/cases/{uuid}/messages        { body }
 ```
 
-> `POST /api/partner/cases/{uuid}/processing` has been removed. Processing is now initiated by the clinician via the web portal (Send to Pharmacy).
-
-**Patients (read-only)**
+**Patient Endpoints (read-only)**
 ```
 GET    /api/partner/patients
 GET    /api/partner/patients/{id}
 GET    /api/partner/patients/by-external-id/{id}
 ```
 
-**Questionnaires (read-only — question ID discovery)**
+**Questionnaire Endpoints (read-only — question ID discovery)**
 ```
 GET    /api/partner/questionnaires/{uuid}
 ```
-Returns the questionnaire with all questions (id, question, key, type, is_required, placeholder, options). Partners call this once to build their `question_id → question` mapping before submitting cases. Response includes only active questionnaires.
+Returns the questionnaire with all active questions (id, question, key, type, is_required, placeholder, options).
+
+**Offering Endpoints**
+```
+GET    /api/partner/offerings
+POST   /api/partner/offerings
+GET    /api/partner/offerings/{id}
+PUT    /api/partner/offerings/{id}
+DELETE /api/partner/offerings/{id}
+GET    /api/partner/offerings/{id}/questionnaires
+```
+
+**Webhook Management**
+```
+GET    /api/partner/webhooks
+POST   /api/partner/webhooks
+GET    /api/partner/webhooks/{id}
+PUT    /api/partner/webhooks/{id}
+DELETE /api/partner/webhooks/{id}
+POST   /api/partner/webhooks/deliveries/{id}/resend
+```
 
 ---
 
 ## Module 7: Webhooks
 
-All webhooks signed with HMAC-SHA256. Up to 5 retry attempts with exponential backoff.
+All webhooks signed with HMAC-SHA256 (`X-Webhook-Signature: sha256=<digest>`). Up to 5 retry attempts with exponential backoff.
 
 | Event | Fired When |
 |-------|-----------|
@@ -386,7 +434,7 @@ All webhooks signed with HMAC-SHA256. Up to 5 retry attempts with exponential ba
 | `case_support` | Clinician escalates to support |
 | `case_assigned_to_clinician` | Clinician assigned (auto or manual) |
 | `case_approved` | Clinician submits prescription |
-| `case_processing` | Partner moves to processing |
+| `case_processing` | Clinician sends to pharmacy |
 | `case_completed` | Case completed |
 | `case_cancelled` | Any cancellation |
 | `clinical_note_added` | Clinician adds a note |
@@ -396,14 +444,46 @@ All webhooks signed with HMAC-SHA256. Up to 5 retry attempts with exponential ba
 
 ---
 
+## File Uploads
+
+### FileUploadService
+Central service used by both the web form and the Partner API.
+
+- **Allowed types**: JPG, JPEG, PNG, PDF
+- **Max size**: 10 MB
+- **Storage**: `FILESYSTEM_DISK` env var (default `local` → `storage/app/private/patient-files/YYYY/MM/`)
+- **Naming**: UUID-based filename (`{uuid}.{ext}`) — no original filename in storage
+- **Virus scan**: `ScanUploadedFileJob` dispatched to the `default` queue after every upload; uses ClamAV via `clamscan`; degrades gracefully if ClamAV not installed (logged + treated as clean)
+
+### PatientFile Model (`files` table)
+
+| Column | Purpose |
+|--------|---------|
+| `uuid` | Public identifier; used as `file_token` in Partner API |
+| `case_id` | Nullable until linked at case creation |
+| `patient_id` | Nullable until linked at case creation |
+| `partner_id` | Set at upload time for API uploads |
+| `path` | Storage path relative to disk root |
+| `disk` | Storage disk name (`local`, `s3`, etc.) |
+| `mime_type` | MIME type at upload time |
+| `size` | File size in bytes |
+| `original_name` | Original filename from the upload |
+| `type` | Category: `prescription`, `lab`, `other`, etc. |
+| `status` | `uploaded`, `clean`, `infected` |
+| `notes` | Optional clinician/admin note |
+
+---
+
 ## Permissions Matrix
 
 | Action | Admin | Clinician | Partner Web | Partner API |
 |--------|:-----:|:---------:|:-----------:|:-----------:|
 | Create partner / clinician | ✓ | — | — | — |
 | Create / edit offering | ✓ | — | ✓ | ✓ |
+| Approve / reject offering | ✓ | — | — | — |
 | Delete / toggle offering active | ✓ | — | ✓ | — |
 | Submit case via API | — | — | — | ✓ |
+| Upload file via API | — | — | — | ✓ |
 | View all cases | ✓ | ✓ (queue) | ✓ (support-only) | ✓ (own) |
 | Assign clinician to case | ✓ | ✓ (self) | — | — |
 | Reassign clinician to assigned case | ✓ | — | — | — |
@@ -413,15 +493,19 @@ All webhooks signed with HMAC-SHA256. Up to 5 retry attempts with exponential ba
 | View prescriptions | ✓ | ✓ | — | — |
 | View questionnaire responses | ✓ | ✓ | — | — |
 | Escalate to support | — | ✓ | — | ✓ |
-| Return support case to clinician (with note) | — | — | ✓ | — |
+| Return support case to clinician | — | — | ✓ | — |
 | Cancel case | ✓ | ✓ | ✓ | ✓ |
-| Move to processing (Send to Pharmacy) | — | ✓ | — | — |
+| Send to pharmacy (Processing) | — | ✓ | — | — |
 | Add clinical note / message | — | ✓ | — | — |
+| Send / read messages via API | — | — | — | ✓ |
+| Upload / delete case files | ✓ | ✓ | — | — |
 | Update order / tracking | — | — | — | ✓ |
 | Manage webhooks | — | — | ✓ | ✓ |
+| View webhook delivery log | ✓ | — | — | — |
 | View patients | ✓ | — | ✓ (own) | ✓ (own) |
 | Manage questionnaires / question bank | ✓ | — | — | — |
 | Set clinician assignment priority | ✓ | — | — | — |
+| View developer guides | ✓ | — | — | — |
 
 ---
 
@@ -431,54 +515,67 @@ All webhooks signed with HMAC-SHA256. Up to 5 retry attempts with exponential ba
 |-------|---------|
 | `users` | Auth for all roles (admin, clinician, partner) |
 | `partners` | Partner organisations |
-| `clinicians` | Clinician profiles linked to users; specialty, credentials, licensed states, priority (for auto-assignment), max_daily_cases |
-| `patients` | Patient records, scoped to partner; deduplicated by email+partner_id; fields: first_name, last_name, email, phone, date_of_birth, age, height, weight, bmi, gender, address, address2, city, state, zip, country |
+| `clinicians` | Clinician profiles; specialty, credentials, licensed states, priority, max_daily_cases |
+| `patients` | Patient records, scoped to partner; deduplicated by email+partner_id |
 | `cases` | Core case record with state-machine status column |
 | `case_notes` | Clinical notes (general/SOAP/progress) |
 | `case_messages` | Portal messages between clinician and partner |
 | `case_events` | Immutable audit trail for every state change |
 | `case_prescriptions` | Doctor-submitted prescriptions created on case approval |
 | `case_prescription_medications` | Individual medications within a prescription |
-| `offerings` | Product/medication catalogue per partner; includes all prescription/dispensing fields |
-| `offering_categories` | Category taxonomy; used to filter the prescription medication search |
-| `questionnaires` | Form containers (name, description, partner, is_active, mode) |
-| `questionnaire_questions` | Questions: type, key, placeholder, is_required, is_readonly, is_active, options (JSON), sort_order |
-| `questionnaire_responses` | One per form submission; `case_id` set immediately on qualified submission (never NULL after auto-case creation) |
+| `files` | Uploaded files (`PatientFile` model); linked to case, patient, and/or partner |
+| `offerings` | Product/medication catalogue per partner; includes `approval_status`, `rejection_note` |
+| `offering_categories` | Category taxonomy; filters the prescription medication search |
+| `questionnaires` | Form containers (name, description, mode: single/multi, is_active) |
+| `questionnaire_questions` | Questions: type, key, placeholder, is_required, is_readonly, is_active, options (JSON), sort_order, step_number, depends_on_question_id |
+| `questionnaire_responses` | One per form submission or API case submission |
 | `questionnaire_answers` | One per Q&A pair; question_text frozen at submission time |
 | `orders` | Fulfillment orders linked to cases |
 | `webhooks` | Registered webhook endpoints per partner |
 | `webhook_deliveries` | Delivery log with retry state |
-| `oauth_clients` | Passport client credentials per partner |
-| `prescriptions` | DoseSpot pharmacy prescriptions (separate system) |
+| `oauth_clients` | Passport client credentials per partner (client_credentials grant) |
+| `jobs` | Laravel queue jobs table (webhooks, virus scans) |
+| `failed_jobs` | Failed job log |
+| `sessions` | Database-backed sessions |
 
 ---
 
 ## Key Architectural Decisions
 
-1. **Auto-case creation on form submit**: Cases are created automatically when a patient submits a qualified public questionnaire form. There is no manual "Form Submissions → Convert to Case" step. `QuestionnaireFormController` creates the patient (via `firstOrCreate`), creates the case, then calls `CaseStateMachine::transition()` outside the DB transaction so webhooks fire cleanly after commit.
+1. **Two case entry paths**: Form submission (iFrame embed) and Partner REST API. Both ultimately call the same `CaseStateMachine::transition()` flow and create the same DB records. The API path supports programmatic patient portals that have their own intake UI.
 
-2. **Auto-assignment priority system**: `CaseAutoAssigner` service selects the highest-priority (`ORDER BY priority ASC`) clinician who is active, available, and below their `max_daily_cases` limit. Auto-assignment fires automatically when a case transitions to `waiting`. Admin can override with manual assignment at any time.
+2. **Two-questionnaire requirement for MWL (API path)**: Partners submitting Weight Loss cases via API must include both Standard Intake 1 and MWL – Weight Loss questionnaire responses in a single `POST /api/partner/cases` call. The API validates that required questionnaires are present for attached offerings.
 
-3. **`skip_auto_assign` context flag**: When admin manually assigns a clinician, `transition(waiting, skip_auto_assign: true)` is passed so the auto-assigner does not race the admin's choice and create a double-assignment conflict.
+3. **File token flow for API uploads**: Partners cannot embed raw binary files in the case creation JSON. Instead, they call `POST /api/partner/files` first to upload the file and receive a `file_token` (UUID). This token is submitted as the answer to `file`-type questions in the case payload. `CaseController` resolves the token within the DB transaction, links the `PatientFile` record to the case and patient, and stores the original filename as the displayed answer.
 
-4. **Reassign without state change**: `CaseStateMachine::reassign()` bypasses the state transition graph for `assigned → assigned` (which is not a valid transition). It directly updates `clinician_id` and logs a `clinician_reassigned` event.
+4. **Auto-case creation on form submit**: `QuestionnaireFormController` creates the patient, creates the case, then calls `CaseStateMachine::transition()` outside the DB transaction so webhooks fire after commit.
 
-5. **Offerings assigned only by clinicians**: Admin cannot assign offerings to a case. Offerings are selected by the clinician when filling out the prescription form. This removes the risk of pre-attaching incorrect offerings before clinical review.
+5. **Auto-assignment priority system**: `CaseAutoAssigner` selects the highest-priority (`ORDER BY priority ASC`) clinician who is active, available, and below their `max_daily_cases` limit. Fires automatically when a case transitions to `waiting`.
 
-6. **`case_prescriptions` vs `prescriptions`**: Doctor-submitted prescriptions use a `case_` prefix to avoid collision with the existing DoseSpot `prescriptions` table. Both systems coexist independently.
+6. **`skip_auto_assign` context flag**: Admin manual assignment passes this flag so the auto-assigner does not race and create a double-assignment conflict.
 
-7. **Patient field extraction via question keys**: The `key` field on each `questionnaire_question` row acts as a mapping to the patient model column. During form submission, the controller builds a `$keyedAnswers` map and uses it to populate `Patient::firstOrCreate`. Keys must match patient column names exactly.
+7. **Reassign without state change**: `CaseStateMachine::reassign()` bypasses the state transition graph for `assigned → assigned`. It directly updates `clinician_id` and logs a `clinician_reassigned` event.
 
-8. **Questionnaire question sort order**: Questions are rendered in `sort_order ASC` order. The builder uses SortableJS drag-and-drop; after each drag, a `reindexCards()` JS function renames all `name="questions[idx]..."` attributes to match the new DOM order. The backend's `syncQuestions()` uses `array_values()` and assigns `sort_order = $i` from the submitted array.
+8. **Offerings approval workflow**: Partner-created offerings are `pending` by default. Admin must explicitly approve before they can be attached to cases or visible to clinicians. Admins can reject with a note so the partner can revise.
 
-9. **Patient deduplication**: `Patient::firstOrCreate([email, partner_id])` prevents duplicate records when the same patient submits multiple times.
+9. **`FileUploadService`**: Central file handling used by both the web (clinician/admin case file uploads) and the API (partner prescription image uploads). Uses `config('filesystems.default')` for disk, generates UUID filenames, dispatches `ScanUploadedFileJob` to the `default` queue after every upload.
 
-10. **No Vite/npm**: All frontend uses Bootstrap 5 + Bootstrap Icons + SortableJS via CDN. JavaScript is vanilla, written inline in Blade views.
+10. **`VirusScanService`**: Wraps `clamscan` CLI. Degrades gracefully if ClamAV is not installed — logs an info message and treats the file as clean. This prevents blocking legitimate uploads in environments without ClamAV. In a strict security posture, the `return true` on scan-unavailable should be changed to `return false`.
 
-11. **Soft deletes**: Patients, cases, offerings, and files are logically deleted (not removed from DB).
+11. **Questionnaire question sort order**: Questions rendered in `sort_order ASC` order. SortableJS drag-and-drop; after each drag, `reindexCards()` renames all `name="questions[idx]..."` attributes to match the new DOM order. Backend's `syncQuestions()` uses `array_values()` and assigns `sort_order = $i` from the submitted array.
 
-12. **Clinician scope**: Clinicians only action cases in their queue; they cannot see unrelated partner data.
+12. **Two-pass `syncQuestions()`**: Conditional logic uses a self-referencing FK (`depends_on_question_id`). Pass 1 creates all questions capturing `idx → DB id` map; Pass 2 resolves and writes the FK. Questionnaire `update()` does `delete()` then re-creates all questions — question IDs change on every save.
 
-13. **Laravel Passport 13 compatibility**: Passport 13 changed `createClientCredentialsGrantClient()` — the `$userId` first parameter was removed. Both `PartnerController::store()` and `regenerateCredentials()` call it with only the name string. Passport 13 also generates ULID/UUID client IDs instead of auto-increment integers, so `partners.oauth_client_id` is stored as `string(100)` (not `unsignedBigInteger`).
+13. **Cross-step conditional logic (form)**: All conditional logic runs in a single JS IIFE. `showStep()` calls `evaluateConditions()` on every step change so conditional questions re-evaluate correctly across step boundaries.
 
-14. **Question ID discoverability for API partners**: Partners building integrations against the case submission API (`POST /api/partner/cases`) need to know which `question_id` maps to which question. They call `GET /api/partner/questionnaires/{uuid}` once to retrieve the mapping, then cache it locally. The questionnaire show page also displays an annotated case JSON example with `// Q{id}: question [type]` comment lines so question IDs are visible without needing an API call during development.
+14. **Dynamic developer guide**: The Weight Loss API guide page pulls live question IDs directly from the DB via the `$questionnaire` and `$standardIntake` models passed from the route. If questions are recreated (e.g. after an admin edit), the guide self-corrects automatically.
+
+15. **`case_prescriptions` vs `prescriptions`**: Doctor-submitted prescriptions use the `case_` prefix to coexist with the DoseSpot `prescriptions` table.
+
+16. **Patient deduplication**: `Patient::firstOrCreate([email, partner_id])` on form submit; API path also deduplicates by `external_id` first, then `email`.
+
+17. **Laravel Passport 13 compatibility**: `createClientCredentialsGrantClient()` no longer accepts `$userId` — only the name string is passed. Client IDs are ULIDs, so `partners.oauth_client_id` is `string(100)`. Schema uses `owner_type`, `owner_id`, `grant_types` columns instead of the Passport 12 booleans.
+
+18. **No Vite/npm**: All frontend uses Bootstrap 5 + Bootstrap Icons + SortableJS via CDN. JavaScript is vanilla, written inline in Blade `@section('scripts')` blocks.
+
+19. **Queue-backed async work**: Webhook delivery (`SendWebhookJob` on `webhooks` queue) and virus scanning (`ScanUploadedFileJob` on `default` queue) are dispatched to the `database` queue. A queue worker must be running on production (`php artisan queue:work --queue=webhooks,default`) for these to execute. On local/dev, jobs sit in the `jobs` table until processed.

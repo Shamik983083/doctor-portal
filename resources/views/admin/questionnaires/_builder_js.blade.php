@@ -13,7 +13,9 @@
         { id: 'select',      label: 'Select' },
         { id: 'multiselect', label: 'Multi Select' },
         { id: 'radio',       label: 'Radio' },
+        { id: 'choice',      label: 'Radio (Choice)' },
         { id: 'checkbox',    label: 'Checkbox' },
+        { id: 'multi',       label: 'Checkbox (Multi)' },
         { id: 'file',        label: 'File' },
         { id: 'number',      label: 'Number' },
         { id: 'height',      label: 'Height' },
@@ -21,7 +23,7 @@
         { id: 'bmi',         label: 'BMI' },
     ];
 
-    var OPTION_TYPES      = ['select', 'multiselect', 'radio', 'checkbox'];
+    var OPTION_TYPES      = ['select', 'multiselect', 'radio', 'checkbox', 'choice', 'multi'];
     var PLACEHOLDER_TYPES = ['input', 'email', 'textarea', 'number'];
 
     var OPERATORS = [
@@ -161,9 +163,9 @@
             /* Question label */
             +     '<div class="col-md-8">'
             +       '<label class="form-label small fw-semibold mb-1">Question / Label <span class="text-danger">*</span></label>'
-            +       '<input type="text" name="questions[' + idx + '][question]"'
-            +              ' class="form-control form-control-sm" value="' + question + '"'
-            +              ' placeholder="e.g. What is your age?" required>'
+            +       '<textarea name="questions[' + idx + '][question]"'
+            +               ' class="form-control form-control-sm" rows="3"'
+            +               ' placeholder="e.g. What is your age?" required>' + question + '</textarea>'
             +     '</div>'
 
             /* Key */
@@ -242,7 +244,7 @@
             var cardIdx = parseInt(card.dataset.idx);
             if (cardIdx === selfIdx) return;
             var label = card.querySelector('.question-label').textContent;
-            var qText = card.querySelector('input[name="questions[' + cardIdx + '][question]"]');
+            var qText = card.querySelector('[name="questions[' + cardIdx + '][question]"]');
             var preview = qText ? (qText.value.trim().substring(0, 40) || label) : label;
             html += '<option value="' + cardIdx + '">' + esc(preview) + '</option>';
         });
@@ -360,7 +362,7 @@
             { patterns: ['name'],                              key: 'first_name' }, // fallback — after last_name rule
         ];
 
-        var questionInput = card.querySelector('input[name="questions[' + idx + '][question]"]');
+        var questionInput = card.querySelector('[name="questions[' + idx + '][question]"]');
         var keyInput      = card.querySelector('input[name="questions[' + idx + '][key]"]');
 
         questionInput.addEventListener('input', function () {

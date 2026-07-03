@@ -12,6 +12,7 @@ use App\Http\Controllers\Web\Admin\OfferingController as AdminOfferingController
 use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCategoryController;
 use App\Http\Controllers\Web\Admin\QuestionnaireController as AdminQuestionnaireController;
 use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController;
+use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeliveryController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
 use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingController;
@@ -49,6 +50,8 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('
         Route::post('/{uuid}/processing', [ClinicianCaseController::class, 'sendToPharmacy'])->name('processing');
         Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
         Route::post('/{uuid}/messages', [ClinicianCaseController::class, 'sendMessage'])->name('messages.store');
+        Route::post('/{uuid}/files', [ClinicianCaseController::class, 'uploadFile'])->name('files.store');
+        Route::delete('/{uuid}/files/{fileUuid}', [ClinicianCaseController::class, 'deleteFile'])->name('files.destroy');
     });
 
     Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
@@ -69,6 +72,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::get('/', [AdminCaseController::class, 'index'])->name('index');
         Route::get('/{uuid}', [AdminCaseController::class, 'show'])->name('show');
         Route::post('/{uuid}/assign', [AdminCaseController::class, 'assign'])->name('assign');
+        Route::post('/{uuid}/files', [AdminCaseController::class, 'uploadFile'])->name('files.store');
+        Route::delete('/{uuid}/files/{fileUuid}', [AdminCaseController::class, 'deleteFile'])->name('files.destroy');
     });
 
     // Partners
@@ -128,6 +133,26 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::put('/{id}', [AdminOfferingController::class, 'update'])->name('update');
         Route::delete('/{id}', [AdminOfferingController::class, 'destroy'])->name('destroy');
         Route::patch('/{id}/toggle-status', [AdminOfferingController::class, 'toggleStatus'])->name('toggle-status');
+        Route::post('/{id}/approve', [AdminOfferingController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject',  [AdminOfferingController::class, 'reject'])->name('reject');
+    });
+
+    // Developer Guide
+    Route::get('/guide/messaging', fn() => view('admin.guide.messaging'))->name('guide.messaging');
+    Route::get('/guide/weightloss-api', function () {
+        $questionnaire = \App\Models\Questionnaire::with([
+            'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
+        ])->where('name', 'MWL – Weight Loss')->first();
+        $standardIntake = \App\Models\Questionnaire::with([
+            'questions' => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
+        ])->where('name', 'Standard Intake 1')->first();
+        return view('admin.guide.weightloss-api', compact('questionnaire', 'standardIntake'));
+    })->name('guide.weightloss-api');
+
+    // Webhook Deliveries
+    Route::prefix('webhooks')->name('webhooks.')->group(function () {
+        Route::get('/',              [AdminWebhookDeliveryController::class, 'index'])->name('index');
+        Route::post('/{uuid}/resend',[AdminWebhookDeliveryController::class, 'resend'])->name('resend');
     });
 
     // Offering Categories

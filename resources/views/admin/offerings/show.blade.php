@@ -38,6 +38,74 @@
             </div>
         </div>
 
+        {{-- Approval Status Card --}}
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0 small">Approval Status</h6></div>
+            <div class="card-body">
+                @if($offering->approval_status === 'approved')
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 mb-2 d-block text-start p-2">
+                        <i class="bi bi-check-circle me-1"></i>Approved
+                    </span>
+                    @if($offering->approvedBy)
+                        <p class="text-muted small mb-2">By {{ $offering->approvedBy->name }}<br>{{ $offering->approved_at?->format('M j, Y g:i A') }}</p>
+                    @endif
+                    <button class="btn btn-sm btn-outline-danger w-100"
+                            data-bs-toggle="modal" data-bs-target="#rejectModal"
+                            data-action="{{ route('admin.offerings.reject', $offering->id) }}"
+                            data-name="{{ $offering->name }}"
+                            data-note="">
+                        <i class="bi bi-x-circle me-1"></i>Revoke Approval
+                    </button>
+                @elseif($offering->approval_status === 'rejected')
+                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 mb-2 d-block text-start p-2">
+                        <i class="bi bi-x-circle me-1"></i>Rejected
+                    </span>
+                    @if($offering->rejection_note)
+                        <div class="border rounded p-2 mb-2 bg-danger bg-opacity-10" style="font-size:.8rem;">
+                            <div class="text-muted small fw-semibold mb-1">Rejection note:</div>
+                            <div>{{ $offering->rejection_note }}</div>
+                        </div>
+                    @endif
+                    <p class="text-muted small mb-2">Partner can edit and re-submit.</p>
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="{{ route('admin.offerings.approve', $offering->id) }}" class="flex-fill">
+                            @csrf
+                            <button class="btn btn-sm btn-success w-100">
+                                <i class="bi bi-check-lg me-1"></i>Approve
+                            </button>
+                        </form>
+                        <button class="btn btn-sm btn-outline-danger flex-fill" title="Update rejection note"
+                                data-bs-toggle="modal" data-bs-target="#rejectModal"
+                                data-action="{{ route('admin.offerings.reject', $offering->id) }}"
+                                data-name="{{ $offering->name }}"
+                                data-note="{{ $offering->rejection_note }}">
+                            <i class="bi bi-pencil me-1"></i>Edit Note
+                        </button>
+                    </div>
+                @else
+                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 mb-2 d-block text-start p-2">
+                        <i class="bi bi-clock me-1"></i>Pending Admin Review
+                    </span>
+                    <p class="text-muted small mb-2">Not visible to clinicians until approved.</p>
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="{{ route('admin.offerings.approve', $offering->id) }}" class="flex-fill">
+                            @csrf
+                            <button class="btn btn-sm btn-success w-100">
+                                <i class="bi bi-check-lg me-1"></i>Approve
+                            </button>
+                        </form>
+                        <button class="btn btn-sm btn-outline-danger flex-fill"
+                                data-bs-toggle="modal" data-bs-target="#rejectModal"
+                                data-action="{{ route('admin.offerings.reject', $offering->id) }}"
+                                data-name="{{ $offering->name }}"
+                                data-note="">
+                            <i class="bi bi-x-lg me-1"></i>Reject
+                        </button>
+                    </div>
+                @endif
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header"><h6 class="mb-0 small">Available States</h6></div>
             <div class="card-body">
@@ -240,6 +308,43 @@
         </div>
     </div>
 </div>
+
+{{-- Rejection note modal --}}
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-semibold" id="rejectModalLabel">
+                    <i class="bi bi-x-octagon text-danger me-2"></i>Reject Offering
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="rejectForm" method="POST">
+                @csrf
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Rejecting: <strong id="rejectOfferingName"></strong>
+                    </p>
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold">
+                            Rejection Note <span class="text-danger">*</span>
+                        </label>
+                        <textarea id="rejectNote" name="rejection_note" class="form-control" rows="4"
+                                  placeholder="Explain why this offering is being rejected so the partner knows what to fix…"
+                                  required maxlength="1000"></textarea>
+                        <div class="form-text">This note is visible to the partner.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-x-lg me-1"></i>Confirm Rejection
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -248,5 +353,12 @@
         document.querySelectorAll('.state-cb').forEach(cb => cb.checked = true));
     document.getElementById('clearAll').addEventListener('click', () =>
         document.querySelectorAll('.state-cb').forEach(cb => cb.checked = false));
+
+    document.getElementById('rejectModal').addEventListener('show.bs.modal', function (e) {
+        var btn = e.relatedTarget;
+        document.getElementById('rejectOfferingName').textContent = btn.dataset.name;
+        document.getElementById('rejectForm').action = btn.dataset.action;
+        document.getElementById('rejectNote').value = btn.dataset.note || '';
+    });
 </script>
 @endsection

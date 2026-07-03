@@ -49,7 +49,7 @@
             </div>
             @endif
 
-            <form method="POST" action="{{ route('forms.submit', $questionnaire->uuid) }}" id="questionnaire-form">
+            <form method="POST" action="{{ route('forms.submit', $questionnaire->uuid) }}" id="questionnaire-form" enctype="multipart/form-data">
                 @csrf
                 {{-- Pass partner tracking params through --}}
                 <input type="hidden" name="partner_token" value="{{ request()->query('partner_token') }}">
@@ -100,7 +100,7 @@
                                     @foreach($q->options ?? [] as $opt)
                                         <option value="{{ $opt['value'] }}"
                                             {{ old('answers.' . $q->id) === $opt['value'] ? 'selected' : '' }}>
-                                            {{ $opt['value'] }}
+                                            {{ $opt['label'] ?? $opt['value'] }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -113,7 +113,7 @@
                                     @foreach($q->options ?? [] as $opt)
                                         <option value="{{ $opt['value'] }}"
                                             {{ in_array($opt['value'], (array) old('answers.' . $q->id, [])) ? 'selected' : '' }}>
-                                            {{ $opt['value'] }}
+                                            {{ $opt['label'] ?? $opt['value'] }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -121,6 +121,7 @@
                                 @break
 
                             @case('radio')
+                            @case('choice')
                                 @foreach($q->options ?? [] as $opt)
                                 <div class="form-check">
                                     <input class="form-check-input @error('answers.' . $q->id) is-invalid @enderror"
@@ -131,13 +132,14 @@
                                            {{ $q->is_required ? 'required' : '' }}
                                            {{ old('answers.' . $q->id) === $opt['value'] ? 'checked' : '' }}>
                                     <label class="form-check-label" for="q{{ $q->id }}_{{ $loop->index }}">
-                                        {{ $opt['value'] }}
+                                        {{ $opt['label'] ?? $opt['value'] }}
                                     </label>
                                 </div>
                                 @endforeach
                                 @break
 
                             @case('checkbox')
+                            @case('multi')
                                 @foreach($q->options ?? [] as $opt)
                                 <div class="form-check">
                                     <input class="form-check-input"
@@ -147,7 +149,7 @@
                                            id="q{{ $q->id }}_{{ $loop->index }}"
                                            {{ in_array($opt['value'], (array) old('answers.' . $q->id, [])) ? 'checked' : '' }}>
                                     <label class="form-check-label" for="q{{ $q->id }}_{{ $loop->index }}">
-                                        {{ $opt['value'] }}
+                                        {{ $opt['label'] ?? $opt['value'] }}
                                     </label>
                                 </div>
                                 @endforeach
@@ -279,74 +281,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function () {
-    var totalSteps = {{ $totalSteps }};
-    if (totalSteps <= 1) return;
-
-    var steps       = document.querySelectorAll('.form-step');
-    var btnPrev     = document.getElementById('btn-prev');
-    var btnNext     = document.getElementById('btn-next');
-    var btnSubmit   = document.getElementById('btn-submit');
-    var indicator   = document.getElementById('step-indicator');
-    var pct         = document.getElementById('step-pct');
-    var progressBar = document.getElementById('progress-bar');
-    var current     = 0;
-
-    function showStep(n) {
-        steps.forEach(function (s, i) {
-            s.classList.toggle('active', i === n);
-        });
-        var pctVal = Math.round(((n + 1) / totalSteps) * 100);
-        indicator.textContent  = 'Step ' + (n + 1) + ' of ' + totalSteps;
-        pct.textContent        = pctVal + '%';
-        progressBar.style.width = pctVal + '%';
-        btnPrev.style.display  = n === 0 ? 'none' : '';
-
-        var isLast = n === totalSteps - 1;
-        btnNext.style.display   = isLast ? 'none' : '';
-        btnSubmit.style.display = isLast ? '' : 'none';
-    }
-
-    function validateCurrent() {
-        var step   = steps[current];
-        var valid  = true;
-        /* clear previous invalid markers */
-        step.querySelectorAll('.is-invalid').forEach(function (el) {
-            el.classList.remove('is-invalid');
-        });
-
-        step.querySelectorAll('input[required], select[required], textarea[required]').forEach(function (inp) {
-            // Skip inputs inside conditionally hidden question wrappers
-            var wrapper = inp.closest('.q-wrapper');
-            if (wrapper && wrapper.style.display === 'none') return;
-
-            var ok;
-            if (inp.type === 'radio') {
-                ok = !!step.querySelector('input[name="' + inp.name + '"]:checked');
-            } else if (inp.type === 'checkbox') {
-                ok = !!step.querySelector('input[name="' + inp.name + '"]:checked');
-            } else {
-                ok = inp.value.trim() !== '';
-            }
-            if (!ok) {
-                inp.classList.add('is-invalid');
-                valid = false;
-            }
-        });
-        return valid;
-    }
-
-    btnNext.addEventListener('click', function () {
-        if (validateCurrent()) showStep(++current);
-        else window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-
-    btnPrev.addEventListener('click', function () { showStep(--current); });
-
-    showStep(0);
-})();
-</script>
-<script>
-(function () {
+    /* ── Conditional visibility ── */
     function getAnswer(qId) {
         var radios = document.querySelectorAll('[name="answers[' + qId + ']"]');
         if (radios.length && radios[0].type === 'radio') {
@@ -411,22 +346,94 @@
         });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        evaluateConditions();
-        var form = document.getElementById('questionnaire-form');
-        form.addEventListener('change', evaluateConditions);
-        form.addEventListener('input',  evaluateConditions);
+    /* ── Multi-step navigation ── */
+    var totalSteps = {{ $totalSteps }};
+    if (totalSteps <= 1) {
+        document.addEventListener('DOMContentLoaded', function () {
+            evaluateConditions();
+            var form = document.getElementById('questionnaire-form');
+            if (form) {
+                form.addEventListener('change', evaluateConditions);
+                form.addEventListener('input',  evaluateConditions);
+            }
+            initHeightBmi();
+        });
+        return;
+    }
 
-        // Height: combine ft + in into total inches in the hidden field
+    var steps       = document.querySelectorAll('.form-step');
+    var btnPrev     = document.getElementById('btn-prev');
+    var btnNext     = document.getElementById('btn-next');
+    var btnSubmit   = document.getElementById('btn-submit');
+    var indicator   = document.getElementById('step-indicator');
+    var pct         = document.getElementById('step-pct');
+    var progressBar = document.getElementById('progress-bar');
+    var current     = 0;
+
+    function showStep(n) {
+        steps.forEach(function (s, i) {
+            s.classList.toggle('active', i === n);
+        });
+        var pctVal = Math.round(((n + 1) / totalSteps) * 100);
+        indicator.textContent   = 'Step ' + (n + 1) + ' of ' + totalSteps;
+        pct.textContent         = pctVal + '%';
+        progressBar.style.width = pctVal + '%';
+        btnPrev.style.display   = n === 0 ? 'none' : '';
+
+        var isLast = n === totalSteps - 1;
+        btnNext.style.display   = isLast ? 'none' : '';
+        btnSubmit.style.display = isLast ? '' : 'none';
+
+        // Re-evaluate conditions so cross-step dependencies show correctly
+        evaluateConditions();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function validateCurrent() {
+        var step  = steps[current];
+        var valid = true;
+        step.querySelectorAll('.is-invalid').forEach(function (el) {
+            el.classList.remove('is-invalid');
+        });
+
+        step.querySelectorAll('input[required], select[required], textarea[required]').forEach(function (inp) {
+            var wrapper = inp.closest('.q-wrapper');
+            if (wrapper && wrapper.style.display === 'none') return;
+
+            var ok;
+            if (inp.type === 'radio') {
+                ok = !!step.querySelector('input[name="' + inp.name + '"]:checked');
+            } else if (inp.type === 'checkbox') {
+                ok = !!step.querySelector('input[name="' + inp.name + '"]:checked');
+            } else {
+                ok = inp.value.trim() !== '';
+            }
+            if (!ok) {
+                inp.classList.add('is-invalid');
+                valid = false;
+            }
+        });
+        return valid;
+    }
+
+    btnNext.addEventListener('click', function () {
+        if (validateCurrent()) showStep(++current);
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    btnPrev.addEventListener('click', function () { showStep(--current); });
+
+    /* ── Height / BMI helpers ── */
+    function initHeightBmi() {
         var heightWrapper = document.querySelector('.q-wrapper[data-field-type="height"]');
         var weightWrapper = document.querySelector('.q-wrapper[data-field-type="weight"]');
         var bmiWrapper    = document.querySelector('.q-wrapper[data-field-type="bmi"]');
 
-        var ftInput      = heightWrapper ? heightWrapper.querySelector('.height-ft-input')       : null;
-        var inInput      = heightWrapper ? heightWrapper.querySelector('.height-in-input')       : null;
-        var combinedH    = heightWrapper ? heightWrapper.querySelector('.height-combined-input') : null;
-        var weightInput  = weightWrapper ? weightWrapper.querySelector('input[type="number"]')   : null;
-        var bmiInput     = bmiWrapper    ? bmiWrapper.querySelector('input[type="number"]')      : null;
+        var ftInput     = heightWrapper ? heightWrapper.querySelector('.height-ft-input')       : null;
+        var inInput     = heightWrapper ? heightWrapper.querySelector('.height-in-input')       : null;
+        var combinedH   = heightWrapper ? heightWrapper.querySelector('.height-combined-input') : null;
+        var weightInput = weightWrapper ? weightWrapper.querySelector('input[type="number"]')   : null;
+        var bmiInput    = bmiWrapper    ? bmiWrapper.querySelector('input[type="number"]')      : null;
 
         function updateHeight() {
             if (!ftInput || !inInput || !combinedH) return;
@@ -454,6 +461,15 @@
         if (ftInput)     ftInput.addEventListener('input', updateHeight);
         if (inInput)     inInput.addEventListener('input', updateHeight);
         if (weightInput) weightInput.addEventListener('input', updateBmi);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        evaluateConditions();
+        showStep(0);
+        var form = document.getElementById('questionnaire-form');
+        form.addEventListener('change', evaluateConditions);
+        form.addEventListener('input',  evaluateConditions);
+        initHeightBmi();
     });
 })();
 </script>
