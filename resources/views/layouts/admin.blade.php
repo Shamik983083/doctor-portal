@@ -8,7 +8,7 @@
         </a>
     </li>
     <hr class="border-secondary my-2">
-    <li><span class="px-3 text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;">Management</span></li>
+    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Management</span></li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.cases.*') ? 'active' : '' }}" href="{{ route('admin.cases.index') }}">
             <i class="bi bi-folder2-open"></i> Cases
@@ -59,19 +59,28 @@
             <i class="bi bi-question-circle me-1"></i> Question Bank
         </a>
     </li>
+    <hr class="border-secondary my-2">
+    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Integration Guides</span></li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.guide.messaging') ? 'active' : '' }}" href="{{ route('admin.guide.messaging') }}">
-            <i class="bi bi-chat-dots"></i> Guide: Messaging API
+            <i class="bi bi-chat-dots"></i> Messaging API
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.guide.weightloss-api') ? 'active' : '' }}" href="{{ route('admin.guide.weightloss-api') }}">
-            <i class="bi bi-journal-medical"></i> Guide: Weight Loss API
+            <i class="bi bi-journal-medical"></i> Weight Loss API
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.guide.webhooks') ? 'active' : '' }}" href="{{ route('admin.guide.webhooks') }}">
+            <i class="bi bi-broadcast-pin"></i> Webhooks
+        </a>
+    </li>
+    <hr class="border-secondary my-2">
+    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Developer</span></li>
+    <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.webhooks.*') ? 'active' : '' }}" href="{{ route('admin.webhooks.index') }}">
-            <i class="bi bi-broadcast"></i> Webhooks
+            <i class="bi bi-broadcast"></i> Webhook Logs
             @php $failedWebhooksCount = \App\Models\WebhookDelivery::where('status', 'failed')->count(); @endphp
             @if($failedWebhooksCount > 0)
                 <span class="badge bg-danger ms-1" style="font-size:.65rem;">{{ $failedWebhooksCount }}</span>
@@ -79,7 +88,7 @@
         </a>
     </li>
     <hr class="border-secondary my-2">
-    <li><span class="px-3 text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;">Clinician View</span></li>
+    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Clinician View</span></li>
     <li class="nav-item">
         <a class="nav-link" href="{{ route('clinician.dashboard') }}">
             <i class="bi bi-heart-pulse"></i> Clinician Portal

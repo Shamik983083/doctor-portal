@@ -578,7 +578,7 @@ function renderQRows($rows, $allRows) {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>If patient has a prescription image: <code>POST /api/partner/files</code> → store <code>file_token</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with patient data + <strong>both</strong> questionnaire answer blocks (Standard Intake 1 and MWL)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Register a webhook at <code>POST /api/partner/webhooks</code> to receive <code>case.status_changed</code> and <code>patient_message_received</code> events</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Register a webhook at <code>POST /api/partner/webhooks</code> to receive status events — the portal fires: <code>case_waiting</code>, <code>case_assigned_to_clinician</code>, <code>case_support</code>, <code>case_approved</code>, <code>case_processing</code>, <code>case_completed</code>, <code>case_cancelled</code>, <code>message_created</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify HMAC signature on incoming webhooks: <code>X-Webhook-Signature: sha256=&lt;digest&gt;</code></li>
     <li class="mb-0"><i class="bi bi-check-square text-success me-2"></i>Use <code>external_id</code> on every case submission for safe retries (409 = already created, treat as success)</li>
 </ul>

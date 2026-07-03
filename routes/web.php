@@ -139,6 +139,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
 
     // Developer Guide
     Route::get('/guide/messaging', fn() => view('admin.guide.messaging'))->name('guide.messaging');
+    Route::get('/guide/webhooks', fn() => view('admin.guide.webhooks'))->name('guide.webhooks');
     Route::get('/guide/weightloss-api', function () {
         $questionnaire = \App\Models\Questionnaire::with([
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),

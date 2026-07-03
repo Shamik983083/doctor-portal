@@ -128,7 +128,9 @@ class CaseController extends Controller
         $case      = PatientCase::where('uuid', $uuid)->firstOrFail();
         $clinician = Auth::user()->clinician;
 
-        DB::transaction(function () use ($request, $case, $clinician) {
+        $prescription = null;
+
+        DB::transaction(function () use ($request, $case, $clinician, &$prescription) {
             $prescription = CasePrescription::create([
                 'case_id'          => $case->id,
                 'clinician_id'     => $clinician->id,
@@ -154,10 +156,24 @@ class CaseController extends Controller
             $this->stateMachine->approve($case, $clinician->id);
         });
 
-        $this->webhooks->dispatch($case->partner_id, 'case_approved', [
-            'case_id'      => $case->uuid,
-            'clinician_id' => $clinician->uuid ?? null,
-            'timestamp'    => now()->timestamp,
+        // Fire a rich prescription_written event with full prescription details.
+        // The state machine already fires case_approved with the basic status change payload.
+        $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
+            'case_id'          => $case->uuid,
+            'external_id'      => $case->external_id,
+            'patient_id'       => $case->patient->uuid ?? null,
+            'clinician_name'   => $clinician->full_name,
+            'clinician_npi'    => $clinician->npi,
+            'diagnoses'        => $prescription->diagnoses,
+            'meds_prescribed'  => $prescription->load('medications')->medications->map(fn($m) => [
+                'name'             => $m->name,
+                'compound_formula' => $m->compound_formula,
+                'refills'          => (string) $m->refills,
+                'quantity'         => (string) $m->quantity,
+                'days_supply'      => (string) $m->days_supply,
+                'dispense_unit'    => $m->dispense_unit,
+            ])->toArray(),
+            'timestamp'        => now()->timestamp,
         ]);
 
         return redirect()->route('clinician.cases.show', $uuid)
@@ -182,11 +198,7 @@ class CaseController extends Controller
             ]);
         }
 
-        $this->webhooks->dispatch($case->partner_id, 'case_approved', [
-            'case_id'      => $case->uuid,
-            'clinician_id' => $clinician->uuid ?? null,
-            'timestamp'    => now()->timestamp,
-        ]);
+        // case_approved webhook is fired by the state machine transition above.
 
         return redirect()->route('clinician.cases.show', $uuid)->with('success', 'Case approved.');
     }
