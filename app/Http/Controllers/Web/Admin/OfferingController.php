@@ -37,10 +37,11 @@ class OfferingController extends Controller
 
     public function create()
     {
-        $partners   = Partner::where('status', 'active')->get(['id', 'name']);
-        $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $usStates   = $this->usStates;
-        return view('admin.offerings.create', compact('partners', 'usStates', 'categories'));
+        $partners          = Partner::where('status', 'active')->get(['id', 'name']);
+        $categories        = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $allQuestionnaires = Questionnaire::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $usStates          = $this->usStates;
+        return view('admin.offerings.create', compact('partners', 'usStates', 'categories', 'allQuestionnaires'));
     }
 
     public function store(Request $request)
@@ -79,10 +80,23 @@ class OfferingController extends Controller
         $data['approved_by']             = Auth::id();
         $data['approved_at']             = now();
 
-        Offering::create($data);
+        $offering = Offering::create($data);
 
-        return redirect()->route('admin.offerings.index')
-            ->with('success', "Offering \"{$data['name']}\" created successfully.");
+        $qIds = $request->input('questionnaire_ids', []);
+        if (!empty($qIds)) {
+            $requiredMap = $request->input('questionnaire_required', []);
+            $sync = [];
+            foreach (array_values($qIds) as $i => $qId) {
+                $sync[(int) $qId] = [
+                    'is_required' => isset($requiredMap[$qId]),
+                    'sort_order'  => $i,
+                ];
+            }
+            $offering->questionnaires()->sync($sync);
+        }
+
+        return redirect()->route('admin.offerings.show', $offering->id)
+            ->with('success', "Offering \"{$offering->name}\" created successfully.");
     }
 
     public function show(int $id)

@@ -79,7 +79,7 @@ class OfferingController extends Controller
 
     public function show(int $id)
     {
-        $offering   = $this->partner()->offerings()->with('category')->findOrFail($id);
+        $offering   = $this->partner()->offerings()->with(['category', 'questionnaires'])->findOrFail($id);
         $usStates   = $this->usStates;
         $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         return view('partner.offerings.show', compact('offering', 'usStates', 'categories'));

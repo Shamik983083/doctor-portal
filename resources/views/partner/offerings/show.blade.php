@@ -247,6 +247,34 @@
                 </div>
             </div>
 
+            @if($offering->questionnaires->isNotEmpty())
+            <div class="card mb-4">
+                <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0 fw-semibold">Required Questionnaires</h6>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"
+                          style="font-size:.65rem">{{ $offering->questionnaires->count() }}</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach($offering->questionnaires->sortBy('pivot.sort_order') as $q)
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                        <span class="small fw-semibold">{{ $q->name }}</span>
+                        @if($q->pivot->is_required)
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size:.62rem">Required</span>
+                        @else
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size:.62rem">Optional</span>
+                        @endif
+                    </li>
+                    @endforeach
+                </ul>
+                <div class="card-footer bg-white py-2 px-3">
+                    <p class="text-muted small mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        These forms must be submitted with every case for this offering.
+                    </p>
+                </div>
+            </div>
+            @endif
+
             <div class="card mb-4">
                 <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Details</h6></div>
                 <div class="card-body small text-muted">
