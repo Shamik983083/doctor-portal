@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Offering;
 use App\Models\OfferingCategory;
 use App\Models\Partner;
+use App\Models\Questionnaire;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -86,10 +87,38 @@ class OfferingController extends Controller
 
     public function show(int $id)
     {
-        $offering   = Offering::with(['partner', 'category'])->findOrFail($id);
-        $usStates   = $this->usStates;
-        $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        return view('admin.offerings.show', compact('offering', 'usStates', 'categories'));
+        $offering          = Offering::with(['partner', 'category', 'questionnaires'])->findOrFail($id);
+        $usStates          = $this->usStates;
+        $categories        = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $allQuestionnaires = Questionnaire::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        return view('admin.offerings.show', compact('offering', 'usStates', 'categories', 'allQuestionnaires'));
+    }
+
+    public function attachQuestionnaire(Request $request, int $id)
+    {
+        $request->validate([
+            'questionnaire_id' => 'required|integer|exists:questionnaires,id',
+            'is_required'      => 'boolean',
+        ]);
+
+        $offering = Offering::findOrFail($id);
+
+        $offering->questionnaires()->syncWithoutDetaching([
+            $request->questionnaire_id => [
+                'is_required' => $request->boolean('is_required', true),
+                'sort_order'  => $offering->questionnaires()->count(),
+            ],
+        ]);
+
+        return back()->with('success', 'Questionnaire attached.');
+    }
+
+    public function detachQuestionnaire(int $id, int $qId)
+    {
+        $offering = Offering::findOrFail($id);
+        $offering->questionnaires()->detach($qId);
+
+        return back()->with('success', 'Questionnaire removed.');
     }
 
     public function approve(int $id)

@@ -129,8 +129,9 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <strong><i class="bi bi-info-circle me-2"></i>Overview</strong><br>
     This guide walks your patient portal developer through submitting a <strong>Weight Loss (MWL)</strong> case via the Partner REST API.
     <ul class="mb-0 mt-1">
-        <li>A single <strong>GET</strong> call to the MWL questionnaire returns <em>all</em> questions — Standard Intake 1 (shared baseline) and MWL-specific questions — merged into one list, each tagged with a <code>slug</code> and a <code>source_questionnaire</code>.</li>
-        <li>A single <strong>POST</strong> to <code>/api/partner/cases</code> submits all answers in <strong>one block</strong> using <code>slug</code> identifiers. The portal splits them internally.</li>
+        <li>A single <strong>GET</strong> call to the MWL questionnaire returns <em>all</em> questions — Standard Intake 1 (shared baseline) and MWL-specific questions — merged into one list, each tagged with a stable <code>slug</code>.</li>
+        <li>A single <strong>POST</strong> to <code>/api/partner/cases</code> with your <strong>Offering ID</strong> + a flat <code>answers</code> array of slug/answer pairs. <strong>No questionnaire UUID needed at submission time.</strong></li>
+        <li>The portal uses the offering to determine which questionnaires apply, then splits and stores the answers internally.</li>
         <li>Use <code>slug</code> instead of <code>question_id</code> — slugs are stable and survive question rebuilds; numeric IDs change when a questionnaire is edited.</li>
     </ul>
 </div>
@@ -257,6 +258,13 @@ file=&lt;binary image — JPG, PNG, or PDF, max 10 MB&gt;</pre>
 <div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">4</span>Create Case — Full Payload</div>
 <div class="card-body">
 
+<div class="alert alert-success border-0 small mb-3 py-2">
+    <i class="bi bi-stars me-1"></i>
+    <strong>No questionnaire UUID needed.</strong>
+    Submit a flat <code>answers</code> array — the portal looks up which questionnaire each slug belongs to
+    from the <code>offering_id</code> you already send. Standard Intake 1 and MWL answers are split internally.
+</div>
+
 <div class="d-flex align-items-center gap-2 mb-2">
     <span class="badge-method method-post">POST</span>
     <code>{{ $base }}/api/partner/cases</code>
@@ -284,45 +292,44 @@ Content-Type: application/json
   "is_chargeable":  true,
   "hold_status":    false,
 
-  "questionnaire_responses": [
-    {
-      "questionnaire_id": "{{ $qUuid }}",
-      "answers": [
+  "offerings": [
+    { "offering_id": "YOUR_MWL_OFFERING_UUID", "quantity": 1 }
+  ],
 
-        // ── Standard Intake 1 answers ─────────────────────────────
-        { "slug": "{{ $siPregnant->slug      ?? 'pregnant_breastfeeding' }}",       "answer": "no" },
-        { "slug": "{{ $siBP->slug            ?? 'blood_pressure_range' }}",          "answer": "normal" },
-        { "slug": "{{ $siMeds->slug          ?? 'prescription_medications' }}",      "answer": "yes" },
-        { "slug": "{{ $siMedsList->slug      ?? 'prescription_medications_list' }}", "answer": "Metformin 500mg twice daily" },
-        { "slug": "{{ $siAllergies->slug     ?? 'medication_allergies' }}",          "answer": "no" },
-        // (omit medication_allergies_list if "no" above)
-        { "slug": "{{ $siConditions->slug    ?? 'medical_conditions' }}",            "answer": "no" },
-        // (omit medical_conditions_list if "no" above)
-        { "slug": "{{ $siInjuries->slug      ?? 'injuries_surgeries' }}",            "answer": "no" },
-        // (omit injuries_surgeries_details if "no" above)
-        { "slug": "{{ $siActivity->slug      ?? 'physical_activity' }}",             "answer": "somewhat_active" },
-        { "slug": "{{ $siLastEval->slug      ?? 'last_medical_evaluation' }}",       "answer": "less_than_1_year" },
-        { "slug": "{{ $siLastLab->slug       ?? 'last_lab_tests' }}",                "answer": "less_than_1_year" },
-        { "slug": "{{ $siMessage->slug       ?? 'first_message_to_doctor' }}",       "answer": "Starting my weight loss journey." },
-        { "slug": "{{ $siConsent->slug       ?? 'telehealth_informed_consent' }}",   "answer": "agree" },
+  "answers": [
 
-        // ── MWL – Weight Loss answers ─────────────────────────────
-        { "slug": "{{ $qMedCond->slug   ?? 'mwl_medical_conditions' }}",    "answer": ["gallbladder_disease", "hypertension"] },
-        { "slug": "{{ $qGbConsent->slug ?? 'mwl_gallbladder_consent' }}",   "answer": "agree" },
-        // (omit mwl_thyroid_consent if thyroid_issues NOT selected above)
-        { "slug": "{{ $qBypass->slug    ?? 'mwl_gastric_bypass' }}",        "answer": "no" },
-        { "slug": "{{ $qAllergy->slug   ?? 'mwl_glp1_brand_allergy' }}",    "answer": ["none"] },
-        { "slug": "{{ $qCurGlp1->slug   ?? 'mwl_current_glp1' }}",          "answer": "semaglutide" },
-        { "slug": "{{ $qSideFx->slug    ?? 'mwl_glp1_side_effects' }}",     "answer": "no" },
-        { "slug": "{{ $qDose->slug      ?? 'mwl_current_dose' }}",           "answer": "sema_0_5" },
-        { "slug": "{{ $qContinu->slug   ?? 'mwl_treatment_continuation' }}", "answer": "same_dose" },
-        { "slug": "{{ $qHasPic->slug    ?? 'mwl_has_prescription_pic' }}",   "answer": "yes" },
-        { "slug": "{{ $qPicUp->slug     ?? 'mwl_prescription_pic_upload' }}", "answer": "3f2a1b4c-..." },
-        // (omit mwl_prescription_pic_upload if "no" above)
-        { "slug": "{{ $qTruth->slug     ?? 'mwl_consent_truthfulness' }}",   "answer": "agree" },
-        { "slug": "{{ $qGlp1Con->slug   ?? 'mwl_consent_glp1' }}",           "answer": "agree" }
-      ]
-    }
+    // ── Standard Intake 1 ─────────────────────────────────────────
+    { "slug": "{{ $siPregnant->slug      ?? 'pregnant_breastfeeding' }}",       "answer": "no" },
+    { "slug": "{{ $siBP->slug            ?? 'blood_pressure_range' }}",          "answer": "normal" },
+    { "slug": "{{ $siMeds->slug          ?? 'prescription_medications' }}",      "answer": "yes" },
+    { "slug": "{{ $siMedsList->slug      ?? 'prescription_medications_list' }}", "answer": "Metformin 500mg twice daily" },
+    { "slug": "{{ $siAllergies->slug     ?? 'medication_allergies' }}",          "answer": "no" },
+    // (omit medication_allergies_list if "no" above)
+    { "slug": "{{ $siConditions->slug    ?? 'medical_conditions' }}",            "answer": "no" },
+    // (omit medical_conditions_list if "no" above)
+    { "slug": "{{ $siInjuries->slug      ?? 'injuries_surgeries' }}",            "answer": "no" },
+    // (omit injuries_surgeries_details if "no" above)
+    { "slug": "{{ $siActivity->slug      ?? 'physical_activity' }}",             "answer": "somewhat_active" },
+    { "slug": "{{ $siLastEval->slug      ?? 'last_medical_evaluation' }}",       "answer": "less_than_1_year" },
+    { "slug": "{{ $siLastLab->slug       ?? 'last_lab_tests' }}",                "answer": "less_than_1_year" },
+    { "slug": "{{ $siMessage->slug       ?? 'first_message_to_doctor' }}",       "answer": "Starting my weight loss journey." },
+    { "slug": "{{ $siConsent->slug       ?? 'telehealth_informed_consent' }}",   "answer": "agree" },
+
+    // ── MWL – Weight Loss ─────────────────────────────────────────
+    { "slug": "{{ $qMedCond->slug   ?? 'mwl_medical_conditions' }}",    "answer": ["gallbladder_disease", "hypertension"] },
+    { "slug": "{{ $qGbConsent->slug ?? 'mwl_gallbladder_consent' }}",   "answer": "agree" },
+    // (omit mwl_thyroid_consent if thyroid_issues NOT selected above)
+    { "slug": "{{ $qBypass->slug    ?? 'mwl_gastric_bypass' }}",        "answer": "no" },
+    { "slug": "{{ $qAllergy->slug   ?? 'mwl_glp1_brand_allergy' }}",    "answer": ["none"] },
+    { "slug": "{{ $qCurGlp1->slug   ?? 'mwl_current_glp1' }}",          "answer": "semaglutide" },
+    { "slug": "{{ $qSideFx->slug    ?? 'mwl_glp1_side_effects' }}",     "answer": "no" },
+    { "slug": "{{ $qDose->slug      ?? 'mwl_current_dose' }}",           "answer": "sema_0_5" },
+    { "slug": "{{ $qContinu->slug   ?? 'mwl_treatment_continuation' }}", "answer": "same_dose" },
+    { "slug": "{{ $qHasPic->slug    ?? 'mwl_has_prescription_pic' }}",   "answer": "yes" },
+    { "slug": "{{ $qPicUp->slug     ?? 'mwl_prescription_pic_upload' }}", "answer": "3f2a1b4c-..." },
+    // (omit mwl_prescription_pic_upload if "no" above)
+    { "slug": "{{ $qTruth->slug     ?? 'mwl_consent_truthfulness' }}",   "answer": "agree" },
+    { "slug": "{{ $qGlp1Con->slug   ?? 'mwl_consent_glp1' }}",           "answer": "agree" }
   ]
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create')">Copy</button>
@@ -551,11 +558,11 @@ function renderQRows($rows, $allRows) {
 <div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">8</span>Integration Checklist</div>
 <div class="card-body">
 <ul class="list-unstyled mb-0">
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code> and <code>client_secret</code> from the admin — Partner → Credentials</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code>, <code>client_secret</code>, and your <strong>Offering UUID(s)</strong> from the admin — Partner → Offerings (shown once approved)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> once — returns <strong>all questions</strong> (Standard Intake 1 + MWL) with <code>slug</code> values; store <code>slug → question_id</code> in your DB</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs (Standard Intake 1 + MWL merged) — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>If patient has a prescription image: <code>POST /api/partner/files</code> → store <code>file_token</code></li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with patient data + <strong>one</strong> questionnaire block (MWL UUID) using <code>slug</code> fields — the API splits Standard Intake 1 and MWL answers internally</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs — no questionnaire UUID required; the portal splits answers internally</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Register a webhook at <code>POST /api/partner/webhooks</code> to receive status events — the portal fires: <code>case_waiting</code>, <code>case_assigned_to_clinician</code>, <code>case_support</code>, <code>case_approved</code>, <code>case_processing</code>, <code>case_completed</code>, <code>case_cancelled</code>, <code>message_created</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify HMAC signature on incoming webhooks: <code>X-Webhook-Signature: sha256=&lt;digest&gt;</code></li>

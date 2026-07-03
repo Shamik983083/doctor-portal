@@ -135,6 +135,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::patch('/{id}/toggle-status', [AdminOfferingController::class, 'toggleStatus'])->name('toggle-status');
         Route::post('/{id}/approve', [AdminOfferingController::class, 'approve'])->name('approve');
         Route::post('/{id}/reject',  [AdminOfferingController::class, 'reject'])->name('reject');
+        Route::post('/{id}/questionnaires',          [AdminOfferingController::class, 'attachQuestionnaire'])->name('questionnaires.attach');
+        Route::delete('/{id}/questionnaires/{qId}',  [AdminOfferingController::class, 'detachQuestionnaire'])->name('questionnaires.detach');
     });
 
     // Developer Guide

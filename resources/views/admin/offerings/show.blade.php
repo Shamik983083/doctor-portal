@@ -126,7 +126,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card mb-3">
             <div class="card-header"><h6 class="mb-0 small">Available States</h6></div>
             <div class="card-body">
                 @if($offering->available_states && count($offering->available_states))
@@ -137,6 +137,76 @@
                     <p class="text-muted small mb-0"><i class="bi bi-globe me-1"></i>All states</p>
                 @endif
             </div>
+        </div>
+
+        {{-- Required Questionnaires --}}
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 small">Required Questionnaires</h6>
+                @if($offering->questionnaires->isNotEmpty())
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"
+                          style="font-size:.65rem">{{ $offering->questionnaires->count() }}</span>
+                @endif
+            </div>
+
+            {{-- Attached list --}}
+            @if($offering->questionnaires->isEmpty())
+                <div class="card-body py-2">
+                    <p class="text-muted small mb-0">
+                        <i class="bi bi-exclamation-circle me-1"></i>
+                        No questionnaires attached. Partners can still submit via <code>questionnaire_responses</code>.
+                    </p>
+                </div>
+            @else
+                <ul class="list-group list-group-flush">
+                    @foreach($offering->questionnaires->sortBy('pivot.sort_order') as $q)
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                        <div>
+                            <div class="small fw-semibold">{{ $q->name }}</div>
+                            @if($q->pivot->is_required)
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size:.62rem">Required</span>
+                            @else
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size:.62rem">Optional</span>
+                            @endif
+                        </div>
+                        <form method="POST"
+                              action="{{ route('admin.offerings.questionnaires.detach', [$offering->id, $q->id]) }}"
+                              onsubmit="return confirm('Remove {{ addslashes($q->name) }}?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-sm btn-outline-danger border-0 p-1" title="Remove">
+                                <i class="bi bi-x-lg" style="font-size:.75rem"></i>
+                            </button>
+                        </form>
+                    </li>
+                    @endforeach
+                </ul>
+            @endif
+
+            {{-- Add questionnaire --}}
+            @php $attachable = $allQuestionnaires->whereNotIn('id', $offering->questionnaires->pluck('id')); @endphp
+            @if($attachable->isNotEmpty())
+            <div class="card-footer p-2">
+                <form method="POST"
+                      action="{{ route('admin.offerings.questionnaires.attach', $offering->id) }}"
+                      class="d-flex gap-2 align-items-center flex-wrap">
+                    @csrf
+                    <select name="questionnaire_id" class="form-select form-select-sm" style="min-width:0;flex:1" required>
+                        <option value="">Add questionnaire…</option>
+                        @foreach($attachable as $q)
+                            <option value="{{ $q->id }}">{{ $q->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="form-check mb-0 text-nowrap">
+                        <input class="form-check-input" type="checkbox" name="is_required" value="1"
+                               id="aqReq_{{ $offering->id }}" checked>
+                        <label class="form-check-label small" for="aqReq_{{ $offering->id }}">Required</label>
+                    </div>
+                    <button class="btn btn-sm btn-primary text-nowrap">
+                        <i class="bi bi-plus-lg me-1"></i>Add
+                    </button>
+                </form>
+            </div>
+            @endif
         </div>
     </div>
 
