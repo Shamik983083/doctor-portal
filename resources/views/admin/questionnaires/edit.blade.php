@@ -63,6 +63,19 @@
                     <div class="form-text">Multi-step shows questions grouped by step number.</div>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label fw-semibold small">Includes Questionnaire <span class="text-muted fw-normal">(optional)</span></label>
+                    <select name="linked_questionnaire_id" class="form-select">
+                        <option value="">— None —</option>
+                        @foreach($questionnaires as $lq)
+                            <option value="{{ $lq->id }}"
+                                {{ old('linked_questionnaire_id', $questionnaire->linked_questionnaire_id) == $lq->id ? 'selected' : '' }}>
+                                {{ $lq->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">Questions from the selected questionnaire are included automatically in the API response and case submission for this questionnaire.</div>
+                </div>
+                <div class="mb-3">
                     <div class="form-check form-switch">
                         <input type="hidden" name="is_active" value="0">
                         <input class="form-check-input" type="checkbox" name="is_active" value="1"

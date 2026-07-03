@@ -35,6 +35,26 @@
                     <tr><th class="text-muted">DoseSpot ID</th><td><code>{{ $offering->dosespot_medication_id ?? '—' }}</code></td></tr>
                     <tr><th class="text-muted">Boothwyn ID</th><td><code>{{ $offering->boothwyn_compound_id ?? '—' }}</code></td></tr>
                 </table>
+
+                @if($offering->approval_status === 'approved')
+                <div class="mt-3 pt-3 border-top">
+                    <div class="d-flex align-items-center gap-1 mb-1">
+                        <i class="bi bi-key-fill text-success" style="font-size:.8rem"></i>
+                        <span class="small fw-semibold">Offering ID</span>
+                        <span class="badge bg-success ms-auto" style="font-size:.6rem">Approved</span>
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="adminOfferingUuid" class="form-control font-monospace bg-light"
+                               value="{{ $offering->uuid }}" readonly style="font-size:.7rem">
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyAdminUuid()" title="Copy ID">
+                            <i class="bi bi-copy" id="adminCopyIcon" style="font-size:.8rem"></i>
+                        </button>
+                    </div>
+                    <div class="form-text mt-1" style="font-size:.7rem">
+                        Share with the patient portal developer to reference this offering in case submissions.
+                    </div>
+                </div>
+                @endif
             </div>
         </div>
 
@@ -360,5 +380,14 @@
         document.getElementById('rejectForm').action = btn.dataset.action;
         document.getElementById('rejectNote').value = btn.dataset.note || '';
     });
+
+    function copyAdminUuid() {
+        var input = document.getElementById('adminOfferingUuid');
+        var icon  = document.getElementById('adminCopyIcon');
+        navigator.clipboard.writeText(input.value).then(function () {
+            icon.className = 'bi bi-check-lg text-success';
+            setTimeout(function () { icon.className = 'bi bi-copy'; }, 1800);
+        });
+    }
 </script>
 @endsection

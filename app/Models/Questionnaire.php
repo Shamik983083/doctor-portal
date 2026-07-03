@@ -11,7 +11,7 @@ class Questionnaire extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['uuid', 'partner_id', 'name', 'description', 'is_active', 'mode'];
+    protected $fillable = ['uuid', 'partner_id', 'name', 'description', 'is_active', 'mode', 'linked_questionnaire_id'];
 
     protected $casts = ['is_active' => 'boolean'];
 
@@ -21,9 +21,10 @@ class Questionnaire extends Model
         static::creating(fn($m) => $m->uuid ??= (string) Str::uuid());
     }
 
-    public function partner()   { return $this->belongsTo(Partner::class); }
-    public function questions() { return $this->hasMany(QuestionnaireQuestion::class)->orderBy('step_number')->orderBy('sort_order'); }
-    public function responses()   { return $this->hasMany(QuestionnaireResponse::class); }
+    public function partner()              { return $this->belongsTo(Partner::class); }
+    public function questions()            { return $this->hasMany(QuestionnaireQuestion::class)->orderBy('step_number')->orderBy('sort_order'); }
+    public function responses()            { return $this->hasMany(QuestionnaireResponse::class); }
+    public function linkedQuestionnaire()  { return $this->belongsTo(Questionnaire::class, 'linked_questionnaire_id'); }
 
     public function offerings()
     {

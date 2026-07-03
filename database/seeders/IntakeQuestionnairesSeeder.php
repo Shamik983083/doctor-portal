@@ -13,6 +13,16 @@ class IntakeQuestionnairesSeeder extends Seeder
         $this->seedStandardIntake();
         $this->seedMWLWeightLoss();
         $this->seedAntiAging();
+        $this->linkToStandardIntake();
+    }
+
+    private function linkToStandardIntake(): void
+    {
+        $si1 = Questionnaire::where('name', 'Standard Intake 1')->first();
+        if (!$si1) return;
+
+        Questionnaire::whereIn('name', ['MWL – Weight Loss', 'Anti-Aging'])
+            ->update(['linked_questionnaire_id' => $si1->id]);
     }
 
     // ────────────────────────────────────────────────────────────────────────────

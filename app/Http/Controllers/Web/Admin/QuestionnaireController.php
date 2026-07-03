@@ -38,6 +38,7 @@ class QuestionnaireController extends Controller
             'description'                       => 'nullable|string',
             'partner_id'                        => 'nullable|exists:partners,id',
             'mode'                              => 'nullable|in:single,multi',
+            'linked_questionnaire_id'           => 'nullable|integer|exists:questionnaires,id',
             'questions'                         => 'nullable|array',
             'questions.*.question'              => 'required|string|max:5000',
             'questions.*.type'                  => 'required|in:hidden,input,email,textarea,date,select,multiselect,radio,checkbox,choice,multi,file,number,height,weight,bmi',
@@ -52,11 +53,12 @@ class QuestionnaireController extends Controller
         ]);
 
         $questionnaire = Questionnaire::create([
-            'name'        => $request->input('name'),
-            'description' => $request->input('description'),
-            'partner_id'  => $request->input('partner_id') ?: null,
-            'is_active'   => $request->boolean('is_active', true),
-            'mode'        => $request->input('mode', 'single'),
+            'name'                    => $request->input('name'),
+            'description'             => $request->input('description'),
+            'partner_id'              => $request->input('partner_id') ?: null,
+            'is_active'               => $request->boolean('is_active', true),
+            'mode'                    => $request->input('mode', 'single'),
+            'linked_questionnaire_id' => $request->input('linked_questionnaire_id') ?: null,
         ]);
 
         $this->syncQuestions($questionnaire, $request->input('questions', []));
@@ -74,9 +76,10 @@ class QuestionnaireController extends Controller
 
     public function edit(int $id)
     {
-        $questionnaire = Questionnaire::with('questions')->findOrFail($id);
-        $partners = Partner::orderBy('name')->get(['id', 'name']);
-        return view('admin.questionnaires.edit', compact('questionnaire', 'partners'));
+        $questionnaire  = Questionnaire::with('questions')->findOrFail($id);
+        $partners       = Partner::orderBy('name')->get(['id', 'name']);
+        $questionnaires = Questionnaire::where('id', '!=', $id)->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        return view('admin.questionnaires.edit', compact('questionnaire', 'partners', 'questionnaires'));
     }
 
     public function update(Request $request, int $id)
@@ -86,6 +89,7 @@ class QuestionnaireController extends Controller
             'description'                       => 'nullable|string',
             'partner_id'                        => 'nullable|exists:partners,id',
             'mode'                              => 'nullable|in:single,multi',
+            'linked_questionnaire_id'           => 'nullable|integer|exists:questionnaires,id',
             'questions'                         => 'nullable|array',
             'questions.*.question'              => 'required|string|max:5000',
             'questions.*.type'                  => 'required|in:hidden,input,email,textarea,date,select,multiselect,radio,checkbox,choice,multi,file,number,height,weight,bmi',
@@ -101,15 +105,19 @@ class QuestionnaireController extends Controller
 
         $questionnaire = Questionnaire::findOrFail($id);
         $questionnaire->update([
-            'name'        => $request->input('name'),
-            'description' => $request->input('description'),
-            'partner_id'  => $request->input('partner_id') ?: null,
-            'is_active'   => $request->boolean('is_active', true),
-            'mode'        => $request->input('mode', 'single'),
+            'name'                    => $request->input('name'),
+            'description'             => $request->input('description'),
+            'partner_id'              => $request->input('partner_id') ?: null,
+            'is_active'               => $request->boolean('is_active', true),
+            'mode'                    => $request->input('mode', 'single'),
+            'linked_questionnaire_id' => $request->input('linked_questionnaire_id') ?: null,
         ]);
 
+        // Capture existing slugs keyed by question key before delete so we can restore them
+        $preservedSlugs = $questionnaire->questions()->pluck('slug', 'key')->all();
+
         $questionnaire->questions()->delete();
-        $this->syncQuestions($questionnaire, $request->input('questions', []));
+        $this->syncQuestions($questionnaire, $request->input('questions', []), $preservedSlugs);
 
         return redirect()->route('admin.questionnaires.show', $questionnaire->id)
             ->with('success', 'Questionnaire updated successfully.');
@@ -122,7 +130,7 @@ class QuestionnaireController extends Controller
             ->with('success', 'Questionnaire deleted.');
     }
 
-    private function syncQuestions(Questionnaire $questionnaire, array $questions): void
+    private function syncQuestions(Questionnaire $questionnaire, array $questions, array $preservedSlugs = []): void
     {
         $optionTypes = ['select', 'multiselect', 'radio', 'checkbox', 'choice', 'multi'];
         $questions   = array_values($questions);
@@ -148,9 +156,15 @@ class QuestionnaireController extends Controller
                 $options = empty($options) ? null : $options;
             }
 
+            // Restore the slug from before the delete (keyed by question key) so stable
+            // identifiers survive edits. Null lets the model boot() auto-generate a new one.
+            $key  = $q['key'] ?? null;
+            $slug = ($key && isset($preservedSlugs[$key])) ? $preservedSlugs[$key] : null;
+
             $created = $questionnaire->questions()->create([
                 'question'    => $q['question'],
-                'key'         => $q['key'] ?? null,
+                'key'         => $key,
+                'slug'        => $slug,
                 'type'        => $type,
                 'placeholder' => $q['placeholder'] ?? null,
                 'is_required' => !empty($q['is_required']),

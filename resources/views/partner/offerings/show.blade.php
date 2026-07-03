@@ -199,6 +199,31 @@
         </div>
 
         <div class="col-lg-4">
+
+            @if($offering->approval_status === 'approved')
+            <div class="card mb-4" style="border-color:#86efac">
+                <div class="card-header py-2" style="background:#f0fdf4;border-color:#86efac">
+                    <h6 class="mb-0 fw-semibold small" style="color:#166534">
+                        <i class="bi bi-key-fill me-1"></i>Offering ID
+                        <span class="badge ms-1" style="background:#166534;font-size:.6rem">Approved</span>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">
+                        Share this ID with your patient portal developer. They will use it in the
+                        <code>offering_id</code> field when submitting cases via the Partner API.
+                    </p>
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="partnerOfferingUuid" class="form-control font-monospace"
+                               value="{{ $offering->uuid }}" readonly style="font-size:.72rem;background:#f0fdf4">
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyPartnerUuid()" title="Copy">
+                            <i class="bi bi-copy" id="partnerCopyIcon" style="font-size:.8rem"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <div class="card mb-4">
                 <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Settings</h6></div>
                 <div class="card-body">
@@ -251,5 +276,15 @@ document.getElementById('selectAll').addEventListener('click', () => {
 document.getElementById('clearAll').addEventListener('click', () => {
     document.querySelectorAll('.state-cb').forEach(cb => cb.checked = false);
 });
+
+function copyPartnerUuid() {
+    var input = document.getElementById('partnerOfferingUuid');
+    var icon  = document.getElementById('partnerCopyIcon');
+    if (!input) return;
+    navigator.clipboard.writeText(input.value).then(function () {
+        icon.className = 'bi bi-check-lg text-success';
+        setTimeout(function () { icon.className = 'bi bi-copy'; }, 1800);
+    });
+}
 </script>
 @endpush

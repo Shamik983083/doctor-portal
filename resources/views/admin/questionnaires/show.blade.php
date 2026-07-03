@@ -87,6 +87,17 @@ $typeMap = [
                         <th class="text-muted">Updated</th>
                         <td>{{ $questionnaire->updated_at->format('M d, Y') }}</td>
                     </tr>
+                    @if($questionnaire->linkedQuestionnaire)
+                    <tr>
+                        <th class="text-muted">Includes</th>
+                        <td>
+                            <span class="badge border"
+                                  style="background:#f0fdf4; color:#166534; border-color:#bbf7d0 !important; font-size:.75rem;">
+                                <i class="bi bi-link-45deg me-1"></i>{{ $questionnaire->linkedQuestionnaire->name }}
+                            </span>
+                        </td>
+                    </tr>
+                    @endif
                 </table>
                 @if($questionnaire->description)
                     <hr class="my-2">
@@ -146,6 +157,14 @@ $typeMap = [
                             @if($q->key)
                                 <span class="badge bg-light text-dark border font-monospace" style="font-size:.7rem;">
                                     key: {{ $q->key }}
+                                </span>
+                            @endif
+
+                            @if($q->slug)
+                                <span class="badge border font-monospace"
+                                      style="font-size:.7rem; background:#f0fdf4; color:#166534; border-color:#bbf7d0 !important;"
+                                      title="Stable slug — use this in API answers instead of question_id">
+                                    slug: {{ $q->slug }}
                                 </span>
                             @endif
 

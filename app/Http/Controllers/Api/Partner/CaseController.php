@@ -58,16 +58,95 @@ class CaseController extends Controller
             'offerings'                                       => 'nullable|array',
             'offerings.*.offering_id'                         => 'string',
             'offerings.*.quantity'                            => 'integer|min:1',
-            // Grouped questionnaire responses (new format)
+            // Grouped questionnaire responses
             'questionnaire_responses'                         => 'nullable|array',
             'questionnaire_responses.*.questionnaire_id'      => 'required_with:questionnaire_responses|string|exists:questionnaires,uuid',
             'questionnaire_responses.*.answers'               => 'nullable|array',
-            'questionnaire_responses.*.answers.*.question_id' => 'required|integer|exists:questionnaire_questions,id',
+            'questionnaire_responses.*.answers.*.question_id' => 'nullable|integer|exists:questionnaire_questions,id',
+            'questionnaire_responses.*.answers.*.slug'        => 'nullable|string|max:120',
             'questionnaire_responses.*.answers.*.answer'      => 'nullable',
         ]);
 
         $partner     = $this->partner($request);
         $patientData = $data['patient'];
+
+        // ── Pre-process questionnaire responses ──────────────────────────────
+        // 1. Resolve slug → question_id for any answer that uses a slug.
+        // 2. If the submitted questionnaire has a linked_questionnaire_id, split
+        //    the answers into two separate response blocks (one per questionnaire)
+        //    so the rest of the pipeline (required-Q check, response creation) works
+        //    without any further changes.
+        if (!empty($data['questionnaire_responses'])) {
+            $expanded = [];
+
+            foreach ($data['questionnaire_responses'] as $qrData) {
+                $questionnaire = Questionnaire::with([
+                    'questions',
+                    'linkedQuestionnaire.questions',
+                ])->where('uuid', $qrData['questionnaire_id'])->first();
+
+                if (!$questionnaire) {
+                    $expanded[] = $qrData;
+                    continue;
+                }
+
+                // Build slug → question and id → questionnaire_id maps across
+                // both the submitted questionnaire and its linked questionnaire.
+                $slugToQuestion = [];
+                $idToQuestionnaire = []; // question_id => questionnaire model
+
+                foreach ($questionnaire->questions as $q) {
+                    if ($q->slug) $slugToQuestion[$q->slug] = $q;
+                    $idToQuestionnaire[$q->id] = $questionnaire;
+                }
+
+                $linked = $questionnaire->linkedQuestionnaire;
+                if ($linked) {
+                    foreach ($linked->questions as $q) {
+                        if ($q->slug) $slugToQuestion[$q->slug] = $q;
+                        $idToQuestionnaire[$q->id] = $linked;
+                    }
+                }
+
+                // Resolve slugs and collect resolved answers
+                $resolvedAnswers = [];
+                foreach ($qrData['answers'] ?? [] as $answer) {
+                    if (empty($answer['question_id']) && !empty($answer['slug'])) {
+                        $match = $slugToQuestion[$answer['slug']] ?? null;
+                        if ($match) {
+                            $answer['question_id'] = $match->id;
+                        }
+                    }
+                    if (!empty($answer['question_id'])) {
+                        $resolvedAnswers[] = $answer;
+                    }
+                }
+
+                // Split answers by their owning questionnaire
+                if ($linked) {
+                    $mainAnswers   = [];
+                    $linkedAnswers = [];
+
+                    foreach ($resolvedAnswers as $answer) {
+                        $owner = $idToQuestionnaire[$answer['question_id']] ?? null;
+                        if ($owner && $owner->id === $linked->id) {
+                            $linkedAnswers[] = $answer;
+                        } else {
+                            $mainAnswers[] = $answer;
+                        }
+                    }
+
+                    // Linked questionnaire block goes first
+                    $expanded[] = ['questionnaire_id' => $linked->uuid, 'answers' => $linkedAnswers];
+                    $expanded[] = ['questionnaire_id' => $qrData['questionnaire_id'], 'answers' => $mainAnswers];
+                } else {
+                    $expanded[] = ['questionnaire_id' => $qrData['questionnaire_id'], 'answers' => $resolvedAnswers];
+                }
+            }
+
+            $data['questionnaire_responses'] = $expanded;
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         // Deduplicate patient by external_id then email
         $patient = null;
