@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('/partner/auth/token', [AuthController::class, 'token']);
 
 // Protected Partner API
-Route::prefix('partner')->middleware(['auth:api', 'partner.auth'])->group(function () {
+Route::prefix('partner')->middleware('partner.auth')->group(function () {
 
     // Patients — read-only; patients are created by the external system via case submission
     Route::prefix('patients')->group(function () {

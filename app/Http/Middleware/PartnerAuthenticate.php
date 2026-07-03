@@ -5,31 +5,38 @@ namespace App\Http\Middleware;
 use App\Models\Partner;
 use Closure;
 use Illuminate\Http\Request;
+use Laravel\Passport\Exceptions\AuthenticationException;
+use League\OAuth2\Server\Exception\OAuthServerException;
+use League\OAuth2\Server\ResourceServer;
+use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 
 class PartnerAuthenticate
 {
+    public function __construct(protected ResourceServer $server)
+    {
+    }
+
     public function handle(Request $request, Closure $next)
     {
-        $user = $request->user();
+        // Validate the Bearer token and extract the client_id.
+        // Client credentials grants have no user, so we resolve
+        // the partner directly from the OAuth client_id.
+        $psrRequest = (new PsrHttpFactory)->createRequest($request);
 
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+        try {
+            $psrRequest = $this->server->validateAuthenticatedRequest($psrRequest);
+        } catch (OAuthServerException) {
+            throw new AuthenticationException;
         }
 
-        // Attach partner via token's client_id
-        $token = $user->token();
+        $clientId = $psrRequest->getAttribute('oauth_client_id');
 
-        if (!$token) {
-            return response()->json(['message' => 'Invalid token.'], 401);
-        }
-
-        $partner = Partner::where('oauth_client_id', $token->client_id)->first();
+        $partner = Partner::where('oauth_client_id', $clientId)->first();
 
         if (!$partner || $partner->status !== 'active') {
             return response()->json(['message' => 'Partner account is inactive or not found.'], 403);
         }
 
-        $request->merge(['_partner' => $partner]);
         $request->attributes->set('partner', $partner);
 
         return $next($request);
