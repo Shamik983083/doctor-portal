@@ -58,6 +58,7 @@ class QuestionnaireController extends Controller
             'partner_id'              => $request->input('partner_id') ?: null,
             'is_active'               => $request->boolean('is_active', true),
             'mode'                    => $request->input('mode', 'single'),
+            'purpose'                 => $request->input('purpose', 'clinical'),
             'linked_questionnaire_id' => $request->input('linked_questionnaire_id') ?: null,
         ]);
 
@@ -110,6 +111,7 @@ class QuestionnaireController extends Controller
             'partner_id'              => $request->input('partner_id') ?: null,
             'is_active'               => $request->boolean('is_active', true),
             'mode'                    => $request->input('mode', 'single'),
+            'purpose'                 => $request->input('purpose', 'clinical'),
             'linked_questionnaire_id' => $request->input('linked_questionnaire_id') ?: null,
         ]);
 

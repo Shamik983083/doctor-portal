@@ -64,6 +64,14 @@
                     <div class="form-text">Multi-step shows questions grouped by step number.</div>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label fw-semibold small">Purpose</label>
+                    <select name="purpose" class="form-select form-select-sm">
+                        <option value="clinical"     {{ old('purpose', 'clinical') === 'clinical'     ? 'selected' : '' }}>Clinical (shown in offering dropdown)</option>
+                        <option value="demographic"  {{ old('purpose') === 'demographic'  ? 'selected' : '' }}>Demographic (patient data — excluded from offerings)</option>
+                    </select>
+                    <div class="form-text">Demographic forms are excluded from the offering questionnaire picker.</div>
+                </div>
+                <div class="mb-3">
                     <div class="form-check form-switch">
                         <input type="hidden" name="is_active" value="0">
                         <input class="form-check-input" type="checkbox" name="is_active" value="1"

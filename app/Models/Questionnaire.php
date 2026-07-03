@@ -11,7 +11,7 @@ class Questionnaire extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['uuid', 'partner_id', 'name', 'description', 'is_active', 'mode', 'linked_questionnaire_id'];
+    protected $fillable = ['uuid', 'partner_id', 'name', 'description', 'is_active', 'mode', 'linked_questionnaire_id', 'purpose'];
 
     protected $casts = ['is_active' => 'boolean'];
 

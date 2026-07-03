@@ -43,6 +43,7 @@ class OfferingController extends Controller
             ->pluck('linked_questionnaire_id');
 
         return Questionnaire::where('is_active', true)
+            ->where('purpose', '!=', 'demographic')
             ->whereNotIn('id', $embeddedIds)
             ->orderBy('name')
             ->get(['id', 'name']);
