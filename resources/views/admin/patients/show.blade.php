@@ -30,6 +30,12 @@
                     <tr><th class="text-muted">Phone</th><td>{{ $patient->phone ?? '—' }}</td></tr>
                     <tr><th class="text-muted">DOB</th><td>{{ $patient->date_of_birth?->format('M d, Y') ?? '—' }}</td></tr>
                     <tr><th class="text-muted">Gender</th><td>{{ ucfirst($patient->gender ?? '—') }}</td></tr>
+                    <tr>
+                        <th class="text-muted">Height</th>
+                        <td>{{ $patient->height ? (int)floor($patient->height/12)."' ".round(fmod($patient->height,12)).'"' : '—' }}</td>
+                    </tr>
+                    <tr><th class="text-muted">Weight</th><td>{{ $patient->weight ? number_format($patient->weight,1).' lbs' : '—' }}</td></tr>
+                    <tr><th class="text-muted">BMI</th><td>{{ $patient->bmi ? number_format($patient->bmi,1) : '—' }}</td></tr>
                     <tr><th class="text-muted">State</th><td>{{ $patient->state ?? '—' }}</td></tr>
                     <tr><th class="text-muted">City</th><td>{{ $patient->city ?? '—' }}</td></tr>
                     <tr><th class="text-muted">Zip</th><td>{{ $patient->zip ?? '—' }}</td></tr>

@@ -18,6 +18,12 @@
                     <tr><th>Gender</th><td>{{ ucfirst($case->patient->gender ?? '—') }}</td></tr>
                     <tr><th>State</th><td>{{ $case->patient_state ?? $case->patient->state ?? '—' }}</td></tr>
                     <tr><th>Phone</th><td>{{ $case->patient->phone ?? '—' }}</td></tr>
+                    <tr>
+                        <th>Height</th>
+                        <td>{{ $case->patient->height ? (int)floor($case->patient->height/12)."' ".round(fmod($case->patient->height,12)).'"' : '—' }}</td>
+                    </tr>
+                    <tr><th>Weight</th><td>{{ $case->patient->weight ? number_format($case->patient->weight,1).' lbs' : '—' }}</td></tr>
+                    <tr><th>BMI</th><td>{{ $case->patient->bmi ? number_format($case->patient->bmi,1) : '—' }}</td></tr>
                 </table>
             </div>
         </div>

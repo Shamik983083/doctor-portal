@@ -62,6 +62,31 @@
             </div>
         </div>
 
+        <!-- Patient Vitals -->
+        <div class="card mb-4">
+            <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold"><i class="bi bi-person-heart me-2"></i>Patient</h6></div>
+            <div class="card-body small">
+                <dl class="row mb-0">
+                    <dt class="col-5 text-muted">Name</dt>
+                    <dd class="col-7">
+                        <a href="{{ route('partner.patients.show', $case->patient->id) }}" class="text-decoration-none">
+                            {{ $case->patient->full_name }}
+                        </a>
+                    </dd>
+                    <dt class="col-5 text-muted">DOB</dt>
+                    <dd class="col-7">{{ $case->patient->date_of_birth?->format('M j, Y') ?? '—' }}</dd>
+                    <dt class="col-5 text-muted">Gender</dt>
+                    <dd class="col-7">{{ $case->patient->gender ? ucfirst($case->patient->gender) : '—' }}</dd>
+                    <dt class="col-5 text-muted">Height</dt>
+                    <dd class="col-7">{{ $case->patient->height ? (int)floor($case->patient->height/12)."' ".round(fmod($case->patient->height,12)).'"' : '—' }}</dd>
+                    <dt class="col-5 text-muted">Weight</dt>
+                    <dd class="col-7">{{ $case->patient->weight ? number_format($case->patient->weight,1).' lbs' : '—' }}</dd>
+                    <dt class="col-5 text-muted">BMI</dt>
+                    <dd class="col-7">{{ $case->patient->bmi ? number_format($case->patient->bmi,1) : '—' }}</dd>
+                </dl>
+            </div>
+        </div>
+
         <!-- Offerings -->
         <div class="card mb-4">
             <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Offerings</h6></div>

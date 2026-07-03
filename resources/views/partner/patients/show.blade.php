@@ -31,6 +31,15 @@
                     <dt class="col-5 text-muted">Gender</dt>
                     <dd class="col-7">{{ $patient->gender ? ucfirst($patient->gender) : '—' }}</dd>
 
+                    <dt class="col-5 text-muted">Height</dt>
+                    <dd class="col-7">{{ $patient->height ? (int)floor($patient->height/12)."' ".round(fmod($patient->height,12)).'"' : '—' }}</dd>
+
+                    <dt class="col-5 text-muted">Weight</dt>
+                    <dd class="col-7">{{ $patient->weight ? number_format($patient->weight,1).' lbs' : '—' }}</dd>
+
+                    <dt class="col-5 text-muted">BMI</dt>
+                    <dd class="col-7">{{ $patient->bmi ? number_format($patient->bmi,1) : '—' }}</dd>
+
                     <dt class="col-5 text-muted">State</dt>
                     <dd class="col-7">{{ $patient->state ?? '—' }}</dd>
 

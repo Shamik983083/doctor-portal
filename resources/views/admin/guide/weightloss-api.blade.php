@@ -131,6 +131,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <ul class="mb-0 mt-1">
         <li>A single <strong>GET</strong> call to the MWL questionnaire returns <em>all</em> questions — Standard Intake 1 (shared baseline) and MWL-specific questions — merged into one list, each tagged with a stable <code>slug</code>.</li>
         <li>A single <strong>POST</strong> to <code>/api/partner/cases</code> with your <strong>Offering ID</strong> + a flat <code>answers</code> array of slug/answer pairs. <strong>No questionnaire UUID needed at submission time.</strong></li>
+        <li>The <code>patient</code> block must include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> — these are required fields and are stored directly on the patient record.</li>
         <li>The portal uses the offering to determine which questionnaires apply, then splits and stores the answers internally.</li>
         <li>Use <code>slug</code> instead of <code>question_id</code> — slugs are stable and survive question rebuilds; numeric IDs change when a questionnaire is edited.</li>
     </ul>
@@ -275,12 +276,15 @@ Content-Type: application/json
 
 {
   "patient": {
-    "first_name":    "Jane",
-    "last_name":     "Doe",
-    "email":         "jane.doe@example.com",
+    "first_name":    "Jane",          ← required
+    "last_name":     "Doe",           ← required
+    "email":         "jane.doe@example.com",  ← required
     "phone":         "+15551234567",
     "date_of_birth": "1985-06-15",
     "gender":        "female",
+    "height":        70.5,            ← required  (inches — e.g. 70.5 = 5'10.5")
+    "weight":        185.0,           ← required  (lbs)
+    "bmi":           26.2,            ← required  (send pre-calculated)
     "address":       "123 Main St",
     "city":          "Austin",
     "state":         "TX",
@@ -563,7 +567,7 @@ function renderQRows($rows, $allRows) {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs (Standard Intake 1 + MWL merged) — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>If patient has a prescription image: <code>POST /api/partner/files</code> → store <code>file_token</code></li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs — no questionnaire UUID required; the portal splits answers internally</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs — no questionnaire UUID required; the portal splits answers internally. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> as required fields in the <code>patient</code> block</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Register a webhook at <code>POST /api/partner/webhooks</code> to receive status events — the portal fires: <code>case_waiting</code>, <code>case_assigned_to_clinician</code>, <code>case_support</code>, <code>case_approved</code>, <code>case_processing</code>, <code>case_completed</code>, <code>case_cancelled</code>, <code>message_created</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify HMAC signature on incoming webhooks: <code>X-Webhook-Signature: sha256=&lt;digest&gt;</code></li>
