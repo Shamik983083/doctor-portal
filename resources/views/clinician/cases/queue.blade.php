@@ -6,7 +6,7 @@
 @section('content')
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="mb-0">Waiting Cases</h6>
+        <h6 class="mb-0">{{ request('status') ? ucfirst(request('status')) . ' Cases' : 'All Cases' }}</h6>
         <form class="d-flex gap-2" method="GET">
             <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
                 <option value="">All Statuses</option>

@@ -53,14 +53,14 @@ class PatientCase extends Model
     public function patient() { return $this->belongsTo(Patient::class); }
     public function clinician() { return $this->belongsTo(Clinician::class); }
     public function caseOfferings() { return $this->hasMany(CaseOffering::class, 'case_id'); }
-    public function offerings() { return $this->belongsToMany(Offering::class, 'case_offerings')->withPivot('status', 'quantity', 'price', 'dosage', 'frequency', 'refills'); }
+    public function offerings() { return $this->belongsToMany(Offering::class, 'case_offerings', 'case_id', 'offering_id')->withPivot('status', 'quantity', 'price', 'dosage', 'frequency', 'refills'); }
     public function caseQuestions() { return $this->hasMany(CaseQuestion::class, 'case_id'); }
-    public function diseases() { return $this->belongsToMany(Disease::class, 'case_diseases')->withPivot('is_primary'); }
+    public function diseases() { return $this->belongsToMany(Disease::class, 'case_diseases', 'case_id', 'disease_id')->withPivot('is_primary'); }
     public function clinicalNotes() { return $this->hasMany(ClinicalNote::class, 'case_id'); }
     public function orders() { return $this->hasMany(Order::class, 'case_id'); }
     public function messages() { return $this->hasMany(Message::class, 'case_id'); }
     public function files() { return $this->hasMany(PatientFile::class, 'case_id'); }
-    public function tags() { return $this->belongsToMany(Tag::class, 'case_tags')->withPivot('notes'); }
+    public function tags() { return $this->belongsToMany(Tag::class, 'case_tags', 'case_id', 'tag_id')->withPivot('notes'); }
     public function events() { return $this->hasMany(CaseEvent::class, 'case_id'); }
     public function questionnaireResponses() { return $this->hasMany(QuestionnaireResponse::class, 'case_id'); }
     public function casePrescriptions()      { return $this->hasMany(CasePrescription::class, 'case_id'); }
