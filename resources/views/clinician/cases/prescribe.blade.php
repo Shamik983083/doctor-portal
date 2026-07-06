@@ -109,17 +109,19 @@
 
 {{-- Offering data for JS --}}
 <script>
-const OFFERINGS = @json($offerings->map(fn($o) => [
-    'id'                  => $o->id,
-    'name'                => $o->name,
-    'internal_name'       => $o->internal_name ?? '',
-    'compound_formula'    => $o->compound_formula ?? '',
-    'refills'             => $o->refills ?? '',
-    'quantity'            => $o->quantity ?? '',
-    'days_supply'         => $o->days_supply ?? '',
-    'dispense_unit'       => $o->dispense_unit ?? '',
-    'days_until_dispense' => $o->days_until_dispense ?? '',
-]));
+const OFFERINGS = {!! json_encode($offerings->map(function($o) {
+    return [
+        'id'                  => $o->id,
+        'name'                => $o->name,
+        'internal_name'       => $o->internal_name ?? '',
+        'compound_formula'    => $o->compound_formula ?? '',
+        'refills'             => $o->refills ?? '',
+        'quantity'            => $o->quantity ?? '',
+        'days_supply'         => $o->days_supply ?? '',
+        'dispense_unit'       => $o->dispense_unit ?? '',
+        'days_until_dispense' => $o->days_until_dispense ?? '',
+    ];
+})->values()) !!};
 
 let medIndex = 0;
 

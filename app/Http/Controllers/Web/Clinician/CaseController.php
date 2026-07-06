@@ -32,7 +32,7 @@ class CaseController extends Controller
             ->withCount(['messages as unread_messages_count' => fn($q) =>
                 $q->where('direction', 'inbound')->where('is_read', false)
             ])
-            ->when($request->status, fn($q, $s) => $q->where('status', $s), fn($q) => $q->where('status', PatientCase::STATUS_WAITING))
+            ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->partner_id, fn($q, $id) => $q->where('partner_id', $id))
             ->orderBy('created_at')
             ->paginate(20);
