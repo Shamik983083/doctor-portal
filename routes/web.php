@@ -149,6 +149,13 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         return view('admin.guide.weightloss-api', compact('questionnaire'));
     })->name('guide.weightloss-api');
 
+    Route::get('/guide/antiaging-api', function () {
+        $questionnaire = \App\Models\Questionnaire::with([
+            'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
+        ])->where('name', 'Anti-Aging')->first();
+        return view('admin.guide.antiaging-api', compact('questionnaire'));
+    })->name('guide.antiaging-api');
+
     // Webhook Deliveries
     Route::prefix('webhooks')->name('webhooks.')->group(function () {
         Route::get('/',              [AdminWebhookDeliveryController::class, 'index'])->name('index');

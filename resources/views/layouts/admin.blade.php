@@ -72,6 +72,11 @@
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}" href="{{ route('admin.guide.antiaging-api') }}">
+            <i class="bi bi-stars"></i> Anti-Aging API
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.guide.webhooks') ? 'active' : '' }}" href="{{ route('admin.guide.webhooks') }}">
             <i class="bi bi-broadcast-pin"></i> Webhooks
         </a>
