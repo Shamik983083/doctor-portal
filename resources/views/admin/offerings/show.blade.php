@@ -185,25 +185,27 @@
             {{-- Add questionnaire --}}
             @php $attachable = $allQuestionnaires->whereNotIn('id', $offering->questionnaires->pluck('id')); @endphp
             @if($attachable->isNotEmpty())
-            <div class="card-footer p-2">
+            <div class="card-footer px-3 py-2 bg-light border-top">
+                <p class="text-muted mb-1" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Attach Questionnaire</p>
                 <form method="POST"
-                      action="{{ route('admin.offerings.questionnaires.attach', $offering->id) }}"
-                      class="d-flex gap-2 align-items-center flex-wrap">
+                      action="{{ route('admin.offerings.questionnaires.attach', $offering->id) }}">
                     @csrf
-                    <select name="questionnaire_id" class="form-select form-select-sm" style="min-width:0;flex:1" required>
-                        <option value="">Add questionnaire…</option>
+                    <select name="questionnaire_id" class="form-select form-select-sm mb-2" required>
+                        <option value="">Select questionnaire…</option>
                         @foreach($attachable as $q)
                             <option value="{{ $q->id }}">{{ $q->name }}</option>
                         @endforeach
                     </select>
-                    <div class="form-check mb-0 text-nowrap">
-                        <input class="form-check-input" type="checkbox" name="is_required" value="1"
-                               id="aqReq_{{ $offering->id }}" checked>
-                        <label class="form-check-label small" for="aqReq_{{ $offering->id }}">Required</label>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" name="is_required" value="1"
+                                   id="aqReq_{{ $offering->id }}" checked>
+                            <label class="form-check-label small" for="aqReq_{{ $offering->id }}">Mark as Required</label>
+                        </div>
+                        <button class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i>Add
+                        </button>
                     </div>
-                    <button class="btn btn-sm btn-primary text-nowrap">
-                        <i class="bi bi-plus-lg me-1"></i>Add
-                    </button>
                 </form>
             </div>
             @endif
