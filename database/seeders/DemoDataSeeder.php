@@ -10,7 +10,9 @@ use App\Models\Patient;
 use App\Models\Pharmacy;
 use App\Models\Tag;
 use App\Models\User;
+use App\Models\Questionnaire;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -80,6 +82,22 @@ class DemoDataSeeder extends Seeder
                 ['name' => $o['name'], 'partner_id' => $partner->id],
                 array_merge($o, ['partner_id' => $partner->id, 'is_active' => true])
             );
+        }
+
+        // Link offerings to questionnaires
+        $semaglutide = Offering::where('name', 'Semaglutide 0.5mg')->where('partner_id', $partner->id)->first();
+        $tirzepatide = Offering::where('name', 'Tirzepatide 2.5mg')->where('partner_id', $partner->id)->first();
+        $mwlQuestionnaire = Questionnaire::where('name', 'like', '%Weight Loss%')->first();
+
+        if ($mwlQuestionnaire) {
+            foreach (array_filter([$semaglutide, $tirzepatide]) as $offering) {
+                DB::table('offering_questionnaire')->insertOrIgnore([
+                    'offering_id' => $offering->id,
+                    'questionnaire_id' => $mwlQuestionnaire->id,
+                    'is_required' => true,
+                    'sort_order' => 0,
+                ]);
+            }
         }
 
         // Demo patient

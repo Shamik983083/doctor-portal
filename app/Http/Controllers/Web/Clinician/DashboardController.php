@@ -11,19 +11,22 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $clinician = Auth::user()->clinician;
+        $clinician   = Auth::user()->clinician;
+        $clinicianId = $clinician?->id;
+
+        $scopeClinician = fn($q) => $clinicianId ? $q->where('clinician_id', $clinicianId) : $q;
 
         $stats = [
             'waiting'    => PatientCase::where('status', PatientCase::STATUS_WAITING)->count(),
-            'assigned'   => PatientCase::where('clinician_id', $clinician?->id)->where('status', PatientCase::STATUS_ASSIGNED)->count(),
-            'approved'   => PatientCase::where('clinician_id', $clinician?->id)->where('status', PatientCase::STATUS_APPROVED)->count(),
-            'completed_today' => PatientCase::where('clinician_id', $clinician?->id)
-                ->where('status', PatientCase::STATUS_COMPLETED)
+            'assigned'   => PatientCase::where('status', PatientCase::STATUS_ASSIGNED)->where($scopeClinician)->count(),
+            'approved'   => PatientCase::where('status', PatientCase::STATUS_APPROVED)->where($scopeClinician)->count(),
+            'completed_today' => PatientCase::where('status', PatientCase::STATUS_COMPLETED)
                 ->whereDate('completed_at', today())
+                ->where($scopeClinician)
                 ->count(),
         ];
 
-        $recentCases = PatientCase::where('clinician_id', $clinician?->id)
+        $recentCases = PatientCase::where($scopeClinician)
             ->with(['patient', 'partner', 'caseOfferings.offering'])
             ->whereIn('status', [PatientCase::STATUS_ASSIGNED, PatientCase::STATUS_APPROVED])
             ->latest()
