@@ -16,6 +16,9 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
 .toc-link { font-size:.85rem }
 .event-badge { font-family:monospace; font-size:.78rem; background:#f3f4f6; border:1px solid #d1d5db; border-radius:4px; padding:1px 6px; color:#1f2937 }
 .step-badge { width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; flex-shrink:0 }
+.endpoint-row { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:.45rem .75rem; font-size:.8rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.75rem }
+.endpoint-row .method-pill { font-size:.68rem; font-weight:700; padding:1px 7px; border-radius:3px; flex-shrink:0 }
+.endpoint-row code { font-size:.8rem; color:#0f172a; word-break:break-all }
 
 @media print {
     nav.sidebar, .topbar, .col-lg-3, button, .copy-btn { display:none !important; }
@@ -277,6 +280,11 @@ def webhook():
   "timestamp":  1751539200
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-created')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— fetch full case details including patient and offerings</span>
+</div>
 </div>
 </div>
 
@@ -294,6 +302,11 @@ def webhook():
   "timestamp":  1751539201
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-waiting')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— confirm case status; no action required on this event</span>
+</div>
 </div>
 </div>
 
@@ -311,7 +324,11 @@ def webhook():
   "timestamp":  1751539260
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-assigned')">Copy</button>
-<p class="mt-2 mb-0 small text-muted">Retrieve clinician details via <code>GET /api/partner/cases/{case_id}</code> if needed.</p>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— retrieve assigned clinician name, NPI, and credentials</span>
+</div>
 </div>
 </div>
 
@@ -329,7 +346,16 @@ def webhook():
   "timestamp":  1751539800
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-support')">Copy</button>
-<p class="mt-2 mb-0 small text-muted">Fetch <code>GET /api/partner/cases/{case_id}</code> to read the <code>support_note</code> the clinician left. Respond via the Partner Portal or <code>POST /api/partner/cases/{case_id}/support { "note": "..." }</code>.</p>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— read the <code>support_note</code> the clinician left</span>
+</div>
+<div class="endpoint-row mt-1">
+    <span class="method-pill method-post">POST</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}/return-to-clinician</code>
+    <span class="text-muted" style="font-size:.75rem">— send your response note back to the clinician</span>
+</div>
 </div>
 </div>
 
@@ -347,6 +373,11 @@ def webhook():
   "timestamp":  1751540000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-approved')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— fetch full case and prescription details</span>
+</div>
 <div class="alert alert-info mt-2 mb-0 small">
     <i class="bi bi-info-circle me-1"></i>
     When the clinician approves <em>via the Prescribe form</em>, you also receive a separate <strong><code>prescription_written</code></strong> event (see below) which includes the full medication list, doctor name, and NPI. Listen for that event for prescription details.
@@ -381,6 +412,11 @@ def webhook():
   "timestamp":       1751540001
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-rx')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— full prescription data is in the payload above; call this only for additional case context</span>
+</div>
 <p class="mt-2 mb-0 small text-muted">This event fires alongside <code>case_approved</code> whenever a prescription form is submitted. If no prescription form was used (approval-only), only <code>case_approved</code> fires.</p>
 </div>
 </div>
@@ -399,6 +435,11 @@ def webhook():
   "timestamp":  1751540200
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-processing')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— check order details; fulfillment and tracking events follow shortly</span>
+</div>
 </div>
 </div>
 
@@ -416,6 +457,11 @@ def webhook():
   "timestamp":  1751599200
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-completed')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— fetch final case record for your own records or audit log</span>
+</div>
 </div>
 </div>
 
@@ -433,7 +479,11 @@ def webhook():
   "timestamp":  1751540500
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-cancelled')">Copy</button>
-<p class="mt-2 mb-0 small text-muted">Fetch <code>GET /api/partner/cases/{case_id}</code> to read the <code>cancellation_reason</code>.</p>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— read the <code>cancellation_reason</code> field for the specific reason</span>
+</div>
 </div>
 </div>
 
@@ -449,7 +499,11 @@ def webhook():
   "timestamp": 1751541000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-note')">Copy</button>
-<p class="mt-2 mb-0 small text-muted">Note content is not included in the payload (may contain PHI). Retrieve via <code>GET /api/partner/cases/{case_id}</code>.</p>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— note content is not in the payload (PHI); retrieve from the case response</span>
+</div>
 </div>
 </div>
 
@@ -466,7 +520,11 @@ def webhook():
   "timestamp": 1751541300
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-msg')">Copy</button>
-<p class="mt-2 mb-0 small text-muted">Retrieve the message body via <code>GET /api/partner/cases/{case_id}/messages</code>.</p>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
+    <span class="text-muted" style="font-size:.75rem">— retrieve the full message body and thread</span>
+</div>
 </div>
 </div>
 
@@ -483,6 +541,11 @@ def webhook():
   "timestamp":  1751541400
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-msg')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
+    <span class="text-muted" style="font-size:.75rem">— confirm delivery and view full message thread</span>
+</div>
 </div>
 </div>
 
@@ -500,6 +563,11 @@ def webhook():
   "timestamp": 1751599000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-order')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— fetch order list and current fulfillment status</span>
+</div>
 </div>
 </div>
 
@@ -516,6 +584,11 @@ def webhook():
   "timestamp":       1751599100
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-tracking')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— tracking number is in the payload above; call this for the full order record if needed</span>
+</div>
 </div>
 </div>
 

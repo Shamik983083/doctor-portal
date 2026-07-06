@@ -103,7 +103,7 @@ class CaseController extends Controller
             ->when($categoryIds->count(), fn($q) => $q->whereIn('category_id', $categoryIds))
             ->orderBy('name')
             ->get(['id', 'name', 'internal_name', 'compound_formula', 'refills',
-                   'quantity', 'days_supply', 'dispense_unit', 'days_until_dispense']);
+                   'quantity', 'days_supply', 'dispense_unit', 'days_until_dispense', 'directions']);
 
         return view('clinician.cases.prescribe', compact('case', 'offerings'));
     }

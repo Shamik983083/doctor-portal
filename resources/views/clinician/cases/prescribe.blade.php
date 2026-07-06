@@ -109,6 +109,7 @@
 
 {{-- Offering data for JS --}}
 <script>
+// All searchable offerings (active + approved, filtered by case category)
 const OFFERINGS = {!! json_encode($offerings->map(function($o) {
     return [
         'id'                  => $o->id,
@@ -120,15 +121,40 @@ const OFFERINGS = {!! json_encode($offerings->map(function($o) {
         'days_supply'         => $o->days_supply ?? '',
         'dispense_unit'       => $o->dispense_unit ?? '',
         'days_until_dispense' => $o->days_until_dispense ?? '',
+        'directions'          => $o->directions ?? '',
     ];
 })->values()) !!};
 
+// Offerings already on this case — pre-loaded from the patient's order
+const CASE_OFFERINGS = {!! json_encode($case->caseOfferings->map(function($co) {
+    $o = $co->offering;
+    if (!$o) return null;
+    return [
+        'id'                  => $o->id,
+        'name'                => $o->name,
+        'internal_name'       => $o->internal_name ?? '',
+        'compound_formula'    => $o->compound_formula ?? '',
+        'refills'             => $o->refills ?? '',
+        'quantity'            => $o->quantity ?? '',
+        'days_supply'         => $o->days_supply ?? '',
+        'dispense_unit'       => $o->dispense_unit ?? '',
+        'days_until_dispense' => $o->days_until_dispense ?? '',
+        'directions'          => $o->directions ?? '',
+    ];
+})->filter()->values()) !!};
+
 let medIndex = 0;
 
-const searchInput   = document.getElementById('med-search');
-const dropdown      = document.getElementById('med-dropdown');
-const container     = document.getElementById('medications-container');
-const noMedsMsg     = document.getElementById('no-meds-msg');
+const searchInput      = document.getElementById('med-search');
+const dropdown         = document.getElementById('med-dropdown');
+const container        = document.getElementById('medications-container');
+const noMedsMsg        = document.getElementById('no-meds-msg');
+const directionsField  = document.querySelector('textarea[name="directions"]');
+
+// Safely escape a value for use inside an HTML attribute
+function esc(val) {
+    return String(val ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 searchInput.addEventListener('input', function () {
     const q = this.value.trim().toLowerCase();
@@ -147,8 +173,8 @@ searchInput.addEventListener('input', function () {
             const item = document.createElement('div');
             item.className = 'px-3 py-2 border-bottom cursor-pointer dropdown-item-hover';
             item.style.cursor = 'pointer';
-            item.innerHTML = `<span class="fw-semibold">${o.name}</span>`
-                + (o.internal_name ? ` <small class="text-muted ms-1">${o.internal_name}</small>` : '');
+            item.innerHTML = `<span class="fw-semibold">${esc(o.name)}</span>`
+                + (o.internal_name ? ` <small class="text-muted ms-1">${esc(o.internal_name)}</small>` : '');
             item.addEventListener('click', () => addMedication(o));
             dropdown.appendChild(item);
         });
@@ -167,6 +193,11 @@ function addMedication(o) {
     searchInput.value = '';
     noMedsMsg.classList.add('d-none');
 
+    // Auto-fill the shared Directions textarea from the first medication that has directions
+    if (directionsField && !directionsField.value.trim() && o.directions) {
+        directionsField.value = o.directions;
+    }
+
     const idx = medIndex++;
     const row = document.createElement('div');
     row.className = 'border rounded mb-3 p-3 position-relative bg-light';
@@ -178,45 +209,45 @@ function addMedication(o) {
             <i class="bi bi-x-lg"></i>
         </button>
 
-        <input type="hidden" name="medications[${idx}][offering_id]" value="${o.id}">
+        <input type="hidden" name="medications[${idx}][offering_id]" value="${esc(o.id)}">
 
         <div class="mb-2">
             <label class="form-label form-label-sm fw-semibold mb-1">Medication Name</label>
             <input type="text" name="medications[${idx}][name]"
-                   class="form-control form-control-sm" value="${o.name}" required>
+                   class="form-control form-control-sm" value="${esc(o.name)}" required>
         </div>
 
         <div class="mb-2">
             <label class="form-label form-label-sm fw-semibold mb-1">Compound Formula</label>
             <input type="text" name="medications[${idx}][compound_formula]"
-                   class="form-control form-control-sm" value="${o.compound_formula}">
+                   class="form-control form-control-sm" value="${esc(o.compound_formula)}">
         </div>
 
         <div class="row g-2 mb-2">
             <div class="col-4 col-md-2">
                 <label class="form-label form-label-sm fw-semibold mb-1">Refills</label>
                 <input type="number" name="medications[${idx}][refills]" min="0"
-                       class="form-control form-control-sm" value="${o.refills}">
+                       class="form-control form-control-sm" value="${esc(o.refills)}">
             </div>
             <div class="col-4 col-md-2">
                 <label class="form-label form-label-sm fw-semibold mb-1">Quantity</label>
                 <input type="number" name="medications[${idx}][quantity]" min="0" step="0.01"
-                       class="form-control form-control-sm" value="${o.quantity}">
+                       class="form-control form-control-sm" value="${esc(o.quantity)}">
             </div>
             <div class="col-4 col-md-2">
                 <label class="form-label form-label-sm fw-semibold mb-1">Days Supply</label>
                 <input type="number" name="medications[${idx}][days_supply]" min="0"
-                       class="form-control form-control-sm" value="${o.days_supply}">
+                       class="form-control form-control-sm" value="${esc(o.days_supply)}">
             </div>
             <div class="col-6 col-md-3">
                 <label class="form-label form-label-sm fw-semibold mb-1">Dispense Unit</label>
                 <input type="text" name="medications[${idx}][dispense_unit]"
-                       class="form-control form-control-sm" value="${o.dispense_unit}">
+                       class="form-control form-control-sm" value="${esc(o.dispense_unit)}">
             </div>
             <div class="col-6 col-md-3">
                 <label class="form-label form-label-sm fw-semibold mb-1">Days Until Dispense</label>
                 <input type="number" name="medications[${idx}][days_until_dispense]" min="0"
-                       class="form-control form-control-sm" value="${o.days_until_dispense}">
+                       class="form-control form-control-sm" value="${esc(o.days_until_dispense)}">
             </div>
         </div>
     `;
@@ -228,5 +259,8 @@ function addMedication(o) {
 
     container.appendChild(row);
 }
+
+// Pre-load the medications the patient ordered on this case
+CASE_OFFERINGS.forEach(o => addMedication(o));
 </script>
 @endsection
