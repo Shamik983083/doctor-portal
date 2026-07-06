@@ -42,6 +42,59 @@
     $qTruth    = $byKey['mwl_consent_truthfulness']    ?? null;
     $qGlp1Con  = $byKey['mwl_consent_glp1']            ?? null;
     $qUuid     = $questionnaire->uuid ?? '';
+
+    // ─── Dynamic payload answers — rebuilt live from DB questions ────────────
+    $_stepLabels = [1 => 'Standard Intake', 2 => 'Program-Specific Medical Intake', 3 => 'Consents'];
+    $_payloadLines = [];
+    $_prevStep = null;
+    foreach ($questions as $_q) {
+        if ($_q->step_number !== $_prevStep) {
+            $_prevStep = $_q->step_number;
+            $_label = $_stepLabels[$_q->step_number] ?? 'Step ' . $_q->step_number;
+            $_payloadLines[] = '';
+            $_payloadLines[] = '    // ── Step ' . $_q->step_number . ': ' . $_label . ' ' . str_repeat('─', 26);
+        }
+        $_dep = $questions->firstWhere('id', $_q->depends_on_question_id);
+        if ($_dep) {
+            $_payloadLines[] = '    // conditional — only when "' . $_dep->key . '" ' . $_q->depends_on_operator . ' "' . $_q->depends_on_value . '"';
+        } elseif (!$_q->is_required) {
+            $_payloadLines[] = '    // optional';
+        }
+        $_opts = collect($_q->options ?? []);
+        switch ($_q->type) {
+            case 'choice':
+                $_safe = null;
+                foreach ($_opts as $_o) { if (empty($_o['disqualifies'])) { $_safe = $_o; break; } }
+                if (!$_safe) $_safe = $_opts->first();
+                $_exVal = $_safe ? '"' . ($_safe['value'] ?? '') . '"' : '"(value)"';
+                break;
+            case 'multi': case 'multiselect':
+                $_sv = [];
+                foreach ($_opts as $_o) {
+                    if (empty($_o['disqualifies']) && !in_array($_o['value'] ?? '', ['none', 'other'])) {
+                        $_sv[] = $_o['value'];
+                        if (count($_sv) >= 2) break;
+                    }
+                }
+                if (empty($_sv)) $_sv = [($_opts->first()['value'] ?? 'value')];
+                $_exVal = '["' . implode('", "', $_sv) . '"]';
+                break;
+            case 'text':
+                $_ph = str_replace('"', "'", $_q->placeholder ?? 'free text');
+                if (strlen($_ph) > 50) $_ph = substr($_ph, 0, 47) . '...';
+                $_exVal = '"' . $_ph . '"';
+                break;
+            case 'file':
+                $_exVal = '"(file_token — from POST /api/partner/files)"';
+                break;
+            default:
+                $_exVal = '"(value)"';
+        }
+        $_slug    = $_q->slug ?? $_q->key;
+        $_isLast  = $questions->last()->id === $_q->id;
+        $_payloadLines[] = '    { "slug": "' . $_slug . '", "answer": ' . $_exVal . ' }' . ($_isLast ? '' : ',');
+    }
+    $payloadAnswers = implode("\n", $_payloadLines);
 @endphp
 
 <style>
@@ -292,43 +345,8 @@ Content-Type: application/json
     { "offering_id": "YOUR_MWL_OFFERING_UUID", "quantity": 1 }
   ],
 
-  "answers": [
+  "answers": [{{ $payloadAnswers }}
 
-    // ── Step 1: Standard Intake ─────────────────────────────────────
-    { "slug": "{{ $siPregnant->slug      ?? 'pregnant_breastfeeding' }}",       "answer": "no" },
-    { "slug": "{{ $siBP->slug            ?? 'blood_pressure_range' }}",          "answer": "normal" },
-    { "slug": "{{ $siMeds->slug          ?? 'prescription_medications' }}",      "answer": "yes" },
-    { "slug": "{{ $siMedsList->slug      ?? 'prescription_medications_list' }}", "answer": "Metformin 500mg twice daily" },
-    { "slug": "{{ $siAllergies->slug     ?? 'medication_allergies' }}",          "answer": "no" },
-    // (omit medication_allergies_list if "no" above)
-    { "slug": "{{ $siConditions->slug    ?? 'medical_conditions' }}",            "answer": "no" },
-    // (omit medical_conditions_list if "no" above)
-    { "slug": "{{ $siInjuries->slug      ?? 'injuries_surgeries' }}",            "answer": "no" },
-    // (omit injuries_surgeries_details if "no" above)
-    { "slug": "{{ $siActivity->slug      ?? 'physical_activity' }}",             "answer": "somewhat_active" },
-    { "slug": "{{ $siLastEval->slug      ?? 'last_medical_evaluation' }}",       "answer": "less_than_1_year" },
-    { "slug": "{{ $siLastLab->slug       ?? 'last_lab_tests' }}",                "answer": "less_than_1_year" },
-    { "slug": "{{ $siMessage->slug       ?? 'first_message_to_doctor' }}",       "answer": "Starting my weight loss journey." },
-    { "slug": "{{ $siConsent->slug       ?? 'telehealth_informed_consent' }}",   "answer": "agree" },
-
-    // ── Step 2: Program-Specific Medical Intake ─────────────────────
-    { "slug": "{{ $qMedCond->slug   ?? 'mwl_medical_conditions' }}",    "answer": ["gallbladder_disease", "hypertension"] },
-    { "slug": "{{ $qBypass->slug    ?? 'mwl_gastric_bypass' }}",        "answer": "no" },
-    { "slug": "{{ $qAllergy->slug   ?? 'mwl_glp1_brand_allergy' }}",    "answer": ["none"] },
-    { "slug": "{{ $qCurGlp1->slug   ?? 'mwl_current_glp1' }}",          "answer": "semaglutide" },
-    { "slug": "{{ $qSideFx->slug    ?? 'mwl_glp1_side_effects' }}",     "answer": "no" },
-    { "slug": "{{ $qDose->slug      ?? 'mwl_current_dose' }}",           "answer": "sema_0_5" },
-    { "slug": "{{ $qContinu->slug   ?? 'mwl_treatment_continuation' }}", "answer": "same_dose" },
-    { "slug": "{{ $qHasPic->slug    ?? 'mwl_has_prescription_pic' }}",   "answer": "yes" },
-    { "slug": "{{ $qPicUp->slug     ?? 'mwl_prescription_pic_upload' }}", "answer": "3f2a1b4c-..." },
-    // (omit mwl_prescription_pic_upload if "no" above)
-
-    // ── Step 3: Consents ────────────────────────────────────────────
-    { "slug": "{{ $qGbConsent->slug ?? 'mwl_gallbladder_consent' }}",   "answer": "agree" },
-    // (omit mwl_gallbladder_consent if gallbladder_disease NOT selected in mwl_medical_conditions)
-    // (omit mwl_thyroid_consent if thyroid_issues NOT selected in mwl_medical_conditions)
-    { "slug": "{{ $qTruth->slug     ?? 'mwl_consent_truthfulness' }}",   "answer": "agree" },
-    { "slug": "{{ $qGlp1Con->slug   ?? 'mwl_consent_glp1' }}",           "answer": "agree" }
   ]
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create')">Copy</button>
@@ -349,7 +367,11 @@ Content-Type: application/json
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create-resp')">Copy</button>
 
 <div class="alert alert-warning mt-3 mb-0 small">
-    <strong><i class="bi bi-exclamation-triangle me-1"></i>Conditional answers</strong> — Only send answers for questions the patient actually answered. Conditional questions (GLP-1 follow-ups, prescription image, gallbladder/thyroid consents) should be <strong>omitted entirely</strong> if the condition was not met. The system does not error on missing optional answers — it silently skips them.
+    <strong><i class="bi bi-exclamation-triangle me-1"></i>Payload is generated live from the DB.</strong>
+    Lines marked <code>// conditional</code> must be <strong>omitted</strong> when the parent condition was not met.
+    Lines marked <code>// optional</code> may always be omitted.
+    Any answer whose value would <strong>disqualify</strong> the patient still creates the case — the doctor sees a disqualification flag.
+    The system silently ignores answers for untriggered conditions.
 </div>
 </div>
 </div>

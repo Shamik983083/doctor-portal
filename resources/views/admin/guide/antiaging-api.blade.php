@@ -40,6 +40,59 @@
     $qConsentTruth     = $byKey['aa_consent_truthfulness']             ?? null;
     $qConsentInformed  = $byKey['aa_consent_informed']                 ?? null;
     $qUuid             = $questionnaire->uuid ?? '';
+
+    // ─── Dynamic payload answers — rebuilt live from DB questions ────────────
+    $_stepLabels = [1 => 'Standard Intake', 2 => 'Anti-Aging Program-Specific Intake', 3 => 'Consents'];
+    $_payloadLines = [];
+    $_prevStep = null;
+    foreach ($questions as $_q) {
+        if ($_q->step_number !== $_prevStep) {
+            $_prevStep = $_q->step_number;
+            $_label = $_stepLabels[$_q->step_number] ?? 'Step ' . $_q->step_number;
+            $_payloadLines[] = '';
+            $_payloadLines[] = '    // ── Step ' . $_q->step_number . ': ' . $_label . ' ' . str_repeat('─', 26);
+        }
+        $_dep = $questions->firstWhere('id', $_q->depends_on_question_id);
+        if ($_dep) {
+            $_payloadLines[] = '    // conditional — only when "' . $_dep->key . '" ' . $_q->depends_on_operator . ' "' . $_q->depends_on_value . '"';
+        } elseif (!$_q->is_required) {
+            $_payloadLines[] = '    // optional';
+        }
+        $_opts = collect($_q->options ?? []);
+        switch ($_q->type) {
+            case 'choice':
+                $_safe = null;
+                foreach ($_opts as $_o) { if (empty($_o['disqualifies'])) { $_safe = $_o; break; } }
+                if (!$_safe) $_safe = $_opts->first();
+                $_exVal = $_safe ? '"' . ($_safe['value'] ?? '') . '"' : '"(value)"';
+                break;
+            case 'multi': case 'multiselect':
+                $_sv = [];
+                foreach ($_opts as $_o) {
+                    if (empty($_o['disqualifies']) && !in_array($_o['value'] ?? '', ['none', 'other'])) {
+                        $_sv[] = $_o['value'];
+                        if (count($_sv) >= 2) break;
+                    }
+                }
+                if (empty($_sv)) $_sv = [($_opts->first()['value'] ?? 'value')];
+                $_exVal = '["' . implode('", "', $_sv) . '"]';
+                break;
+            case 'text':
+                $_ph = str_replace('"', "'", $_q->placeholder ?? 'free text');
+                if (strlen($_ph) > 50) $_ph = substr($_ph, 0, 47) . '...';
+                $_exVal = '"' . $_ph . '"';
+                break;
+            case 'file':
+                $_exVal = '"(file_token — from POST /api/partner/files)"';
+                break;
+            default:
+                $_exVal = '"(value)"';
+        }
+        $_slug    = $_q->slug ?? $_q->key;
+        $_isLast  = $questions->last()->id === $_q->id;
+        $_payloadLines[] = '    { "slug": "' . $_slug . '", "answer": ' . $_exVal . ' }' . ($_isLast ? '' : ',');
+    }
+    $payloadAnswers = implode("\n", $_payloadLines);
 @endphp
 
 <style>
@@ -249,40 +302,8 @@ Content-Type: application/json
     { "offering_id": "YOUR_AA_OFFERING_UUID", "quantity": 1 }
   ],
 
-  "answers": [
+  "answers": [{{ $payloadAnswers }}
 
-    // ── Step 1: Standard Intake ─────────────────────────────────────
-    { "slug": "{{ $siPregnant->slug      ?? 'pregnant_breastfeeding' }}",       "answer": "no" },
-    { "slug": "{{ $siBP->slug            ?? 'blood_pressure_range' }}",          "answer": "normal" },
-    { "slug": "{{ $siMeds->slug          ?? 'prescription_medications' }}",      "answer": "yes" },
-    { "slug": "{{ $siMedsList->slug      ?? 'prescription_medications_list' }}", "answer": "Metformin 500mg twice daily" },
-    { "slug": "{{ $siAllergies->slug     ?? 'medication_allergies' }}",          "answer": "no" },
-    // (omit medication_allergies_list if "no" above)
-    { "slug": "{{ $siConditions->slug    ?? 'medical_conditions' }}",            "answer": "no" },
-    // (omit medical_conditions_list if "no" above)
-    { "slug": "{{ $siInjuries->slug      ?? 'injuries_surgeries' }}",            "answer": "no" },
-    // (omit injuries_surgeries_details if "no" above)
-    { "slug": "{{ $siActivity->slug      ?? 'physical_activity' }}",             "answer": "somewhat_active" },
-    { "slug": "{{ $siLastEval->slug      ?? 'last_medical_evaluation' }}",       "answer": "less_than_1_year" },
-    { "slug": "{{ $siLastLab->slug       ?? 'last_lab_tests' }}",                "answer": "less_than_1_year" },
-    { "slug": "{{ $siMessage->slug       ?? 'first_message_to_doctor' }}",       "answer": "Looking to improve energy and skin health." },
-    { "slug": "{{ $siConsent->slug       ?? 'telehealth_informed_consent' }}",   "answer": "agree" },
-
-    // ── Step 2: Anti-Aging Program-Specific Intake ──────────────────
-    { "slug": "{{ $qPrimaryReason->slug    ?? 'aa_primary_reason' }}",                   "answer": ["anti_aging", "boost_energy"] },
-    // (omit aa_primary_reason_other if "other" NOT selected above)
-    { "slug": "{{ $qSymptoms->slug         ?? 'aa_current_symptoms' }}",                  "answer": ["fatigue", "sleep_disorders"] },
-    // (omit aa_current_symptoms_other if "other" NOT selected above)
-    { "slug": "{{ $qPriorTreat->slug       ?? 'aa_prior_treatment' }}",                  "answer": "yes" },
-    { "slug": "{{ $qPriorReact->slug       ?? 'aa_prior_treatment_reactions' }}",        "answer": "no" },
-    // (omit aa_prior_treatment_reactions and aa_prior_treatment_reaction_details if "no" above for aa_prior_treatment)
-    // (omit aa_prior_treatment_reaction_details if "no" for aa_prior_treatment_reactions)
-    { "slug": "{{ $qG6pd->slug             ?? 'aa_g6pd_ckd_liver' }}",                   "answer": "no" },
-    { "slug": "{{ $qCancer->slug           ?? 'aa_cancer_treatment' }}",                 "answer": "no" },
-
-    // ── Step 3: Consents ────────────────────────────────────────────
-    { "slug": "{{ $qConsentTruth->slug    ?? 'aa_consent_truthfulness' }}",              "answer": "agree" },
-    { "slug": "{{ $qConsentInformed->slug ?? 'aa_consent_informed' }}",                  "answer": "agree" }
   ]
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create')">Copy</button>
@@ -303,14 +324,11 @@ Content-Type: application/json
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create-resp')">Copy</button>
 
 <div class="alert alert-warning mt-3 mb-0 small">
-    <strong><i class="bi bi-exclamation-triangle me-1"></i>Conditional answers</strong> — Only send answers for questions the patient actually answered.
-    <ul class="mb-0 mt-1">
-        <li><code>aa_primary_reason_other</code> — only if <code>aa_primary_reason</code> contains <code>"other"</code></li>
-        <li><code>aa_current_symptoms_other</code> — only if <code>aa_current_symptoms</code> contains <code>"other"</code></li>
-        <li><code>aa_prior_treatment_reactions</code> and <code>aa_prior_treatment_reaction_details</code> — only if <code>aa_prior_treatment</code> is <code>"yes"</code></li>
-        <li><code>aa_prior_treatment_reaction_details</code> — only if <code>aa_prior_treatment_reactions</code> is <code>"yes"</code></li>
-    </ul>
-    Answering <code>"yes"</code> to <code>aa_g6pd_ckd_liver</code> or <code>aa_cancer_treatment</code> will <strong>disqualify</strong> the case — the case is still created but flagged for the doctor.
+    <strong><i class="bi bi-exclamation-triangle me-1"></i>Payload is generated live from the DB.</strong>
+    Lines marked <code>// conditional</code> must be <strong>omitted</strong> when the parent condition was not met.
+    Lines marked <code>// optional</code> may always be omitted.
+    Any answer whose value would <strong>disqualify</strong> the patient still creates the case — the doctor sees a disqualification flag.
+    The system silently ignores answers for untriggered conditions.
 </div>
 </div>
 </div>
