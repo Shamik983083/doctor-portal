@@ -149,7 +149,24 @@ class QuestionnaireFormController extends Controller
             if ($partnerId && $email) {
                 $caseRef = null;
 
-                DB::transaction(function () use ($response, $partnerId, $keyedAnswers, $email, $pendingFiles, &$caseRef) {
+                // ── State soft-hold check ─────────────────────────────────────────
+                // If the patient's state is known and none of the offerings linked
+                // to this questionnaire cover that state, create the case on hold
+                // so admin can review before it enters the assignment queue.
+                $stateHold    = false;
+                $patientState = $keyedAnswers['state'] ?? null;
+                if ($patientState) {
+                    $linkedOfferings = $questionnaire->offerings()->get();
+                    foreach ($linkedOfferings as $linkedOffering) {
+                        if (!$linkedOffering->isAvailableInState($patientState)) {
+                            $stateHold = true;
+                            break;
+                        }
+                    }
+                }
+                // ─────────────────────────────────────────────────────────────────
+
+                DB::transaction(function () use ($response, $partnerId, $keyedAnswers, $email, $pendingFiles, $stateHold, $patientState, &$caseRef) {
                     $patient = Patient::firstOrCreate(
                         ['email' => $email, 'partner_id' => $partnerId],
                         [
@@ -175,8 +192,12 @@ class QuestionnaireFormController extends Controller
                     $caseRef = PatientCase::create([
                         'partner_id'    => $partnerId,
                         'patient_id'    => $patient->id,
-                        'patient_state' => $keyedAnswers['state'] ?? null,
+                        'patient_state' => $patientState,
                         'status'        => PatientCase::STATUS_CREATED,
+                        'hold_status'   => $stateHold,
+                        'support_note'  => $stateHold
+                            ? "Patient state ({$patientState}) may not be covered by the requested offering. Please review before assigning."
+                            : null,
                     ]);
 
                     $response->update(['case_id' => $caseRef->id, 'patient_id' => $patient->id]);
@@ -191,8 +212,9 @@ class QuestionnaireFormController extends Controller
                     }
                 });
 
-                // Transition outside the transaction so webhooks fire cleanly after commit
-                if ($caseRef) {
+                // Transition outside the transaction so webhooks fire cleanly after commit.
+                // State-hold cases stay in created status — admin must release them manually.
+                if ($caseRef && !$stateHold) {
                     $this->stateMachine->transition($caseRef, PatientCase::STATUS_WAITING, ['actor_type' => 'system']);
                 }
             }

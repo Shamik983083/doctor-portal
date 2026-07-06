@@ -37,4 +37,11 @@ class Clinician extends Model
     {
         return trim(($this->credentials ? $this->credentials . ' ' : '') . $this->user->name);
     }
+
+    public function isLicensedInState(string $state): bool
+    {
+        $states = $this->licensed_states ?? [];
+        if (empty($states)) return true;
+        return collect($states)->pluck('state')->contains(strtoupper($state));
+    }
 }

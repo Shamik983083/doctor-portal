@@ -141,6 +141,28 @@ class CaseController extends Controller
         unset($data['answers']);
         // ─────────────────────────────────────────────────────────────────────
 
+        // ── Offering state availability check ────────────────────────────────
+        // Reject before touching the DB if any requested offering is not
+        // available in the patient's state. patient_state wins over patient.state
+        // because the API caller may override it for telehealth visit purposes.
+        $effectiveState = $data['patient_state'] ?? $patientData['state'] ?? null;
+        if ($effectiveState && !empty($data['offerings'])) {
+            foreach ($data['offerings'] as $offeringData) {
+                $offering = $partner->offerings()
+                    ->where('uuid', $offeringData['offering_id'])
+                    ->first();
+                if ($offering && !$offering->isAvailableInState($effectiveState)) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
+                        'errors'  => [
+                            'offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."],
+                        ],
+                    ], 422);
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // Deduplicate patient by external_id then email
         $patient = null;
         if (!empty($patientData['external_id'])) {

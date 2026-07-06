@@ -23,8 +23,14 @@
         #sidebar .nav-link {
             color: rgba(255,255,255,.75); padding: .55rem 1.5rem;
             display: flex; align-items: center; gap: .6rem; border-radius: 0;
+            transform-origin: left center;
+            transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
         }
-        #sidebar .nav-link:hover, #sidebar .nav-link.active {
+        #sidebar .nav-link:hover {
+            color: #fff; background: rgba(255,255,255,.12);
+            transform: scale(1.06); box-shadow: 0 2px 10px rgba(0,0,0,.25); border-radius: 4px;
+        }
+        #sidebar .nav-link.active {
             color: #fff; background: rgba(255,255,255,.12);
         }
         #sidebar .nav-section {

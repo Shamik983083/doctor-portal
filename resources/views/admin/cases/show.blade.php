@@ -79,6 +79,17 @@
                         Select a different clinician to reassign.
                     </p>
                 @endif
+                @if($case->patient_state)
+                    @php
+                        $unlicensedCount = collect($clinicians)->filter(fn($c) => !$c->isLicensedInState($case->patient_state))->count();
+                    @endphp
+                    @if($unlicensedCount > 0)
+                        <div class="alert alert-warning py-2 px-2 mb-2 small">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            {{ $unlicensedCount }} clinician(s) not licensed in <strong>{{ $case->patient_state }}</strong> — marked ⚠ below.
+                        </div>
+                    @endif
+                @endif
                 <form method="POST" action="{{ route('admin.cases.assign', $case->uuid) }}">
                     @csrf
                     <div class="mb-3">
@@ -86,10 +97,12 @@
                         <select name="clinician_id" class="form-select form-select-sm" required>
                             <option value="">— Choose clinician —</option>
                             @foreach($clinicians as $c)
+                                @php $unlicensed = $case->patient_state && !$c->isLicensedInState($case->patient_state); @endphp
                                 <option value="{{ $c->id }}" {{ $case->clinician_id == $c->id ? 'selected' : '' }}>
                                     {{ $c->full_name }}
                                     @if($c->specialty) ({{ $c->specialty }})@endif
                                     @if(!$c->is_available) — Unavailable @endif
+                                    @if($unlicensed) ⚠ Not licensed in {{ $case->patient_state }} @endif
                                 </option>
                             @endforeach
                         </select>

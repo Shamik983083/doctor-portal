@@ -10,8 +10,9 @@
     <style>
         body { background: #f8f9fa; }
         .sidebar { min-height: 100vh; background: #1a2035; color: #ccc; z-index: 1030; }
-        .sidebar .nav-link { color: #adb5bd; padding: .5rem 1rem; border-radius: 6px; margin: 2px 8px; }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { background: rgba(255,255,255,.1); color: #fff; }
+        .sidebar .nav-link { color: #adb5bd; padding: .5rem 1rem; border-radius: 6px; margin: 2px 8px; transform-origin: left center; transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease; }
+        .sidebar .nav-link:hover { background: rgba(255,255,255,.12); color: #fff; transform: scale(1.06); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+        .sidebar .nav-link.active { background: rgba(255,255,255,.1); color: #fff; }
         .sidebar .nav-link i { width: 20px; }
         .sidebar-brand { font-size: 1.1rem; font-weight: 700; color: #fff; padding: 1.5rem 1rem; display: block; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.1); }
         .main-content { min-height: 100vh; }
