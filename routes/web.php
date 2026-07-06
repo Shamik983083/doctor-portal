@@ -146,10 +146,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         $questionnaire = \App\Models\Questionnaire::with([
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
         ])->where('name', 'MWL – Weight Loss')->first();
-        $standardIntake = \App\Models\Questionnaire::with([
-            'questions' => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
-        ])->where('name', 'Standard Intake 1')->first();
-        return view('admin.guide.weightloss-api', compact('questionnaire', 'standardIntake'));
+        return view('admin.guide.weightloss-api', compact('questionnaire'));
     })->name('guide.weightloss-api');
 
     // Webhook Deliveries

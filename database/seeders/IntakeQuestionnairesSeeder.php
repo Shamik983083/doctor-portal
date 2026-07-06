@@ -10,61 +10,43 @@ class IntakeQuestionnairesSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->seedStandardIntake();
         $this->seedMWLWeightLoss();
         $this->seedAntiAging();
-        $this->linkToStandardIntake();
-    }
-
-    private function linkToStandardIntake(): void
-    {
-        $si1 = Questionnaire::where('name', 'Standard Intake 1')->first();
-        if (!$si1) return;
-
-        Questionnaire::whereIn('name', ['MWL – Weight Loss', 'Anti-Aging'])
-            ->update(['linked_questionnaire_id' => $si1->id]);
     }
 
     // ────────────────────────────────────────────────────────────────────────────
-    // STANDARD INTAKE 1  (mode: single — Info Page + Intake on one screen)
+    // SHARED: Standard Intake questions — added to the top of every program
+    // questionnaire so each is self-contained.
     // ────────────────────────────────────────────────────────────────────────────
 
-    private function seedStandardIntake(): void
+    /**
+     * Seed the shared standard-intake questions into $q on the given step.
+     * Sort orders start at $sortStart and increment by 10 (sub-items +1).
+     */
+    private function seedStandardIntakeQuestions(Questionnaire $q, int $step = 1, int $sortStart = 10): void
     {
-        if (Questionnaire::where('name', 'Standard Intake 1')->exists()) {
-            $this->command->info('Standard Intake 1 already seeded — skipping.');
-            return;
-        }
-
-        $q = Questionnaire::create([
-            'name'        => 'Standard Intake 1',
-            'description' => 'Shared baseline intake questionnaire for all programs. Displayed as a single page together with the patient info page.',
-            'mode'        => 'single',
-            'is_active'   => true,
-        ]);
-
-        // Q1 — Pregnancy / breastfeeding
-        $q1 = $q->questions()->create([
+        // Q — Pregnancy / breastfeeding
+        $q->questions()->create([
             'key'         => 'pregnant_breastfeeding',
             'question'    => 'If female — are you currently pregnant or breastfeeding?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 10,
-            'step_number' => 1,
+            'sort_order'  => $sortStart,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Yes', 'value' => 'yes', 'disqualifies' => true],
                 ['label' => 'No',  'value' => 'no'],
             ],
         ]);
 
-        // Q2 — Blood pressure range
+        // Q — Blood pressure range
         $q->questions()->create([
             'key'         => 'blood_pressure_range',
             'question'    => 'What is your blood pressure range?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 20,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 10,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Normal (less than 120/80)',          'value' => 'normal'],
                 ['label' => 'Elevated (120–129 / less than 80)', 'value' => 'elevated'],
@@ -74,14 +56,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q3 — Prescription medications
-        $q3 = $q->questions()->create([
+        // Q — Prescription medications
+        $qMeds = $q->questions()->create([
             'key'         => 'prescription_medications',
             'question'    => 'Are you currently taking any prescription medications?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 30,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 20,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Yes – Please list the names and dosages',       'value' => 'yes'],
                 ['label' => 'No – I affirm I am not taking any medications', 'value' => 'no'],
@@ -93,21 +75,21 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'                   => 'text',
             'placeholder'            => 'e.g. Metformin 500mg twice daily, Lisinopril 10mg once daily',
             'is_required'            => true,
-            'sort_order'             => 31,
-            'step_number'            => 1,
-            'depends_on_question_id' => $q3->id,
+            'sort_order'             => $sortStart + 21,
+            'step_number'            => $step,
+            'depends_on_question_id' => $qMeds->id,
             'depends_on_operator'    => 'equals',
             'depends_on_value'       => 'yes',
         ]);
 
-        // Q4 — Medication allergies
-        $q4 = $q->questions()->create([
+        // Q — Medication allergies
+        $qAllergies = $q->questions()->create([
             'key'         => 'medication_allergies',
             'question'    => 'Do you have any medication allergies?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 40,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 30,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Yes – Please list your allergies and any known reactions', 'value' => 'yes'],
                 ['label' => 'No – I affirm I have no known drug allergies',             'value' => 'no'],
@@ -119,21 +101,21 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'                   => 'text',
             'placeholder'            => 'e.g. Penicillin – hives and rash',
             'is_required'            => true,
-            'sort_order'             => 41,
-            'step_number'            => 1,
-            'depends_on_question_id' => $q4->id,
+            'sort_order'             => $sortStart + 31,
+            'step_number'            => $step,
+            'depends_on_question_id' => $qAllergies->id,
             'depends_on_operator'    => 'equals',
             'depends_on_value'       => 'yes',
         ]);
 
-        // Q5 — Medical conditions (general)
-        $q5 = $q->questions()->create([
+        // Q — Medical conditions (general)
+        $qConditions = $q->questions()->create([
             'key'         => 'medical_conditions',
             'question'    => 'Do you have any medical conditions?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 50,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 40,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Yes – Please list your medical conditions',        'value' => 'yes'],
                 ['label' => 'No – I affirm I have no known medical conditions', 'value' => 'no'],
@@ -145,21 +127,21 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'                   => 'text',
             'placeholder'            => 'e.g. Type 2 Diabetes, Hypertension',
             'is_required'            => true,
-            'sort_order'             => 51,
-            'step_number'            => 1,
-            'depends_on_question_id' => $q5->id,
+            'sort_order'             => $sortStart + 41,
+            'step_number'            => $step,
+            'depends_on_question_id' => $qConditions->id,
             'depends_on_operator'    => 'equals',
             'depends_on_value'       => 'yes',
         ]);
 
-        // Q6 — Injuries / surgeries
-        $q6 = $q->questions()->create([
+        // Q — Injuries / surgeries
+        $qInjuries = $q->questions()->create([
             'key'         => 'injuries_surgeries',
             'question'    => 'Have you had any injuries or surgeries within the last 6 months?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 60,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 50,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Yes', 'value' => 'yes'],
                 ['label' => 'No',  'value' => 'no'],
@@ -171,21 +153,21 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'                   => 'text',
             'placeholder'            => 'Please provide details of the injuries or surgeries',
             'is_required'            => true,
-            'sort_order'             => 61,
-            'step_number'            => 1,
-            'depends_on_question_id' => $q6->id,
+            'sort_order'             => $sortStart + 51,
+            'step_number'            => $step,
+            'depends_on_question_id' => $qInjuries->id,
             'depends_on_operator'    => 'equals',
             'depends_on_value'       => 'yes',
         ]);
 
-        // Q7 — Physical activity
+        // Q — Physical activity
         $q->questions()->create([
             'key'         => 'physical_activity',
             'question'    => 'How physically active are you?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 70,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 60,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Sedentary',              'value' => 'sedentary'],
                 ['label' => 'Somewhat Active',        'value' => 'somewhat_active'],
@@ -195,14 +177,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q8 — Last medical evaluation (drop-down)
+        // Q — Last medical evaluation
         $q->questions()->create([
             'key'         => 'last_medical_evaluation',
             'question'    => 'When was the last time you had an in-person medical evaluation?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 80,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 70,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Less than a year ago',  'value' => 'less_than_1_year'],
                 ['label' => '1 to 2 years ago',      'value' => '1_to_2_years'],
@@ -210,14 +192,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q9 — Last lab tests (drop-down)
+        // Q — Last lab tests
         $q->questions()->create([
             'key'         => 'last_lab_tests',
             'question'    => 'When were your last lab tests performed?',
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 81,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 71,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'Less than a year ago',  'value' => 'less_than_1_year'],
                 ['label' => '1 to 2 years ago',      'value' => '1_to_2_years'],
@@ -225,25 +207,25 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q10 — First message to doctor (not required)
+        // Q — First message to doctor
         $q->questions()->create([
             'key'         => 'first_message_to_doctor',
             'question'    => 'Please provide your first message to the doctor here (anything else you want them to know):',
             'type'        => 'text',
             'placeholder' => 'Optional – share anything else you would like your doctor to know',
             'is_required' => false,
-            'sort_order'  => 90,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 80,
+            'step_number' => $step,
         ]);
 
-        // Q11 — General Informed Consent (Telehealth)
+        // Q — General Informed Consent (Telehealth)
         $q->questions()->create([
             'key'         => 'telehealth_informed_consent',
             'question'    => $this->telehealthConsentText(),
             'type'        => 'choice',
             'is_required' => true,
-            'sort_order'  => 100,
-            'step_number' => 1,
+            'sort_order'  => $sortStart + 90,
+            'step_number' => $step,
             'options'     => [
                 ['label' => 'I confirm I have read, understand, and agree to this consent.',   'value' => 'agree'],
                 ['label' => 'I have read the above information and I do not wish to continue', 'value' => 'disagree', 'disqualifies' => true],
@@ -252,7 +234,10 @@ class IntakeQuestionnairesSeeder extends Seeder
     }
 
     // ────────────────────────────────────────────────────────────────────────────
-    // MWL – WEIGHT LOSS  (mode: multi — Step 1: Medical | Step 2: Consents)
+    // MWL – WEIGHT LOSS  (mode: multi)
+    //   Step 1: Standard Intake questions
+    //   Step 2: Program-specific medical intake
+    //   Step 3: Consents
     // ────────────────────────────────────────────────────────────────────────────
 
     private function seedMWLWeightLoss(): void
@@ -264,21 +249,24 @@ class IntakeQuestionnairesSeeder extends Seeder
 
         $q = Questionnaire::create([
             'name'        => 'MWL – Weight Loss',
-            'description' => 'Weight loss program specific medical intake. Step 1: medical history & GLP-1 status. Step 2: consents (gallbladder and thyroid consents shown conditionally).',
+            'description' => 'Weight loss program intake. Step 1: standard intake. Step 2: program-specific medical history & GLP-1 status. Step 3: consents.',
             'mode'        => 'multi',
             'is_active'   => true,
         ]);
 
-        // ── STEP 1: Medical intake ───────────────────────────────────────────
+        // ── STEP 1: Standard Intake questions ──────────────────────────────
+        $this->seedStandardIntakeQuestions($q, step: 1, sortStart: 10);
 
-        // Q1 — Medical conditions checklist
+        // ── STEP 2: Program-specific medical intake ────────────────────────
+
+        // Q — Medical conditions checklist
         $qMedConditions = $q->questions()->create([
             'key'         => 'mwl_medical_conditions',
             'question'    => 'Please check all current or past medical conditions that you have had.',
             'type'        => 'multi',
             'is_required' => true,
             'sort_order'  => 10,
-            'step_number' => 1,
+            'step_number' => 2,
             'placeholder' => 'Select all that apply. Selecting gallbladder or thyroid conditions will display an additional consent on the next step.',
             'options'     => [
                 // ── Disqualifying ────────────────────────────────────────────
@@ -316,28 +304,28 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q2 — Gastric bypass
+        // Q — Gastric bypass
         $q->questions()->create([
             'key'         => 'mwl_gastric_bypass',
             'question'    => 'Have you had a gastric bypass in the past 6 months?',
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 20,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'Yes', 'value' => 'yes', 'disqualifies' => true],
                 ['label' => 'No',  'value' => 'no'],
             ],
         ]);
 
-        // Q3 — GLP-1 branded allergy
+        // Q — GLP-1 branded allergy
         $q->questions()->create([
             'key'         => 'mwl_glp1_brand_allergy',
             'question'    => 'Are you allergic to any of the following?',
             'type'        => 'multi',
             'is_required' => true,
             'sort_order'  => 30,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'Ozempic',           'value' => 'ozempic',   'disqualifies' => true],
                 ['label' => 'Mounjaro',          'value' => 'mounjaro',  'disqualifies' => true],
@@ -349,14 +337,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q4 — Current / recent GLP-1 medication (drives next 5 questions)
+        // Q — Current / recent GLP-1 medication
         $qCurrentGlp1 = $q->questions()->create([
             'key'         => 'mwl_current_glp1',
             'question'    => 'Are you currently, or have you in the past two months, taken any of the following medications?',
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 40,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'Semaglutide (Ozempic, Wegovy)',    'value' => 'semaglutide'],
                 ['label' => 'Tirzepatide (Zepbound, Mounjaro)', 'value' => 'tirzepatide'],
@@ -364,14 +352,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q4a — Side effects (shown if Sema or Tirze selected)
+        // Q — Side effects (shown if Sema or Tirze selected)
         $q->questions()->create([
             'key'                    => 'mwl_glp1_side_effects',
             'question'               => 'Have you experienced side effects from your current medication?',
             'type'                   => 'choice',
             'is_required'            => true,
             'sort_order'             => 41,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qCurrentGlp1->id,
             'depends_on_operator'    => 'not_equals',
             'depends_on_value'       => 'none',
@@ -381,14 +369,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q4b — Current dose match
+        // Q — Current dose match
         $q->questions()->create([
             'key'                    => 'mwl_current_dose',
             'question'               => 'Which medication and dose most closely matches your most recent dose?',
             'type'                   => 'choice',
             'is_required'            => true,
             'sort_order'             => 42,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qCurrentGlp1->id,
             'depends_on_operator'    => 'not_equals',
             'depends_on_value'       => 'none',
@@ -407,14 +395,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q4c — Treatment continuation preference
+        // Q — Treatment continuation preference
         $q->questions()->create([
             'key'                    => 'mwl_treatment_continuation',
             'question'               => 'How would you like to continue your treatment?',
             'type'                   => 'choice',
             'is_required'            => true,
             'sort_order'             => 43,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qCurrentGlp1->id,
             'depends_on_operator'    => 'not_equals',
             'depends_on_value'       => 'none',
@@ -425,14 +413,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q4d — Has prescription picture?
+        // Q — Has prescription picture?
         $qHasPic = $q->questions()->create([
             'key'                    => 'mwl_has_prescription_pic',
             'question'               => 'Do you have a picture of your current prescription? We need this photograph in order to validate your current dosage.',
             'type'                   => 'choice',
             'is_required'            => true,
             'sort_order'             => 44,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qCurrentGlp1->id,
             'depends_on_operator'    => 'not_equals',
             'depends_on_value'       => 'none',
@@ -442,7 +430,7 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q4e — Upload prescription picture (shown only if Yes above)
+        // Q — Upload prescription picture
         $q->questions()->create([
             'key'                    => 'mwl_prescription_pic_upload',
             'question'               => 'Please upload a picture of the prescription or bottle of your current GLP-1/GIP medication.',
@@ -450,22 +438,22 @@ class IntakeQuestionnairesSeeder extends Seeder
             'placeholder'            => 'Upload your prescription or medication bottle image',
             'is_required'            => true,
             'sort_order'             => 45,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qHasPic->id,
             'depends_on_operator'    => 'equals',
             'depends_on_value'       => 'yes',
         ]);
 
-        // ── STEP 2: Consents ─────────────────────────────────────────────────
+        // ── STEP 3: Consents ───────────────────────────────────────────────
 
-        // Gallbladder Disease Consent (conditional — only if gallbladder_disease selected in Q1)
+        // Gallbladder Disease Consent (conditional)
         $q->questions()->create([
             'key'                    => 'mwl_gallbladder_consent',
             'question'               => $this->gallbladderConsentText(),
             'type'                   => 'choice',
             'is_required'            => true,
             'sort_order'             => 10,
-            'step_number'            => 2,
+            'step_number'            => 3,
             'depends_on_question_id' => $qMedConditions->id,
             'depends_on_operator'    => 'contains',
             'depends_on_value'       => 'gallbladder_disease',
@@ -475,14 +463,14 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Thyroid Consent (conditional — only if thyroid_issues selected in Q1)
+        // Thyroid Consent (conditional)
         $q->questions()->create([
             'key'                    => 'mwl_thyroid_consent',
             'question'               => $this->thyroidConsentText(),
             'type'                   => 'choice',
             'is_required'            => true,
             'sort_order'             => 20,
-            'step_number'            => 2,
+            'step_number'            => 3,
             'depends_on_question_id' => $qMedConditions->id,
             'depends_on_operator'    => 'contains',
             'depends_on_value'       => 'thyroid_issues',
@@ -499,7 +487,7 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 30,
-            'step_number' => 2,
+            'step_number' => 3,
             'options'     => [
                 ['label' => 'I have read the above information and I consent and wish to move forward', 'value' => 'agree'],
                 ['label' => 'I have read the above information and I do not wish to continue',          'value' => 'disagree', 'disqualifies' => true],
@@ -513,7 +501,7 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 40,
-            'step_number' => 2,
+            'step_number' => 3,
             'options'     => [
                 ['label' => 'I have read and understand the above information and I wish to continue', 'value' => 'agree'],
                 ['label' => 'I have read the above information and I do not wish to continue',         'value' => 'disagree', 'disqualifies' => true],
@@ -522,7 +510,10 @@ class IntakeQuestionnairesSeeder extends Seeder
     }
 
     // ────────────────────────────────────────────────────────────────────────────
-    // ANTI-AGING  (mode: multi — Step 1: Medical | Step 2: Consents)
+    // ANTI-AGING  (mode: multi)
+    //   Step 1: Standard Intake questions
+    //   Step 2: Program-specific medical intake
+    //   Step 3: Consents
     // ────────────────────────────────────────────────────────────────────────────
 
     private function seedAntiAging(): void
@@ -534,21 +525,24 @@ class IntakeQuestionnairesSeeder extends Seeder
 
         $q = Questionnaire::create([
             'name'        => 'Anti-Aging',
-            'description' => 'Anti-aging program specific medical intake. Step 1: medical history & prior treatments. Step 2: consents.',
+            'description' => 'Anti-aging program intake. Step 1: standard intake. Step 2: program-specific medical history & prior treatments. Step 3: consents.',
             'mode'        => 'multi',
             'is_active'   => true,
         ]);
 
-        // ── STEP 1: Medical intake ───────────────────────────────────────────
+        // ── STEP 1: Standard Intake questions ──────────────────────────────
+        $this->seedStandardIntakeQuestions($q, step: 1, sortStart: 10);
 
-        // Q1 — Primary reason for medication
+        // ── STEP 2: Program-specific medical intake ────────────────────────
+
+        // Q — Primary reason for medication
         $qPrimaryReason = $q->questions()->create([
             'key'         => 'aa_primary_reason',
             'question'    => 'What is your primary reason for requesting this medication?',
             'type'        => 'multi',
             'is_required' => true,
             'sort_order'  => 10,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'General wellness',     'value' => 'general_wellness'],
                 ['label' => 'Anti-Aging',           'value' => 'anti_aging'],
@@ -560,7 +554,6 @@ class IntakeQuestionnairesSeeder extends Seeder
                 ['label' => 'Other',                'value' => 'other'],
             ],
         ]);
-        // Q1a — Other reason (shown if "Other" selected)
         $q->questions()->create([
             'key'                    => 'aa_primary_reason_other',
             'question'               => 'Please describe your primary reason.',
@@ -568,20 +561,20 @@ class IntakeQuestionnairesSeeder extends Seeder
             'placeholder'            => 'Please provide more details',
             'is_required'            => true,
             'sort_order'             => 11,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qPrimaryReason->id,
             'depends_on_operator'    => 'contains',
             'depends_on_value'       => 'other',
         ]);
 
-        // Q2 — Currently experiencing symptoms
+        // Q — Currently experiencing symptoms
         $qSymptoms = $q->questions()->create([
             'key'         => 'aa_current_symptoms',
             'question'    => 'Are you currently experiencing any of the following?',
             'type'        => 'multi',
             'is_required' => true,
             'sort_order'  => 20,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'Fatigue or Low Energy',      'value' => 'fatigue'],
                 ['label' => 'Memory Issues',              'value' => 'memory_issues'],
@@ -593,7 +586,6 @@ class IntakeQuestionnairesSeeder extends Seeder
                 ['label' => 'None of these apply to me', 'value' => 'none'],
             ],
         ]);
-        // Q2a — Other symptoms (shown if "Other" selected)
         $q->questions()->create([
             'key'                    => 'aa_current_symptoms_other',
             'question'               => 'Please describe your other symptoms.',
@@ -601,34 +593,34 @@ class IntakeQuestionnairesSeeder extends Seeder
             'placeholder'            => 'Describe your other symptoms',
             'is_required'            => true,
             'sort_order'             => 21,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qSymptoms->id,
             'depends_on_operator'    => 'contains',
             'depends_on_value'       => 'other',
         ]);
 
-        // Q3 — Prior treatment with Metformin / MIC / B-12 / Glutathione / NAD
+        // Q — Prior treatment with Metformin / MIC / B-12 / Glutathione / NAD
         $qPriorTreatment = $q->questions()->create([
             'key'         => 'aa_prior_treatment',
             'question'    => 'Have you ever received treatment before with Metformin, MIC, B-12, Glutathione, or NAD?',
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 30,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'Yes', 'value' => 'yes'],
                 ['label' => 'No',  'value' => 'no'],
             ],
         ]);
 
-        // Q3a — Adverse reactions to prior treatment (shown only if Yes above)
+        // Q — Adverse reactions to prior treatment
         $qPriorReactions = $q->questions()->create([
             'key'                    => 'aa_prior_treatment_reactions',
             'question'               => 'Did you experience any allergic or negative reactions to any of these?',
             'type'                   => 'choice',
             'is_required'            => true,
             'sort_order'             => 31,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qPriorTreatment->id,
             'depends_on_operator'    => 'equals',
             'depends_on_value'       => 'yes',
@@ -638,7 +630,7 @@ class IntakeQuestionnairesSeeder extends Seeder
             ],
         ]);
 
-        // Q3a-i — Reaction details (shown only if Yes above)
+        // Q — Reaction details
         $q->questions()->create([
             'key'                    => 'aa_prior_treatment_reaction_details',
             'question'               => 'Please tell us more about what was used, when this was used, and what side effect(s) you experienced.',
@@ -646,41 +638,41 @@ class IntakeQuestionnairesSeeder extends Seeder
             'placeholder'            => 'Please tell us more about what was used, when this was used, and what side effect(s) you experienced.',
             'is_required'            => true,
             'sort_order'             => 32,
-            'step_number'            => 1,
+            'step_number'            => 2,
             'depends_on_question_id' => $qPriorReactions->id,
             'depends_on_operator'    => 'equals',
             'depends_on_value'       => 'yes',
         ]);
 
-        // Q4 — G6PD / CKD / Liver cirrhosis
+        // Q — G6PD / CKD / Liver cirrhosis
         $q->questions()->create([
             'key'         => 'aa_g6pd_ckd_liver',
             'question'    => 'Do you have a known history of glucose-6-phosphate dehydrogenase (G6PD) deficiency, chronic kidney disease (CKD) or liver cirrhosis?',
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 40,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'Yes', 'value' => 'yes', 'disqualifies' => true],
                 ['label' => 'No',  'value' => 'no'],
             ],
         ]);
 
-        // Q5 — Cancer / chemotherapy / radiation
+        // Q — Cancer / chemotherapy / radiation
         $q->questions()->create([
             'key'         => 'aa_cancer_treatment',
             'question'    => 'Are you currently undergoing treatment for cancer, including chemotherapy or radiation therapy?',
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 50,
-            'step_number' => 1,
+            'step_number' => 2,
             'options'     => [
                 ['label' => 'Yes', 'value' => 'yes', 'disqualifies' => true],
                 ['label' => 'No',  'value' => 'no'],
             ],
         ]);
 
-        // ── STEP 2: Consents ─────────────────────────────────────────────────
+        // ── STEP 3: Consents ───────────────────────────────────────────────
 
         // Consent (Truthfulness – General Intake)
         $q->questions()->create([
@@ -689,7 +681,7 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 10,
-            'step_number' => 2,
+            'step_number' => 3,
             'options'     => [
                 ['label' => 'I have read the above information and I do consent and wish to move forward', 'value' => 'agree'],
                 ['label' => 'I have read the above information and I do not wish to continue',             'value' => 'disagree', 'disqualifies' => true],
@@ -703,7 +695,7 @@ class IntakeQuestionnairesSeeder extends Seeder
             'type'        => 'choice',
             'is_required' => true,
             'sort_order'  => 20,
-            'step_number' => 2,
+            'step_number' => 3,
             'options'     => [
                 ['label' => 'I have read the above information, I understand the risks and would like to proceed', 'value' => 'agree'],
                 ['label' => 'I have read the above information and I do not wish to continue',                     'value' => 'disagree', 'disqualifies' => true],

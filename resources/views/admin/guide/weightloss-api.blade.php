@@ -7,9 +7,27 @@
     $base    = rtrim(config('app.url'), '/');
 
     // ── MWL – Weight Loss ─────────────────────────────────────────────────────
-    $questions = $questionnaire ? $questionnaire->questions->sortBy('sort_order')->values() : collect();
+    $questions = $questionnaire ? $questionnaire->questions->sortBy(['step_number', 'sort_order'])->values() : collect();
     $byKey = $questions->keyBy('key');
 
+    // Standard Intake questions (step 1 — embedded in the MWL questionnaire)
+    $siPregnant      = $byKey['pregnant_breastfeeding']        ?? null;
+    $siBP            = $byKey['blood_pressure_range']           ?? null;
+    $siMeds          = $byKey['prescription_medications']       ?? null;
+    $siMedsList      = $byKey['prescription_medications_list']  ?? null;
+    $siAllergies     = $byKey['medication_allergies']           ?? null;
+    $siAllergiesList = $byKey['medication_allergies_list']      ?? null;
+    $siConditions    = $byKey['medical_conditions']             ?? null;
+    $siCondsList     = $byKey['medical_conditions_list']        ?? null;
+    $siInjuries      = $byKey['injuries_surgeries']             ?? null;
+    $siInjuriesDet   = $byKey['injuries_surgeries_details']     ?? null;
+    $siActivity      = $byKey['physical_activity']              ?? null;
+    $siLastEval      = $byKey['last_medical_evaluation']        ?? null;
+    $siLastLab       = $byKey['last_lab_tests']                 ?? null;
+    $siMessage       = $byKey['first_message_to_doctor']        ?? null;
+    $siConsent       = $byKey['telehealth_informed_consent']    ?? null;
+
+    // MWL-specific questions (steps 2–3)
     $qMedCond  = $byKey['mwl_medical_conditions']   ?? null;
     $qGbConsent= $byKey['mwl_gallbladder_consent']   ?? null;
     $qTConsent = $byKey['mwl_thyroid_consent']        ?? null;
@@ -24,27 +42,6 @@
     $qTruth    = $byKey['mwl_consent_truthfulness']    ?? null;
     $qGlp1Con  = $byKey['mwl_consent_glp1']            ?? null;
     $qUuid     = $questionnaire->uuid ?? '';
-
-    // ── Standard Intake 1 ────────────────────────────────────────────────────
-    $siQuestions = $standardIntake ? $standardIntake->questions->sortBy('sort_order')->values() : collect();
-    $siBk = $siQuestions->keyBy('key');
-
-    $siPregnant      = $siBk['pregnant_breastfeeding']        ?? null;
-    $siBP            = $siBk['blood_pressure_range']           ?? null;
-    $siMeds          = $siBk['prescription_medications']       ?? null;
-    $siMedsList      = $siBk['prescription_medications_list']  ?? null;
-    $siAllergies     = $siBk['medication_allergies']           ?? null;
-    $siAllergiesList = $siBk['medication_allergies_list']      ?? null;
-    $siConditions    = $siBk['medical_conditions']             ?? null;
-    $siCondsList     = $siBk['medical_conditions_list']        ?? null;
-    $siInjuries      = $siBk['injuries_surgeries']             ?? null;
-    $siInjuriesDet   = $siBk['injuries_surgeries_details']     ?? null;
-    $siActivity      = $siBk['physical_activity']              ?? null;
-    $siLastEval      = $siBk['last_medical_evaluation']        ?? null;
-    $siLastLab       = $siBk['last_lab_tests']                 ?? null;
-    $siMessage       = $siBk['first_message_to_doctor']        ?? null;
-    $siConsent       = $siBk['telehealth_informed_consent']    ?? null;
-    $siUuid          = $standardIntake->uuid ?? '';
 @endphp
 
 <style>
@@ -129,10 +126,10 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <strong><i class="bi bi-info-circle me-2"></i>Overview</strong><br>
     This guide walks your patient portal developer through submitting a <strong>Weight Loss (MWL)</strong> case via the Partner REST API.
     <ul class="mb-0 mt-1">
-        <li>A single <strong>GET</strong> call to the MWL questionnaire returns <em>all</em> questions — Standard Intake 1 (shared baseline) and MWL-specific questions — merged into one list, each tagged with a stable <code>slug</code>.</li>
+        <li>A single <strong>GET</strong> call to the MWL questionnaire returns <em>all</em> questions — standard intake (Step 1), program-specific medical history (Step 2), and consents (Step 3) — in one list, each tagged with a stable <code>slug</code>.</li>
         <li>A single <strong>POST</strong> to <code>/api/partner/cases</code> with your <strong>Offering ID</strong> + a flat <code>answers</code> array of slug/answer pairs. <strong>No questionnaire UUID needed at submission time.</strong></li>
         <li>The <code>patient</code> block must include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> — these are required fields and are stored directly on the patient record.</li>
-        <li>The portal uses the offering to determine which questionnaires apply, then splits and stores the answers internally.</li>
+        <li>The portal uses the offering to determine which questionnaire applies, then stores the answers internally.</li>
         <li>Use <code>slug</code> instead of <code>question_id</code> — slugs are stable and survive question rebuilds; numeric IDs change when a questionnaire is edited.</li>
     </ul>
 </div>
@@ -171,7 +168,7 @@ grant_type=client_credentials
 <div id="discover" class="card mb-4 section-anchor">
 <div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">2</span>Discover Question Slugs <span class="text-muted fw-normal small">(one call — do once per environment)</span></div>
 <div class="card-body">
-<p class="mb-3">Call the MWL questionnaire endpoint once. It returns <strong>all questions</strong> — Standard Intake 1 questions first, then MWL-specific questions — in a single flat list. Each question includes a <code>slug</code> (stable text key) and a <code>source_questionnaire</code> UUID identifying which questionnaire it belongs to.</p>
+<p class="mb-3">Call the MWL questionnaire endpoint once. It returns <strong>all questions</strong> — standard intake, program-specific medical history, and consents — in a single flat list. Each question includes a <code>slug</code> (stable text key).</p>
 
 <div class="d-flex align-items-center gap-2 mb-2">
     <span class="badge-method method-get">GET</span>
@@ -185,36 +182,30 @@ Authorization: Bearer &lt;access_token&gt;</pre>
 <pre id="code-discover-resp">{
   "uuid":        "{{ $qUuid }}",
   "name":        "MWL – Weight Loss",
-  "linked_questionnaire": {
-    "uuid": "{{ $siUuid }}",
-    "name": "Standard Intake 1"
-  },
   "questions": [
-    // ── Standard Intake 1 questions (source_questionnaire = SI1 uuid) ──
+    // ── Step 1: Standard Intake questions ──
     {
-      "id":                   {{ $siPregnant->id ?? 0 }},
       "slug":                 "{{ $siPregnant->slug ?? 'pregnant_breastfeeding' }}",
       "key":                  "pregnant_breastfeeding",
       "question":             "If female — are you currently pregnant or breastfeeding?",
       "type":                 "choice",
       "is_required":          true,
       "options":              [{"value":"yes","is_disqualify":true},{"value":"no"}],
-      "source_questionnaire": "{{ $siUuid }}"
+      "step_number":          1
     },
-    // … more Standard Intake 1 questions …
+    // … more Step 1 questions …
 
-    // ── MWL – Weight Loss questions (source_questionnaire = MWL uuid) ──
+    // ── Step 2: Program-specific medical intake ──
     {
-      "id":                   {{ $qMedCond->id ?? 0 }},
       "slug":                 "{{ $qMedCond->slug ?? 'mwl_medical_conditions' }}",
       "key":                  "mwl_medical_conditions",
       "question":             "Please check all current or past medical conditions …",
       "type":                 "multi",
       "is_required":          true,
       "options":              [{"value":"gastroparesis","is_disqualify":true}, …],
-      "source_questionnaire": "{{ $qUuid }}"
-    }
-    // … more MWL questions …
+      "step_number":          2
+    },
+    // … more Step 2 & 3 questions …
   ]
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-discover-resp')">Copy</button>
@@ -263,7 +254,7 @@ file=&lt;binary image — JPG, PNG, or PDF, max 10 MB&gt;</pre>
     <i class="bi bi-stars me-1"></i>
     <strong>No questionnaire UUID needed.</strong>
     Submit a flat <code>answers</code> array — the portal looks up which questionnaire each slug belongs to
-    from the <code>offering_id</code> you already send. Standard Intake 1 and MWL answers are split internally.
+    from the <code>offering_id</code> you already send.
 </div>
 
 <div class="d-flex align-items-center gap-2 mb-2">
@@ -303,7 +294,7 @@ Content-Type: application/json
 
   "answers": [
 
-    // ── Standard Intake 1 ─────────────────────────────────────────
+    // ── Step 1: Standard Intake ─────────────────────────────────────
     { "slug": "{{ $siPregnant->slug      ?? 'pregnant_breastfeeding' }}",       "answer": "no" },
     { "slug": "{{ $siBP->slug            ?? 'blood_pressure_range' }}",          "answer": "normal" },
     { "slug": "{{ $siMeds->slug          ?? 'prescription_medications' }}",      "answer": "yes" },
@@ -320,10 +311,8 @@ Content-Type: application/json
     { "slug": "{{ $siMessage->slug       ?? 'first_message_to_doctor' }}",       "answer": "Starting my weight loss journey." },
     { "slug": "{{ $siConsent->slug       ?? 'telehealth_informed_consent' }}",   "answer": "agree" },
 
-    // ── MWL – Weight Loss ─────────────────────────────────────────
+    // ── Step 2: Program-Specific Medical Intake ─────────────────────
     { "slug": "{{ $qMedCond->slug   ?? 'mwl_medical_conditions' }}",    "answer": ["gallbladder_disease", "hypertension"] },
-    { "slug": "{{ $qGbConsent->slug ?? 'mwl_gallbladder_consent' }}",   "answer": "agree" },
-    // (omit mwl_thyroid_consent if thyroid_issues NOT selected above)
     { "slug": "{{ $qBypass->slug    ?? 'mwl_gastric_bypass' }}",        "answer": "no" },
     { "slug": "{{ $qAllergy->slug   ?? 'mwl_glp1_brand_allergy' }}",    "answer": ["none"] },
     { "slug": "{{ $qCurGlp1->slug   ?? 'mwl_current_glp1' }}",          "answer": "semaglutide" },
@@ -333,6 +322,11 @@ Content-Type: application/json
     { "slug": "{{ $qHasPic->slug    ?? 'mwl_has_prescription_pic' }}",   "answer": "yes" },
     { "slug": "{{ $qPicUp->slug     ?? 'mwl_prescription_pic_upload' }}", "answer": "3f2a1b4c-..." },
     // (omit mwl_prescription_pic_upload if "no" above)
+
+    // ── Step 3: Consents ────────────────────────────────────────────
+    { "slug": "{{ $qGbConsent->slug ?? 'mwl_gallbladder_consent' }}",   "answer": "agree" },
+    // (omit mwl_gallbladder_consent if gallbladder_disease NOT selected in mwl_medical_conditions)
+    // (omit mwl_thyroid_consent if thyroid_issues NOT selected in mwl_medical_conditions)
     { "slug": "{{ $qTruth->slug     ?? 'mwl_consent_truthfulness' }}",   "answer": "agree" },
     { "slug": "{{ $qGlp1Con->slug   ?? 'mwl_consent_glp1' }}",           "answer": "agree" }
   ]
@@ -371,7 +365,7 @@ function renderQRows($rows, $allRows) {
     foreach ($rows as $q) {
         $depQ = $allRows->firstWhere('id', $q->depends_on_question_id);
         $cond = $depQ
-            ? 'Show if Q' . $depQ->id . ' ' . $q->depends_on_operator . ' "' . $q->depends_on_value . '"'
+            ? 'Show if ' . e($depQ->key) . ' ' . $q->depends_on_operator . ' "' . $q->depends_on_value . '"'
             : '—';
         $optVals = collect($q->options ?? [])->pluck('value')->implode(', ');
         if (strlen($optVals) > 60) $optVals = substr($optVals, 0, 58) . '…';
@@ -392,7 +386,6 @@ function renderQRows($rows, $allRows) {
             ? '<code style="font-size:.72rem;color:#166534">' . e($q->slug) . '</code>'
             : '<span class="text-muted">—</span>';
         $out .= '<tr class="' . $rowClass . '">'
-            . '<td><strong>' . $q->id . '</strong></td>'
             . '<td><code style="font-size:.75rem">' . e($q->key) . '</code></td>'
             . '<td>' . $slugCell . '</td>'
             . '<td>' . $typeBadge . '</td>'
@@ -405,27 +398,14 @@ function renderQRows($rows, $allRows) {
 }
 @endphp
 
-{{-- Standard Intake 1 --}}
-<div class="px-3 pt-3 pb-1 small fw-semibold text-muted text-uppercase" style="letter-spacing:.04em">
-    Standard Intake 1 &nbsp;<span class="badge bg-secondary fw-normal" style="font-size:.65rem;letter-spacing:0">{{ $siUuid }}</span>
-</div>
-<div class="table-responsive">
-<table class="table table-sm table-hover mb-0 q-table">
-<thead class="table-light">
-<tr><th>ID</th><th>Key</th><th>Slug</th><th>Type</th><th>Step</th><th>Condition</th><th>Accepted Values</th></tr>
-</thead>
-<tbody>{!! renderQRows($siQuestions, $siQuestions) !!}</tbody>
-</table>
-</div>
-
 {{-- MWL – Weight Loss --}}
-<div class="px-3 pt-3 pb-1 small fw-semibold text-muted text-uppercase border-top" style="letter-spacing:.04em">
-    MWL – Weight Loss &nbsp;<span class="badge bg-secondary fw-normal" style="font-size:.65rem;letter-spacing:0">{{ $qUuid }}</span>
+<div class="px-3 pt-3 pb-1 small fw-semibold text-muted text-uppercase" style="letter-spacing:.04em">
+    MWL – Weight Loss
 </div>
 <div class="table-responsive">
 <table class="table table-sm table-hover mb-0 q-table">
 <thead class="table-light">
-<tr><th>ID</th><th>Key</th><th>Slug</th><th>Type</th><th>Step</th><th>Condition</th><th>Accepted Values</th></tr>
+<tr><th>Key</th><th>Slug</th><th>Type</th><th>Step</th><th>Condition</th><th>Accepted Values</th></tr>
 </thead>
 <tbody>{!! renderQRows($questions, $questions) !!}</tbody>
 </table>
@@ -565,9 +545,9 @@ function renderQRows($rows, $allRows) {
 <ul class="list-unstyled mb-0">
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code>, <code>client_secret</code>, and your <strong>Offering UUID(s)</strong> from the admin — Partner → Offerings (shown once approved)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs (Standard Intake 1 + MWL merged) — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>If patient has a prescription image: <code>POST /api/partner/files</code> → store <code>file_token</code></li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs — no questionnaire UUID required; the portal splits answers internally. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> as required fields in the <code>patient</code> block</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs — no questionnaire UUID required; the portal resolves answers internally. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> as required fields in the <code>patient</code> block</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Register a webhook at <code>POST /api/partner/webhooks</code> to receive status events — the portal fires: <code>case_waiting</code>, <code>case_assigned_to_clinician</code>, <code>case_support</code>, <code>case_approved</code>, <code>case_processing</code>, <code>case_completed</code>, <code>case_cancelled</code>, <code>message_created</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify HMAC signature on incoming webhooks: <code>X-Webhook-Signature: sha256=&lt;digest&gt;</code></li>
