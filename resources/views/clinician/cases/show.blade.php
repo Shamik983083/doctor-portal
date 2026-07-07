@@ -96,7 +96,6 @@
                     @endif
                 </a>
             </li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-intake">Intake</a></li>
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#tab-questionnaires">
                     Questionnaires
@@ -207,17 +206,6 @@
                 @endforelse
             </div>
 
-            {{-- Intake Questions --}}
-            <div class="tab-pane fade" id="tab-intake">
-                @forelse($case->caseQuestions as $q)
-                <div class="mb-3">
-                    <p class="fw-semibold mb-1 small">{{ $q->question }}</p>
-                    <p class="text-muted small ms-2">{{ $q->answer ?: '—' }}</p>
-                </div>
-                @empty
-                <p class="text-muted">No intake questions.</p>
-                @endforelse
-            </div>
 
             {{-- Questionnaires --}}
             <div class="tab-pane fade" id="tab-questionnaires">

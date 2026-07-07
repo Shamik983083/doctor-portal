@@ -164,6 +164,77 @@
             @endif
         </div>
 
+        {{-- Webhooks --}}
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-broadcast me-2"></i>Webhooks</h6>
+            </div>
+            <div class="card-body">
+                {{-- Add Webhook Form --}}
+                <form method="POST" action="{{ route('admin.partners.webhooks.store', $partner->id) }}" class="mb-3">
+                    @csrf
+                    <div class="mb-2">
+                        <input type="url" name="url" class="form-control form-control-sm @error('url') is-invalid @enderror"
+                               placeholder="http://localhost:8000/api/v1/webhooks/doctor-network" value="{{ old('url') }}" required>
+                        @error('url') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="d-flex gap-2">
+                        <select name="event_type" class="form-select form-select-sm @error('event_type') is-invalid @enderror">
+                            <option value="">All Events</option>
+                            @foreach(['case_waiting','case_assigned_to_clinician','case_support','case_approved','case_processing','case_completed','case_cancelled','prescription_written','message_created'] as $evt)
+                                <option value="{{ $evt }}" @selected(old('event_type') === $evt)>{{ $evt }}</option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm text-nowrap">
+                            <i class="bi bi-plus-lg me-1"></i>Add
+                        </button>
+                    </div>
+                    @error('event_type') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                </form>
+            </div>
+            @if($partner->webhooks->isNotEmpty())
+                <ul class="list-group list-group-flush">
+                    @foreach($partner->webhooks as $wh)
+                    <li class="list-group-item px-3 py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="min-width:0">
+                                <div class="font-monospace small text-truncate" title="{{ $wh->url }}">{{ $wh->url }}</div>
+                                <div class="text-muted" style="font-size:.75rem">
+                                    {{ $wh->event_type ?? 'All events' }}
+                                    &middot;
+                                    @if($wh->status === 'active')
+                                        <span class="text-success">Active</span>
+                                    @else
+                                        <span class="text-secondary">{{ ucfirst($wh->status) }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="text-nowrap ms-2">
+                                <form method="POST" action="{{ route('admin.partners.webhooks.update', [$partner->id, $wh->id]) }}" class="d-inline">
+                                    @csrf @method('PATCH')
+                                    <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Toggle status">
+                                        <i class="bi bi-{{ $wh->status === 'active' ? 'pause' : 'play' }}"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('admin.partners.webhooks.destroy', [$partner->id, $wh->id]) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete this webhook?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </li>
+                    @endforeach
+                </ul>
+            @else
+                <div class="card-body pt-0">
+                    <p class="text-muted small mb-0">No webhooks configured.</p>
+                </div>
+            @endif
+        </div>
+
     </div>
 
     {{-- Right column: integration guide + recent cases --}}

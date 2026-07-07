@@ -44,7 +44,7 @@ class CaseController extends Controller
     {
         $case = PatientCase::with([
             'patient', 'partner', 'clinician.user',
-            'caseOfferings.offering', 'caseQuestions',
+            'caseOfferings.offering',
             'diseases', 'clinicalNotes.clinician.user',
             'orders.pharmacy', 'messages', 'files', 'tags',
             'questionnaireResponses.questionnaire',

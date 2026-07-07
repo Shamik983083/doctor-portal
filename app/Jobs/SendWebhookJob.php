@@ -34,12 +34,23 @@ class SendWebhookJob implements ShouldQueue
             return;
         }
 
+        $partner = $webhook->partner;
+
         $payload  = $delivery->payload;
+        $payload['event'] = $delivery->event_type;
         $jsonBody = json_encode($payload);
-        $signature = hash_hmac('sha256', $jsonBody, $webhook->secret ?? '');
+        $signature = hash_hmac('sha256', $jsonBody, $partner->webhook_secret ?? '');
 
         $delivery->increment('attempts');
         $delivery->update(['last_attempted_at' => now(), 'status' => WebhookDelivery::STATUS_RETRYING]);
+
+        Log::info("Webhook dispatch", [
+            'delivery_id' => $delivery->id,
+            'event_type'  => $delivery->event_type,
+            'url'         => $webhook->url,
+            'attempt'     => $delivery->attempts,
+            'payload'     => $payload,
+        ]);
 
         try {
             $response = Http::timeout(10)
@@ -56,12 +67,33 @@ class SendWebhookJob implements ShouldQueue
                     'response_code' => $response->status(),
                     'response_body' => substr($response->body(), 0, 1000),
                 ]);
+
+                Log::info("Webhook delivered", [
+                    'delivery_id'   => $delivery->id,
+                    'event_type'    => $delivery->event_type,
+                    'url'           => $webhook->url,
+                    'response_code' => $response->status(),
+                    'response_body' => substr($response->body(), 0, 1000),
+                ]);
                 return;
             }
 
+            Log::warning("Webhook failed", [
+                'delivery_id'   => $delivery->id,
+                'event_type'    => $delivery->event_type,
+                'url'           => $webhook->url,
+                'response_code' => $response->status(),
+                'response_body' => substr($response->body(), 0, 1000),
+            ]);
+
             $this->handleFailure($delivery, $response->status(), $response->body());
         } catch (\Throwable $e) {
-            Log::error("Webhook delivery {$delivery->id} failed: " . $e->getMessage());
+            Log::error("Webhook exception", [
+                'delivery_id' => $delivery->id,
+                'event_type'  => $delivery->event_type,
+                'url'         => $webhook->url,
+                'error'       => $e->getMessage(),
+            ]);
             $this->handleFailure($delivery, 0, $e->getMessage());
         }
     }
