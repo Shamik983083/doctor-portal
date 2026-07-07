@@ -276,9 +276,11 @@ class CaseController extends Controller
             return back()->with('error', 'Case must be approved before sending to pharmacy.');
         }
 
-        $this->stateMachine->startProcessing($case);
+        $case = $this->stateMachine->startProcessing($case);
+        $this->stateMachine->complete($case);
 
-        return back()->with('success', 'Case sent to pharmacy for processing.');
+        return redirect()->route('clinician.cases.show', $uuid)
+            ->with('success', 'Case sent to pharmacy and marked as completed.');
     }
 
     public function sendMessage(Request $request, string $uuid)
