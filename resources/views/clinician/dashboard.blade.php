@@ -75,6 +75,33 @@
         </div>
     </div>
 
+    {{-- SLA status --}}
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100"
+             style="border-left:4px solid {{ $slaBreached > 0 ? '#dc3545' : ($slaAtRisk > 0 ? '#ffc107' : '#2dc653') }} !important;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:48px;height:48px;background:{{ $slaBreached > 0 ? '#dc35451a' : ($slaAtRisk > 0 ? '#ffc1071a' : '#2dc6531a') }};">
+                    <i class="bi bi-{{ $slaBreached > 0 ? 'exclamation-triangle' : ($slaAtRisk > 0 ? 'clock-history' : 'check-circle') }}"
+                       style="font-size:1.3rem;color:{{ $slaBreached > 0 ? '#dc3545' : ($slaAtRisk > 0 ? '#ffc107' : '#2dc653') }};"></i>
+                </div>
+                <div>
+                    <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">SLA Status</p>
+                    @if($slaBreached > 0)
+                        <h3 class="fw-bold mb-0 text-danger">{{ $slaBreached }} Breached</h3>
+                        <p class="mb-0" style="font-size:.7rem;color:#dc3545;">{{ $slaAtRisk }} more at risk</p>
+                    @elseif($slaAtRisk > 0)
+                        <h3 class="fw-bold mb-0 text-warning">{{ $slaAtRisk }} At Risk</h3>
+                        <p class="text-muted mb-0" style="font-size:.7rem;">{{ $slaReviewHours }}h review deadline</p>
+                    @else
+                        <h3 class="fw-bold mb-0 text-success">On Track</h3>
+                        <p class="text-muted mb-0" style="font-size:.7rem;">All within {{ $slaReviewHours }}h deadline</p>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Completion rate with SVG ring --}}
     <div class="col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $rateColor }} !important;">
@@ -173,6 +200,7 @@
                         <th class="py-3"       style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;font-weight:600;">Partner</th>
                         <th class="py-3"       style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;font-weight:600;">Offerings</th>
                         <th class="py-3"       style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;font-weight:600;">Status</th>
+                        <th class="py-3"       style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;font-weight:600;">SLA</th>
                         <th class="py-3"       style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;font-weight:600;">Created</th>
                         <th class="pe-4 py-3"></th>
                     </tr>
@@ -202,6 +230,23 @@
                             @endif
                         </td>
                         <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>
+                        <td style="min-width:140px;">
+                            @php
+                                $barColor = $case->sla_breached ? '#dc3545' : ($case->sla_at_risk ? '#ffc107' : '#2dc653');
+                                $barPct   = min($case->sla_pct, 100);
+                                $label    = $case->sla_breached
+                                    ? 'Breached +' . round($case->sla_elapsed_h - $slaReviewHours, 1) . 'h'
+                                    : $case->sla_remaining . 'h left';
+                            @endphp
+                            <div class="d-flex align-items-center gap-2">
+                                <div style="flex:1;background:#f1f3f5;border-radius:4px;height:6px;overflow:hidden;">
+                                    <div style="width:{{ $barPct }}%;height:100%;background:{{ $barColor }};border-radius:4px;transition:width .4s;"></div>
+                                </div>
+                                <span style="font-size:.68rem;white-space:nowrap;color:{{ $barColor }};font-weight:600;">
+                                    {{ $label }}
+                                </span>
+                            </div>
+                        </td>
                         <td class="text-muted">{{ $case->created_at->diffForHumans() }}</td>
                         <td class="pe-4">
                             <a href="{{ route('clinician.cases.show', $case->uuid) }}"

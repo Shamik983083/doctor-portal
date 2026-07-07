@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Clinician;
 
 use App\Http\Controllers\Controller;
 use App\Models\PatientCase;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -81,7 +82,10 @@ class DashboardController extends Controller
         );
         $visitTypeCounts = array_values($visitTypeRaw);
 
-        // ── Active cases table ────────────────────────────────────────────
+        // ── SLA configuration (from admin settings) ───────────────────────
+        $slaReviewHours = (int) Setting::get('sla_review_hours', 24);
+
+        // ── Active cases table with SLA computation ───────────────────────
         $recentCases = PatientCase::where($myCase)
             ->with(['patient', 'partner', 'caseOfferings.offering'])
             ->whereIn('status', [
@@ -91,13 +95,30 @@ class DashboardController extends Controller
             ])
             ->latest()
             ->take(10)
-            ->get();
+            ->get()
+            ->map(function ($case) use ($slaReviewHours) {
+                $clock        = $case->assigned_at ?? $case->created_at;
+                $hoursElapsed = $clock->diffInMinutes(now()) / 60;
+                $pct          = round(($hoursElapsed / $slaReviewHours) * 100);
+                $remaining    = max(0, round($slaReviewHours - $hoursElapsed, 1));
+
+                $case->sla_pct       = min($pct, 999);
+                $case->sla_breached  = $hoursElapsed >= $slaReviewHours;
+                $case->sla_at_risk   = !$case->sla_breached && $pct >= 70;
+                $case->sla_remaining = $remaining;
+                $case->sla_elapsed_h = round($hoursElapsed, 1);
+
+                return $case;
+            });
+
+        $slaBreached = $recentCases->where('sla_breached', true)->count();
+        $slaAtRisk   = $recentCases->where('sla_at_risk', true)->count();
 
         return view('clinician.dashboard', compact(
             'stats', 'clinician',
             'trendLabels', 'trendAssigned', 'trendCompleted',
             'visitTypeLabels', 'visitTypeCounts',
-            'recentCases'
+            'recentCases', 'slaReviewHours', 'slaBreached', 'slaAtRisk'
         ));
     }
 }
