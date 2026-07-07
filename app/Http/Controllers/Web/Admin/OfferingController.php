@@ -37,13 +37,11 @@ class OfferingController extends Controller
 
     private function attachableQuestionnaires()
     {
-        // Exclude questionnaires that are embedded inside another via linked_questionnaire_id
-        // — they are pulled in automatically and should never be attached directly to an offering.
         $embeddedIds = Questionnaire::whereNotNull('linked_questionnaire_id')
             ->pluck('linked_questionnaire_id');
 
         return Questionnaire::where('is_active', true)
-            ->where('purpose', '!=', 'demographic')
+            ->whereNotIn('purpose', ['demographic', 'standard_intake'])
             ->whereNotIn('id', $embeddedIds)
             ->orderBy('name')
             ->get(['id', 'name']);

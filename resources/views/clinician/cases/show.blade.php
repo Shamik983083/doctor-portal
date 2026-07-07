@@ -242,10 +242,27 @@
                         </div>
                     </div>
                     @forelse($response->answers as $answer)
+                    @php
+                        $qText   = $answer->question_text;
+                        $isLong  = mb_strlen($qText) > 200;
+                        $preview = $isLong ? mb_substr($qText, 0, 200) : $qText;
+                        $decoded = json_decode($answer->answer, true);
+                    @endphp
                     <div class="d-flex px-3 py-2 {{ !$loop->last ? 'border-bottom' : '' }}
                                 {{ $answer->is_disqualified ? 'bg-danger bg-opacity-5' : '' }}">
                         <div class="text-muted small" style="min-width:45%; max-width:45%; padding-right:1rem; line-height:1.4;">
-                            {{ $answer->question_text }}
+                            @if($isLong)
+                                <span class="q-preview">{{ $preview }}<span class="text-muted">…</span></span>
+                                <span class="q-full d-none">{{ $qText }}</span>
+                                <br>
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 mt-1 q-toggle"
+                                        style="font-size:.72rem;">
+                                    Show more
+                                </button>
+                            @else
+                                {{ $qText }}
+                            @endif
                             @if($answer->is_disqualified)
                                 <span class="badge bg-danger ms-1" style="font-size:.6rem">
                                     <i class="bi bi-slash-circle"></i> Disqualifying
@@ -253,7 +270,6 @@
                             @endif
                         </div>
                         <div class="small fw-semibold">
-                            @php $decoded = json_decode($answer->answer, true); @endphp
                             @if(is_array($decoded))
                                 {{ implode(', ', $decoded) }}
                             @elseif($answer->answer !== '' && $answer->answer !== null)
@@ -312,19 +328,105 @@
 
             {{-- Messages --}}
             <div class="tab-pane fade" id="tab-messages">
-                <div class="mb-3" style="max-height:300px; overflow-y:auto;">
-                    @forelse($case->messages->sortBy('created_at') as $msg)
-                    <div class="d-flex mb-2 {{ $msg->sender_type === 'clinician' ? 'justify-content-end' : '' }}">
-                        <div class="card p-2 px-3 {{ $msg->sender_type === 'clinician' ? 'bg-primary text-white' : 'bg-light' }}" style="max-width:80%; border-radius:12px;">
-                            <small class="fw-semibold d-block">{{ ucfirst($msg->sender_type ?? 'System') }}</small>
-                            <p class="mb-0 small">{{ $msg->body }}</p>
-                            <small class="opacity-75">{{ $msg->created_at->format('H:i') }}</small>
+                @php
+                    $msgs          = $case->messages->sortBy('created_at');
+                    $clinicianName = $case->clinician?->user->name ?? 'You';
+                    $patientName   = $case->patient->full_name ?? 'Patient';
+
+                    $initials = function(string $name): string {
+                        $parts = explode(' ', trim($name));
+                        return strtoupper(substr($parts[0],0,1) . (isset($parts[1]) ? substr($parts[1],0,1) : ''));
+                    };
+                @endphp
+
+                @if($msgs->isEmpty())
+                    <div class="text-center text-muted py-5 mb-3">
+                        <i class="bi bi-chat-dots" style="font-size:2.5rem;opacity:.2"></i>
+                        <p class="mt-3 mb-0 small">No messages on this case yet.</p>
+                    </div>
+                @else
+                {{-- Thread --}}
+                <div id="clinThread"
+                     style="max-height:420px; overflow-y:auto; background:#f8f9fc;
+                            border-radius:12px; padding:16px 12px; scroll-behavior:smooth; margin-bottom:16px;">
+                    @php $prevDate = null; @endphp
+                    @foreach($msgs as $msg)
+                    @php
+                        $msgDate   = $msg->created_at->format('Y-m-d');
+                        $isClinic  = $msg->sender_type === 'clinician';
+                        $isPatient = $msg->sender_type === 'patient';
+
+                        if ($isClinic) {
+                            $avatarBg  = '#4361ee';
+                            $avatarStr = $initials($clinicianName);
+                            $name      = 'You';
+                        } elseif ($isPatient) {
+                            $avatarBg  = '#2dc653';
+                            $avatarStr = $initials($patientName);
+                            $name      = $patientName;
+                        } else {
+                            $avatarBg  = '#6c757d';
+                            $avatarStr = 'SY';
+                            $name      = 'System';
+                        }
+                    @endphp
+
+                    {{-- Date separator --}}
+                    @if($msgDate !== $prevDate)
+                    @php $prevDate = $msgDate; @endphp
+                    <div class="d-flex align-items-center gap-2 my-3">
+                        <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                        <span style="font-size:.7rem;color:#adb5bd;white-space:nowrap;font-weight:500;letter-spacing:.04em;text-transform:uppercase;">
+                            {{ $msg->created_at->isToday() ? 'Today' : ($msg->created_at->isYesterday() ? 'Yesterday' : $msg->created_at->format('M j, Y')) }}
+                        </span>
+                        <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                    </div>
+                    @endif
+
+                    {{-- Message row --}}
+                    <div class="d-flex align-items-end gap-2 mb-3 {{ $isClinic ? 'flex-row-reverse' : '' }}">
+                        {{-- Avatar --}}
+                        <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold"
+                             style="width:34px;height:34px;background:{{ $avatarBg }};color:#fff;
+                                    font-size:.68rem;letter-spacing:.02em;">
+                            {{ $avatarStr }}
+                        </div>
+
+                        {{-- Bubble + meta --}}
+                        <div style="max-width:68%;">
+                            <div class="d-flex align-items-baseline gap-1 mb-1 {{ $isClinic ? 'justify-content-end' : '' }}">
+                                <span style="font-size:.72rem;font-weight:600;color:#495057;">{{ $name }}</span>
+                                <span style="font-size:.67rem;color:#adb5bd;">{{ $msg->created_at->format('H:i') }}</span>
+                            </div>
+
+                            @if($isClinic)
+                            <div style="background:#4361ee;color:#fff;padding:10px 14px;
+                                        border-radius:16px 4px 16px 16px;
+                                        font-size:.875rem;line-height:1.5;word-break:break-word;
+                                        box-shadow:0 2px 8px rgba(67,97,238,.2);">
+                                {{ $msg->body }}
+                            </div>
+                            @elseif($isPatient)
+                            <div style="background:#fff;color:#212529;padding:10px 14px;
+                                        border-radius:4px 16px 16px 16px;
+                                        border:1px solid #e9ecef;
+                                        font-size:.875rem;line-height:1.5;word-break:break-word;
+                                        box-shadow:0 1px 4px rgba(0,0,0,.06);">
+                                {{ $msg->body }}
+                            </div>
+                            @else
+                            <div style="background:#f1f3f5;color:#495057;padding:8px 12px;
+                                        border-radius:8px;border:1px dashed #dee2e6;
+                                        font-size:.8rem;line-height:1.5;word-break:break-word;">
+                                {{ $msg->body }}
+                            </div>
+                            @endif
                         </div>
                     </div>
-                    @empty
-                    <p class="text-muted text-center py-3">No messages yet.</p>
-                    @endforelse
+                    @endforeach
                 </div>
+                @endif
+
                 <form method="POST" action="{{ route('clinician.cases.messages.store', $case->uuid) }}">
                     @csrf
                     <div class="input-group">
@@ -469,4 +571,20 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.q-toggle');
+    if (!btn) return;
+    var row     = btn.closest('.text-muted');
+    var preview = row.querySelector('.q-preview');
+    var full    = row.querySelector('.q-full');
+    var expanded = full.classList.contains('d-none');
+    preview.classList.toggle('d-none', expanded);
+    full.classList.toggle('d-none', !expanded);
+    btn.textContent = expanded ? 'Hide' : 'Show more';
+});
+</script>
 @endsection

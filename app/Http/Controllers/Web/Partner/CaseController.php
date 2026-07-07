@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Partner;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClinicalNote;
 use App\Services\CaseStateMachine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +31,11 @@ class CaseController extends Controller
             ->whereNotNull('support_at')
             ->with(['patient', 'clinician.user', 'caseOfferings.offering',
                     'caseQuestions', 'diseases', 'orders.pharmacy',
-                    'clinicalNotes', 'messages', 'files', 'events'])
+                    'clinicalNotes', 'messages', 'files', 'events',
+                    'questionnaireResponses.questionnaire',
+                    'questionnaireResponses.answers',
+                    'casePrescriptions.clinician.user',
+                    'casePrescriptions.medications'])
             ->where('uuid', $uuid)->firstOrFail();
 
         return view('partner.cases.show', compact('case'));
@@ -58,7 +63,20 @@ class CaseController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
-        $this->stateMachine->returnToClinicianFromSupport($case, $request->input('partner_note'));
+        $partnerNote = $request->input('partner_note');
+
+        $this->stateMachine->returnToClinicianFromSupport($case, $partnerNote);
+
+        // Save as a clinical note so the assigned clinician can see it in their Notes tab
+        if ($case->clinician_id) {
+            ClinicalNote::create([
+                'case_id'      => $case->id,
+                'clinician_id' => $case->clinician_id,
+                'type'         => 'general',
+                'note'         => 'Support response: ' . $partnerNote,
+                'is_private'   => false,
+            ]);
+        }
 
         return back()->with('success', 'Case returned to clinician.');
     }

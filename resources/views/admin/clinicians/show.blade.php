@@ -19,8 +19,6 @@
             <div class="card-body pt-0">
                 <table class="table table-sm table-borderless small mb-0">
                     <tr><th>NPI</th><td><code>{{ $clinician->npi ?? '—' }}</code></td></tr>
-                    <tr><th>License #</th><td>{{ $clinician->license_number ?? '—' }}</td></tr>
-                    <tr><th>License State</th><td>{{ $clinician->license_state ?? '—' }}</td></tr>
                     <tr><th>Specialty</th><td>{{ $clinician->specialty ?? '—' }}</td></tr>
                     <tr><th>Total Cases</th><td>{{ $clinician->cases_count }}</td></tr>
                     <tr><th>Max Daily</th><td>{{ $clinician->max_daily_cases }}</td></tr>

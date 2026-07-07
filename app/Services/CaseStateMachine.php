@@ -25,7 +25,10 @@ class CaseStateMachine
             );
         }
 
-        DB::transaction(function () use ($case, $toStatus, $context) {
+        // Capture before update() syncs the model's originals
+        $fromStatus = $case->status;
+
+        DB::transaction(function () use ($case, $toStatus, $context, $fromStatus) {
             $timestamps = [
                 PatientCase::STATUS_ASSIGNED   => 'assigned_at',
                 PatientCase::STATUS_APPROVED   => 'approved_at',
@@ -62,7 +65,7 @@ class CaseStateMachine
                 'event_type' => 'status_changed',
                 'actor_type' => $context['actor_type'] ?? 'system',
                 'actor_id'   => $context['actor_id'] ?? null,
-                'payload'    => ['from' => $case->getOriginal('status'), 'to' => $toStatus],
+                'payload'    => ['from' => $fromStatus, 'to' => $toStatus],
                 'notes'      => $context['notes'] ?? null,
             ]);
         });

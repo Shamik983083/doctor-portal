@@ -218,18 +218,32 @@
                     </div>
                     <div class="card-body p-0">
                         @forelse($response->answers as $answer)
+                        @php
+                            $qText   = $answer->question_text;
+                            $isLong  = mb_strlen($qText) > 200;
+                            $preview = $isLong ? mb_substr($qText, 0, 200) : $qText;
+                            $decoded = json_decode($answer->answer, true);
+                        @endphp
                         <div class="d-flex px-3 py-2 {{ !$loop->last ? 'border-bottom' : '' }}
                                     {{ $answer->is_disqualified ? 'bg-danger bg-opacity-5' : '' }}">
                             <div class="text-muted small" style="min-width:45%; max-width:45%; padding-right:1rem;">
-                                {{ $answer->question_text }}
+                                @if($isLong)
+                                    <span class="q-preview">{{ $preview }}<span class="text-muted">…</span></span>
+                                    <span class="q-full d-none">{{ $qText }}</span>
+                                    <br>
+                                    <button type="button"
+                                            class="btn btn-link btn-sm p-0 mt-1 q-toggle"
+                                            style="font-size:.72rem;">
+                                        Show more
+                                    </button>
+                                @else
+                                    {{ $qText }}
+                                @endif
                                 @if($answer->is_disqualified)
                                     <i class="bi bi-slash-circle text-danger ms-1" title="Disqualifying answer"></i>
                                 @endif
                             </div>
                             <div class="small fw-semibold">
-                                @php
-                                    $decoded = json_decode($answer->answer, true);
-                                @endphp
                                 @if(is_array($decoded))
                                     {{ implode(', ', $decoded) }}
                                 @elseif($answer->answer !== '')
@@ -345,80 +359,139 @@
             <div class="tab-pane fade" id="tab-messages">
                 @if($case->messages->isEmpty())
                     <div class="text-center text-muted py-5">
-                        <i class="bi bi-chat-dots" style="font-size:2rem;opacity:.3"></i>
-                        <p class="mt-2 mb-0">No messages yet on this case.</p>
+                        <i class="bi bi-chat-dots" style="font-size:2.5rem;opacity:.2"></i>
+                        <p class="mt-3 mb-0 small">No messages on this case yet.</p>
                     </div>
                 @else
-                {{-- Summary bar --}}
                 @php
                     $msgs          = $case->messages->sortBy('created_at');
                     $totalMsgs     = $msgs->count();
                     $clinicianMsgs = $msgs->where('sender_type','clinician')->count();
                     $patientMsgs   = $msgs->where('sender_type','patient')->count();
                     $unreadCount   = $msgs->where('direction','inbound')->where('is_read',false)->count();
+
+                    // Avatar helpers
+                    $initials = function(string $name): string {
+                        $parts = explode(' ', trim($name));
+                        return strtoupper(substr($parts[0],0,1) . (isset($parts[1]) ? substr($parts[1],0,1) : ''));
+                    };
+                    $clinicianName = $case->clinician?->user->name ?? 'Clinician';
+                    $patientName   = $case->patient->full_name ?? 'Patient';
                 @endphp
-                <div class="d-flex gap-3 mb-3 pb-2 border-bottom flex-wrap" style="font-size:.8rem">
-                    <span class="text-muted"><i class="bi bi-chat-square-dots me-1"></i>{{ $totalMsgs }} total</span>
-                    <span class="text-primary"><i class="bi bi-person-badge me-1"></i>{{ $clinicianMsgs }} from clinician</span>
+
+                {{-- Summary bar --}}
+                <div class="d-flex gap-3 align-items-center mb-3 pb-2 border-bottom flex-wrap" style="font-size:.78rem;">
+                    <span class="text-muted"><i class="bi bi-chat-square-text me-1"></i>{{ $totalMsgs }} message{{ $totalMsgs !== 1 ? 's' : '' }}</span>
+                    <span style="color:#4361ee"><i class="bi bi-person-badge me-1"></i>{{ $clinicianMsgs }} from clinician</span>
                     <span class="text-success"><i class="bi bi-person me-1"></i>{{ $patientMsgs }} from patient</span>
                     @if($unreadCount > 0)
-                        <span class="text-warning fw-semibold"><i class="bi bi-envelope me-1"></i>{{ $unreadCount }} unread by clinician</span>
+                        <span class="ms-auto badge bg-warning text-dark">
+                            <i class="bi bi-envelope me-1"></i>{{ $unreadCount }} unread
+                        </span>
                     @endif
                 </div>
 
                 {{-- Thread --}}
-                <div style="max-height:480px; overflow-y:auto; padding-right:4px;" id="commThread">
+                <div id="commThread"
+                     style="max-height:500px; overflow-y:auto; background:#f8f9fc;
+                            border-radius:12px; padding:16px 12px; scroll-behavior:smooth;">
                     @php $prevDate = null; @endphp
                     @foreach($msgs as $msg)
-                        @php
-                            $msgDate     = $msg->created_at->format('Y-m-d');
-                            $isClinic    = $msg->sender_type === 'clinician';
-                            $isPatient   = $msg->sender_type === 'patient';
-                            $bubbleAlign = $isClinic ? 'justify-content-end' : 'justify-content-start';
-                            $bubbleBg    = $isClinic ? 'bg-primary text-white' : ($isPatient ? 'bg-light border' : 'bg-warning-subtle border');
-                            $senderLabel = match($msg->sender_type) {
-                                'clinician' => '🩺 ' . ($case->clinician?->user->name ?? 'Clinician'),
-                                'patient'   => '👤 Patient',
-                                default     => '⚙ System',
-                            };
-                        @endphp
+                    @php
+                        $msgDate   = $msg->created_at->format('Y-m-d');
+                        $isClinic  = $msg->sender_type === 'clinician';
+                        $isPatient = $msg->sender_type === 'patient';
 
-                        {{-- Date separator --}}
-                        @if($msgDate !== $prevDate)
-                        <div class="text-center my-2">
-                            <span class="badge bg-light text-muted border" style="font-size:.72rem">
-                                {{ $msg->created_at->isToday() ? 'Today' : ($msg->created_at->isYesterday() ? 'Yesterday' : $msg->created_at->format('M j, Y')) }}
-                            </span>
+                        if ($isClinic) {
+                            $avatarBg  = '#4361ee';
+                            $avatarTxt = '#fff';
+                            $avatarStr = $initials($clinicianName);
+                            $name      = $clinicianName;
+                        } elseif ($isPatient) {
+                            $avatarBg  = '#2dc653';
+                            $avatarTxt = '#fff';
+                            $avatarStr = $initials($patientName);
+                            $name      = $patientName;
+                        } else {
+                            $avatarBg  = '#6c757d';
+                            $avatarTxt = '#fff';
+                            $avatarStr = 'SY';
+                            $name      = 'System';
+                        }
+                    @endphp
+
+                    {{-- Date separator --}}
+                    @if($msgDate !== $prevDate)
+                    @php $prevDate = $msgDate; @endphp
+                    <div class="d-flex align-items-center gap-2 my-3">
+                        <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                        <span style="font-size:.7rem; color:#adb5bd; white-space:nowrap; font-weight:500; letter-spacing:.04em; text-transform:uppercase;">
+                            {{ $msg->created_at->isToday() ? 'Today' : ($msg->created_at->isYesterday() ? 'Yesterday' : $msg->created_at->format('M j, Y')) }}
+                        </span>
+                        <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                    </div>
+                    @endif
+
+                    {{-- Message row --}}
+                    <div class="d-flex align-items-end gap-2 mb-3 {{ $isClinic ? 'flex-row-reverse' : '' }}">
+
+                        {{-- Avatar --}}
+                        <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold"
+                             style="width:34px;height:34px;background:{{ $avatarBg }};color:{{ $avatarTxt }};
+                                    font-size:.68rem;letter-spacing:.02em;">
+                            {{ $avatarStr }}
                         </div>
-                        @php $prevDate = $msgDate; @endphp
-                        @endif
 
-                        <div class="d-flex {{ $bubbleAlign }} mb-2">
-                            <div style="max-width:75%">
-                                {{-- Sender label --}}
-                                <div class="mb-1 {{ $isClinic ? 'text-end' : '' }}" style="font-size:.72rem; color:#6c757d">
-                                    {{ $senderLabel }}
-                                    &nbsp;·&nbsp;{{ $msg->created_at->format('H:i') }}
-                                    @if($isPatient)
-                                        @if($msg->is_read)
-                                            &nbsp;<i class="bi bi-check2-all text-primary" title="Read by clinician at {{ $msg->read_at?->format('M j H:i') }}"></i>
-                                        @else
-                                            &nbsp;<i class="bi bi-check2 text-muted" title="Not yet read by clinician"></i>
-                                        @endif
+                        {{-- Bubble + meta --}}
+                        <div style="max-width:68%;">
+                            {{-- Name + time --}}
+                            <div class="d-flex align-items-baseline gap-1 mb-1 {{ $isClinic ? 'justify-content-end' : '' }}">
+                                <span style="font-size:.72rem;font-weight:600;color:#495057;">{{ $name }}</span>
+                                <span style="font-size:.67rem;color:#adb5bd;">{{ $msg->created_at->format('H:i') }}</span>
+                                @if($isPatient)
+                                    @if($msg->is_read)
+                                        <i class="bi bi-check2-all" style="font-size:.72rem;color:#4361ee;"
+                                           title="Read at {{ $msg->read_at?->format('M j H:i') }}"></i>
+                                    @else
+                                        <i class="bi bi-check2" style="font-size:.72rem;color:#adb5bd;"
+                                           title="Not yet read"></i>
                                     @endif
-                                </div>
-                                {{-- Bubble --}}
-                                <div class="{{ $bubbleBg }} p-2 px-3" style="border-radius:12px; font-size:.875rem; word-break:break-word">
-                                    {{ $msg->body }}
-                                </div>
-                                {{-- Channel badge --}}
-                                @if($msg->channel && $msg->channel !== 'portal')
-                                <div class="{{ $isClinic ? 'text-end' : '' }} mt-1" style="font-size:.68rem;color:#adb5bd">
-                                    via {{ $msg->channel }}
-                                </div>
                                 @endif
                             </div>
+
+                            {{-- Bubble --}}
+                            @if($isClinic)
+                            <div style="background:#4361ee;color:#fff;padding:10px 14px;
+                                        border-radius:16px 4px 16px 16px;
+                                        font-size:.875rem;line-height:1.5;word-break:break-word;
+                                        box-shadow:0 2px 8px rgba(67,97,238,.2);">
+                                {{ $msg->body }}
+                            </div>
+                            @elseif($isPatient)
+                            <div style="background:#fff;color:#212529;padding:10px 14px;
+                                        border-radius:4px 16px 16px 16px;
+                                        border:1px solid #e9ecef;
+                                        font-size:.875rem;line-height:1.5;word-break:break-word;
+                                        box-shadow:0 1px 4px rgba(0,0,0,.06);">
+                                {{ $msg->body }}
+                            </div>
+                            @else
+                            <div style="background:#f1f3f5;color:#495057;padding:8px 12px;
+                                        border-radius:8px;border:1px dashed #dee2e6;
+                                        font-size:.8rem;line-height:1.5;word-break:break-word;">
+                                {{ $msg->body }}
+                            </div>
+                            @endif
+
+                            {{-- Channel badge --}}
+                            @if($msg->channel && $msg->channel !== 'portal')
+                            <div class="mt-1 {{ $isClinic ? 'text-end' : '' }}"
+                                 style="font-size:.65rem;color:#adb5bd;">
+                                via {{ $msg->channel }}
+                            </div>
+                            @endif
                         </div>
+                    </div>
                     @endforeach
                 </div>
                 @endif
@@ -510,18 +583,64 @@
 
             {{-- Timeline --}}
             <div class="tab-pane fade" id="tab-timeline">
+                @php
+                // Human-readable label + badge colour for each status transition
+                $eventLabel = function($event) {
+                    $from = $event->payload['from'] ?? null;
+                    $to   = $event->payload['to']   ?? null;
+
+                    if ($event->event_type === 'clinician_reassigned') {
+                        return ['label' => 'Clinician reassigned', 'color' => 'bg-primary'];
+                    }
+
+                    $map = [
+                        'created→waiting'     => ['Case submitted',              'bg-info text-dark'],
+                        'waiting→assigned'    => ['Case assigned to clinician',  'bg-primary'],
+                        'created→assigned'    => ['Case assigned to clinician',  'bg-primary'],
+                        'assigned→support'    => ['Sent to support',             'bg-warning text-dark'],
+                        'support→assigned'    => ['Returned to clinician',       'bg-primary'],
+                        'assigned→approved'   => ['Case approved',               'bg-success'],
+                        'approved→processing' => ['Sent to pharmacy',            'bg-success'],
+                        'processing→completed'=> ['Case completed',              'bg-success'],
+                        'assigned→cancelled'  => ['Case cancelled',              'bg-danger'],
+                        'waiting→cancelled'   => ['Case cancelled',              'bg-danger'],
+                        'support→cancelled'   => ['Case cancelled',              'bg-danger'],
+                        'approved→cancelled'  => ['Case cancelled',              'bg-danger'],
+                        'created→cancelled'   => ['Case cancelled',              'bg-danger'],
+                    ];
+
+                    $key = $from . '→' . $to;
+                    if (isset($map[$key])) {
+                        return ['label' => $map[$key][0], 'color' => $map[$key][1]];
+                    }
+
+                    // Fallback: capitalise the status names
+                    $label = $to ? ucfirst($from) . ' → ' . ucfirst($to) : ucfirst(str_replace('_', ' ', $event->event_type));
+                    return ['label' => $label, 'color' => 'bg-secondary'];
+                };
+
+                $actorLabel = function($event) {
+                    return match($event->actor_type) {
+                        'admin'     => 'Admin',
+                        'clinician' => 'Clinician',
+                        'partner'   => 'Partner / Support',
+                        default     => 'System',
+                    };
+                };
+                @endphp
+
                 @forelse($case->events->sortByDesc('created_at') as $event)
-                <div class="d-flex gap-3 mb-3">
-                    <div class="text-muted" style="min-width:120px; font-size:.75rem;">{{ $event->created_at->format('M d, H:i') }}</div>
+                @php [$label, $color] = array_values($eventLabel($event)); @endphp
+                <div class="d-flex gap-3 mb-3 pb-3 border-bottom">
+                    <div class="text-muted text-nowrap" style="min-width:110px; font-size:.75rem; padding-top:2px;">
+                        {{ $event->created_at->format('M d, H:i') }}
+                    </div>
                     <div>
-                        <span class="badge bg-secondary">{{ ucfirst(str_replace('_', ' ', $event->event_type)) }}</span>
-                        @if($event->payload)
-                            @if(isset($event->payload['from'], $event->payload['to']))
-                                <small class="text-muted ms-1">{{ $event->payload['from'] }} → {{ $event->payload['to'] }}</small>
-                            @endif
+                        <span class="badge {{ $color }} mb-1">{{ $label }}</span>
+                        <div class="small text-muted">{{ $actorLabel($event) }}</div>
+                        @if($event->notes)
+                            <p class="small mb-0 mt-1 text-body">{{ $event->notes }}</p>
                         @endif
-                        <div class="small text-muted">{{ ucfirst($event->actor_type ?? 'system') }}</div>
-                        @if($event->notes)<p class="small mb-0">{{ $event->notes }}</p>@endif
                     </div>
                 </div>
                 @empty
@@ -541,6 +660,19 @@ document.querySelectorAll('[href="#tab-messages"]').forEach(function(tab) {
         var thread = document.getElementById('commThread');
         if (thread) thread.scrollTop = thread.scrollHeight;
     });
+});
+
+// Show more / Hide toggle for long consent question text
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.q-toggle');
+    if (!btn) return;
+    var row     = btn.closest('.text-muted');
+    var preview = row.querySelector('.q-preview');
+    var full    = row.querySelector('.q-full');
+    var expanded = full.classList.contains('d-none');
+    preview.classList.toggle('d-none', expanded);
+    full.classList.toggle('d-none', !expanded);
+    btn.textContent = expanded ? 'Hide' : 'Show more';
 });
 </script>
 @endsection

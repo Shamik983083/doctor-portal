@@ -165,6 +165,7 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
                                                name="license_info[{{ $abbr }}][expiry]"
                                                class="form-control form-control-sm @error("license_info.{$abbr}.expiry") is-invalid @enderror"
                                                value="{{ $info['expiry'] ?? '' }}"
+                                               min="{{ date('Y-m-d') }}"
                                                required>
                                         @error("license_info.{$abbr}.expiry")
                                             <div class="invalid-feedback">{{ $message }}</div>
@@ -217,6 +218,8 @@ document.addEventListener('DOMContentLoaded', function () {
         emptyMsg.classList.remove('d-none');
     }
 
+    var today = new Date().toISOString().split('T')[0];
+
     function addLicenseRow(abbr) {
         if (document.getElementById('license-row-' + abbr)) return;
         var name = stateNames[abbr] || abbr;
@@ -235,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
             + '</td>'
             + '<td>'
             +   '<input type="date" name="license_info[' + abbr + '][expiry]"'
-            +          ' class="form-control form-control-sm" required>'
+            +          ' class="form-control form-control-sm" min="' + today + '" required>'
             + '</td>';
         tbody.appendChild(tr);
         showTable();
