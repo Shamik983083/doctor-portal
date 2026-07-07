@@ -140,9 +140,8 @@
         </div>
 
         <ul class="nav nav-tabs mb-3" id="caseTabs">
-            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-intake">Intake</a></li>
             <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#tab-questionnaires">
+                <a class="nav-link active" data-bs-toggle="tab" href="#tab-questionnaires">
                     Questionnaires
                     @if($case->questionnaireResponses->count())
                         <span class="badge bg-primary">{{ $case->questionnaireResponses->count() }}</span>
@@ -181,20 +180,8 @@
         </ul>
 
         <div class="tab-content">
-            {{-- Intake Questions --}}
-            <div class="tab-pane fade show active" id="tab-intake">
-                @forelse($case->caseQuestions as $q)
-                <div class="mb-3">
-                    <p class="fw-semibold mb-1 small">{{ $q->question }}</p>
-                    <p class="text-muted small ms-2">{{ $q->answer ?: '—' }}</p>
-                </div>
-                @empty
-                <p class="text-muted">No intake questions.</p>
-                @endforelse
-            </div>
-
             {{-- Questionnaire Responses --}}
-            <div class="tab-pane fade" id="tab-questionnaires">
+            <div class="tab-pane fade show active" id="tab-questionnaires">
                 @forelse($case->questionnaireResponses as $response)
                 <div class="card mb-3 {{ $response->is_disqualified ? 'border-danger' : 'border-0 shadow-sm' }}">
                     <div class="card-header d-flex justify-content-between align-items-center py-2

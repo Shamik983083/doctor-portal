@@ -11,6 +11,7 @@ use App\Models\Pharmacy;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Questionnaire;
+use App\Models\Webhook;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -99,6 +100,12 @@ class DemoDataSeeder extends Seeder
                 ]);
             }
         }
+
+        // Webhook for demo partner
+        Webhook::firstOrCreate(
+            ['partner_id' => $partner->id, 'url' => 'http://localhost:8000/api/v1/webhooks/doctor-network'],
+            ['status' => 'active', 'event_type' => null]
+        );
 
         // Demo patient
         Patient::firstOrCreate(

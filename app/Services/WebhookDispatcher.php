@@ -43,7 +43,7 @@ class WebhookDispatcher
     public function buildSignedPayload(Webhook $webhook, array $payload): array
     {
         $json = json_encode($payload);
-        $signature = hash_hmac('sha256', $json, $webhook->secret);
+        $signature = hash_hmac('sha256', $json, $webhook->partner->webhook_secret ?? '');
 
         return [
             'payload'   => $payload,

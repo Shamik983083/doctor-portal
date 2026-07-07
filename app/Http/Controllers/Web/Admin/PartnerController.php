@@ -8,10 +8,17 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Laravel\Passport\ClientRepository;
 
 class PartnerController extends Controller
 {
+    private const EVENT_TYPES = [
+        'case_waiting', 'case_assigned_to_clinician', 'case_support',
+        'case_approved', 'case_processing', 'case_completed', 'case_cancelled',
+        'prescription_written', 'message_created',
+    ];
+
     public function index(Request $request)
     {
         $partners = Partner::withCount(['patients', 'cases'])
@@ -59,7 +66,7 @@ class PartnerController extends Controller
     public function show(int $id)
     {
         $partner = Partner::withCount(['patients', 'cases', 'offerings'])
-            ->with('users')
+            ->with(['users', 'webhooks' => fn($q) => $q->latest()])
             ->findOrFail($id);
         $partner->makeVisible('client_secret');
         return view('admin.partners.show', compact('partner'));
@@ -139,5 +146,45 @@ class PartnerController extends Controller
 
         return redirect()->route('admin.partners.show', $partner->id)
             ->with('success', 'API credentials regenerated. Share the new secret with the partner immediately — it cannot be retrieved again.');
+    }
+
+    public function storeWebhook(Request $request, int $id)
+    {
+        $partner = Partner::findOrFail($id);
+
+        $data = $request->validate([
+            'url'        => ['required', 'url'],
+            'event_type' => ['nullable', Rule::in(self::EVENT_TYPES)],
+        ]);
+
+        $partner->webhooks()->create([
+            'url'        => $data['url'],
+            'event_type' => $data['event_type'] ?? null,
+            'status'     => 'active',
+        ]);
+
+        return redirect()->route('admin.partners.show', $partner->id)->with('success', 'Webhook added.');
+    }
+
+    public function updateWebhook(int $id, int $webhookId)
+    {
+        $partner = Partner::findOrFail($id);
+        $webhook = $partner->webhooks()->findOrFail($webhookId);
+
+        $webhook->update([
+            'status' => $webhook->status === 'active' ? 'inactive' : 'active',
+        ]);
+
+        return redirect()->route('admin.partners.show', $partner->id)->with('success', 'Webhook status updated.');
+    }
+
+    public function destroyWebhook(int $id, int $webhookId)
+    {
+        $partner = Partner::findOrFail($id);
+        $webhook = $partner->webhooks()->findOrFail($webhookId);
+
+        $webhook->delete();
+
+        return redirect()->route('admin.partners.show', $partner->id)->with('success', 'Webhook deleted.');
     }
 }

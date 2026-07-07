@@ -87,6 +87,9 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::get('/{id}/users/create', [AdminPartnerController::class, 'createUser'])->name('users.create');
         Route::post('/{id}/users', [AdminPartnerController::class, 'storeUser'])->name('users.store');
         Route::post('/{id}/regenerate-credentials', [AdminPartnerController::class, 'regenerateCredentials'])->name('regenerate-credentials');
+        Route::post('/{id}/webhooks', [AdminPartnerController::class, 'storeWebhook'])->name('webhooks.store');
+        Route::patch('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'updateWebhook'])->name('webhooks.update');
+        Route::delete('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'destroyWebhook'])->name('webhooks.destroy');
     });
 
     // Clinicians
@@ -202,4 +205,7 @@ Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])
 
     // API Credentials & Webhooks
     Route::get('/credentials', [PartnerCredentialController::class, 'show'])->name('credentials');
+    Route::post('/webhooks', [PartnerCredentialController::class, 'storeWebhook'])->name('webhooks.store');
+    Route::patch('/webhooks/{id}', [PartnerCredentialController::class, 'updateWebhook'])->name('webhooks.update');
+    Route::delete('/webhooks/{id}', [PartnerCredentialController::class, 'destroyWebhook'])->name('webhooks.destroy');
 });
