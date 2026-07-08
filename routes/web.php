@@ -13,6 +13,7 @@ use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCa
 use App\Http\Controllers\Web\Admin\QuestionnaireController as AdminQuestionnaireController;
 use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController;
 use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeliveryController;
+use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
 use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingController;
@@ -164,6 +165,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::get('/',              [AdminWebhookDeliveryController::class, 'index'])->name('index');
         Route::post('/{uuid}/resend',[AdminWebhookDeliveryController::class, 'resend'])->name('resend');
     });
+
+    // Settings
+    Route::get('/settings',  [AdminSettingsController::class, 'index'])->name('settings');
+    Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
 
     // Offering Categories
     Route::prefix('categories')->name('categories.')->group(function () {

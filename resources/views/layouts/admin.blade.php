@@ -93,6 +93,13 @@
         </a>
     </li>
     <hr class="border-secondary my-2">
+    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Configuration</span></li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.settings*') ? 'active' : '' }}" href="{{ route('admin.settings') }}">
+            <i class="bi bi-sliders"></i> Settings
+        </a>
+    </li>
+    <hr class="border-secondary my-2">
     <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Clinician View</span></li>
     <li class="nav-item">
         <a class="nav-link" href="{{ route('clinician.dashboard') }}">
