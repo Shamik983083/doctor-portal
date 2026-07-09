@@ -247,50 +247,40 @@
                 </div>
             </div>
 
-            {{-- Required Questionnaires (editable) --}}
-            @php
-                $attachedIds  = old('questionnaire_ids', $offering->questionnaires->pluck('id')->toArray());
-                $pivotRequired = $offering->questionnaires->keyBy('id')->map(fn($q) => $q->pivot->is_required);
-                $oldRequired   = old('questionnaire_required', []);
-            @endphp
+            {{-- Required Questionnaires (read-only — assigned by admin) --}}
             <div class="card mb-4">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-semibold">Required Questionnaires <span class="text-danger">*</span></h6>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-3">Select which questionnaire forms must be completed when a case is submitted for this offering.</p>
-                    @error('questionnaire_ids')
-                        <div class="alert alert-danger py-2 mb-3"><small>{{ $message }}</small></div>
-                    @enderror
-                    @if($allQuestionnaires->isEmpty())
-                        <p class="text-muted small fst-italic mb-0">No active questionnaires found.</p>
-                    @else
-                    <div class="border rounded" id="questionnaireBox">
-                        @foreach($allQuestionnaires as $q)
-                        @php
-                            $checked    = in_array($q->id, (array)$attachedIds);
-                            $isRequired = !empty($oldRequired) ? isset($oldRequired[$q->id]) : ($pivotRequired[$q->id] ?? false);
-                        @endphp
-                        <div class="d-flex align-items-center justify-content-between px-3 py-2 {{ !$loop->last ? 'border-bottom' : '' }}">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input q-check" type="checkbox"
-                                       name="questionnaire_ids[]" value="{{ $q->id }}"
-                                       id="qc_{{ $q->id }}" {{ $checked ? 'checked' : '' }}>
-                                <label class="form-check-label fw-semibold small" for="qc_{{ $q->id }}">{{ $q->name }}</label>
-                            </div>
-                            <div class="form-check form-check-inline mb-0 qr-toggle" id="qrt_{{ $q->id }}"
-                                 style="{{ $checked ? '' : 'opacity:.35;pointer-events:none' }}">
-                                <input class="form-check-input" type="checkbox"
-                                       name="questionnaire_required[{{ $q->id }}]" value="1"
-                                       id="qr_{{ $q->id }}" {{ ($checked && $isRequired) ? 'checked' : '' }}>
-                                <label class="form-check-label small text-muted" for="qr_{{ $q->id }}">Required</label>
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                    <div id="qError" class="text-danger small mt-2" style="display:none">Please select at least one questionnaire.</div>
+                <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0 fw-semibold">Required Questionnaires</h6>
+                    @if($offering->questionnaires->isNotEmpty())
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"
+                              style="font-size:.65rem">{{ $offering->questionnaires->count() }}</span>
                     @endif
                 </div>
+                @if($offering->questionnaires->isNotEmpty())
+                    <ul class="list-group list-group-flush">
+                        @foreach($offering->questionnaires->sortBy('pivot.sort_order') as $q)
+                        <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                            <span class="small fw-semibold">{{ $q->name }}</span>
+                            @if($q->pivot->is_required)
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size:.62rem">Required</span>
+                            @else
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size:.62rem">Optional</span>
+                            @endif
+                        </li>
+                        @endforeach
+                    </ul>
+                    <div class="card-footer bg-white py-2 px-3">
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>These forms must be submitted with every case for this offering.
+                        </p>
+                    </div>
+                @else
+                    <div class="card-body py-2">
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-clock me-1"></i>Questionnaires will be assigned by admin before this offering is approved.
+                        </p>
+                    </div>
+                @endif
             </div>
 
             <div class="card mb-4">
@@ -321,31 +311,6 @@ document.getElementById('selectAll').addEventListener('click', () => {
 });
 document.getElementById('clearAll').addEventListener('click', () => {
     document.querySelectorAll('.state-cb').forEach(cb => cb.checked = false);
-});
-
-document.querySelectorAll('.q-check').forEach(function (cb) {
-    cb.addEventListener('change', function () {
-        var toggle = document.getElementById('qrt_' + this.value);
-        if (!toggle) return;
-        toggle.style.opacity       = this.checked ? '1'    : '0.35';
-        toggle.style.pointerEvents = this.checked ? 'auto' : 'none';
-        if (!this.checked) {
-            var req = document.getElementById('qr_' + this.value);
-            if (req) req.checked = false;
-        }
-        document.getElementById('qError').style.display = 'none';
-        document.getElementById('questionnaireBox').style.borderColor = '';
-    });
-});
-
-document.querySelector('form[method="POST"]').addEventListener('submit', function (e) {
-    var checked = document.querySelectorAll('.q-check:checked').length;
-    if (checked === 0 && document.getElementById('questionnaireBox')) {
-        e.preventDefault();
-        document.getElementById('qError').style.display = 'block';
-        document.getElementById('questionnaireBox').style.borderColor = '#dc3545';
-        document.getElementById('questionnaireBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
 });
 
 function copyPartnerUuid() {

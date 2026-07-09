@@ -59,6 +59,7 @@
         </div>
 
         {{-- Approval Status Card --}}
+        @php $hasQuestionnaires = $offering->questionnaires->count() > 0; @endphp
         <div class="card mb-3">
             <div class="card-header"><h6 class="mb-0 small">Approval Status</h6></div>
             <div class="card-body">
@@ -87,10 +88,16 @@
                         </div>
                     @endif
                     <p class="text-muted small mb-2">Partner can edit and re-submit.</p>
+                    @if(!$hasQuestionnaires)
+                        <div class="alert alert-warning py-2 mb-2" style="font-size:.8rem;">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Attach at least one questionnaire (left sidebar) before approving.
+                        </div>
+                    @endif
                     <div class="d-flex gap-2">
                         <form method="POST" action="{{ route('admin.offerings.approve', $offering->id) }}" class="flex-fill">
                             @csrf
-                            <button class="btn btn-sm btn-success w-100">
+                            <button class="btn btn-sm btn-success w-100" {{ !$hasQuestionnaires ? 'disabled' : '' }}>
                                 <i class="bi bi-check-lg me-1"></i>Approve
                             </button>
                         </form>
@@ -107,10 +114,16 @@
                         <i class="bi bi-clock me-1"></i>Pending Admin Review
                     </span>
                     <p class="text-muted small mb-2">Not visible to clinicians until approved.</p>
+                    @if(!$hasQuestionnaires)
+                        <div class="alert alert-warning py-2 mb-2" style="font-size:.8rem;">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Attach at least one questionnaire (left sidebar) before approving.
+                        </div>
+                    @endif
                     <div class="d-flex gap-2">
                         <form method="POST" action="{{ route('admin.offerings.approve', $offering->id) }}" class="flex-fill">
                             @csrf
-                            <button class="btn btn-sm btn-success w-100">
+                            <button class="btn btn-sm btn-success w-100" {{ !$hasQuestionnaires ? 'disabled' : '' }}>
                                 <i class="bi bi-check-lg me-1"></i>Approve
                             </button>
                         </form>

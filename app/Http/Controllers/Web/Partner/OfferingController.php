@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Web\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\Offering;
 use App\Models\OfferingCategory;
-use App\Models\Questionnaire;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,18 +20,6 @@ class OfferingController extends Controller
 
     private function partner() { return Auth::user()->partner; }
 
-    private function attachableQuestionnaires()
-    {
-        $embeddedIds = Questionnaire::whereNotNull('linked_questionnaire_id')
-            ->pluck('linked_questionnaire_id');
-
-        return Questionnaire::where('is_active', true)
-            ->whereNotIn('purpose', ['demographic', 'standard_intake'])
-            ->whereNotIn('id', $embeddedIds)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-    }
-
     public function index(Request $request)
     {
         $offerings = $this->partner()->offerings()->with('category')
@@ -46,10 +33,9 @@ class OfferingController extends Controller
 
     public function create()
     {
-        $usStates          = $this->usStates;
-        $categories        = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $allQuestionnaires = $this->attachableQuestionnaires();
-        return view('partner.offerings.create', compact('usStates', 'categories', 'allQuestionnaires'));
+        $usStates   = $this->usStates;
+        $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        return view('partner.offerings.create', compact('usStates', 'categories'));
     }
 
     public function store(Request $request)
@@ -78,8 +64,6 @@ class OfferingController extends Controller
             'available_states.*'      => 'string|size:2',
             'is_active'               => 'boolean',
             'is_controlled_substance' => 'boolean',
-            'questionnaire_ids'       => 'required|array|min:1',
-            'questionnaire_ids.*'     => 'integer|exists:questionnaires,id',
         ]);
 
         $data['is_active']               = $request->boolean('is_active');
@@ -89,25 +73,16 @@ class OfferingController extends Controller
 
         $offering = $this->partner()->offerings()->create($data);
 
-        $qIds = $request->input('questionnaire_ids', []);
-        $requiredMap = $request->input('questionnaire_required', []);
-        $sync = [];
-        foreach (array_values($qIds) as $i => $qId) {
-            $sync[(int) $qId] = ['is_required' => isset($requiredMap[$qId]), 'sort_order' => $i];
-        }
-        $offering->questionnaires()->sync($sync);
-
         return redirect()->route('partner.offerings.show', $offering->id)
             ->with('success', "Offering \"{$offering->name}\" created and submitted for admin approval.");
     }
 
     public function show(int $id)
     {
-        $offering          = $this->partner()->offerings()->with(['category', 'questionnaires'])->findOrFail($id);
-        $usStates          = $this->usStates;
-        $categories        = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $allQuestionnaires = $this->attachableQuestionnaires();
-        return view('partner.offerings.show', compact('offering', 'usStates', 'categories', 'allQuestionnaires'));
+        $offering   = $this->partner()->offerings()->with(['category', 'questionnaires'])->findOrFail($id);
+        $usStates   = $this->usStates;
+        $categories = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        return view('partner.offerings.show', compact('offering', 'usStates', 'categories'));
     }
 
     public function update(Request $request, int $id)
@@ -135,8 +110,6 @@ class OfferingController extends Controller
             'available_states'        => 'nullable|array',
             'is_active'               => 'boolean',
             'is_controlled_substance' => 'boolean',
-            'questionnaire_ids'       => 'required|array|min:1',
-            'questionnaire_ids.*'     => 'integer|exists:questionnaires,id',
         ]);
 
         $data['is_active']               = $request->boolean('is_active');
@@ -152,14 +125,6 @@ class OfferingController extends Controller
         }
 
         $offering->update($data);
-
-        $qIds = $request->input('questionnaire_ids', []);
-        $requiredMap = $request->input('questionnaire_required', []);
-        $sync = [];
-        foreach (array_values($qIds) as $i => $qId) {
-            $sync[(int) $qId] = ['is_required' => isset($requiredMap[$qId]), 'sort_order' => $i];
-        }
-        $offering->questionnaires()->sync($sync);
 
         $message = $offering->approval_status === 'pending'
             ? 'Offering updated and re-submitted for admin approval.'

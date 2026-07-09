@@ -151,7 +151,12 @@ class OfferingController extends Controller
 
     public function approve(int $id)
     {
-        $offering = Offering::findOrFail($id);
+        $offering = Offering::with('questionnaires')->findOrFail($id);
+
+        if ($offering->questionnaires->count() === 0) {
+            return back()->with('error', "Cannot approve \"{$offering->name}\" — please attach at least one Required Questionnaire first.");
+        }
+
         $offering->update([
             'approval_status' => 'approved',
             'approved_by'     => Auth::id(),
