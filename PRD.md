@@ -1,6 +1,6 @@
 # Doctor Portal — Product Requirements Document
 
-**Last Updated:** 2026-07-03 (rev 3)
+**Last Updated:** 2026-07-09 (rev 4)
 **Status:** In Development
 **Stack:** Laravel 12, PHP 8.2, Bootstrap 5, MySQL (XAMPP), Laravel Passport 13.7, Spatie Permission 6.25
 
@@ -39,9 +39,11 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 | Assigned → Approved | Clinician (via Approve & Prescribe flow) |
 | Assigned → Support | Clinician (with a note explaining what is needed) |
 | Support → Assigned | **Partner** (writes a response note; case returns to the **same clinician**) |
-| Approved → Processing | **Clinician** (Send to Pharmacy) |
-| Processing → Completed | System / Admin |
+| Approved → Processing | **Clinician** (Send to Pharmacy — triggers both `processing` and `completed` in sequence) |
+| Processing → Completed | **Auto** — fires immediately after `processing` when Clinician clicks "Send to Pharmacy" |
 | Any → Cancelled | Admin / Clinician / Partner |
+
+> **Auto-completion on Send to Pharmacy**: When a clinician clicks "Send to Pharmacy", `CaseStateMachine::startProcessing()` and `CaseStateMachine::complete()` are called in sequence. Both the `case_processing` and `case_completed` webhooks fire automatically. The clinician is redirected to the final `completed` case view.
 
 **Key rules:**
 - Partners only see cases where `support_at IS NOT NULL` — i.e. cases the clinician has explicitly escalated to support.
@@ -186,7 +188,7 @@ The questionnaire builder **auto-populates the field key** as the admin types th
 - Manually resend failed deliveries
 
 ### Developer Guides (`/admin/guide/*`)
-Two built-in integration guides for sharing with partner developers:
+Three built-in integration guides for sharing with partner developers:
 
 - **Guide: Messaging API** (`/admin/guide/messaging`) — explains how to send and receive case messages via the API
 - **Guide: Weight Loss API** (`/admin/guide/weightloss-api`) — comprehensive 8-section guide:
@@ -200,16 +202,67 @@ Two built-in integration guides for sharing with partner developers:
   8. Integration Checklist
   - Dynamic — question IDs auto-update when questionnaire is edited
   - Print-optimized: `@media print` hides admin chrome; content fills full page width
+- **Guide: Anti-Aging API** (`/admin/guide/antiaging-api`) — equivalent guide for the Anti-Aging program (Metformin, NAD+, Glutathione), same structure as the Weight Loss guide with live question IDs from the Anti-Aging questionnaire
+
+### Admin Dashboard (`/admin/dashboard`)
+Professional analytics dashboard with Chart.js 4.4 charts:
+- **Stat cards** — color-tinted icon circles with left-border accent for total cases, waiting, active, and completed
+- **Doughnut chart** — cases by status; 72% cutout with total count in center; clickable legend
+- **Area/line chart** — 30-day case creation trend with gradient fill
+- **Horizontal bar chart** — top 10 clinician active case workload (`indexAxis: 'y'`); indigo-to-violet palette
+- **Recent cases table** — avatar initials, clinician name or "Unassigned" fallback, status badge
+
+### SLA Configuration (`/admin/settings`)
+Admin-editable Service Level Agreement deadlines — no code deploy needed:
+
+| Setting Key | Default | Description |
+|-------------|---------|-------------|
+| `sla_pickup_hours` | 4h | Time from case creation to assignment |
+| `sla_review_hours` | 24h | Time from assignment to clinician action (primary SLA) |
+| `sla_total_hours` | 48h | End-to-end from creation to completion |
+
+- Changes are cached (1-hour TTL) and invalidated immediately on save
+- Sidebar link under **Configuration → Settings** with `bi-sliders` icon
+- Validation: pickup/review max 168h; total max 720h
+- Info panel on the settings page explains the three clocks and the green/amber/red thresholds
 
 ---
 
 ## Module 2: Clinician Flows
 
+### Dashboard (`/clinician/dashboard`)
+Analytics dashboard scoped to the logged-in clinician:
+
+**Stat cards (5):**
+| Card | Description |
+|------|-------------|
+| Waiting Queue | Global count of unassigned cases in the waiting queue |
+| My Active Cases | Cases in `assigned`, `approved`, or `processing` status assigned to this clinician |
+| Completed This Month | Cases completed by this clinician in the current calendar month |
+| SLA Status | Green / Amber / Red based on breached / at-risk counts across active cases |
+| Completion Rate | SVG radial ring showing lifetime completion rate percentage |
+
+**Charts:**
+- **Dual-line trend** (30 days) — blue line = cases assigned per day; green line = cases completed per day; both with gradient fill
+- **Visit type horizontal bar** — top 6 visit types for this clinician's cases; indigo-to-teal palette
+
+**Active cases table** — with SLA progress bar column per case:
+- Green bar: under 70% of review deadline elapsed
+- Amber bar: 70–99% elapsed (at risk)
+- Red bar: past deadline (breached) — shows "Breached +X.Xh"
+- Label shows "X.Xh left" while on track
+
 ### Queue (`/clinician/cases/queue`)
 - See all `waiting` cases; claim one to self-assign (→ `assigned`)
 
 ### Case Detail Tabs
-Prescriptions, Questionnaires, Clinical Notes, Messages, Files, Timeline
+Questionnaires, Prescriptions, Clinical Notes, Messages, Files, Timeline
+
+**Professional chat UI** on the Messages tab:
+- Avatar circle with initials (indigo for clinician "You", green for patient)
+- Shaped bubbles: clinician side rounded `16px 4px 16px 16px`, patient side `4px 16px 16px 16px`
+- Date separators with HR lines between day groups
+- `#f8f9fc` chat background
 
 ### Assigned Case Actions
 
@@ -221,7 +274,7 @@ Prescriptions, Questionnaires, Clinical Notes, Messages, Files, Timeline
 | Cancel / Decline | `POST /clinician/cases/{uuid}/cancel` | → `cancelled`; reason logged |
 | Add Clinical Note | `POST /clinician/cases/{uuid}/notes` | Note attached; webhook fired |
 | Send Message | `POST /clinician/cases/{uuid}/messages` | Outbound portal message; webhook fired |
-| Send to Pharmacy | `POST /clinician/cases/{uuid}/processing` | → `processing` |
+| **Send to Pharmacy** | `POST /clinician/cases/{uuid}/processing` | → `processing` then **→ `completed` automatically**; both webhooks fire |
 | Upload File | `POST /clinician/cases/{uuid}/files` | File saved to storage; virus scan queued |
 | Delete File | `DELETE /clinician/cases/{uuid}/files/{fileUuid}` | File removed from storage and DB |
 
@@ -513,6 +566,7 @@ Central service used by both the web form and the Partner API.
 
 | Table | Purpose |
 |-------|---------|
+| `settings` | Key-value store for configurable system settings (SLA deadlines, etc.); columns: `key` (unique), `value`, `label`, `group`, `type`, `description` |
 | `users` | Auth for all roles (admin, clinician, partner) |
 | `partners` | Partner organisations |
 | `clinicians` | Clinician profiles; specialty, credentials, licensed states, priority, max_daily_cases |

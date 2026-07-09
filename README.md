@@ -191,8 +191,8 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 | Assigned → Approved | Clinician (via Approve & Prescribe) |
 | Assigned → Support | Clinician (with a note) |
 | Support → Assigned | Partner — writes response note; case returns to **same clinician** |
-| Approved → Processing | Clinician — Send to Pharmacy |
-| Processing → Completed | System / Admin |
+| Approved → Processing | Clinician — Send to Pharmacy (auto-advances to Completed immediately) |
+| Processing → Completed | Auto — fires in the same request as Send to Pharmacy |
 | Any → Cancelled | Admin / Clinician / Partner |
 
 ---
@@ -203,10 +203,11 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 
 | Module | URL | Description |
 |--------|-----|-------------|
+| Dashboard | `/admin/dashboard` | Chart.js analytics: doughnut by status, 30-day area trend, clinician workload bar, recent cases table |
 | Partners | `/admin/partners` | Create partners; auto-generates OAuth2 client credentials; manage portal users |
 | Clinicians | `/admin/clinicians` | Create clinicians; specialty, credentials, licensed states (US state grid), availability |
 | Priority Queue | `/admin/clinicians/priority` | Drag-and-drop assignment priority; inline max daily case load; live capacity badge |
-| Cases | `/admin/cases` | Full case list with filters; assign/reassign clinicians; all case tabs |
+| Cases | `/admin/cases` | Full case list with filters; assign/reassign clinicians; professional chat UI on Messages tab |
 | Patients | `/admin/patients` | Read-only patient list and detail |
 | Offerings | `/admin/offerings` | Full CRUD; approve/reject partner offerings; state availability; dispensing fields |
 | Questionnaires | `/admin/questionnaires` | Visual question builder (16 field types); multi-step; conditional logic; drag-and-drop |
@@ -214,13 +215,16 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 | Webhook Log | `/admin/webhooks` | View all delivery attempts; resend failed; sidebar badge for failed count |
 | Guide: Messaging API | `/admin/guide/messaging` | Integration guide for the messaging API |
 | Guide: Weight Loss API | `/admin/guide/weightloss-api` | Full integration guide for MWL cases (dynamic live question IDs, print-friendly) |
+| Guide: Anti-Aging API | `/admin/guide/antiaging-api` | Integration guide for Anti-Aging program cases |
+| Settings | `/admin/settings` | Configurable SLA deadlines (pickup, review, end-to-end hours); changes take effect immediately |
 
 ### Clinician
 
 | Module | URL | Description |
 |--------|-----|-------------|
+| Dashboard | `/clinician/dashboard` | 5 stat cards; dual-line 30-day trend; visit type bar; SVG completion rate ring; SLA status card; active cases table with per-case SLA progress bar |
 | Queue | `/clinician/cases/queue` | See waiting cases; self-claim |
-| Case Detail | `/clinician/cases/{uuid}` | Tabs: Intake, Questionnaires, Prescriptions, Notes, Messages, Files, Timeline |
+| Case Detail | `/clinician/cases/{uuid}` | Tabs: Questionnaires, Prescriptions, Notes, Messages (professional chat UI), Files, Timeline |
 | Prescribe | `/clinician/cases/{uuid}/prescribe` | Prescription form with medication search; transitions to `approved` |
 
 ### Partner (Web)
@@ -349,8 +353,8 @@ All webhooks signed with `X-Webhook-Signature: sha256=<hmac>`. Retried up to 5 t
 | `case_assigned_to_clinician` | Clinician assigned |
 | `case_support` | Clinician escalates to support |
 | `case_approved` | Clinician submits prescription |
-| `case_processing` | Clinician sends to pharmacy |
-| `case_completed` | Case completed |
+| `case_processing` | Clinician clicks "Send to Pharmacy" |
+| `case_completed` | Fires automatically in the same request as `case_processing` (auto-completion) |
 | `case_cancelled` | Any cancellation |
 | `clinical_note_added` | Clinician adds a note |
 | `message_created` | Clinician sends a message |
@@ -360,6 +364,20 @@ Verify signature:
 $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $webhookSecret);
 hash_equals($expected, $request->header('X-Webhook-Signature'));
 ```
+
+---
+
+## SLA System
+
+Admin-configurable Service Level Agreement deadlines stored in the `settings` table:
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `sla_pickup_hours` | 4h | Time from case creation to first assignment |
+| `sla_review_hours` | 24h | Time from assignment to clinician action — the primary SLA shown on clinician dashboard |
+| `sla_total_hours` | 48h | End-to-end turnaround from creation to completion |
+
+Admin changes these at `/admin/settings`. Values are cached for 1 hour and invalidated immediately on save. The clinician dashboard reads `sla_review_hours` and computes per-case SLA progress bars in green (< 70%), amber (70–99%), and red (≥ 100% — breached). The SLA stat card on the dashboard turns green/amber/red based on breached and at-risk case counts.
 
 ---
 
