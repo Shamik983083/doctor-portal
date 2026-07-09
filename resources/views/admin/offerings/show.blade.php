@@ -265,9 +265,9 @@
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Pharmacy Type</label>
-                            <select name="pharmacy_type" class="form-select">
-                                <option value="">Not specified</option>
+                            <label class="form-label fw-semibold">Pharmacy Type <span class="text-danger">*</span></label>
+                            <select name="pharmacy_type" class="form-select" required>
+                                <option value="">Select pharmacy type...</option>
                                 @foreach(['boothwyn','curexa','custom'] as $pt)
                                 <option value="{{ $pt }}" {{ old('pharmacy_type', $offering->pharmacy_type) === $pt ? 'selected' : '' }}>
                                     {{ ucfirst($pt) }}
@@ -290,22 +290,22 @@
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Prescription &amp; Dispensing</h6>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Compound Formula</label>
+                        <label class="form-label fw-semibold">Compound Formula <span class="text-danger">*</span></label>
                         <input type="text" name="compound_formula" class="form-control"
                                value="{{ old('compound_formula', $offering->compound_formula) }}"
-                               placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial">
+                               placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial" required>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">Refills</label>
+                            <label class="form-label fw-semibold">Refills <span class="text-danger">*</span></label>
                             <input type="number" name="refills" min="0" class="form-control"
-                                   value="{{ old('refills', $offering->refills) }}" placeholder="0">
+                                   value="{{ old('refills', $offering->refills) }}" placeholder="0" required>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">Quantity</label>
+                            <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
                             <input type="number" name="quantity" min="0" step="0.01" class="form-control"
-                                   value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00">
+                                   value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00" required>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
@@ -313,10 +313,10 @@
                                    value="{{ old('days_supply', $offering->days_supply) }}">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Dispense Unit</label>
+                            <label class="form-label fw-semibold">Dispense Unit <span class="text-danger">*</span></label>
                             <input type="text" name="dispense_unit" class="form-control"
                                    value="{{ old('dispense_unit', $offering->dispense_unit) }}"
-                                   placeholder="e.g. Each, Vial, mL">
+                                   placeholder="e.g. Each, Vial, mL" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Days Until Dispense <span class="text-muted fw-normal">(opt)</span></label>
@@ -326,9 +326,9 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Directions</label>
+                        <label class="form-label fw-semibold">Directions <span class="text-danger">*</span></label>
                         <textarea name="directions" class="form-control" rows="3"
-                                  placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…">{{ old('directions', $offering->directions) }}</textarea>
+                                  placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…" required>{{ old('directions', $offering->directions) }}</textarea>
                         <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
                     </div>
 

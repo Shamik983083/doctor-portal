@@ -76,13 +76,14 @@
 
             <div class="row g-3 mb-3">
                 <div class="col-md-4">
-                    <label class="form-label fw-semibold">Pharmacy Type</label>
-                    <select name="pharmacy_type" class="form-select">
-                        <option value="">Not specified</option>
+                    <label class="form-label fw-semibold">Pharmacy Type <span class="text-danger">*</span></label>
+                    <select name="pharmacy_type" class="form-select @error('pharmacy_type') is-invalid @enderror" required>
+                        <option value="">Select pharmacy type...</option>
                         <option value="boothwyn" {{ old('pharmacy_type') === 'boothwyn' ? 'selected' : '' }}>Boothwyn</option>
                         <option value="curexa"   {{ old('pharmacy_type') === 'curexa'   ? 'selected' : '' }}>Curexa</option>
                         <option value="custom"   {{ old('pharmacy_type') === 'custom'   ? 'selected' : '' }}>Custom</option>
                     </select>
+                    @error('pharmacy_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">DoseSpot Medication ID</label>
@@ -100,21 +101,24 @@
             <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Prescription &amp; Dispensing</h6>
 
             <div class="mb-3">
-                <label class="form-label fw-semibold">Compound Formula</label>
-                <input type="text" name="compound_formula" class="form-control"
-                       value="{{ old('compound_formula') }}" placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial">
+                <label class="form-label fw-semibold">Compound Formula <span class="text-danger">*</span></label>
+                <input type="text" name="compound_formula" class="form-control @error('compound_formula') is-invalid @enderror"
+                       value="{{ old('compound_formula') }}" placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial" required>
+                @error('compound_formula')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
 
             <div class="row g-3 mb-3">
                 <div class="col-md-2">
-                    <label class="form-label fw-semibold">Refills</label>
-                    <input type="number" name="refills" min="0" class="form-control"
-                           value="{{ old('refills') }}" placeholder="0">
+                    <label class="form-label fw-semibold">Refills <span class="text-danger">*</span></label>
+                    <input type="number" name="refills" min="0" class="form-control @error('refills') is-invalid @enderror"
+                           value="{{ old('refills') }}" placeholder="0" required>
+                    @error('refills')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-semibold">Quantity</label>
-                    <input type="number" name="quantity" min="0" step="0.01" class="form-control"
-                           value="{{ old('quantity') }}" placeholder="1.00">
+                    <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
+                    <input type="number" name="quantity" min="0" step="0.01" class="form-control @error('quantity') is-invalid @enderror"
+                           value="{{ old('quantity') }}" placeholder="1.00" required>
+                    @error('quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
@@ -122,9 +126,10 @@
                            value="{{ old('days_supply') }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold">Dispense Unit</label>
-                    <input type="text" name="dispense_unit" class="form-control"
-                           value="{{ old('dispense_unit') }}" placeholder="e.g. Each, Vial, mL">
+                    <label class="form-label fw-semibold">Dispense Unit <span class="text-danger">*</span></label>
+                    <input type="text" name="dispense_unit" class="form-control @error('dispense_unit') is-invalid @enderror"
+                           value="{{ old('dispense_unit') }}" placeholder="e.g. Each, Vial, mL" required>
+                    @error('dispense_unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-semibold">Days Until Dispense <span class="text-muted fw-normal">(opt)</span></label>
@@ -134,9 +139,10 @@
             </div>
 
             <div class="mb-3">
-                <label class="form-label fw-semibold">Directions</label>
-                <textarea name="directions" class="form-control" rows="3"
-                          placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…">{{ old('directions') }}</textarea>
+                <label class="form-label fw-semibold">Directions <span class="text-danger">*</span></label>
+                <textarea name="directions" class="form-control @error('directions') is-invalid @enderror" rows="3"
+                          placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…" required>{{ old('directions') }}</textarea>
+                @error('directions')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
             </div>
 
@@ -183,13 +189,17 @@
             </div>
 
             {{-- Required Questionnaires --}}
-            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Required Questionnaires</h6>
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Required Questionnaires <span class="text-danger">*</span></h6>
             <p class="text-muted small mb-3">Select which questionnaire forms must be completed when a case is submitted for this offering.</p>
+
+            @error('questionnaire_ids')
+                <div class="alert alert-danger py-2 mb-3"><small>{{ $message }}</small></div>
+            @enderror
 
             @if($allQuestionnaires->isEmpty())
                 <p class="text-muted small fst-italic mb-3">No active questionnaires found.</p>
             @else
-            <div class="border rounded mb-3">
+            <div class="border rounded mb-3" id="questionnaireBox">
                 @foreach($allQuestionnaires as $q)
                 @php $checked = in_array($q->id, old('questionnaire_ids', [])); @endphp
                 <div class="d-flex align-items-center justify-content-between px-3 py-2 {{ !$loop->last ? 'border-bottom' : '' }}">
@@ -211,6 +221,7 @@
                 </div>
                 @endforeach
             </div>
+            <div id="qError" class="text-danger small mb-3" style="display:none">Please select at least one questionnaire.</div>
             @endif
 
             {{-- Flags --}}
@@ -259,7 +270,20 @@
                 var req = document.getElementById('qr_' + this.value);
                 if (req) req.checked = false;
             }
+            document.getElementById('qError').style.display = 'none';
+            document.getElementById('questionnaireBox').style.borderColor = '';
         });
+    });
+
+    document.querySelector('form').addEventListener('submit', function (e) {
+        var checked = document.querySelectorAll('.q-check:checked').length;
+        if (checked === 0 && document.getElementById('questionnaireBox')) {
+            e.preventDefault();
+            var err = document.getElementById('qError');
+            err.style.display = 'block';
+            document.getElementById('questionnaireBox').style.borderColor = '#dc3545';
+            document.getElementById('questionnaireBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     });
 </script>
 @endsection

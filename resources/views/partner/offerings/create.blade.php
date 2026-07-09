@@ -66,13 +66,14 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-sm-4">
-                            <label class="form-label fw-medium">Pharmacy Type</label>
-                            <select name="pharmacy_type" class="form-select">
-                                <option value="">None / Custom</option>
+                            <label class="form-label fw-medium">Pharmacy Type <span class="text-danger">*</span></label>
+                            <select name="pharmacy_type" class="form-select @error('pharmacy_type') is-invalid @enderror" required>
+                                <option value="">Select pharmacy type...</option>
                                 <option value="boothwyn" @selected(old('pharmacy_type') === 'boothwyn')>Boothwyn</option>
                                 <option value="curexa"   @selected(old('pharmacy_type') === 'curexa')>Curexa</option>
                                 <option value="custom"   @selected(old('pharmacy_type') === 'custom')>Custom</option>
                             </select>
+                            @error('pharmacy_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-4">
                             <label class="form-label fw-medium">DoseSpot Medication ID</label>
@@ -92,20 +93,23 @@
                 <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Prescription &amp; Dispensing</h6></div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <label class="form-label fw-medium">Compound Formula</label>
-                        <input type="text" name="compound_formula" class="form-control"
-                               value="{{ old('compound_formula') }}" placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial">
+                        <label class="form-label fw-medium">Compound Formula <span class="text-danger">*</span></label>
+                        <input type="text" name="compound_formula" class="form-control @error('compound_formula') is-invalid @enderror"
+                               value="{{ old('compound_formula') }}" placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial" required>
+                        @error('compound_formula')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="row g-3 mb-3">
                         <div class="col-sm-2">
-                            <label class="form-label fw-medium">Refills</label>
-                            <input type="number" name="refills" min="0" class="form-control"
-                                   value="{{ old('refills') }}" placeholder="0">
+                            <label class="form-label fw-medium">Refills <span class="text-danger">*</span></label>
+                            <input type="number" name="refills" min="0" class="form-control @error('refills') is-invalid @enderror"
+                                   value="{{ old('refills') }}" placeholder="0" required>
+                            @error('refills')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-2">
-                            <label class="form-label fw-medium">Quantity</label>
-                            <input type="number" name="quantity" min="0" step="0.01" class="form-control"
-                                   value="{{ old('quantity') }}" placeholder="1.00">
+                            <label class="form-label fw-medium">Quantity <span class="text-danger">*</span></label>
+                            <input type="number" name="quantity" min="0" step="0.01" class="form-control @error('quantity') is-invalid @enderror"
+                                   value="{{ old('quantity') }}" placeholder="1.00" required>
+                            @error('quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-3">
                             <label class="form-label fw-medium">Days Supply <small class="text-muted">(opt)</small></label>
@@ -113,9 +117,10 @@
                                    value="{{ old('days_supply') }}">
                         </div>
                         <div class="col-sm-3">
-                            <label class="form-label fw-medium">Dispense Unit</label>
-                            <input type="text" name="dispense_unit" class="form-control"
-                                   value="{{ old('dispense_unit') }}" placeholder="Each, Vial, mL…">
+                            <label class="form-label fw-medium">Dispense Unit <span class="text-danger">*</span></label>
+                            <input type="text" name="dispense_unit" class="form-control @error('dispense_unit') is-invalid @enderror"
+                                   value="{{ old('dispense_unit') }}" placeholder="Each, Vial, mL…" required>
+                            @error('dispense_unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-2">
                             <label class="form-label fw-medium">Days Until Dispense <small class="text-muted">(opt)</small></label>
@@ -124,9 +129,10 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-medium">Directions</label>
-                        <textarea name="directions" class="form-control" rows="3"
-                                  placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…">{{ old('directions') }}</textarea>
+                        <label class="form-label fw-medium">Directions <span class="text-danger">*</span></label>
+                        <textarea name="directions" class="form-control @error('directions') is-invalid @enderror" rows="3"
+                                  placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…" required>{{ old('directions') }}</textarea>
+                        @error('directions')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
                     </div>
                     <div class="mb-3">
@@ -139,6 +145,44 @@
                         <textarea name="pharmacy_notes" class="form-control" rows="2"
                                   placeholder="e.g. Bill to partner, Ship to Patient">{{ old('pharmacy_notes') }}</textarea>
                     </div>
+                </div>
+            </div>
+
+            {{-- Required Questionnaires --}}
+            <div class="card mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-semibold">Required Questionnaires <span class="text-danger">*</span></h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">Select which questionnaire forms must be completed when a case is submitted for this offering.</p>
+                    @error('questionnaire_ids')
+                        <div class="alert alert-danger py-2 mb-3"><small>{{ $message }}</small></div>
+                    @enderror
+                    @if($allQuestionnaires->isEmpty())
+                        <p class="text-muted small fst-italic mb-0">No active questionnaires found.</p>
+                    @else
+                    <div class="border rounded" id="questionnaireBox">
+                        @foreach($allQuestionnaires as $q)
+                        @php $checked = in_array($q->id, old('questionnaire_ids', [])); @endphp
+                        <div class="d-flex align-items-center justify-content-between px-3 py-2 {{ !$loop->last ? 'border-bottom' : '' }}">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input q-check" type="checkbox"
+                                       name="questionnaire_ids[]" value="{{ $q->id }}"
+                                       id="qc_{{ $q->id }}" {{ $checked ? 'checked' : '' }}>
+                                <label class="form-check-label fw-semibold small" for="qc_{{ $q->id }}">{{ $q->name }}</label>
+                            </div>
+                            <div class="form-check form-check-inline mb-0 qr-toggle" id="qrt_{{ $q->id }}"
+                                 style="{{ $checked ? '' : 'opacity:.35;pointer-events:none' }}">
+                                <input class="form-check-input" type="checkbox"
+                                       name="questionnaire_required[{{ $q->id }}]" value="1"
+                                       id="qr_{{ $q->id }}" checked>
+                                <label class="form-check-label small text-muted" for="qr_{{ $q->id }}">Required</label>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    <div id="qError" class="text-danger small mt-2" style="display:none">Please select at least one questionnaire.</div>
+                    @endif
                 </div>
             </div>
 
@@ -214,6 +258,31 @@ document.getElementById('selectAll').addEventListener('click', () => {
 });
 document.getElementById('clearAll').addEventListener('click', () => {
     document.querySelectorAll('.state-cb').forEach(cb => cb.checked = false);
+});
+
+document.querySelectorAll('.q-check').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+        var toggle = document.getElementById('qrt_' + this.value);
+        if (!toggle) return;
+        toggle.style.opacity       = this.checked ? '1'    : '0.35';
+        toggle.style.pointerEvents = this.checked ? 'auto' : 'none';
+        if (!this.checked) {
+            var req = document.getElementById('qr_' + this.value);
+            if (req) req.checked = false;
+        }
+        document.getElementById('qError').style.display = 'none';
+        document.getElementById('questionnaireBox').style.borderColor = '';
+    });
+});
+
+document.querySelector('form').addEventListener('submit', function (e) {
+    var checked = document.querySelectorAll('.q-check:checked').length;
+    if (checked === 0 && document.getElementById('questionnaireBox')) {
+        e.preventDefault();
+        document.getElementById('qError').style.display = 'block';
+        document.getElementById('questionnaireBox').style.borderColor = '#dc3545';
+        document.getElementById('questionnaireBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 });
 </script>
 @endpush
