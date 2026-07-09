@@ -34,10 +34,15 @@
                     <tr><th class="text-muted">Created</th><td>{{ $partner->created_at->format('M d, Y') }}</td></tr>
                 </table>
             </div>
-            <div class="card-footer">
-                <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-outline-primary btn-sm w-100">
+            <div class="card-footer d-flex gap-2">
+                <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-outline-primary btn-sm flex-fill">
                     <i class="bi bi-pencil me-1"></i>Edit
                 </a>
+                <form method="POST" action="{{ route('admin.partners.destroy', $partner->id) }}" onsubmit="return confirm('Are you sure you want to delete this partner? This cannot be undone.')" class="d-inline flex-fill">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-trash me-1"></i>Delete</button>
+                </form>
             </div>
         </div>
 

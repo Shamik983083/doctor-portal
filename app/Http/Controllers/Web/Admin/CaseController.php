@@ -117,4 +117,13 @@ class CaseController extends Controller
 
         return back()->with('success', 'File deleted.');
     }
+
+    public function destroy(string $uuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case->delete();
+
+        return redirect()->route('admin.cases.index')
+            ->with('success', "Case #{$case->uuid} has been deleted.");
+    }
 }

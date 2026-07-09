@@ -25,6 +25,13 @@
                     <tr><th>Available</th><td>{{ $clinician->is_available ? '✅ Yes' : '❌ No' }}</td></tr>
                 </table>
             </div>
+            <div class="card-footer">
+                <form method="POST" action="{{ route('admin.clinicians.destroy', $clinician->id) }}" onsubmit="return confirm('Are you sure you want to delete this clinician? This cannot be undone.')" class="d-inline w-100">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-trash me-1"></i>Delete Clinician</button>
+                </form>
+            </div>
         </div>
         <div class="card">
             <div class="card-header"><h6 class="mb-0">Licensed States</h6></div>

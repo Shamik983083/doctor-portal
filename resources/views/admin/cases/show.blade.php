@@ -4,6 +4,16 @@
 @section('page-title', 'Case — ' . substr($case->uuid, 0, 8))
 
 @section('content')
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <a href="{{ route('admin.cases.index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Cases
+    </a>
+    <form method="POST" action="{{ route('admin.cases.destroy', $case->uuid) }}" onsubmit="return confirm('Are you sure you want to delete this case? This cannot be undone.')" class="d-inline">
+        @csrf
+        @method('DELETE')
+        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete Case</button>
+    </form>
+</div>
 <div class="row g-4">
 
     {{-- Left sidebar --}}

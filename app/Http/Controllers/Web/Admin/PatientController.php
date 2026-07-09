@@ -40,4 +40,13 @@ class PatientController extends Controller
 
         return view('admin.patients.show', compact('patient'));
     }
+
+    public function destroy(int $id)
+    {
+        $patient = Patient::findOrFail($id);
+        $patient->delete();
+
+        return redirect()->route('admin.patients.index')
+            ->with('success', "Patient {$patient->full_name} has been deleted.");
+    }
 }

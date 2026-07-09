@@ -66,6 +66,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::prefix('patients')->name('patients.')->group(function () {
         Route::get('/', [AdminPatientController::class, 'index'])->name('index');
         Route::get('/{id}', [AdminPatientController::class, 'show'])->name('show');
+        Route::delete('/{id}', [AdminPatientController::class, 'destroy'])->name('destroy');
     });
 
     // Cases
@@ -75,6 +76,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::post('/{uuid}/assign', [AdminCaseController::class, 'assign'])->name('assign');
         Route::post('/{uuid}/files', [AdminCaseController::class, 'uploadFile'])->name('files.store');
         Route::delete('/{uuid}/files/{fileUuid}', [AdminCaseController::class, 'deleteFile'])->name('files.destroy');
+        Route::delete('/{uuid}', [AdminCaseController::class, 'destroy'])->name('destroy');
     });
 
     // Partners
@@ -91,6 +93,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::post('/{id}/webhooks', [AdminPartnerController::class, 'storeWebhook'])->name('webhooks.store');
         Route::patch('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'updateWebhook'])->name('webhooks.update');
         Route::delete('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'destroyWebhook'])->name('webhooks.destroy');
+        Route::delete('/{id}', [AdminPartnerController::class, 'destroy'])->name('destroy');
     });
 
     // Clinicians
@@ -104,6 +107,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::patch('/{id}/case-load', [AdminClinicianController::class, 'updateCaseLoad'])->name('case-load');
         Route::get('/{id}', [AdminClinicianController::class, 'show'])->name('show');
         Route::put('/{id}', [AdminClinicianController::class, 'update'])->name('update');
+        Route::delete('/{id}', [AdminClinicianController::class, 'destroy'])->name('destroy');
     });
 
     // Questions (individual question library)

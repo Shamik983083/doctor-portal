@@ -178,6 +178,15 @@ class PartnerController extends Controller
         return redirect()->route('admin.partners.show', $partner->id)->with('success', 'Webhook status updated.');
     }
 
+    public function destroy(int $id)
+    {
+        $partner = Partner::findOrFail($id);
+        $partner->delete();
+
+        return redirect()->route('admin.partners.index')
+            ->with('success', "Partner {$partner->name} has been deleted.");
+    }
+
     public function destroyWebhook(int $id, int $webhookId)
     {
         $partner = Partner::findOrFail($id);

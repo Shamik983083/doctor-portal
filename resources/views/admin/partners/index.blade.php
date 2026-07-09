@@ -51,6 +51,11 @@
                         <td>
                             <a href="{{ route('admin.partners.show', $partner->id) }}" class="btn btn-sm btn-outline-secondary">View</a>
                             <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <form method="POST" action="{{ route('admin.partners.destroy', $partner->id) }}" onsubmit="return confirm('Are you sure you want to delete this partner? This cannot be undone.')" class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
                         </td>
                     </tr>
                     @empty

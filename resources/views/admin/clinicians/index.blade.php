@@ -62,7 +62,14 @@
                         <td>
                             <span class="badge {{ $clinician->is_available ? 'bg-success' : 'bg-warning text-dark' }}">{{ $clinician->is_available ? 'Yes' : 'No' }}</span>
                         </td>
-                        <td><a href="{{ route('admin.clinicians.show', $clinician->id) }}" class="btn btn-sm btn-outline-secondary">View</a></td>
+                        <td>
+                            <a href="{{ route('admin.clinicians.show', $clinician->id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                            <form method="POST" action="{{ route('admin.clinicians.destroy', $clinician->id) }}" onsubmit="return confirm('Are you sure you want to delete this clinician? This cannot be undone.')" class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
                     </tr>
                     @empty
                     <tr><td colspan="8" class="text-center text-muted py-4">No clinicians yet.</td></tr>

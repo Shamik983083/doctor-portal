@@ -79,6 +79,11 @@
                         <td><small class="text-muted">{{ $case->created_at->diffForHumans() }}</small></td>
                         <td>
                             <a href="{{ route('admin.cases.show', $case->uuid) }}" class="btn btn-sm btn-outline-primary">View</a>
+                            <form method="POST" action="{{ route('admin.cases.destroy', $case->uuid) }}" onsubmit="return confirm('Are you sure you want to delete this case? This cannot be undone.')" class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
                         </td>
                     </tr>
                     @empty

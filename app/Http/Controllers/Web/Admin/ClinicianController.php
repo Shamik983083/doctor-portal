@@ -127,4 +127,14 @@ class ClinicianController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    public function destroy(int $id)
+    {
+        $clinician = Clinician::with('user')->findOrFail($id);
+        $name = $clinician->full_name;
+        $clinician->delete();
+
+        return redirect()->route('admin.clinicians.index')
+            ->with('success', "Clinician {$name} has been deleted.");
+    }
 }
