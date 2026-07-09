@@ -23,7 +23,8 @@ jobs:
             cd /home/axismd/doctor-portal
 
             echo "--- Pulling latest code ---"
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "--- Installing dependencies ---"
             /opt/cpanel/ea-php82/root/usr/bin/php composer.phar install --no-dev --optimize-autoloader --no-interaction
