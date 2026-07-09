@@ -1,0 +1,42 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy via SSH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to axismd.io
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /home/axismd/doctor-portal
+
+            echo "--- Pulling latest code ---"
+            git pull origin main
+
+            echo "--- Installing dependencies ---"
+            /opt/cpanel/ea-php82/root/usr/bin/php composer.phar install --no-dev --optimize-autoloader --no-interaction
+
+            echo "--- Running migrations ---"
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan migrate --force
+
+            echo "--- Clearing and rebuilding caches ---"
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan config:cache
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan route:cache
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan view:cache
+
+            echo "--- Restarting queue workers ---"
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan queue:restart
+
+            echo "--- Deployment complete ---"
