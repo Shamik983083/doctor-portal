@@ -204,7 +204,11 @@ class OfferingController extends Controller
 
     public function update(Request $request, int $id)
     {
-        $offering = Offering::findOrFail($id);
+        $offering = Offering::with('questionnaires')->findOrFail($id);
+
+        if ($offering->questionnaires->count() === 0) {
+            return back()->with('error', "Cannot save \"{$offering->name}\" — please attach at least one questionnaire first.");
+        }
 
         $data = $request->validate([
             'name'                    => 'required|string|max:255',

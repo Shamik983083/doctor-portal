@@ -402,8 +402,14 @@
                         </div>
                     </div>
 
+                    @if(!$hasQuestionnaires)
+                        <div class="alert alert-warning py-2 mb-3" style="font-size:.85rem;">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Attach at least one questionnaire using the sidebar before saving.
+                        </div>
+                    @endif
                     <div class="d-flex gap-2 pt-2 border-top">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" {{ !$hasQuestionnaires ? 'disabled' : '' }}>
                             <i class="bi bi-check-lg me-1"></i>Save Changes
                         </button>
                         <a href="{{ route('admin.offerings.index') }}" class="btn btn-outline-secondary">Cancel</a>
