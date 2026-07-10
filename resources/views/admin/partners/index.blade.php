@@ -48,13 +48,13 @@
                             </span>
                         </td>
                         <td><code class="small">{{ $partner->client_id ?? '—' }}</code></td>
-                        <td>
-                            <a href="{{ route('admin.partners.show', $partner->id) }}" class="btn btn-sm btn-outline-secondary">View</a>
-                            <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                        <td class="text-nowrap">
+                            <a href="{{ route('admin.partners.show', $partner->id) }}" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
+                            <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
                             <form method="POST" action="{{ route('admin.partners.destroy', $partner->id) }}" onsubmit="return confirm('Are you sure you want to delete this partner? This cannot be undone.')" class="d-inline">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
                             </form>
                         </td>
                     </tr>
