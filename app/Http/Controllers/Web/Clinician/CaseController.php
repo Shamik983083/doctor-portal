@@ -205,6 +205,20 @@ class CaseController extends Controller
         return redirect()->route('clinician.cases.show', $uuid)->with('success', 'Case approved.');
     }
 
+    public function completeCase(string $uuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        if ($case->status !== PatientCase::STATUS_APPROVED) {
+            return back()->with('error', 'Only approved cases can be completed.');
+        }
+
+        $this->stateMachine->complete($case);
+
+        return redirect()->route('clinician.cases.show', $uuid)
+            ->with('success', 'Case marked as completed.');
+    }
+
     public function cancel(Request $request, string $uuid)
     {
         $request->validate(['reason' => 'required|string']);

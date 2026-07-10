@@ -52,7 +52,7 @@
                 <div>
                     <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">My Active Cases</p>
                     <h3 class="fw-bold mb-0" style="color:#ffc107;">{{ $stats['my_active'] }}</h3>
-                    <p class="text-muted mb-0" style="font-size:.7rem;">assigned, approved &amp; processing</p>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">assigned &amp; approved</p>
                 </div>
             </div>
         </div>
@@ -187,7 +187,7 @@
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
         <div>
             <h6 class="mb-0 fw-semibold">My Active Cases</h6>
-            <p class="text-muted mb-0" style="font-size:.72rem;">Cases currently assigned, approved or in processing</p>
+            <p class="text-muted mb-0" style="font-size:.72rem;">Cases currently assigned or approved</p>
         </div>
         <a href="{{ route('clinician.queue') }}" class="btn btn-sm btn-outline-primary">View Queue</a>
     </div>

@@ -46,6 +46,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('
         Route::get('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribeForm'])->name('prescribe.form');
         Route::post('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribe'])->name('prescribe');
         Route::post('/{uuid}/approve', [ClinicianCaseController::class, 'approve'])->name('approve');
+        Route::post('/{uuid}/complete', [ClinicianCaseController::class, 'completeCase'])->name('complete');
         Route::post('/{uuid}/cancel', [ClinicianCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/support', [ClinicianCaseController::class, 'escalateToSupport'])->name('support');
 Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
