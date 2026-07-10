@@ -44,15 +44,16 @@
 
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">Category</label>
-                    <select name="category_id" class="form-select">
-                        <option value="">No category</option>
+                    <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
+                    <select name="category_id" class="form-select @error('category_id') is-invalid @enderror" required>
+                        <option value="">Select category...</option>
                         @foreach($categories as $cat)
                             <option value="{{ $cat->id }}" {{ old('category_id') == $cat->id ? 'selected' : '' }}>
                                 {{ $cat->name }}
                             </option>
                         @endforeach
                     </select>
+                    @error('category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
 

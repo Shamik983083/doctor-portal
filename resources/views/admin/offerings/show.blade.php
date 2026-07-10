@@ -249,7 +249,7 @@
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Offering Name</label>
+                            <label class="form-label fw-semibold">Offering Name <span class="text-danger">*</span></label>
                             <input type="text" name="name" class="form-control" value="{{ old('name', $offering->name) }}" required>
                         </div>
                         <div class="col-md-6">
@@ -261,9 +261,9 @@
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Category</label>
-                            <select name="category_id" class="form-select">
-                                <option value="">No category</option>
+                            <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
+                            <select name="category_id" class="form-select @error('category_id') is-invalid @enderror" required>
+                                <option value="">Select category...</option>
                                 @foreach($categories as $cat)
                                     <option value="{{ $cat->id }}"
                                         {{ old('category_id', $offering->category_id) == $cat->id ? 'selected' : '' }}>
@@ -271,6 +271,7 @@
                                     </option>
                                 @endforeach
                             </select>
+                            @error('category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
 

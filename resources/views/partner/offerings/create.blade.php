@@ -49,13 +49,14 @@
                             @error('type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-4">
-                            <label class="form-label fw-medium">Category</label>
-                            <select name="category_id" class="form-select">
-                                <option value="">No category</option>
+                            <label class="form-label fw-medium">Category <span class="text-danger">*</span></label>
+                            <select name="category_id" class="form-select @error('category_id') is-invalid @enderror" required>
+                                <option value="">Select category...</option>
                                 @foreach($categories as $cat)
                                     <option value="{{ $cat->id }}" @selected(old('category_id') == $cat->id)>{{ $cat->name }}</option>
                                 @endforeach
                             </select>
+                            @error('category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
                 </div>

@@ -57,7 +57,7 @@
                 <div class="card-body">
                     <div class="row g-3 mb-3">
                         <div class="col-sm-8">
-                            <label class="form-label fw-medium">Name</label>
+                            <label class="form-label fw-medium">Name <span class="text-danger">*</span></label>
                             <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
                                    value="{{ old('name', $offering->name) }}" required>
                             @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -75,13 +75,14 @@
                             <div class="form-text">Type cannot be changed after creation.</div>
                         </div>
                         <div class="col-sm-4">
-                            <label class="form-label fw-medium">Category</label>
-                            <select name="category_id" class="form-select">
-                                <option value="">No category</option>
+                            <label class="form-label fw-medium">Category <span class="text-danger">*</span></label>
+                            <select name="category_id" class="form-select @error('category_id') is-invalid @enderror" required>
+                                <option value="">Select category...</option>
                                 @foreach($categories as $cat)
                                     <option value="{{ $cat->id }}" @selected(old('category_id', $offering->category_id) == $cat->id)>{{ $cat->name }}</option>
                                 @endforeach
                             </select>
+                            @error('category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
                 </div>

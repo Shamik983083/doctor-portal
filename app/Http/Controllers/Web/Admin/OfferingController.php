@@ -60,7 +60,7 @@ class OfferingController extends Controller
     {
         $data = $request->validate([
             'partner_id'              => 'required|exists:partners,id',
-            'category_id'             => 'nullable|exists:offering_categories,id',
+            'category_id'             => 'required|exists:offering_categories,id',
             'name'                    => 'required|string|max:255',
             'internal_name'           => 'nullable|string|max:255',
             'type'                    => 'required|in:medication,compound,supply',
@@ -213,7 +213,7 @@ class OfferingController extends Controller
         $data = $request->validate([
             'name'                    => 'required|string|max:255',
             'internal_name'           => 'nullable|string|max:255',
-            'category_id'             => 'nullable|exists:offering_categories,id',
+            'category_id'             => 'required|exists:offering_categories,id',
             'description'             => 'nullable|string',
             'price'                   => 'nullable|numeric|min:0',
             'compound_formula'        => 'required|string',
