@@ -69,17 +69,20 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
             {{-- Professional details --}}
             <div class="row">
                 <div class="col-md-3 mb-3">
-                    <label class="form-label fw-semibold">Credentials</label>
-                    <select name="credentials" class="form-select">
-                        <option value="">Select</option>
+                    <label class="form-label fw-semibold">Credentials <span class="text-danger">*</span></label>
+                    <select name="credentials" class="form-select @error('credentials') is-invalid @enderror" required>
+                        <option value="">Select credentials...</option>
                         @foreach(['MD','DO','NP','PA'] as $c)
                         <option value="{{ $c }}" {{ old('credentials') === $c ? 'selected' : '' }}>{{ $c }}</option>
                         @endforeach
                     </select>
+                    @error('credentials')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label class="form-label fw-semibold">NPI Number</label>
-                    <input type="text" name="npi" class="form-control" value="{{ old('npi') }}">
+                    <label class="form-label fw-semibold">NPI Number <span class="text-danger">*</span></label>
+                    <input type="text" name="npi" class="form-control @error('npi') is-invalid @enderror"
+                           value="{{ old('npi') }}" required>
+                    @error('npi')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-semibold">Specialty</label>
@@ -93,7 +96,7 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
             <div class="mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <label class="form-label fw-semibold mb-0">
-                        Licensed States
+                        Licensed States <span class="text-danger">*</span>
                         <span id="state-count" @class(['badge', 'bg-primary', 'ms-2', 'd-none' => !$hasOldLicenses])>
                             {{ count($oldLicenseInfo) }} selected
                         </span>
@@ -121,6 +124,12 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
                         </div>
                         @endforeach
                     </div>
+                </div>
+                @error('license_info')
+                    <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ $message }}</div>
+                @enderror
+                <div id="stateError" class="text-danger small mt-1" style="display:none">
+                    <i class="bi bi-exclamation-circle me-1"></i>Please select at least one licensed state.
                 </div>
             </div>
 
@@ -278,6 +287,22 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     updateCount();
+
+    document.querySelector('form').addEventListener('submit', function (e) {
+        var checked = document.querySelectorAll('.state-checkbox:checked').length;
+        if (checked === 0) {
+            e.preventDefault();
+            var err = document.getElementById('stateError');
+            err.style.display = 'block';
+            document.querySelector('.border.rounded.p-3').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+
+    document.querySelectorAll('.state-checkbox').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            if (this.checked) document.getElementById('stateError').style.display = 'none';
+        });
+    });
 });
 </script>
 @endsection
