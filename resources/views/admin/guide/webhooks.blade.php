@@ -52,7 +52,6 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
             <li><a class="toc-link text-decoration-none" href="#ev-case-support">case_support</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-approved">case_approved</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-prescription-written">prescription_written</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-processing">case_processing</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-completed">case_completed</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-cancelled">case_cancelled</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-note-added">clinical_note_added</a></li>
@@ -417,29 +416,7 @@ def webhook():
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
     <span class="text-muted" style="font-size:.75rem">— full prescription data is in the payload above; call this only for additional case context</span>
 </div>
-<p class="mt-2 mb-0 small text-muted">This event fires alongside <code>case_approved</code> whenever a prescription form is submitted. If no prescription form was used (approval-only), only <code>case_approved</code> fires.</p>
-</div>
-</div>
-
-{{-- case_processing --}}
-<div id="ev-case-processing" class="card mb-3 section-anchor">
-<div class="card-header py-2 d-flex align-items-center gap-2">
-    <span class="event-badge">case_processing</span>
-    <span class="text-muted small">Clinician has sent the prescription to pharmacy</span>
-</div>
-<div class="card-body">
-<pre id="code-ev-processing">{
-  "case_id":    "9d2f1c3e-...",
-  "patient_id": "a1b2c3d4-...",
-  "status":     "processing",
-  "timestamp":  1751540200
-}</pre>
-<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-processing')">Copy</button>
-<div class="endpoint-row">
-    <span class="method-pill method-get">GET</span>
-    <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— check order details; fulfillment and tracking events follow shortly</span>
-</div>
+<p class="mt-2 mb-0 small text-muted">This event fires alongside <code>case_approved</code> and <code>case_completed</code> whenever a prescription form is submitted. All three events fire in quick succession — listen for <code>case_completed</code> as the final confirmation.</p>
 </div>
 </div>
 

@@ -79,7 +79,7 @@
                             <label class="form-label small fw-medium">Event Type</label>
                             <select name="event_type" class="form-select form-select-sm @error('event_type') is-invalid @enderror">
                                 <option value="">All Events</option>
-                                @foreach(['case_waiting','case_assigned_to_clinician','case_support','case_approved','case_processing','case_completed','case_cancelled','prescription_written','message_created'] as $evt)
+                                @foreach(['case_waiting','case_assigned_to_clinician','case_support','case_approved','prescription_written','case_completed','case_cancelled','message_created'] as $evt)
                                     <option value="{{ $evt }}" @selected(old('event_type') === $evt)>{{ $evt }}</option>
                                 @endforeach
                             </select>

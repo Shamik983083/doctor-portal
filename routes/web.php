@@ -48,8 +48,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('
         Route::post('/{uuid}/approve', [ClinicianCaseController::class, 'approve'])->name('approve');
         Route::post('/{uuid}/cancel', [ClinicianCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/support', [ClinicianCaseController::class, 'escalateToSupport'])->name('support');
-        Route::post('/{uuid}/processing', [ClinicianCaseController::class, 'sendToPharmacy'])->name('processing');
-        Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
+Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
         Route::post('/{uuid}/messages', [ClinicianCaseController::class, 'sendMessage'])->name('messages.store');
         Route::post('/{uuid}/files', [ClinicianCaseController::class, 'uploadFile'])->name('files.store');
         Route::delete('/{uuid}/files/{fileUuid}', [ClinicianCaseController::class, 'deleteFile'])->name('files.destroy');

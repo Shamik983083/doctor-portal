@@ -156,8 +156,10 @@ class CaseController extends Controller
             $this->stateMachine->approve($case, $clinician->id);
         });
 
-        // Fire a rich prescription_written event with full prescription details.
-        // The state machine already fires case_approved with the basic status change payload.
+        // Complete immediately — no manual pharmacy step required.
+        $this->stateMachine->complete($case);
+
+        // Fire prescription_written webhook alongside case_approved + case_completed.
         $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
             'case_id'          => $case->uuid,
             'external_id'      => $case->external_id,
@@ -177,7 +179,7 @@ class CaseController extends Controller
         ]);
 
         return redirect()->route('clinician.cases.show', $uuid)
-            ->with('success', 'Case approved and prescription submitted.');
+            ->with('success', 'Prescription submitted — case completed.');
     }
 
     public function approve(Request $request, string $uuid)
@@ -266,21 +268,6 @@ class CaseController extends Controller
         ]);
 
         return back()->with('success', 'Case escalated to support. Partner has been notified.');
-    }
-
-    public function sendToPharmacy(string $uuid)
-    {
-        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
-
-        if ($case->status !== PatientCase::STATUS_APPROVED) {
-            return back()->with('error', 'Case must be approved before sending to pharmacy.');
-        }
-
-        $case = $this->stateMachine->startProcessing($case);
-        $this->stateMachine->complete($case);
-
-        return redirect()->route('clinician.cases.show', $uuid)
-            ->with('success', 'Case sent to pharmacy and marked as completed.');
     }
 
     public function sendMessage(Request $request, string $uuid)

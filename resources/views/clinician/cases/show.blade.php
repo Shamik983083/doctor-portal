@@ -71,15 +71,6 @@
                 </button>
                 @endif
 
-                @if($case->status === 'approved')
-                <form method="POST" action="{{ route('clinician.cases.processing', $case->uuid) }}"
-                      onsubmit="return confirm('Send this case to pharmacy for processing?')">
-                    @csrf
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-truck me-1"></i>Send to Pharmacy
-                    </button>
-                </form>
-                @endif
             </div>
         </div>
     </div>
