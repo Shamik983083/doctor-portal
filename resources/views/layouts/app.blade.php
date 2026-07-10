@@ -8,15 +8,20 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <style>
-        body { background: #f8f9fa; }
-        .sidebar { min-height: 100vh; background: #1a2035; color: #ccc; z-index: 1030; }
-        .sidebar .nav-link { color: #adb5bd; padding: .5rem 1rem; border-radius: 6px; margin: 2px 8px; transform-origin: left center; transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease; }
-        .sidebar .nav-link:hover { background: rgba(255,255,255,.12); color: #fff; transform: scale(1.06); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
-        .sidebar .nav-link.active { background: rgba(255,255,255,.1); color: #fff; }
-        .sidebar .nav-link i { width: 20px; }
-        .sidebar-brand { font-size: 1.1rem; font-weight: 700; color: #fff; padding: 1.5rem 1rem; display: block; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.1); }
+        body { background: #f1f5f9; }
+        .sidebar { min-height: 100vh; background: #0f172a; color: #94a3b8; z-index: 1030; }
+        .sidebar .nav-link { color: #94a3b8; padding: .38rem .9rem; border-radius: 5px; margin: 1px 8px; font-size: .82rem; font-weight: 500; transition: background .15s, color .15s; border-left: 2px solid transparent; display: flex; align-items: center; }
+        .sidebar .nav-link:hover { background: rgba(255,255,255,.08); color: #e2e8f0; }
+        .sidebar .nav-link.active { background: rgba(59,130,246,.14); color: #60a5fa; border-left-color: #3b82f6; }
+        .sidebar .nav-link i { width: 18px; text-align: center; margin-right: .4rem; font-size: .88rem; flex-shrink: 0; }
+        .sidebar .nav-link.sub { font-size: .78rem; padding-left: 2.2rem; color: #64748b; }
+        .sidebar .nav-link.sub:hover { color: #cbd5e1; }
+        .sidebar .nav-link.sub.active { color: #60a5fa; }
+        .sidebar-brand { font-size: 1rem; font-weight: 700; color: #fff; padding: 1rem; display: flex; align-items: center; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.07); }
+        .sidebar-section { padding: .65rem 1.1rem .15rem; font-size: .59rem; text-transform: uppercase; letter-spacing: .1em; color: rgba(255,255,255,.3); font-weight: 600; display: block; }
+        .sidebar hr { border-color: rgba(255,255,255,.07); margin: .3rem 0; }
         .main-content { min-height: 100vh; }
-        .topbar { background: #fff; border-bottom: 1px solid #e9ecef; padding: .75rem 1.5rem; }
+        .topbar { background: #fff; border-bottom: 1px solid #e9ecef; padding: .65rem 1.5rem; }
         .stat-card { border-left: 4px solid; border-radius: 8px; }
         .badge-status-created    { background: #6c757d; }
         .badge-status-waiting    { background: #0d6efd; }

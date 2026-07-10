@@ -95,7 +95,7 @@
                                 </button>
                             </form>
                         </td>
-                        <td class="text-end" style="white-space:nowrap;">
+                        <td class="text-nowrap">
                             @if($offering->approval_status === 'pending')
                                 <form method="POST" action="{{ route('admin.offerings.approve', $offering->id) }}" class="d-inline">
                                     @csrf
@@ -131,11 +131,11 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                             @endif
-                            <a href="{{ route('admin.offerings.show', $offering->id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <a href="{{ route('admin.offerings.show', $offering->id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
                             <form method="POST" action="{{ route('admin.offerings.destroy', $offering->id) }}"
                                   class="d-inline" onsubmit="return confirm('Delete {{ addslashes($offering->name) }}?')">
                                 @csrf @method('DELETE')
-                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
                             </form>
                         </td>
                     </tr>

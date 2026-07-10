@@ -1,14 +1,14 @@
 @extends('layouts.app')
 
 @section('sidebar-nav')
-<ul class="nav flex-column mt-3">
+<ul class="nav flex-column mt-2">
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
             <i class="bi bi-speedometer2"></i> Dashboard
         </a>
     </li>
-    <hr class="border-secondary my-2">
-    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Management</span></li>
+    <hr>
+    <li><span class="sidebar-section">Management</span></li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.cases.*') ? 'active' : '' }}" href="{{ route('admin.cases.index') }}">
             <i class="bi bi-folder2-open"></i> Cases
@@ -30,9 +30,8 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link ps-4 {{ request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
-           href="{{ route('admin.clinicians.priority') }}" style="font-size:.85rem">
-            <i class="bi bi-sort-numeric-down me-1"></i> Assignment Priority
+        <a class="nav-link sub {{ request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}" href="{{ route('admin.clinicians.priority') }}">
+            <i class="bi bi-sort-numeric-down"></i> Assignment Priority
         </a>
     </li>
     <li class="nav-item">
@@ -40,13 +39,13 @@
             <i class="bi bi-capsule"></i> Offerings
             @php $pendingOfferingsCount = \App\Models\Offering::where('approval_status', 'pending')->count(); @endphp
             @if($pendingOfferingsCount > 0)
-                <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">{{ $pendingOfferingsCount }}</span>
+                <span class="badge bg-warning text-dark ms-auto" style="font-size:.6rem;">{{ $pendingOfferingsCount }}</span>
             @endif
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link ps-4 {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}" style="font-size:.85rem">
-            <i class="bi bi-tags me-1"></i> Categories
+        <a class="nav-link sub {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">
+            <i class="bi bi-tags"></i> Categories
         </a>
     </li>
     <li class="nav-item">
@@ -55,12 +54,12 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link ps-4 {{ request()->routeIs('admin.questions.*') ? 'active' : '' }}" href="{{ route('admin.questions.index') }}" style="font-size:.85rem">
-            <i class="bi bi-question-circle me-1"></i> Question Bank
+        <a class="nav-link sub {{ request()->routeIs('admin.questions.*') ? 'active' : '' }}" href="{{ route('admin.questions.index') }}">
+            <i class="bi bi-question-circle"></i> Question Bank
         </a>
     </li>
-    <hr class="border-secondary my-2">
-    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Integration Guides</span></li>
+    <hr>
+    <li><span class="sidebar-section">Integration Guides</span></li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.guide.messaging') ? 'active' : '' }}" href="{{ route('admin.guide.messaging') }}">
             <i class="bi bi-chat-dots"></i> Messaging API
@@ -81,33 +80,26 @@
             <i class="bi bi-broadcast-pin"></i> Webhooks
         </a>
     </li>
-    <hr class="border-secondary my-2">
-    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Developer</span></li>
+    <hr>
+    <li><span class="sidebar-section">Developer</span></li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.webhooks.*') ? 'active' : '' }}" href="{{ route('admin.webhooks.index') }}">
             <i class="bi bi-broadcast"></i> Webhook Logs
             @php $failedWebhooksCount = \App\Models\WebhookDelivery::where('status', 'failed')->count(); @endphp
             @if($failedWebhooksCount > 0)
-                <span class="badge bg-danger ms-1" style="font-size:.65rem;">{{ $failedWebhooksCount }}</span>
+                <span class="badge bg-danger ms-auto" style="font-size:.6rem;">{{ $failedWebhooksCount }}</span>
             @endif
         </a>
     </li>
-    <hr class="border-secondary my-2">
-    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Configuration</span></li>
+    <hr>
+    <li><span class="sidebar-section">Configuration</span></li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.settings*') ? 'active' : '' }}" href="{{ route('admin.settings') }}">
             <i class="bi bi-sliders"></i> Settings
         </a>
     </li>
-    <hr class="border-secondary my-2">
-    <li><span class="px-3" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);display:block;padding-top:.35rem;padding-bottom:.2rem;">Clinician View</span></li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ route('clinician.dashboard') }}">
-            <i class="bi bi-heart-pulse"></i> Clinician Portal
-        </a>
-    </li>
 </ul>
-<div class="px-3 py-3 border-top border-secondary mt-3">
-    <small class="text-muted">Admin Console</small>
+<div class="px-3 mt-3 pb-3" style="border-top:1px solid rgba(255,255,255,.06);">
+    <small class="sidebar-section" style="padding:.5rem 0 0;">Admin Console</small>
 </div>
 @endsection
