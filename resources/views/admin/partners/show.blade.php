@@ -252,14 +252,13 @@
                 <p class="text-muted small mb-3">Share this guide with the partner so they can start creating offerings and submitting cases via the API. Patient records are created automatically from the data sent with each case.</p>
 
                 <p class="fw-semibold small mb-1">Step 1 — Get a Bearer token</p>
-                <pre class="bg-dark text-light rounded p-3 small mb-3"><code>POST {{ url('/api/partner/auth/token') }}
-Content-Type: application/json
+                <pre class="bg-dark text-light rounded p-3 small mb-1"><code>POST {{ url('/api/partner/auth/token') }}
+Content-Type: application/x-www-form-urlencoded
 
-{
-  "grant_type": "client_credentials",
-  "client_id": "{{ $partner->client_id ?? '<client_id>' }}",
-  "client_secret": "&lt;client_secret&gt;"
-}</code></pre>
+grant_type=client_credentials
+&amp;client_id={{ $partner->client_id ?? 'YOUR_CLIENT_ID' }}
+&amp;client_secret=YOUR_CLIENT_SECRET</code></pre>
+                <p class="text-muted small mb-3"><strong>Success 200</strong> returns <code>{ "token_type": "Bearer", "expires_in": 31536000, "access_token": "eyJ…" }</code></p>
 
                 <p class="fw-semibold small mb-1">Step 2 — Create an Offering</p>
                 <pre class="bg-dark text-light rounded p-3 small mb-3"><code>POST {{ url('/api/partner/offerings') }}
@@ -269,13 +268,18 @@ Content-Type: application/json
 {
   "name": "Semaglutide 0.5mg Weekly",
   "type": "compound",
-  "price": 299.00,
+  "category_id": &lt;category_id&gt;,
   "pharmacy_type": "boothwyn",
+  "compound_formula": "Semaglutide 0.5mg/mL 2mL Vial",
+  "refills": 0,
+  "quantity": 1,
+  "dispense_unit": "Vial",
+  "directions": "Inject 0.25mg once weekly for 4 weeks, then 0.5mg weekly.",
   "available_states": ["CA", "NY", "TX"],
   "is_active": true
 }</code></pre>
 
-                <p class="fw-semibold small mb-1">Step 3 — Submit a Case (patient data included inline)</p>
+                <p class="fw-semibold small mb-1">Step 3 — Submit a Case</p>
                 <pre class="bg-dark text-light rounded p-3 small mb-0"><code>POST {{ url('/api/partner/cases') }}
 Authorization: Bearer &lt;access_token&gt;
 Content-Type: application/json
@@ -293,7 +297,10 @@ Content-Type: application/json
   },
   "external_id": "your-system-case-id",
   "offerings": [{ "offering_id": "&lt;offering_uuid&gt;", "quantity": 1 }],
-  "questions": [{ "question": "Any allergies?", "answer": "None" }]
+  "questionnaire_responses": [{
+    "questionnaire_uuid": "&lt;questionnaire_uuid&gt;",
+    "answers": [{ "slug": "question_slug", "answer": "value" }]
+  }]
 }</code></pre>
             </div>
         </div>
