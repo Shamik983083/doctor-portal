@@ -71,16 +71,6 @@
                 </button>
                 @endif
 
-                @if($case->status === 'approved')
-                <form method="POST" action="{{ route('clinician.cases.complete', $case->uuid) }}"
-                      onsubmit="return confirm('Mark this case as completed?')">
-                    @csrf
-                    <button type="submit" class="btn btn-success w-100">
-                        <i class="bi bi-check-circle me-1"></i>Complete Case
-                    </button>
-                </form>
-                @endif
-
             </div>
         </div>
     </div>
