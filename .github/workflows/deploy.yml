@@ -31,6 +31,7 @@ jobs:
 
             echo "--- Generating Passport keys (skipped if already exist) ---"
             [ -f storage/oauth-private.key ] || /opt/cpanel/ea-php82/root/usr/bin/php artisan passport:keys
+            chmod 660 storage/oauth-private.key storage/oauth-public.key 2>/dev/null || true
 
             echo "--- Running migrations ---"
             /opt/cpanel/ea-php82/root/usr/bin/php artisan migrate --force
