@@ -147,7 +147,11 @@
         <div class="card">
             <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Quick-Start Guide</h6></div>
             <div class="card-body">
-                <p class="small text-muted mb-3">Follow these steps to integrate with the Partner API.</p>
+                <p class="small text-muted mb-3">
+                    Follow these steps to integrate with the Partner API.
+                    For a full field reference and questionnaire payload, see the
+                    <strong>Weight Loss API</strong> or <strong>Anti-Aging API</strong> guides in your admin console.
+                </p>
 
                 <h6 class="small fw-bold mb-2">Step 1 — Get an access token</h6>
                 <pre class="bg-dark text-light rounded p-3 small" style="font-size:.72rem">POST {{ url('/api/partner/auth/token') }}
@@ -156,38 +160,55 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=client_credentials
 &amp;client_id=YOUR_CLIENT_ID
 &amp;client_secret=YOUR_CLIENT_SECRET</pre>
+                <p class="small text-muted mt-1 mb-3">Response: <code>{"token_type":"Bearer","access_token":"…","expires_in":…}</code></p>
 
-                <h6 class="small fw-bold mb-2 mt-3">Step 2 — Register a patient</h6>
+                <h6 class="small fw-bold mb-2">Step 2 — Register a patient</h6>
                 <pre class="bg-dark text-light rounded p-3 small" style="font-size:.72rem">POST {{ url('/api/partner/patients') }}
 Authorization: Bearer {access_token}
 Content-Type: application/json
 
 {
-  "external_id": "user-123",
-  "first_name": "Jane",
-  "last_name": "Doe",
-  "email": "jane@example.com",
+  "external_id":   "user-123",
+  "first_name":    "Jane",
+  "last_name":     "Doe",
+  "email":         "jane@example.com",
   "date_of_birth": "1985-06-15",
-  "state": "CA"
+  "gender":        "female",
+  "phone":         "+15551234567",
+  "state":         "CA",
+  "address":       "123 Main St",
+  "city":          "Los Angeles",
+  "zip":           "90001"
 }</pre>
 
                 <h6 class="small fw-bold mb-2 mt-3">Step 3 — Submit a case</h6>
                 <pre class="bg-dark text-light rounded p-3 small" style="font-size:.72rem">POST {{ url('/api/partner/cases') }}
 Authorization: Bearer {access_token}
+Content-Type: application/json
 
 {
-  "patient_id": 1,
-  "offering_ids": [1, 2],
-  "intake_data": { "chief_complaint": "…" }
+  "patient_id":   1,
+  "offering_ids": ["&lt;offering_uuid&gt;"],
+  "questionnaire_responses": [
+    { "slug": "pregnant_breastfeeding",   "answer": "no" },
+    { "slug": "blood_pressure_range",     "answer": "normal" },
+    { "slug": "prescription_medications", "answer": "no" },
+    { "slug": "medication_allergies",     "answer": "no" },
+    { "slug": "medical_conditions",       "answer": "no" },
+    { "slug": "first_message_to_doctor",  "answer": "Interested in weight loss program." },
+    { "slug": "telehealth_informed_consent", "answer": "yes" }
+  ]
 }</pre>
+                <p class="small text-muted mt-1 mb-3">
+                    The <code>offering_uuid</code> is shown on each approved offering's detail page.
+                    Required questionnaire slugs vary by offering — see the full API guides for a complete list.
+                </p>
 
-                <h6 class="small fw-bold mb-2 mt-3">Step 4 — Verify webhook signature</h6>
+                <h6 class="small fw-bold mb-2">Step 4 — Verify webhook signature</h6>
                 <pre class="bg-dark text-light rounded p-3 small" style="font-size:.72rem">$header = $request->header('X-Webhook-Signature');
-// header format: "sha256={hex_digest}"
-$digest = str_replace('sha256=', '', $header);
-
-$expected = hash_hmac('sha256',
-    $rawBody, WEBHOOK_SECRET);
+// format: "sha256={hex_digest}"
+$digest   = str_replace('sha256=', '', $header);
+$expected = hash_hmac('sha256', $rawBody, WEBHOOK_SECRET);
 
 if (!hash_equals($expected, $digest)) {
     return response('Unauthorized', 401);

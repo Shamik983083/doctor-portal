@@ -94,12 +94,13 @@
                     <div class="row g-3">
                         <div class="col-sm-4">
                             <label class="form-label fw-medium">Pharmacy Type <span class="text-danger">*</span></label>
-                            <select name="pharmacy_type" class="form-select" required>
+                            <select name="pharmacy_type" class="form-select @error('pharmacy_type') is-invalid @enderror" required>
                                 <option value="">Select pharmacy type...</option>
                                 <option value="boothwyn" @selected(old('pharmacy_type', $offering->pharmacy_type) === 'boothwyn')>Boothwyn</option>
                                 <option value="curexa"   @selected(old('pharmacy_type', $offering->pharmacy_type) === 'curexa')>Curexa</option>
                                 <option value="custom"   @selected(old('pharmacy_type', $offering->pharmacy_type) === 'custom')>Custom</option>
                             </select>
+                            @error('pharmacy_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-4">
                             <label class="form-label fw-medium">DoseSpot Medication ID</label>
@@ -120,20 +121,23 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label fw-medium">Compound Formula <span class="text-danger">*</span></label>
-                        <input type="text" name="compound_formula" class="form-control"
+                        <input type="text" name="compound_formula" class="form-control @error('compound_formula') is-invalid @enderror"
                                value="{{ old('compound_formula', $offering->compound_formula) }}"
                                placeholder="e.g. NAD+ liquid – Olympia – 100mg/ml 10ml Vial" required>
+                        @error('compound_formula')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="row g-3 mb-3">
                         <div class="col-sm-2">
                             <label class="form-label fw-medium">Refills <span class="text-danger">*</span></label>
-                            <input type="number" name="refills" min="0" class="form-control"
+                            <input type="number" name="refills" min="0" class="form-control @error('refills') is-invalid @enderror"
                                    value="{{ old('refills', $offering->refills) }}" placeholder="0" required>
+                            @error('refills')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-2">
                             <label class="form-label fw-medium">Quantity <span class="text-danger">*</span></label>
-                            <input type="number" name="quantity" min="0" step="0.01" class="form-control"
+                            <input type="number" name="quantity" min="0" step="0.01" class="form-control @error('quantity') is-invalid @enderror"
                                    value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00" required>
+                            @error('quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-3">
                             <label class="form-label fw-medium">Days Supply <small class="text-muted">(opt)</small></label>
@@ -142,9 +146,10 @@
                         </div>
                         <div class="col-sm-3">
                             <label class="form-label fw-medium">Dispense Unit <span class="text-danger">*</span></label>
-                            <input type="text" name="dispense_unit" class="form-control"
+                            <input type="text" name="dispense_unit" class="form-control @error('dispense_unit') is-invalid @enderror"
                                    value="{{ old('dispense_unit', $offering->dispense_unit) }}"
                                    placeholder="Each, Vial, mL…" required>
+                            @error('dispense_unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-sm-2">
                             <label class="form-label fw-medium">Days Until Dispense <small class="text-muted">(opt)</small></label>
@@ -154,8 +159,9 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-medium">Directions <span class="text-danger">*</span></label>
-                        <textarea name="directions" class="form-control" rows="3"
+                        <textarea name="directions" class="form-control @error('directions') is-invalid @enderror" rows="3"
                                   placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…" required>{{ old('directions', $offering->directions) }}</textarea>
+                        @error('directions')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
                     </div>
                     <div class="mb-3">

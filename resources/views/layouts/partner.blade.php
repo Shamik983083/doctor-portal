@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <style>
-        :root { --sidebar-width: 240px; }
+        :root { --sidebar-width: 230px; }
         body { background: #f0f4f8; }
         #sidebar {
             width: var(--sidebar-width); min-height: 100vh; position: fixed;
@@ -16,30 +16,27 @@
             display: flex; flex-direction: column;
         }
         #sidebar .brand {
-            padding: 1.2rem 1.5rem; font-size: 1.1rem; font-weight: 700;
-            border-bottom: 1px solid rgba(255,255,255,.15); letter-spacing: .5px;
+            padding: 1rem 1.2rem; font-size: .95rem; font-weight: 700;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+            display: flex; flex-direction: column; gap: .1rem;
         }
-        #sidebar .brand small { display: block; font-size: .7rem; font-weight: 400; opacity: .7; }
+        #sidebar .brand small { font-size: .68rem; font-weight: 400; opacity: .55; }
         #sidebar .nav-link {
-            color: rgba(255,255,255,.75); padding: .55rem 1.5rem;
-            display: flex; align-items: center; gap: .6rem; border-radius: 0;
-            transform-origin: left center;
-            transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+            color: rgba(255,255,255,.72); padding: .38rem 1.2rem;
+            display: flex; align-items: center; gap: .5rem;
+            font-size: .82rem; font-weight: 500;
+            border-left: 2px solid transparent;
+            transition: background .15s, color .15s;
         }
-        #sidebar .nav-link:hover {
-            color: #fff; background: rgba(255,255,255,.12);
-            transform: scale(1.06); box-shadow: 0 2px 10px rgba(0,0,0,.25); border-radius: 4px;
-        }
-        #sidebar .nav-link.active {
-            color: #fff; background: rgba(255,255,255,.12);
-        }
+        #sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,.1); }
+        #sidebar .nav-link.active { color: #fff; background: rgba(255,255,255,.12); border-left-color: #93c5fd; }
         #sidebar .nav-section {
-            font-size: .65rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-            color: rgba(255,255,255,.4); padding: 1rem 1.5rem .3rem;
+            font-size: .58rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+            color: rgba(255,255,255,.35); padding: .65rem 1.2rem .15rem;
         }
         #topbar {
             margin-left: var(--sidebar-width); background: #fff;
-            border-bottom: 1px solid #e2e8f0; padding: .75rem 1.5rem;
+            border-bottom: 1px solid #e2e8f0; padding: .65rem 1.5rem;
             display: flex; align-items: center; justify-content: space-between;
             position: sticky; top: 0; z-index: 99;
         }
