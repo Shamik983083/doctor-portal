@@ -30,7 +30,7 @@ jobs:
             /opt/cpanel/ea-php82/root/usr/bin/php composer.phar install --no-dev --optimize-autoloader --no-interaction
 
             echo "--- Generating Passport keys (skipped if already exist) ---"
-            /opt/cpanel/ea-php82/root/usr/bin/php artisan passport:keys
+            [ -f storage/oauth-private.key ] || /opt/cpanel/ea-php82/root/usr/bin/php artisan passport:keys
 
             echo "--- Running migrations ---"
             /opt/cpanel/ea-php82/root/usr/bin/php artisan migrate --force
