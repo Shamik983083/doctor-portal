@@ -180,7 +180,7 @@
                     @csrf
                     <div class="mb-2">
                         <input type="url" name="url" class="form-control form-control-sm @error('url') is-invalid @enderror"
-                               placeholder="http://localhost:8000/api/v1/webhooks/doctor-network" value="{{ old('url') }}" required>
+                               placeholder="https://your-server.com/webhooks/doctor-portal" value="{{ old('url') }}" required>
                         @error('url') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="d-flex gap-2">
