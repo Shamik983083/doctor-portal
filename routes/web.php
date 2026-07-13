@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Web\Auth\LoginController;
+use App\Http\Controllers\Web\Auth\ForgotPasswordController;
+use App\Http\Controllers\Web\Auth\ResetPasswordController;
 use App\Http\Controllers\Web\Clinician\DashboardController as ClinicianDashboard;
 use App\Http\Controllers\Web\Clinician\CaseController as ClinicianCaseController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboard;
@@ -26,6 +28,12 @@ use Illuminate\Support\Facades\Route;
 Route::get('/login', [LoginController::class, 'showLogin'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.post');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+// Password reset
+Route::get('/forgot-password', [ForgotPasswordController::class, 'showForm'])->name('password.request');
+Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink'])->name('password.email');
+Route::get('/reset-password/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
+Route::post('/reset-password', [ResetPasswordController::class, 'reset'])->name('password.update');
 
 Route::get('/', fn() => redirect('/login'));
 
