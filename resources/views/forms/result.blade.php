@@ -4,9 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $status === 'success' ? 'Submitted Successfully' : 'Not Eligible' }}</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <style>body { background: #f8f9fa; }</style>
+    <style>
+        body { background: #f8f9fa; }
+        @media (max-width: 575.98px) {
+            .container { padding-left: 1rem; padding-right: 1rem; }
+            .card { padding: 2rem 1.25rem !important; }
+        }
+    </style>
 </head>
 <body>
 <div class="container py-5 text-center" style="max-width:520px">

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $questionnaire->name }}</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -12,6 +13,15 @@
         .form-step { display: none; }
         .form-step.active { display: block; }
         .progress { height: 4px; border-radius: 0; }
+        /* Height field: flex-wrap so ft/in stack on very small screens */
+        .height-input-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+        .height-input-row input[type="number"] { width: 80px; min-width: 60px; flex-shrink: 0; }
+        /* Prevent iOS zoom on inputs */
+        input, select, textarea { font-size: max(1rem, 16px) !important; }
+        @media (max-width: 575.98px) {
+            .card-header, .card-body { padding-left: 1rem; padding-right: 1rem; }
+            .container { padding-left: .75rem; padding-right: .75rem; }
+        }
     </style>
 </head>
 <body>
@@ -278,7 +288,7 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
 <script>
 (function () {
     /* ── Conditional visibility ── */
