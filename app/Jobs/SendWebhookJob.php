@@ -49,7 +49,6 @@ class SendWebhookJob implements ShouldQueue
             'event_type'  => $delivery->event_type,
             'url'         => $webhook->url,
             'attempt'     => $delivery->attempts,
-            'payload'     => $payload,
         ]);
 
         try {
@@ -61,11 +60,20 @@ class SendWebhookJob implements ShouldQueue
                 ])
                 ->post($webhook->url, $payload);
 
+            $contentType = $response->header('Content-Type') ?? '';
+            if (str_contains($contentType, 'text/html')) {
+                Log::warning("Webhook URL returned HTML — likely misconfigured (points at a login page or redirect)", [
+                    'delivery_id' => $delivery->id,
+                    'url'         => $webhook->url,
+                    'content_type' => $contentType,
+                ]);
+            }
+
             if ($response->successful()) {
                 $delivery->update([
                     'status'        => WebhookDelivery::STATUS_DELIVERED,
                     'response_code' => $response->status(),
-                    'response_body' => substr($response->body(), 0, 1000),
+                    'response_body' => $this->safeResponseBody($response->body()),
                 ]);
 
                 Log::info("Webhook delivered", [
@@ -73,7 +81,6 @@ class SendWebhookJob implements ShouldQueue
                     'event_type'    => $delivery->event_type,
                     'url'           => $webhook->url,
                     'response_code' => $response->status(),
-                    'response_body' => substr($response->body(), 0, 1000),
                 ]);
                 return;
             }
@@ -83,7 +90,6 @@ class SendWebhookJob implements ShouldQueue
                 'event_type'    => $delivery->event_type,
                 'url'           => $webhook->url,
                 'response_code' => $response->status(),
-                'response_body' => substr($response->body(), 0, 1000),
             ]);
 
             $this->handleFailure($delivery, $response->status(), $response->body());
@@ -105,7 +111,7 @@ class SendWebhookJob implements ShouldQueue
             $delivery->update([
                 'status'        => WebhookDelivery::STATUS_RETRYING,
                 'response_code' => $code,
-                'response_body' => substr($body, 0, 1000),
+                'response_body' => $this->safeResponseBody($body),
                 'next_retry_at' => now()->addSeconds($backoffSeconds),
             ]);
             self::dispatch($delivery->id)
@@ -115,8 +121,16 @@ class SendWebhookJob implements ShouldQueue
             $delivery->update([
                 'status'        => WebhookDelivery::STATUS_FAILED,
                 'response_code' => $code,
-                'response_body' => substr($body, 0, 1000),
+                'response_body' => $this->safeResponseBody($body),
             ]);
         }
+    }
+
+    private function safeResponseBody(string $body): string
+    {
+        // Strip bytes that are not valid UTF-8 so the string can be stored
+        // in a utf8mb4 column without a charset error.
+        $clean = mb_convert_encoding($body, 'UTF-8', 'UTF-8');
+        return mb_substr($clean, 0, 1000);
     }
 }
