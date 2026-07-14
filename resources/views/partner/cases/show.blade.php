@@ -172,38 +172,62 @@
                 <div class="tab-content">
                     <!-- Timeline -->
                     <div class="tab-pane fade show active" id="tab-events">
-                        @forelse($case->events->sortBy('created_at') as $event)
                         @php
-                            $iconMap = [
-                                'status_changed'       => ['icon' => 'bi-arrow-right-circle', 'color' => 'primary'],
-                                'clinician_reassigned' => ['icon' => 'bi-person-check',        'color' => 'info'],
-                                'note_added'           => ['icon' => 'bi-journal-text',        'color' => 'secondary'],
-                                'message_sent'         => ['icon' => 'bi-chat-dots',           'color' => 'secondary'],
-                                'file_uploaded'        => ['icon' => 'bi-paperclip',           'color' => 'secondary'],
+                        $eventLabel = function($event) {
+                            $from = $event->payload['from'] ?? null;
+                            $to   = $event->payload['to']   ?? null;
+
+                            if ($event->event_type === 'clinician_reassigned') {
+                                return ['label' => 'Clinician reassigned', 'color' => 'bg-primary'];
+                            }
+
+                            $map = [
+                                'created→waiting'      => ['Case submitted',             'bg-info text-dark'],
+                                'waiting→assigned'     => ['Case assigned to clinician', 'bg-primary'],
+                                'created→assigned'     => ['Case assigned to clinician', 'bg-primary'],
+                                'assigned→support'     => ['Sent to support',            'bg-warning text-dark'],
+                                'support→assigned'     => ['Returned to clinician',      'bg-primary'],
+                                'assigned→approved'    => ['Case approved',              'bg-success'],
+                                'approved→processing'  => ['Sent to pharmacy',           'bg-success'],
+                                'processing→completed' => ['Case completed',             'bg-success'],
+                                'assigned→cancelled'   => ['Case cancelled',             'bg-danger'],
+                                'waiting→cancelled'    => ['Case cancelled',             'bg-danger'],
+                                'support→cancelled'    => ['Case cancelled',             'bg-danger'],
+                                'approved→cancelled'   => ['Case cancelled',             'bg-danger'],
+                                'created→cancelled'    => ['Case cancelled',             'bg-danger'],
                             ];
-                            $meta  = $iconMap[$event->event_type] ?? ['icon' => 'bi-circle', 'color' => 'secondary'];
-                            $label = ucfirst(str_replace('_', ' ', $event->event_type));
+
+                            $key = $from . '→' . $to;
+                            if (isset($map[$key])) {
+                                return ['label' => $map[$key][0], 'color' => $map[$key][1]];
+                            }
+
+                            $label = $to ? ucfirst($from) . ' → ' . ucfirst($to) : ucfirst(str_replace('_', ' ', $event->event_type));
+                            return ['label' => $label, 'color' => 'bg-secondary'];
+                        };
+
+                        $actorLabel = function($event) {
+                            return match($event->actor_type) {
+                                'admin'     => 'Admin',
+                                'clinician' => 'Clinician',
+                                'partner'   => 'Partner',
+                                default     => 'System',
+                            };
+                        };
                         @endphp
-                        <div class="d-flex gap-3 mb-3">
-                            <div class="flex-shrink-0 mt-1">
-                                <div class="rounded-circle bg-{{ $meta['color'] }} bg-opacity-10 d-flex align-items-center justify-content-center"
-                                     style="width:32px;height:32px">
-                                    <i class="bi {{ $meta['icon'] }} text-{{ $meta['color'] }} small"></i>
-                                </div>
+
+                        @forelse($case->events->sortByDesc('created_at') as $event)
+                        @php [$label, $color] = array_values($eventLabel($event)); @endphp
+                        <div class="d-flex gap-3 mb-3 pb-3 border-bottom">
+                            <div class="text-muted text-nowrap" style="min-width:110px; font-size:.75rem; padding-top:2px;">
+                                {{ $event->created_at->format('M d, H:i') }}
                             </div>
                             <div>
-                                <div class="fw-medium small">{{ $label }}</div>
-                                @if($event->event_type === 'status_changed' && !empty($event->payload['from']) && !empty($event->payload['to']))
-                                <div class="text-muted small">
-                                    <span class="badge badge-{{ $event->payload['from'] }}">{{ ucfirst($event->payload['from']) }}</span>
-                                    <i class="bi bi-arrow-right mx-1 small"></i>
-                                    <span class="badge badge-{{ $event->payload['to'] }}">{{ ucfirst($event->payload['to']) }}</span>
-                                </div>
-                                @endif
+                                <span class="badge {{ $color }} mb-1">{{ $label }}</span>
+                                <div class="small text-muted">{{ $actorLabel($event) }}</div>
                                 @if($event->notes)
-                                <div class="text-muted small mt-1">{{ $event->notes }}</div>
+                                    <p class="small mb-0 mt-1 text-body">{{ $event->notes }}</p>
                                 @endif
-                                <div class="text-muted" style="font-size:.75rem">{{ $event->created_at->format('M j, Y g:i A') }}</div>
                             </div>
                         </div>
                         @empty
