@@ -56,7 +56,7 @@
                 <tbody>
                     @forelse($cases as $case)
                     <tr>
-                        <td><small class="text-muted font-monospace">{{ substr($case->uuid, 0, 8) }}</small></td>
+                        <td class="text-muted">{{ $cases->firstItem() + $loop->index }}</td>
                         <td>
                             <strong>{{ $case->patient->full_name ?? 'N/A' }}</strong>
                             @if($case->unread_messages_count > 0)
