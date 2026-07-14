@@ -32,10 +32,18 @@ class CaseController extends Controller
             ->withCount(['messages as unread_messages_count' => fn($q) =>
                 $q->where('direction', 'inbound')->where('is_read', false)
             ])
-            ->when($request->status, fn($q, $s) => $q->where('status', $s))
-            ->when($request->partner_id, fn($q, $id) => $q->where('partner_id', $id))
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->status))
+            ->when($request->filled('state'), fn($q) => $q->where(
+                fn($q) => $q->where('patient_state', $request->state)
+                             ->orWhereHas('patient', fn($p) => $p->where('state', $request->state))
+            ))
+            ->when($request->filled('search'), fn($q) => $q->whereHas('patient', fn($p) =>
+                $p->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ['%' . $request->search . '%'])
+            ))
+            ->when($request->filled('partner_id'), fn($q) => $q->where('partner_id', $request->partner_id))
             ->orderBy('created_at')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
         return view('clinician.cases.queue', compact('cases', 'clinician'));
     }
