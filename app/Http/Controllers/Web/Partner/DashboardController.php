@@ -11,7 +11,9 @@ class DashboardController extends Controller
     {
         $partner = Auth::user()->partner;
 
-        $visibleCases = $partner->cases()->whereNotNull('support_at');
+        $visibleCases = $partner->cases()
+            ->where(fn($q) => $q->whereNotNull('support_at')
+                ->orWhereIn('status', ['completed', 'cancelled']));
 
         $stats = [
             'offerings'  => $partner->offerings()->where('is_active', true)->count(),

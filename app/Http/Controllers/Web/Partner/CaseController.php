@@ -17,7 +17,8 @@ class CaseController extends Controller
     public function index(Request $request)
     {
         $cases = $this->partner()->cases()
-            ->whereNotNull('support_at')
+            ->where(fn($q) => $q->whereNotNull('support_at')
+                ->orWhereIn('status', ['completed', 'cancelled']))
             ->with(['patient', 'clinician.user', 'caseOfferings.offering'])
             ->when($request->input('status'), fn($q, $s) => $q->where('status', $s))
             ->latest()->paginate(20);
@@ -28,7 +29,8 @@ class CaseController extends Controller
     public function show(string $uuid)
     {
         $case = $this->partner()->cases()
-            ->whereNotNull('support_at')
+            ->where(fn($q) => $q->whereNotNull('support_at')
+                ->orWhereIn('status', ['completed', 'cancelled']))
             ->with(['patient', 'clinician.user', 'caseOfferings.offering',
                     'caseQuestions', 'diseases', 'orders.pharmacy',
                     'clinicalNotes', 'messages', 'files', 'events',
