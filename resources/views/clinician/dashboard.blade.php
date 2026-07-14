@@ -223,7 +223,7 @@
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
         <div>
             <h6 class="mb-0 fw-semibold">My Active Cases</h6>
-            <p class="text-muted mb-0" style="font-size:.72rem;">Cases currently assigned or approved</p>
+            <p class="text-muted mb-0" style="font-size:.72rem;">Cases currently assigned or approved &mdash; showing up to 10</p>
         </div>
         <a href="{{ route('clinician.queue') }}" class="btn btn-sm btn-outline-primary">View Queue</a>
     </div>
