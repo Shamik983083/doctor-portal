@@ -114,6 +114,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::patch('/reorder', [AdminClinicianController::class, 'reorder'])->name('reorder');
         Route::patch('/{id}/case-load', [AdminClinicianController::class, 'updateCaseLoad'])->name('case-load');
         Route::get('/{id}', [AdminClinicianController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [AdminClinicianController::class, 'edit'])->name('edit');
         Route::put('/{id}', [AdminClinicianController::class, 'update'])->name('update');
         Route::delete('/{id}', [AdminClinicianController::class, 'destroy'])->name('destroy');
     });
