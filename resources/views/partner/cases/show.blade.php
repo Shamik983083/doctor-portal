@@ -172,20 +172,38 @@
                 <div class="tab-content">
                     <!-- Timeline -->
                     <div class="tab-pane fade show active" id="tab-events">
-                        @forelse($case->events as $event)
+                        @forelse($case->events->sortBy('created_at') as $event)
+                        @php
+                            $iconMap = [
+                                'status_changed'       => ['icon' => 'bi-arrow-right-circle', 'color' => 'primary'],
+                                'clinician_reassigned' => ['icon' => 'bi-person-check',        'color' => 'info'],
+                                'note_added'           => ['icon' => 'bi-journal-text',        'color' => 'secondary'],
+                                'message_sent'         => ['icon' => 'bi-chat-dots',           'color' => 'secondary'],
+                                'file_uploaded'        => ['icon' => 'bi-paperclip',           'color' => 'secondary'],
+                            ];
+                            $meta  = $iconMap[$event->event_type] ?? ['icon' => 'bi-circle', 'color' => 'secondary'];
+                            $label = ucfirst(str_replace('_', ' ', $event->event_type));
+                        @endphp
                         <div class="d-flex gap-3 mb-3">
                             <div class="flex-shrink-0 mt-1">
-                                <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+                                <div class="rounded-circle bg-{{ $meta['color'] }} bg-opacity-10 d-flex align-items-center justify-content-center"
                                      style="width:32px;height:32px">
-                                    <i class="bi bi-arrow-right-circle text-primary small"></i>
+                                    <i class="bi {{ $meta['icon'] }} text-{{ $meta['color'] }} small"></i>
                                 </div>
                             </div>
                             <div>
-                                <div class="fw-medium small">{{ ucfirst(str_replace('_',' ',$event->event_type)) }}</div>
-                                @if($event->notes)
-                                <div class="text-muted small">{{ $event->notes }}</div>
+                                <div class="fw-medium small">{{ $label }}</div>
+                                @if($event->event_type === 'status_changed' && !empty($event->payload['from']) && !empty($event->payload['to']))
+                                <div class="text-muted small">
+                                    <span class="badge badge-{{ $event->payload['from'] }}">{{ ucfirst($event->payload['from']) }}</span>
+                                    <i class="bi bi-arrow-right mx-1 small"></i>
+                                    <span class="badge badge-{{ $event->payload['to'] }}">{{ ucfirst($event->payload['to']) }}</span>
+                                </div>
                                 @endif
-                                <div class="text-muted x-small">{{ $event->created_at->format('M j, Y g:i A') }}</div>
+                                @if($event->notes)
+                                <div class="text-muted small mt-1">{{ $event->notes }}</div>
+                                @endif
+                                <div class="text-muted" style="font-size:.75rem">{{ $event->created_at->format('M j, Y g:i A') }}</div>
                             </div>
                         </div>
                         @empty
