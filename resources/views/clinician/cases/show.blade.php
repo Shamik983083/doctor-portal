@@ -49,6 +49,7 @@
         </div>
 
         {{-- Case Actions --}}
+        @if(in_array($case->status, ['waiting', 'assigned']))
         <div class="card">
             <div class="card-header"><h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Actions</h6></div>
             <div class="card-body d-grid gap-2">
@@ -70,9 +71,9 @@
                     <i class="bi bi-x-lg me-1"></i>Decline Case
                 </button>
                 @endif
-
             </div>
         </div>
+        @endif
     </div>
 
     {{-- Right: Tabs --}}
