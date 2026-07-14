@@ -64,6 +64,7 @@
                         </td>
                         <td class="text-nowrap">
                             <a href="{{ route('admin.clinicians.show', $clinician->id) }}" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
+                            <a href="{{ route('admin.clinicians.edit', $clinician->id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
                             <form method="POST" action="{{ route('admin.clinicians.destroy', $clinician->id) }}" onsubmit="return confirm('Are you sure you want to delete this clinician? This cannot be undone.')" class="d-inline">
                                 @csrf
                                 @method('DELETE')

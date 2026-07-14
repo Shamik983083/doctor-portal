@@ -75,21 +75,59 @@ class ClinicianController extends Controller
         return view('admin.clinicians.show', compact('clinician'));
     }
 
+    public function edit(int $id)
+    {
+        $clinician = Clinician::with('user')->findOrFail($id);
+        return view('admin.clinicians.edit', compact('clinician'));
+    }
+
     public function update(Request $request, int $id)
     {
-        $clinician = Clinician::findOrFail($id);
+        $clinician = Clinician::with('user')->findOrFail($id);
 
         $data = $request->validate([
-            'status'          => 'nullable|in:active,inactive,suspended',
-            'is_available'    => 'nullable|boolean',
-            'max_daily_cases' => 'nullable|integer|min:1',
-            'specialty'       => 'nullable|string',
-            'licensed_states' => 'nullable|array',
+            'name'                 => 'required|string',
+            'email'                => 'required|email|unique:users,email,' . $clinician->user_id,
+            'password'             => 'nullable|min:8|confirmed',
+            'npi'                  => 'required|string',
+            'specialty'            => 'nullable|string',
+            'credentials'          => 'required|in:MD,DO,NP,PA',
+            'status'               => 'required|in:active,inactive,suspended',
+            'is_available'         => 'nullable|boolean',
+            'max_daily_cases'      => 'nullable|integer|min:1',
+            'license_info'         => 'required|array|min:1',
+            'license_info.*.state' => 'required|string|size:2',
+            'license_info.*.number'=> 'required|string|max:100',
+            'license_info.*.expiry'=> 'required|date',
         ]);
 
-        $clinician->update($data);
+        $userUpdate = ['name' => $data['name'], 'email' => $data['email']];
+        if (!empty($data['password'])) {
+            $userUpdate['password'] = Hash::make($data['password']);
+        }
+        $clinician->user->update($userUpdate);
 
-        return back()->with('success', 'Clinician updated.');
+        $licensedStates = [];
+        foreach ($request->input('license_info', []) as $abbr => $info) {
+            $licensedStates[] = [
+                'state'          => strtoupper($abbr),
+                'license_number' => $info['number'],
+                'expiry_date'    => $info['expiry'],
+            ];
+        }
+
+        $clinician->update([
+            'npi'             => $data['npi'],
+            'specialty'       => $data['specialty'] ?? null,
+            'credentials'     => $data['credentials'],
+            'status'          => $data['status'],
+            'is_available'    => $request->boolean('is_available'),
+            'max_daily_cases' => $data['max_daily_cases'] ?? $clinician->max_daily_cases,
+            'licensed_states' => $licensedStates,
+        ]);
+
+        return redirect()->route('admin.clinicians.show', $clinician->id)
+            ->with('success', 'Clinician updated successfully.');
     }
 
     public function priorityIndex()

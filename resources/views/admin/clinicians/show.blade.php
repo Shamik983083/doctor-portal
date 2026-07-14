@@ -25,11 +25,12 @@
                     <tr><th>Available</th><td>{{ $clinician->is_available ? '✅ Yes' : '❌ No' }}</td></tr>
                 </table>
             </div>
-            <div class="card-footer">
-                <form method="POST" action="{{ route('admin.clinicians.destroy', $clinician->id) }}" onsubmit="return confirm('Are you sure you want to delete this clinician? This cannot be undone.')" class="d-inline w-100">
+            <div class="card-footer d-flex gap-2">
+                <a href="{{ route('admin.clinicians.edit', $clinician->id) }}" class="btn btn-outline-primary btn-sm flex-grow-1"><i class="bi bi-pencil me-1"></i>Edit</a>
+                <form method="POST" action="{{ route('admin.clinicians.destroy', $clinician->id) }}" onsubmit="return confirm('Are you sure you want to delete this clinician? This cannot be undone.')" class="d-inline flex-grow-1">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-trash me-1"></i>Delete Clinician</button>
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-trash me-1"></i>Delete</button>
                 </form>
             </div>
         </div>
