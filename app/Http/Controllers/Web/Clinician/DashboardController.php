@@ -37,6 +37,8 @@ class DashboardController extends Controller
                                     ? round(($totalCompleted / $totalMyCases) * 100)
                                     : 0,
             'total_my_cases'   => $totalMyCases,
+            'total_assigned'   => $totalMyCases,
+            'total_completed'  => $totalCompleted,
         ];
 
         // ── 30-day dual trend: cases assigned vs cases completed ──────────

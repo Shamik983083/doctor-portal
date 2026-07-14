@@ -102,6 +102,42 @@
         </div>
     </div>
 
+    {{-- Total Assigned Cases --}}
+    <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.queue', ['status' => 'assigned']) }}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #6f42c1 !important;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:48px;height:48px;background:#6f42c11a;">
+                    <i class="bi bi-folder2-open" style="font-size:1.3rem;color:#6f42c1;"></i>
+                </div>
+                <div>
+                    <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">Total Assigned Cases</p>
+                    <h3 class="fw-bold mb-0" style="color:#6f42c1;">{{ $stats['total_assigned'] }}</h3>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">all time</p>
+                </div>
+            </div>
+        </div>
+        </a>
+    </div>
+
+    {{-- Total Completed Cases --}}
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #20c997 !important;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:48px;height:48px;background:#20c9971a;">
+                    <i class="bi bi-patch-check" style="font-size:1.3rem;color:#20c997;"></i>
+                </div>
+                <div>
+                    <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">Total Completed Cases</p>
+                    <h3 class="fw-bold mb-0" style="color:#20c997;">{{ $stats['total_completed'] }}</h3>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">all time</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Completion rate with SVG ring --}}
     <div class="col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $rateColor }} !important;">
