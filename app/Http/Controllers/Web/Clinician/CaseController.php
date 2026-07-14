@@ -278,6 +278,31 @@ class CaseController extends Controller
         return back()->with('success', 'Case escalated to support. Partner has been notified.');
     }
 
+    public function pollMessages(Request $request, string $uuid)
+    {
+        $case    = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $afterId = (int) $request->query('after', 0);
+
+        $messages = $case->messages()
+            ->where('id', '>', $afterId)
+            ->orderBy('id')
+            ->get(['id', 'body', 'sender_type', 'created_at'])
+            ->map(fn($msg) => [
+                'id'          => $msg->id,
+                'body'        => $msg->body,
+                'sender_type' => $msg->sender_type,
+                'time'        => $msg->created_at->format('H:i'),
+                'date'        => $msg->created_at->format('Y-m-d'),
+                'date_label'  => $msg->created_at->isToday()
+                                    ? 'Today'
+                                    : ($msg->created_at->isYesterday()
+                                        ? 'Yesterday'
+                                        : $msg->created_at->format('M j, Y')),
+            ]);
+
+        return response()->json(['messages' => $messages]);
+    }
+
     public function sendMessage(Request $request, string $uuid)
     {
         $request->validate(['body' => 'required|string']);

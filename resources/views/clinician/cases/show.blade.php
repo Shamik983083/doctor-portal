@@ -313,6 +313,7 @@
                     $msgs          = $case->messages->sortBy('created_at');
                     $clinicianName = $case->clinician?->user->name ?? 'You';
                     $patientName   = $case->patient->full_name ?? 'Patient';
+                    $lastMsgId     = $msgs->last()?->id ?? 0;
 
                     $initials = function(string $name): string {
                         $parts = explode(' ', trim($name));
@@ -320,16 +321,22 @@
                     };
                 @endphp
 
-                @if($msgs->isEmpty())
-                    <div class="text-center text-muted py-5 mb-3">
+                {{-- Thread --}}
+                <div id="clinThread"
+                     data-last-id="{{ $lastMsgId }}"
+                     data-poll-url="{{ route('clinician.cases.messages.poll', $case->uuid) }}"
+                     data-patient-name="{{ $patientName }}"
+                     data-patient-initials="{{ $initials($patientName) }}"
+                     data-clinician-initials="{{ $initials($clinicianName) }}"
+                     style="max-height:420px; overflow-y:auto; background:#f8f9fc;
+                            border-radius:12px; padding:16px 12px; scroll-behavior:smooth; margin-bottom:16px;">
+
+                    @if($msgs->isEmpty())
+                    <div id="clinThreadEmpty" class="text-center text-muted py-5">
                         <i class="bi bi-chat-dots" style="font-size:2.5rem;opacity:.2"></i>
                         <p class="mt-3 mb-0 small">No messages on this case yet.</p>
                     </div>
-                @else
-                {{-- Thread --}}
-                <div id="clinThread"
-                     style="max-height:420px; overflow-y:auto; background:#f8f9fc;
-                            border-radius:12px; padding:16px 12px; scroll-behavior:smooth; margin-bottom:16px;">
+                    @else
                     @php $prevDate = null; @endphp
                     @foreach($msgs as $msg)
                     @php
@@ -355,7 +362,7 @@
                     {{-- Date separator --}}
                     @if($msgDate !== $prevDate)
                     @php $prevDate = $msgDate; @endphp
-                    <div class="d-flex align-items-center gap-2 my-3">
+                    <div class="d-flex align-items-center gap-2 my-3" data-date="{{ $msgDate }}">
                         <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
                         <span style="font-size:.7rem;color:#adb5bd;white-space:nowrap;font-weight:500;letter-spacing:.04em;text-transform:uppercase;">
                             {{ $msg->created_at->isToday() ? 'Today' : ($msg->created_at->isYesterday() ? 'Yesterday' : $msg->created_at->format('M j, Y')) }}
@@ -366,47 +373,27 @@
 
                     {{-- Message row --}}
                     <div class="d-flex align-items-end gap-2 mb-3 {{ $isClinic ? 'flex-row-reverse' : '' }}">
-                        {{-- Avatar --}}
                         <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold"
-                             style="width:34px;height:34px;background:{{ $avatarBg }};color:#fff;
-                                    font-size:.68rem;letter-spacing:.02em;">
+                             style="width:34px;height:34px;background:{{ $avatarBg }};color:#fff;font-size:.68rem;letter-spacing:.02em;">
                             {{ $avatarStr }}
                         </div>
-
-                        {{-- Bubble + meta --}}
                         <div style="max-width:68%;">
                             <div class="d-flex align-items-baseline gap-1 mb-1 {{ $isClinic ? 'justify-content-end' : '' }}">
                                 <span style="font-size:.72rem;font-weight:600;color:#495057;">{{ $name }}</span>
                                 <span style="font-size:.67rem;color:#adb5bd;">{{ $msg->created_at->format('H:i') }}</span>
                             </div>
-
                             @if($isClinic)
-                            <div style="background:#4361ee;color:#fff;padding:10px 14px;
-                                        border-radius:16px 4px 16px 16px;
-                                        font-size:.875rem;line-height:1.5;word-break:break-word;
-                                        box-shadow:0 2px 8px rgba(67,97,238,.2);">
-                                {{ $msg->body }}
-                            </div>
+                            <div style="background:#4361ee;color:#fff;padding:10px 14px;border-radius:16px 4px 16px 16px;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 2px 8px rgba(67,97,238,.2);">{{ $msg->body }}</div>
                             @elseif($isPatient)
-                            <div style="background:#fff;color:#212529;padding:10px 14px;
-                                        border-radius:4px 16px 16px 16px;
-                                        border:1px solid #e9ecef;
-                                        font-size:.875rem;line-height:1.5;word-break:break-word;
-                                        box-shadow:0 1px 4px rgba(0,0,0,.06);">
-                                {{ $msg->body }}
-                            </div>
+                            <div style="background:#fff;color:#212529;padding:10px 14px;border-radius:4px 16px 16px 16px;border:1px solid #e9ecef;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 1px 4px rgba(0,0,0,.06);">{{ $msg->body }}</div>
                             @else
-                            <div style="background:#f1f3f5;color:#495057;padding:8px 12px;
-                                        border-radius:8px;border:1px dashed #dee2e6;
-                                        font-size:.8rem;line-height:1.5;word-break:break-word;">
-                                {{ $msg->body }}
-                            </div>
+                            <div style="background:#f1f3f5;color:#495057;padding:8px 12px;border-radius:8px;border:1px dashed #dee2e6;font-size:.8rem;line-height:1.5;word-break:break-word;">{{ $msg->body }}</div>
                             @endif
                         </div>
                     </div>
                     @endforeach
+                    @endif
                 </div>
-                @endif
 
                 <form method="POST" action="{{ route('clinician.cases.messages.store', $case->uuid) }}">
                     @csrf
@@ -633,5 +620,134 @@ document.addEventListener('click', function (e) {
     full.classList.toggle('d-none', !expanded);
     btn.textContent = expanded ? 'Hide' : 'Show more';
 });
+</script>
+
+<script>
+(function () {
+    var thread = document.getElementById('clinThread');
+    if (!thread) return;
+
+    var pollUrl     = thread.dataset.pollUrl;
+    var patientName = thread.dataset.patientName;
+    var patientInit = thread.dataset.patientInitials;
+    var clinicInit  = thread.dataset.clinicianInitials;
+    var lastId      = parseInt(thread.dataset.lastId, 10) || 0;
+    var polling     = false;
+    var interval    = null;
+
+    function isMessagesTabActive() {
+        var pane = document.getElementById('tab-messages');
+        return pane && pane.classList.contains('active') && pane.classList.contains('show');
+    }
+
+    function scrollToBottom() {
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    function hasSeparatorForDate(dateStr) {
+        return !!thread.querySelector('[data-date="' + dateStr + '"]');
+    }
+
+    function escape(str) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(str));
+        return d.innerHTML;
+    }
+
+    function buildSeparator(dateStr, label) {
+        return '<div class="d-flex align-items-center gap-2 my-3" data-date="' + escape(dateStr) + '">' +
+            '<hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">' +
+            '<span style="font-size:.7rem;color:#adb5bd;white-space:nowrap;font-weight:500;letter-spacing:.04em;text-transform:uppercase;">' + escape(label) + '</span>' +
+            '<hr class="flex-grow-1 my-0" style="border-color:#dee2e6;"></div>';
+    }
+
+    function buildBubble(msg) {
+        var isClinic  = msg.sender_type === 'clinician';
+        var isPatient = msg.sender_type === 'patient';
+        var avatarBg, avatarStr, name, bubbleStyle, flexDir, metaJustify;
+
+        if (isClinic) {
+            avatarBg     = '#4361ee'; avatarStr = clinicInit; name = 'You';
+            bubbleStyle  = 'background:#4361ee;color:#fff;padding:10px 14px;border-radius:16px 4px 16px 16px;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 2px 8px rgba(67,97,238,.2);';
+            flexDir      = 'flex-row-reverse'; metaJustify = 'justify-content-end';
+        } else if (isPatient) {
+            avatarBg     = '#2dc653'; avatarStr = patientInit; name = patientName;
+            bubbleStyle  = 'background:#fff;color:#212529;padding:10px 14px;border-radius:4px 16px 16px 16px;border:1px solid #e9ecef;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 1px 4px rgba(0,0,0,.06);';
+            flexDir      = ''; metaJustify = '';
+        } else {
+            avatarBg     = '#6c757d'; avatarStr = 'SY'; name = 'System';
+            bubbleStyle  = 'background:#f1f3f5;color:#495057;padding:8px 12px;border-radius:8px;border:1px dashed #dee2e6;font-size:.8rem;line-height:1.5;word-break:break-word;';
+            flexDir      = ''; metaJustify = '';
+        }
+
+        return '<div class="d-flex align-items-end gap-2 mb-3 ' + flexDir + '">' +
+            '<div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold" style="width:34px;height:34px;background:' + avatarBg + ';color:#fff;font-size:.68rem;letter-spacing:.02em;">' + escape(avatarStr) + '</div>' +
+            '<div style="max-width:68%;">' +
+                '<div class="d-flex align-items-baseline gap-1 mb-1 ' + metaJustify + '">' +
+                    '<span style="font-size:.72rem;font-weight:600;color:#495057;">' + escape(name) + '</span>' +
+                    '<span style="font-size:.67rem;color:#adb5bd;">' + escape(msg.time) + '</span>' +
+                '</div>' +
+                '<div style="' + bubbleStyle + '">' + escape(msg.body) + '</div>' +
+            '</div></div>';
+    }
+
+    function poll() {
+        if (polling || !isMessagesTabActive() || document.visibilityState !== 'visible') return;
+        polling = true;
+        fetch(pollUrl + '?after=' + lastId)
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (!data || !data.messages || data.messages.length === 0) return;
+
+                var empty = document.getElementById('clinThreadEmpty');
+                if (empty) empty.remove();
+
+                var html = '';
+                data.messages.forEach(function (msg) {
+                    if (!hasSeparatorForDate(msg.date)) {
+                        html += buildSeparator(msg.date, msg.date_label);
+                    }
+                    html += buildBubble(msg);
+                    lastId = msg.id;
+                });
+
+                thread.insertAdjacentHTML('beforeend', html);
+                thread.dataset.lastId = lastId;
+                scrollToBottom();
+            })
+            .catch(function () {})
+            .finally(function () { polling = false; });
+    }
+
+    function startPolling() {
+        if (!interval) {
+            poll();
+            interval = setInterval(poll, 5000);
+        }
+    }
+
+    function stopPolling() {
+        if (interval) { clearInterval(interval); interval = null; }
+    }
+
+    var messagesTabLink = document.querySelector('a[href="#tab-messages"]');
+    if (messagesTabLink) {
+        messagesTabLink.addEventListener('shown.bs.tab', function () {
+            scrollToBottom();
+            startPolling();
+        });
+        messagesTabLink.addEventListener('hidden.bs.tab', stopPolling);
+    }
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') { stopPolling(); }
+        else if (isMessagesTabActive()) { startPolling(); }
+    });
+
+    if (isMessagesTabActive()) {
+        scrollToBottom();
+        startPolling();
+    }
+})();
 </script>
 @endsection
