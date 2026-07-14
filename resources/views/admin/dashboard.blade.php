@@ -12,7 +12,7 @@ $cards = [
     ['label' => 'Active Cases',    'value' => $stats['active_cases'],    'icon' => 'folder2-open',    'color' => '#ffc107', 'link' => route('admin.cases.index')],
     ['label' => 'Clinicians',      'value' => $stats['clinicians'],      'icon' => 'person-badge',    'color' => '#2dc653', 'link' => route('admin.clinicians.index')],
     ['label' => 'Orders Today',    'value' => $stats['orders_today'],    'icon' => 'cart-check',      'color' => '#6c757d', 'link' => null],
-    ['label' => 'Completed Today', 'value' => $stats['completed_today'], 'icon' => 'clipboard-check', 'color' => '#20c997', 'link' => route('admin.cases.index') . '?status=completed'],
+    ['label' => 'Completed Cases', 'value' => $stats['completed_today'], 'icon' => 'clipboard-check', 'color' => '#20c997', 'link' => route('admin.cases.index') . '?status=completed'],
 ];
 
 // Status config: label, color, icon

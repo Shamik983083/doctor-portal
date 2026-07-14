@@ -19,7 +19,7 @@ class DashboardController extends Controller
             'active_cases'    => PatientCase::whereNotIn('status', ['completed', 'cancelled'])->count(),
             'clinicians'      => Clinician::where('status', 'active')->count(),
             'orders_today'    => Order::whereDate('created_at', today())->count(),
-            'completed_today' => PatientCase::where('status', 'completed')->whereDate('completed_at', today())->count(),
+            'completed_today' => PatientCase::where('status', 'completed')->count(),
         ];
 
         $casesByStatus = PatientCase::selectRaw('status, COUNT(*) as count')
