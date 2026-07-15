@@ -210,4 +210,25 @@
     .ma-reason-codes { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
     .ma-reason-codes li { font-size: .78rem; color: var(--ma-muted); display: flex; align-items: center; gap: .4rem; }
     .ma-reason-codes li::before { content: ""; width: .35rem; height: .35rem; border-radius: 999px; background: var(--ma-accent); flex: 0 0 auto; }
+
+    /* ── Responsive overrides ────────────────────────────────── */
+    @media (max-width: 575.98px) {
+        /* Stack obs-grid to single column on mobile */
+        .ma-obs-grid { grid-template-columns: 1fr; }
+
+        /* Scroll matrix horizontally rather than overflow on mobile */
+        .ma-matrix { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .ma-matrix-head, .ma-matrix-row { min-width: 480px; }
+
+        /* Stack triage banner vertically on mobile */
+        .ma-surface .card-body.d-flex { flex-direction: column; align-items: flex-start !important; }
+        .ma-surface .card-body.d-flex .ms-auto { margin-left: 0 !important; max-width: 100% !important; }
+
+        /* Tighten metric grid on very small screens */
+        .ma-metric-grid { grid-template-columns: 1fr 1fr; }
+        .ma-metric .ma-metric-value { font-size: 1.3rem; }
+
+        /* Quick-review grid: single column */
+        .ma-quick-grid { grid-template-columns: 1fr; }
+    }
 </style>
