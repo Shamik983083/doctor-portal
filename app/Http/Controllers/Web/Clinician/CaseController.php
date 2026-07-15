@@ -69,7 +69,64 @@ class CaseController extends Controller
             'green'  => (int) $triageCounts->get(PatientCase::TRIAGE_GREEN, 0),
         ];
 
-        return view('clinician.cases.queue', compact('cases', 'clinician', 'triageMetrics'));
+        // Quick-review panel — top case drives summary, intake, and triage findings
+        $topCase = $cases->first();
+        if ($topCase) {
+            $topCase->load(['caseQuestions', 'questionnaireResponses.answers', 'clinician.user']);
+        }
+
+        $intake = collect();
+        if ($topCase) {
+            $fromQuestions = $topCase->caseQuestions
+                ->map(fn($q) => ['q' => $q->question, 'a' => $q->answer])
+                ->filter(fn($r) => filled($r['q']));
+            $intake = $fromQuestions->isNotEmpty()
+                ? $fromQuestions->values()
+                : $topCase->questionnaireResponses->flatMap->answers
+                    ->map(fn($a) => ['q' => $a->question_text, 'a' => $a->answer])
+                    ->filter(fn($r) => filled($r['q']))->values();
+        }
+
+        $aiSummary = [];
+        if ($topCase) {
+            $bullets = ['Triage classification: ' . $topCase->triageLabel() . ' — ' . $topCase->triageMeaning()];
+            $p = $topCase->patient;
+            if ($p) {
+                $demo = array_filter([
+                    $p->gender ? ucfirst($p->gender) : null,
+                    $p->age    ? $p->age . ' yrs'   : null,
+                    !is_null($p->bmi) ? 'BMI ' . number_format((float) $p->bmi, 1) : null,
+                ]);
+                if ($demo) { $bullets[] = 'Patient: ' . implode(' · ', $demo) . '.'; }
+                $bullets[] = 'Identity verification: ' . (strtolower($p->id_verified_status ?? '') === 'verified' ? 'verified.' : 'not verified.');
+            }
+            $offerings = $topCase->caseOfferings->map(fn($co) => optional($co->offering)->name)->filter()->implode(', ');
+            if ($offerings) { $bullets[] = 'Requested offerings: ' . $offerings . '.'; }
+            $reasons = collect($topCase->triage_reasons ?? []);
+            if ($reasons->isNotEmpty()) { $bullets[] = 'Triage signals: ' . $reasons->take(3)->implode('; ') . '.'; }
+            foreach (collect($intake)->take(4) as $a) {
+                $bullets[] = $a['q'] . ': ' . \Illuminate\Support\Str::limit((string) $a['a'], 80);
+            }
+            $aiSummary = $bullets;
+        }
+
+        $heldCases   = $cases->getCollection()->filter(fn($c) => $c->hold_status || $c->status === 'support')->values();
+        $messages    = \App\Models\Message::with(['patient', 'case.patient'])->latest()->limit(6)->get();
+        $videoStates = ['CA', 'NY', 'TX'];
+        $note        = \App\Models\ClinicalNote::with(['clinician.user', 'case.patient'])->latest()->first();
+        $reasonCodes = [
+            'Dose exceeds protocol titration step',
+            'Active workflow hold not cleared',
+            'Identity verification incomplete',
+            'Allergy conflict requires clinician review',
+            'Out-of-catalog request for patient state',
+        ];
+
+        return view('clinician.cases.queue', compact(
+            'cases', 'clinician', 'triageMetrics',
+            'topCase', 'intake', 'aiSummary',
+            'heldCases', 'messages', 'videoStates', 'note', 'reasonCodes'
+        ));
     }
 
     public function show(string $uuid)
