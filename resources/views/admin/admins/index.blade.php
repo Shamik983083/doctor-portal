@@ -65,24 +65,24 @@
                         </td>
                         <td><small>{{ $admin->created_at->format('M j, Y') }}</small></td>
                         <td class="text-nowrap">
-                            <a href="{{ route('admin.admins.show', $admin->id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                            <a href="{{ route('admin.admins.show', $admin->id) }}" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
 
                             @if($admin->id !== Auth::id())
                                 @if($admin->hasRole('admin'))
                                     <form method="POST" action="{{ route('admin.admins.promote', $admin->id) }}" class="d-inline">
                                         @csrf @method('PATCH')
-                                        <button class="btn btn-sm btn-outline-warning" onclick="return confirm('Promote {{ addslashes($admin->name) }} to Super Admin?')">Promote</button>
+                                        <button class="btn btn-sm btn-outline-warning" title="Promote to Super Admin" onclick="return confirm('Promote {{ addslashes($admin->name) }} to Super Admin?')"><i class="bi bi-arrow-up-circle"></i></button>
                                     </form>
                                 @else
                                     <form method="POST" action="{{ route('admin.admins.demote', $admin->id) }}" class="d-inline">
                                         @csrf @method('PATCH')
-                                        <button class="btn btn-sm btn-outline-secondary" onclick="return confirm('Demote {{ addslashes($admin->name) }} to Admin?')">Demote</button>
+                                        <button class="btn btn-sm btn-outline-secondary" title="Demote to Admin" onclick="return confirm('Demote {{ addslashes($admin->name) }} to Admin?')"><i class="bi bi-arrow-down-circle"></i></button>
                                     </form>
                                 @endif
 
                                 <form method="POST" action="{{ route('admin.admins.destroy', $admin->id) }}" class="d-inline">
                                     @csrf @method('DELETE')
-                                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Permanently delete {{ addslashes($admin->name) }}? This cannot be undone.')">Delete</button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete" onclick="return confirm('Permanently delete {{ addslashes($admin->name) }}? This cannot be undone.')"><i class="bi bi-trash"></i></button>
                                 </form>
                             @endif
                         </td>
