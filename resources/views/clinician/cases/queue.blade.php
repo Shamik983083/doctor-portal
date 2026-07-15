@@ -282,7 +282,7 @@
     <div class="card">
         <div class="card-header">
             <div class="ma-eyebrow">Recorded intake</div>
-            <div class="ma-title">Intake summary@if($topCase) <span class="ma-sub" style="font-weight:400">· {{ $topCase->patient?->full_name ?? 'Patient' }}</span>@endif</div>
+            <div class="ma-title">Intake summary@if($topCase) <span class="ma-sub" style="font-weight:400">· {{ optional($topCase->patient)->full_name ?? 'Patient' }}</span>@endif</div>
             <div class="ma-sub">Questionnaire answers for the top case — source of truth behind triage classification.</div>
         </div>
         <div class="card-body">
