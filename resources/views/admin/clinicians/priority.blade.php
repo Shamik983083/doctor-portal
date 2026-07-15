@@ -16,9 +16,6 @@
     </div>
 </div>
 
-@if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
-@endif
 
 <div id="save-toast" class="position-fixed bottom-0 end-0 p-3" style="z-index:2000; display:none;">
     <div class="toast show align-items-center text-bg-success border-0">

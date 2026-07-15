@@ -77,12 +77,6 @@
                 @endif
             </div>
             <div class="card-body">
-                @if(session('success'))
-                    <div class="alert alert-success py-1 small">{{ session('success') }}</div>
-                @endif
-                @if(session('error'))
-                    <div class="alert alert-danger py-1 small">{{ session('error') }}</div>
-                @endif
                 @if($isReassign)
                     <p class="text-muted small mb-2">
                         Currently assigned to <strong>{{ $case->clinician?->full_name ?? '—' }}</strong>.
@@ -125,16 +119,6 @@
             </div>
         </div>
         @else
-        <div class="card mb-3">
-            <div class="card-body py-2 px-3">
-                @if(session('success'))
-                    <div class="alert alert-success py-1 small mb-0">{{ session('success') }}</div>
-                @endif
-                @if(session('error'))
-                    <div class="alert alert-danger py-1 small mb-0">{{ session('error') }}</div>
-                @endif
-            </div>
-        </div>
         @endif
 
     </div>
