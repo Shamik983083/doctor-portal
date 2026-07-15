@@ -17,6 +17,7 @@ use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController
 use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeliveryController;
 use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
+use App\Http\Controllers\Web\MaPortalController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
 use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingController;
 use App\Http\Controllers\Web\Partner\PatientController as PartnerPatientController;
@@ -41,6 +42,14 @@ Route::get('/', fn() => redirect('/login'));
 Route::prefix('forms')->name('forms.')->group(function () {
     Route::get('/{uuid}',  [QuestionnaireFormController::class, 'show'])->name('show');
     Route::post('/{uuid}', [QuestionnaireFormController::class, 'submit'])->name('submit');
+});
+
+// MA-Portal role-view preview — read-only showcase, any authenticated user
+Route::prefix('ma-portal')->middleware(['auth'])->name('ma-portal.')->group(function () {
+    Route::get('/', fn () => redirect()->route('ma-portal.practitioner'));
+    Route::get('/practitioner', [MaPortalController::class, 'practitioner'])->name('practitioner');
+    Route::get('/admin', [MaPortalController::class, 'admin'])->name('admin');
+    Route::get('/super-admin', [MaPortalController::class, 'superAdmin'])->name('super-admin');
 });
 
 // Clinician Portal

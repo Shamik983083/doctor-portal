@@ -15,6 +15,7 @@ class CaseStateMachine
     public function __construct(
         private WebhookDispatcher $webhookDispatcher,
         private CaseAutoAssigner $autoAssigner,
+        private TriageClassifier $triageClassifier,
     ) {}
 
     public function transition(PatientCase $case, string $toStatus, array $context = []): PatientCase
@@ -72,6 +73,13 @@ class CaseStateMachine
 
         $case->refresh();
         $this->dispatchWebhookEvent($case, $toStatus);
+
+        // Classify triage band as the case enters the review queue — runs before
+        // auto-assign so the band is set whether or not a clinician is immediately available.
+        if ($toStatus === PatientCase::STATUS_WAITING) {
+            $case->loadMissing(['patient', 'caseOfferings.offering', 'caseQuestions']);
+            $this->triageClassifier->apply($case);
+        }
 
         // Auto-assign when entering the waiting queue, unless the caller is about to manually assign
         if ($toStatus === PatientCase::STATUS_WAITING && empty($context['skip_auto_assign'])) {

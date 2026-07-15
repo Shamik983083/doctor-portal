@@ -4,7 +4,33 @@
 @section('page-title', 'Case Review — ' . substr($case->uuid, 0, 8))
 
 @section('content')
-<div class="row g-4">
+<x-ma-styles />
+<div class="row g-4 ma-surface">
+
+    {{-- Triage banner --}}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex flex-wrap align-items-center gap-3">
+                <div>
+                    <div class="ma-eyebrow">Triage classification</div>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <x-triage-pill :case="$case" />
+                        <span class="ma-sub mb-0">{{ $case->triageMeaning() }}</span>
+                    </div>
+                </div>
+                @if(!empty($case->triage_reasons))
+                <div class="ms-auto" style="max-width:65%">
+                    <div class="ma-eyebrow mb-1">Signals ({{ $case->triage_ruleset }})</div>
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach($case->triage_reasons as $reason)
+                            <span class="ma-pill neutral" title="{{ $reason }}">{{ \Illuminate\Support\Str::before($reason, ':') }}</span>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
 
     {{-- Left: Patient + Case Info --}}
     <div class="col-lg-4">

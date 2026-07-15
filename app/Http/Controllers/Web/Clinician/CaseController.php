@@ -41,11 +41,30 @@ class CaseController extends Controller
                 $p->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ['%' . $request->search . '%'])
             ))
             ->when($request->filled('partner_id'), fn($q) => $q->where('partner_id', $request->partner_id))
+            ->when($request->filled('triage'), fn($q) => $q->where('triage', $request->triage))
+            ->orderByRaw("FIELD(triage, 'red', 'yellow', 'green') DESC")
             ->orderBy('created_at')
             ->paginate(20)
             ->withQueryString();
 
-        return view('clinician.cases.queue', compact('cases', 'clinician'));
+        $openStatuses = [
+            PatientCase::STATUS_WAITING,
+            PatientCase::STATUS_ASSIGNED,
+            PatientCase::STATUS_SUPPORT,
+        ];
+        $triageCounts = PatientCase::whereIn('status', $openStatuses)
+            ->selectRaw('triage, COUNT(*) as total')
+            ->groupBy('triage')
+            ->pluck('total', 'triage');
+
+        $triageMetrics = [
+            'open'   => (int) $triageCounts->sum(),
+            'red'    => (int) $triageCounts->get(PatientCase::TRIAGE_RED, 0),
+            'yellow' => (int) $triageCounts->get(PatientCase::TRIAGE_YELLOW, 0),
+            'green'  => (int) $triageCounts->get(PatientCase::TRIAGE_GREEN, 0),
+        ];
+
+        return view('clinician.cases.queue', compact('cases', 'clinician', 'triageMetrics'));
     }
 
     public function show(string $uuid)
