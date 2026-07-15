@@ -70,6 +70,7 @@ Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name(
         Route::get('/{uuid}/messages/poll', [ClinicianCaseController::class, 'pollMessages'])->name('messages.poll');
         Route::post('/{uuid}/files', [ClinicianCaseController::class, 'uploadFile'])->name('files.store');
         Route::delete('/{uuid}/files/{fileUuid}', [ClinicianCaseController::class, 'deleteFile'])->name('files.destroy');
+        Route::get('/{uuid}/prescription-document/{documentUuid}', [ClinicianCaseController::class, 'downloadPrescriptionDocument'])->name('prescription-document.download');
     });
 
     Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');

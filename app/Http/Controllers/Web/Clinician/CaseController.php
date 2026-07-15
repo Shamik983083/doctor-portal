@@ -11,17 +11,22 @@ use App\Models\PatientCase;
 use App\Models\PatientFile;
 use App\Services\CaseStateMachine;
 use App\Services\FileUploadService;
+use App\Services\PharmacyDispatchService;
+use App\Services\PrescriptionDocumentService;
 use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CaseController extends Controller
 {
     public function __construct(
-        private CaseStateMachine  $stateMachine,
-        private WebhookDispatcher $webhooks,
-        private FileUploadService $fileUploader,
+        private CaseStateMachine            $stateMachine,
+        private WebhookDispatcher           $webhooks,
+        private FileUploadService           $fileUploader,
+        private PrescriptionDocumentService $prescriptionDocuments,
+        private PharmacyDispatchService     $pharmacyDispatch,
     ) {}
 
     public function queue(Request $request)
@@ -185,6 +190,18 @@ class CaseController extends Controller
 
         // Complete immediately — no manual pharmacy step required.
         $this->stateMachine->complete($case);
+
+        // Generate the signed prescription PDF and queue it for pharmacy dispatch.
+        // Best-effort and fully feature-flagged — a failure here must never break case completion.
+        try {
+            $document = $this->prescriptionDocuments->generate($case, $prescription);
+            $this->pharmacyDispatch->queue($document);
+        } catch (\Throwable $e) {
+            Log::error('Prescription document/dispatch generation failed', [
+                'case_id' => $case->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
 
         // Fire prescription_written webhook alongside case_approved + case_completed.
         $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
@@ -369,6 +386,29 @@ class CaseController extends Controller
         );
 
         return back()->with('success', 'File uploaded successfully.');
+    }
+
+    public function downloadPrescriptionDocument(string $uuid, string $documentUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $document = \App\Models\PrescriptionDocument::where('uuid', $documentUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        $disk = config('dispatch.documents_disk', 'local');
+
+        abort_unless(
+            \Illuminate\Support\Facades\Storage::disk($disk)->exists($document->document_path),
+            404,
+            'Prescription document is no longer available.'
+        );
+
+        return \Illuminate\Support\Facades\Storage::disk($disk)->download(
+            $document->document_path,
+            "prescription-{$case->uuid}.pdf",
+            ['Content-Type' => 'application/pdf']
+        );
     }
 
     public function deleteFile(string $uuid, string $fileUuid)
