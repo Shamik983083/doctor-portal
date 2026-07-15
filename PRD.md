@@ -1,6 +1,6 @@
 # Doctor Portal — Product Requirements Document
 
-**Last Updated:** 2026-07-09 (rev 4)
+**Last Updated:** 2026-07-15 (rev 5)
 **Status:** In Development
 **Stack:** Laravel 12, PHP 8.2, Bootstrap 5, MySQL (XAMPP), Laravel Passport 13.7, Spatie Permission 6.25
 
@@ -14,12 +14,21 @@ A Telehealth & E-Prescribing Integration Platform. Healthcare partners can submi
 
 ## Roles & Authentication
 
-| Role | Login | Entry Point |
-|------|-------|-------------|
-| **Admin** | Email + password | `/admin/dashboard` |
-| **Clinician** | Email + password | `/clinician/dashboard` |
-| **Partner (web)** | Email + password | `/partner/dashboard` |
-| **Partner (API)** | OAuth2 client credentials | `POST /api/partner/auth/token` |
+| Role | Login | Entry Point | Notes |
+|------|-------|-------------|-------|
+| **Super Admin** | Email + password | `/admin/dashboard` | Full access to everything including Admin Users management |
+| **Admin** | Email + password | `/admin/dashboard` | All admin features except Admin Users management |
+| **Clinician** | Email + password | `/clinician/dashboard` | |
+| **Partner (web)** | Email + password | `/partner/dashboard` | |
+| **Partner (API)** | OAuth2 client credentials | `POST /api/partner/auth/token` | |
+
+### Spatie Role Names
+| Role | Name | Middleware |
+|------|------|-----------|
+| Super Admin | `super_admin` | `role:admin\|super_admin` (admin routes) + `role:super_admin` (admin users routes) |
+| Admin | `admin` | `role:admin\|super_admin` |
+| Clinician | `clinician` | `role:clinician` |
+| Partner (web) | `partner` | `role:partner` |
 
 ---
 
@@ -126,6 +135,17 @@ The questionnaire builder **auto-populates the field key** as the admin types th
 
 ## Module 1: Admin Flows
 
+### Admin Users — Super Admin Only (`/admin/admins`)
+Visible only to users with the `super_admin` role (sidebar section hidden from regular admins).
+
+- **List** all admin and super admin users with search (name/email) and role filter
+- **Create** new admin or super admin account (name, email, password, role)
+- **Promote** an Admin to Super Admin
+- **Demote** a Super Admin to Admin
+- **Delete** any admin user (cannot delete own account)
+- **"You" badge** on the logged-in user's row; all destructive actions blocked on self
+- All actions in the table use icon buttons (`bi-eye`, `bi-arrow-up-circle`, `bi-arrow-down-circle`, `bi-trash`) with tooltip titles
+
 ### Partners (`/admin/partners`)
 - Create partner → auto-generates OAuth2 client ID + secret (Passport 13 client_credentials grant)
 - Add portal users to a partner (role: `partner`)
@@ -144,7 +164,9 @@ The questionnaire builder **auto-populates the field key** as the admin types th
 - Changes take effect immediately for new cases entering the waiting queue
 
 ### Cases (`/admin/cases`)
-- List all cases across all partners/clinicians with filters (status, partner, clinician)
+Redesigned using the MA Portal design system. Full case list:
+- Filters: patient name search, triage dropdown (red/yellow/green), status, partner, clinician
+- Table has a **Triage** column with `ma-pill` (green/yellow/red); offerings use `ma-pill neutral`
 - **Assign** clinician to any `created` or `waiting` case
 - **Reassign** clinician to an already-`assigned` case (no status change, logged as `clinician_reassigned` event)
 - Case detail tabs: **Intake, Questionnaires, Prescriptions, Clinical Notes, Messages, Files, Timeline**
@@ -205,12 +227,30 @@ Three built-in integration guides for sharing with partner developers:
 - **Guide: Anti-Aging API** (`/admin/guide/antiaging-api`) — equivalent guide for the Anti-Aging program (Metformin, NAD+, Glutathione), same structure as the Weight Loss guide with live question IDs from the Anti-Aging questionnaire
 
 ### Admin Dashboard (`/admin/dashboard`)
-Professional analytics dashboard with Chart.js 4.4 charts:
-- **Stat cards** — color-tinted icon circles with left-border accent for total cases, waiting, active, and completed
-- **Doughnut chart** — cases by status; 72% cutout with total count in center; clickable legend
-- **Area/line chart** — 30-day case creation trend with gradient fill
-- **Horizontal bar chart** — top 10 clinician active case workload (`indexAxis: 'y'`); indigo-to-violet palette
-- **Recent cases table** — avatar initials, clinician name or "Unassigned" fallback, status badge
+Fully redesigned using the MA Portal design system (`<x-ma-styles />`). Professional analytics dashboard with Chart.js 4.4 charts:
+
+**Metric grid (6 clickable stat cards):** Total Cases, Waiting, Assigned, Completed, Approval Rate, Avg Review Time
+
+**Storefront workload table:** Per-partner row with open / green / yellow / red case counts
+
+**Provider load bars:** Active cases vs cap with ≥ 85% warning threshold; 2-column layout with exception center panel showing:
+- Workflow holds (yellow)
+- Support escalations (red)
+- Missing IDV (yellow)
+- Cancellations in last 7 days (neutral)
+
+**Operational report (2-column):**
+- TTFR (time-to-first-response), TTD (time-to-decision), approval rate, throughput metrics
+- Triage volume bar chart (using `FIELD(triage,...)` ordering)
+
+**Charts (Chart.js 4.4.0 from CDN):**
+- **Doughnut** — cases by status; 72% cutout with total count in center
+- **Area/line trend** — 30-day case creation trend with gradient fill
+- **Horizontal bar** — top 10 clinician active case workload (`indexAxis: 'y'`); teal accent (`#0d9488`)
+
+**Webhook delivery log:** Latest 6 deliveries with status badges + failed count
+
+**Recent cases table:** With triage `ma-pill` badges (green/yellow/red)
 
 ### SLA Configuration (`/admin/settings`)
 Admin-editable Service Level Agreement deadlines — no code deploy needed:
@@ -225,6 +265,81 @@ Admin-editable Service Level Agreement deadlines — no code deploy needed:
 - Sidebar link under **Configuration → Settings** with `bi-sliders` icon
 - Validation: pickup/review max 168h; total max 720h
 - Info panel on the settings page explains the three clocks and the green/amber/red thresholds
+
+---
+
+---
+
+## Module 1b: Triage Classification
+
+Every case is automatically classified into a triage band as it enters the `waiting` queue. This is a **review-priority signal for clinicians, not a clinical decision**.
+
+### Bands
+
+| Band | Meaning | Display |
+|------|---------|---------|
+| `red` | Critical — high BMI, multiple contraindications, or complex history | Red pill — "review carefully" |
+| `yellow` | Borderline — one or more flags worth a closer look | Yellow pill — "closer look" |
+| `green` | Routine — no significant flags raised | Green pill — "routine" |
+| `null` | Not yet classified (cases created before triage was deployed) | Greyed out — "Not yet classified" |
+
+### How It Works
+
+1. `CaseStateMachine::transition()` detects `$toStatus === STATUS_WAITING`
+2. Calls `TriageClassifier::apply($case)` — runs before auto-assignment
+3. `TriageClassifier` evaluates the case against rules in `config/triage.php`:
+   - BMI thresholds
+   - Questionnaire answer flags
+   - Medical conditions
+   - Offering-specific contraindications
+4. Writes `triage`, `triage_reasons` (JSON array of signal strings), `triage_ruleset` label, and `triaged_at` to the case record
+5. Case is then auto-assigned by `CaseAutoAssigner` (triage band already set)
+
+### Triage Backfill
+
+Existing cases created before triage deployment have `triage = NULL`. Run once to classify them:
+```bash
+php artisan triage:backfill
+```
+
+### Demo Seeder
+
+```bash
+php artisan db:seed --class=TriageDemoCasesSeeder
+```
+
+Creates sample cases across all three triage bands for UI testing.
+
+---
+
+## Module 1c: Pharmacy Dispatch
+
+When a clinician clicks **"Send to Pharmacy"**, the `PharmacyDispatchService` and `PrescriptionDocumentService` are invoked alongside the case state transition.
+
+### Pharmacy Gateways
+
+| Adapter | Used For |
+|---------|---------|
+| `LifeFilePharmacyAdapter` | LifeFile pharmacy integration |
+| `MockPharmacyAdapter` | Local/staging testing without a real gateway |
+
+Gateway selection is driven by `config/dispatch.php` and the offering's `pharmacy_type` field.
+
+### Dispatch Flow
+
+1. Clinician submits prescription → case transitions `approved`
+2. Clinician clicks "Send to Pharmacy" → `POST /clinician/cases/{uuid}/processing`
+3. `PrescriptionDocumentService` generates a `PrescriptionDocument` record (PDF-ready)
+4. `PharmacyDispatchService` dispatches `DispatchPharmacyOrderJob` to the queue
+5. Job calls the configured gateway adapter; result stored in `pharmacy_dispatches` table
+6. Case transitions `processing → completed` automatically; both webhooks fire
+
+### New Tables
+
+| Table | Purpose |
+|-------|---------|
+| `prescription_documents` | Generated prescription documents linked to case/prescription |
+| `pharmacy_dispatches` | Dispatch attempt log per case (status, gateway response, timestamps) |
 
 ---
 
@@ -253,16 +368,47 @@ Analytics dashboard scoped to the logged-in clinician:
 - Label shows "X.Xh left" while on track
 
 ### Queue (`/clinician/cases/queue`)
-- See all `waiting` cases; claim one to self-assign (→ `assigned`)
+Redesigned using the MA Portal design system. Full-featured provider review queue:
 
-### Case Detail Tabs
-Questionnaires, Prescriptions, Clinical Notes, Messages, Files, Timeline
+**Triage metric cards (4):** Open in Queue, Red, Yellow, Green — live counts from open-status cases only (`waiting`, `assigned`, `support`)
+
+**Card header:**
+- Eyebrow: "Provider review queue"
+- Title: "Fast review, full context one click away"
+- Subtitle: "Highest-attention cases surface first. Triage is a review-priority signal, not a clinical decision."
+- Legend pills: Red · review carefully, Yellow · closer look, Green · routine
+
+**Filters:** Patient name search, All Triage dropdown (red/yellow/green), All States dropdown (50 US states), All Statuses dropdown
+
+**Table columns:** Checkbox (batch), Triage pill, Time, Patient (with unread message badge), IDV, Sex, Age, BMI, Offerings, Video Visit, Company, Status, Actions
+
+**Triage sort order:** Red first, then yellow, then green, then NULL (existing cases) — via `FIELD(triage,'red','yellow','green') DESC`
+
+**Batch Review:**
+- Checkboxes on eligible rows (Green triage + waiting/assigned + no hold + not support)
+- Select-all checkbox in header
+- Batch card shows case count badge, step indicators (Select → Preflight → Attest → Approve)
+- "Run preflight" button POSTs to `clinician.cases.batch.preflight` — server revalidates each case (state availability, offerings, hold status) and returns pass/fail table
+- Attestation checkbox: "I have reviewed each case above and attest that each prescription is clinically appropriate"
+- Submit POSTs to `clinician.cases.batch.submit` — wraps all case transitions in `DB::transaction()`, calls `CaseStateMachine` for each; shows results and reloads after 2.5 s
+- Webhooks fire automatically per case via `CaseStateMachine`
+
+### Case Detail (`/clinician/cases/{uuid}`)
+**Triage banner** at top of page (before the main content grid):
+- Eyebrow: "Triage classification"
+- `<x-triage-pill>` component showing the case's band
+- `$case->triageMeaning()` text: "Critical — review carefully before approving" / "Borderline — closer look recommended" / "Routine — no flags raised" / "Not yet classified"
+- Triage signals panel (right side): shows `triage_ruleset` label + each signal as a `ma-pill neutral` badge
+- NULL triage (existing cases) shows graceful "Not yet classified" fallback — no PHP error
+
+**Tabs:** Questionnaires, Prescriptions, Clinical Notes, Messages, Files, Timeline
 
 **Professional chat UI** on the Messages tab:
 - Avatar circle with initials (indigo for clinician "You", green for patient)
 - Shaped bubbles: clinician side rounded `16px 4px 16px 16px`, patient side `4px 16px 16px 16px`
 - Date separators with HR lines between day groups
 - `#f8f9fc` chat background
+- Real-time polling: JS polls `GET /clinician/cases/{uuid}/messages/poll` every 5 seconds; new messages appended without page reload
 
 ### Assigned Case Actions
 
@@ -529,36 +675,39 @@ Central service used by both the web form and the Partner API.
 
 ## Permissions Matrix
 
-| Action | Admin | Clinician | Partner Web | Partner API |
-|--------|:-----:|:---------:|:-----------:|:-----------:|
-| Create partner / clinician | ✓ | — | — | — |
-| Create / edit offering | ✓ | — | ✓ | ✓ |
-| Approve / reject offering | ✓ | — | — | — |
-| Delete / toggle offering active | ✓ | — | ✓ | — |
-| Submit case via API | — | — | — | ✓ |
-| Upload file via API | — | — | — | ✓ |
-| View all cases | ✓ | ✓ (queue) | ✓ (support-only) | ✓ (own) |
-| Assign clinician to case | ✓ | ✓ (self) | — | — |
-| Reassign clinician to assigned case | ✓ | — | — | — |
-| Approve case (via prescription flow) | — | ✓ | — | — |
-| Submit prescription | — | ✓ | — | — |
-| Assign offerings to case | — | ✓ (via prescription) | — | — |
-| View prescriptions | ✓ | ✓ | — | — |
-| View questionnaire responses | ✓ | ✓ | — | — |
-| Escalate to support | — | ✓ | — | ✓ |
-| Return support case to clinician | — | — | ✓ | — |
-| Cancel case | ✓ | ✓ | ✓ | ✓ |
-| Send to pharmacy (Processing) | — | ✓ | — | — |
-| Add clinical note / message | — | ✓ | — | — |
-| Send / read messages via API | — | — | — | ✓ |
-| Upload / delete case files | ✓ | ✓ | — | — |
-| Update order / tracking | — | — | — | ✓ |
-| Manage webhooks | — | — | ✓ | ✓ |
-| View webhook delivery log | ✓ | — | — | — |
-| View patients | ✓ | — | ✓ (own) | ✓ (own) |
-| Manage questionnaires / question bank | ✓ | — | — | — |
-| Set clinician assignment priority | ✓ | — | — | — |
-| View developer guides | ✓ | — | — | — |
+| Action | Super Admin | Admin | Clinician | Partner Web | Partner API |
+|--------|:-----------:|:-----:|:---------:|:-----------:|:-----------:|
+| Manage admin users (create/promote/demote/delete) | ✓ | — | — | — | — |
+| Create partner / clinician | ✓ | ✓ | — | — | — |
+| Create / edit offering | ✓ | ✓ | — | ✓ | ✓ |
+| Approve / reject offering | ✓ | ✓ | — | — | — |
+| Delete / toggle offering active | ✓ | ✓ | — | ✓ | — |
+| Submit case via API | — | — | — | — | ✓ |
+| Upload file via API | — | — | — | — | ✓ |
+| View all cases | ✓ | ✓ | ✓ (queue) | ✓ (support-only) | ✓ (own) |
+| Assign clinician to case | ✓ | ✓ | ✓ (self) | — | — |
+| Reassign clinician to assigned case | ✓ | ✓ | — | — | — |
+| Batch review cases | — | — | ✓ (green triage only) | — | — |
+| Approve case (via prescription flow) | — | — | ✓ | — | — |
+| Submit prescription | — | — | ✓ | — | — |
+| Assign offerings to case | — | — | ✓ (via prescription) | — | — |
+| View prescriptions | ✓ | ✓ | ✓ | — | — |
+| View questionnaire responses | ✓ | ✓ | ✓ | — | — |
+| Escalate to support | — | — | ✓ | — | ✓ |
+| Return support case to clinician | — | — | — | ✓ | — |
+| Cancel case | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Send to pharmacy (Processing) | — | — | ✓ | — | — |
+| Add clinical note / message | — | — | ✓ | — | — |
+| Send / read messages via API | — | — | — | — | ✓ |
+| Upload / delete case files | ✓ | ✓ | ✓ | — | — |
+| Update order / tracking | — | — | — | — | ✓ |
+| Manage webhooks | — | — | — | ✓ | ✓ |
+| View webhook delivery log | ✓ | ✓ | — | — | — |
+| View patients | ✓ | ✓ | — | ✓ (own) | ✓ (own) |
+| Manage questionnaires / question bank | ✓ | ✓ | — | — | — |
+| Set clinician assignment priority | ✓ | ✓ | — | — | — |
+| View developer guides | ✓ | ✓ | — | — | — |
+| Run triage backfill | ✓ | ✓ | — | — | — |
 
 ---
 
@@ -567,16 +716,18 @@ Central service used by both the web form and the Partner API.
 | Table | Purpose |
 |-------|---------|
 | `settings` | Key-value store for configurable system settings (SLA deadlines, etc.); columns: `key` (unique), `value`, `label`, `group`, `type`, `description` |
-| `users` | Auth for all roles (admin, clinician, partner) |
+| `users` | Auth for all roles (super_admin, admin, clinician, partner) |
 | `partners` | Partner organisations |
 | `clinicians` | Clinician profiles; specialty, credentials, licensed states, priority, max_daily_cases |
 | `patients` | Patient records, scoped to partner; deduplicated by email+partner_id |
-| `cases` | Core case record with state-machine status column |
+| `cases` | Core case record with state-machine status column; includes `triage`, `triage_reasons` (JSON), `triage_ruleset`, `triaged_at` columns |
 | `case_notes` | Clinical notes (general/SOAP/progress) |
 | `case_messages` | Portal messages between clinician and partner |
 | `case_events` | Immutable audit trail for every state change |
 | `case_prescriptions` | Doctor-submitted prescriptions created on case approval |
 | `case_prescription_medications` | Individual medications within a prescription |
+| `prescription_documents` | Generated prescription documents linked to case/prescription (PDF-ready) |
+| `pharmacy_dispatches` | Pharmacy dispatch attempt log per case (gateway, status, response, timestamps) |
 | `files` | Uploaded files (`PatientFile` model); linked to case, patient, and/or partner |
 | `offerings` | Product/medication catalogue per partner; includes `approval_status`, `rejection_note` |
 | `offering_categories` | Category taxonomy; filters the prescription medication search |
@@ -588,7 +739,7 @@ Central service used by both the web form and the Partner API.
 | `webhooks` | Registered webhook endpoints per partner |
 | `webhook_deliveries` | Delivery log with retry state |
 | `oauth_clients` | Passport client credentials per partner (client_credentials grant) |
-| `jobs` | Laravel queue jobs table (webhooks, virus scans) |
+| `jobs` | Laravel queue jobs table (webhooks, virus scans, pharmacy dispatch) |
 | `failed_jobs` | Failed job log |
 | `sessions` | Database-backed sessions |
 
@@ -632,4 +783,16 @@ Central service used by both the web form and the Partner API.
 
 18. **No Vite/npm**: All frontend uses Bootstrap 5 + Bootstrap Icons + SortableJS via CDN. JavaScript is vanilla, written inline in Blade `@section('scripts')` blocks.
 
-19. **Queue-backed async work**: Webhook delivery (`SendWebhookJob` on `webhooks` queue) and virus scanning (`ScanUploadedFileJob` on `default` queue) are dispatched to the `database` queue. A queue worker must be running on production (`php artisan queue:work --queue=webhooks,default`) for these to execute. On local/dev, jobs sit in the `jobs` table until processed.
+19. **Queue-backed async work**: Webhook delivery (`SendWebhookJob` on `webhooks` queue), virus scanning (`ScanUploadedFileJob` on `default` queue), and pharmacy dispatch (`DispatchPharmacyOrderJob` on `default` queue) are dispatched to the `database` queue. A queue worker must be running on production (`php artisan queue:work --queue=webhooks,default`) for these to execute. On local/dev, jobs sit in the `jobs` table until processed.
+
+20. **Super Admin role isolation**: All admin routes use `role:admin|super_admin` (Spatie OR syntax). The Admin Users sub-routes additionally gate to `role:super_admin` only. The `super_admin` role is seeded with `Permission::all()` — it inherits every permission automatically. The sidebar Admin Users section is wrapped in `@role('super_admin')` so regular admins never see it.
+
+21. **Flash message ownership**: `layouts/app.blade.php` renders `session('success')` and `session('error')` globally. Individual views must never add their own flash blocks — doing so causes double flash rendering because the layout already handles it.
+
+22. **Triage is non-blocking**: `TriageClassifier::apply()` is called after the DB transaction commits and after the webhook fires. If classification fails (exception), it is caught internally and logged — the case still enters the queue with `triage = NULL`. The queue and case show handle NULL gracefully.
+
+23. **Batch review pre-flight**: The batch preflight endpoint (`POST clinician.cases.batch.preflight`) revalidates every selected case server-side (state, offering availability for patient's state, hold status) before showing the attestation step. The batch submit wraps all state machine calls in a single `DB::transaction()`. Webhooks fire per case from within `CaseStateMachine`.
+
+24. **MA Portal design system**: A suite of CSS utility classes loaded via `<x-ma-styles />` Blade component. Used on admin dashboard, admin cases index, clinician queue, and clinician case show. Classes: `ma-surface`, `ma-metric-grid`, `ma-metric`, `ma-pill` (red/yellow/green/neutral), `ma-dot`, `ma-eyebrow`, `ma-title`, `ma-sub`, `ma-legend`, `ma-provider-load`, `ma-barchart`, `ma-stat-grid`. The MA Portal preview views (`/ma-portal/practitioner`, `/ma-portal/admin`, `/ma-portal/super-admin`) use the `layouts/ma-portal.blade.php` layout.
+
+25. **Login redirect by role**: `LoginController::redirectAfterLogin()` checks roles in this order: `super_admin` → `admin` → `clinician` → `partner` → fallback `/login`. The super_admin check must come first because Spatie's `hasRole('admin')` returns `false` for super_admin (they are separate roles). Missing this order causes an infinite redirect loop for super admin logins.
