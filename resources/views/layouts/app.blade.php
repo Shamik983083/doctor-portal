@@ -18,7 +18,7 @@
         }
 
         /* ── Base ───────────────────────────────────────────── */
-        body { background: #f1f5f9; }
+        body { background: #f6f8fb; }
 
         /* ── Sidebar ────────────────────────────────────────── */
         .sidebar {
@@ -169,6 +169,9 @@
             .sidebar, .sidebar-overlay { transition: none; }
         }
     </style>
+
+    {{-- MA-DOCPORTAL design system promoted to global shell (O0.1) --}}
+    <x-ma-styles />
 </head>
 <body>
 
@@ -214,7 +217,7 @@
         </div>
 
         {{-- Flash messages + content --}}
-        <div class="page-content">
+        <div class="page-content ma-surface">
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show">
                     <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
