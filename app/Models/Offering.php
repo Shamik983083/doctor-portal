@@ -17,7 +17,7 @@ class Offering extends Model
         'pharmacy_type', 'pharmacy_name', 'pharmacy_notes',
         'compound_formula', 'refills', 'quantity', 'days_supply',
         'dispense_unit', 'dispense_units', 'days_until_dispense', 'directions',
-        'available_states', 'images', 'faqs', 'is_active', 'is_controlled_substance', 'metadata',
+        'available_states', 'video_required_states', 'images', 'faqs', 'is_active', 'is_controlled_substance', 'metadata',
         'approval_status', 'approved_by', 'approved_at', 'rejection_note',
     ];
 
@@ -26,6 +26,7 @@ class Offering extends Model
         'is_active' => 'boolean',
         'is_controlled_substance' => 'boolean',
         'available_states' => 'array',
+        'video_required_states' => 'array',
         'dispense_units' => 'array',
         'images' => 'array',
         'faqs' => 'array',
@@ -58,5 +59,11 @@ class Offering extends Model
     {
         if (empty($this->available_states)) return true;
         return \in_array(strtoupper($state), array_map('strtoupper', $this->available_states));
+    }
+
+    public function isVideoRequiredInState(string $state): bool
+    {
+        if (empty($this->video_required_states)) return false;
+        return \in_array(strtoupper($state), array_map('strtoupper', $this->video_required_states));
     }
 }

@@ -71,13 +71,15 @@ Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name(
         Route::post('/{uuid}/files', [ClinicianCaseController::class, 'uploadFile'])->name('files.store');
         Route::delete('/{uuid}/files/{fileUuid}', [ClinicianCaseController::class, 'deleteFile'])->name('files.destroy');
         Route::get('/{uuid}/prescription-document/{documentUuid}', [ClinicianCaseController::class, 'downloadPrescriptionDocument'])->name('prescription-document.download');
+        Route::post('/batch/preflight', [ClinicianCaseController::class, 'batchPreflight'])->name('batch.preflight');
+        Route::post('/batch/submit',    [ClinicianCaseController::class, 'batchSubmit'])->name('batch.submit');
     });
 
     Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
 });
 
 // Admin Console
-Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->group(function () {
+Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
 
     // Patients
@@ -192,6 +194,18 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     // Settings
     Route::get('/settings',  [AdminSettingsController::class, 'index'])->name('settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
+
+    // Admin Users (Super Admin only)
+    Route::prefix('admins')->name('admins.')->middleware('role:super_admin')->group(function () {
+        Route::get('/',         [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'index'])->name('index');
+        Route::get('/create',   [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'create'])->name('create');
+        Route::post('/',        [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'store'])->name('store');
+        Route::get('/{id}',     [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'show'])->name('show');
+        Route::patch('/{id}/toggle-active', [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'toggleActive'])->name('toggle-active');
+        Route::patch('/{id}/promote',       [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'promote'])->name('promote');
+        Route::patch('/{id}/demote',        [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'demote'])->name('demote');
+        Route::delete('/{id}',  [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'destroy'])->name('destroy');
+    });
 
     // Offering Categories
     Route::prefix('categories')->name('categories.')->group(function () {

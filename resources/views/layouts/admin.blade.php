@@ -98,6 +98,15 @@
             <i class="bi bi-sliders"></i> Settings
         </a>
     </li>
+    @role('super_admin')
+    <hr>
+    <li><span class="sidebar-section">Super Admin</span></li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.admins.*') ? 'active' : '' }}" href="{{ route('admin.admins.index') }}">
+            <i class="bi bi-shield-lock"></i> Admin Users
+        </a>
+    </li>
+    @endrole
 </ul>
 <div class="px-3 mt-3 pb-3" style="border-top:1px solid rgba(255,255,255,.06);">
     <small class="sidebar-section" style="padding:.5rem 0 0;">Admin Console</small>

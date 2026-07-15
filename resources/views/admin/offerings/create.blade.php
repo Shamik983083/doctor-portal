@@ -225,6 +225,27 @@
             <div id="qError" class="text-danger small mb-3" style="display:none">Please select at least one questionnaire.</div>
             @endif
 
+            {{-- Video visit required states --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Video Visit Required States</h6>
+            <p class="text-muted small mb-2">Select states where a synchronous video visit is required before prescribing this offering. Leave blank if no video requirement applies.</p>
+            <div class="d-flex gap-2 mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="selectAllVideo">Select All</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAllVideo">Clear All</button>
+            </div>
+            <div class="row row-cols-8 g-1 mb-3">
+                @foreach($usStates as $state)
+                <div class="col">
+                    <div class="form-check">
+                        <input class="form-check-input video-state-cb" type="checkbox"
+                               name="video_required_states[]" value="{{ $state }}"
+                               id="vs_{{ $state }}"
+                               {{ in_array($state, old('video_required_states', [])) ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="vs_{{ $state }}">{{ $state }}</label>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
             {{-- Flags --}}
             <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Flags</h6>
 
@@ -260,6 +281,10 @@
         document.querySelectorAll('.state-cb').forEach(cb => cb.checked = true));
     document.getElementById('clearAll').addEventListener('click', () =>
         document.querySelectorAll('.state-cb').forEach(cb => cb.checked = false));
+    document.getElementById('selectAllVideo').addEventListener('click', () =>
+        document.querySelectorAll('.video-state-cb').forEach(cb => cb.checked = true));
+    document.getElementById('clearAllVideo').addEventListener('click', () =>
+        document.querySelectorAll('.video-state-cb').forEach(cb => cb.checked = false));
 
     document.querySelectorAll('.q-check').forEach(function (cb) {
         cb.addEventListener('change', function () {

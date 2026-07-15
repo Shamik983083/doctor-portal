@@ -70,6 +70,7 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
+                            <th style="width:2rem"><input type="checkbox" id="batchSelectAll" class="form-check-input" title="Select all eligible"></th>
                             <th>Triage</th>
                             <th>Time</th>
                             <th>Patient</th>
@@ -88,10 +89,23 @@
                         @forelse($cases as $case)
                         @php
                             $st       = strtoupper($case->patient_state ?? optional($case->patient)->state ?? '');
-                            $videoReq = in_array($st, $videoStates, true);
+                            $videoReq = $st && $case->caseOfferings->some(fn($co) => optional($co->offering)->isVideoRequiredInState($st));
                             $idv      = strtolower($case->patient?->id_verified_status ?? '');
                         @endphp
-                        <tr>
+                        @php
+                            $batchEligible = $case->triage === 'green'
+                                && in_array($case->status, ['waiting', 'assigned'])
+                                && !$case->hold_status
+                                && $case->status !== 'support';
+                        @endphp
+                        <tr data-uuid="{{ $case->uuid }}" data-batch="{{ $batchEligible ? '1' : '0' }}">
+                            <td>
+                                @if($batchEligible)
+                                    <input type="checkbox" class="form-check-input batch-cb" data-uuid="{{ $case->uuid }}" title="Select for batch review">
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
                             <td><x-triage-pill :case="$case" /></td>
                             <td><small>{{ $case->created_at->diffForHumans(null, true) }}</small></td>
                             <td>
@@ -129,7 +143,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
+                        <tr><td colspan="13" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -144,7 +158,7 @@
     @if($topCase)
     @php
         $tcState = strtoupper($topCase->patient_state ?? optional($topCase->patient)->state ?? '');
-        $tcVideo = in_array($tcState, $videoStates, true);
+        $tcVideo = $tcState && $topCase->caseOfferings->some(fn($co) => optional($co->offering)->isVideoRequiredInState($tcState));
     @endphp
     <div class="card">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -317,26 +331,228 @@
         </div>
     </div>
 
-    {{-- Batch review (preview) --}}
-    <div class="card">
+    {{-- Batch review --}}
+    <div class="card" id="batchReviewCard">
         <div class="card-header d-flex justify-content-between align-items-center">
             <div>
                 <div class="ma-eyebrow">Batch review</div>
-                <div class="ma-title">Green batch: preflight → attest → submit</div>
-                <div class="ma-sub">Select batch-eligible Green cases, then run preflight. Each case is revalidated independently before a batch draft is seeded.</div>
+                <div class="ma-title">Green batch: preflight → attest → approve</div>
+                <div class="ma-sub">Select Green cases from the table above, run preflight, attest, and approve in one action.</div>
             </div>
-            <x-ma-preview-tag />
+            <span class="ma-pill neutral" id="batchCount">0 selected</span>
         </div>
         <div class="card-body">
             <ol class="ma-batch-steps">
-                <li class="done"><span class="ma-batch-dot"></span><div><strong>Select Green cases</strong><span>Only batch-eligible Green rows can enter the selection.</span></div><span class="ma-pill green">done</span></li>
-                <li class="active"><span class="ma-batch-dot"></span><div><strong>Per-case preflight</strong><span>Each case revalidated against true state (intake, triage, holds, eligibility, catalog).</span></div><span class="ma-pill yellow">active</span></li>
-                <li><span class="ma-batch-dot"></span><div><strong>Provider attestation</strong><span>One attestation covers the batch; each order keeps its own locked snapshot.</span></div><span class="ma-pill neutral">pending</span></li>
-                <li><span class="ma-batch-dot"></span><div><strong>Submit + delivery stagger</strong><span>Signed PDF per order dispatched through the outbox.</span></div><span class="ma-pill neutral">pending</span></li>
+                <li id="batchStep1"><span class="ma-batch-dot"></span><div><strong>Select Green cases</strong><span>Check rows in the queue table above. Only Green-triage cases in waiting or assigned status are eligible.</span></div><span class="ma-pill neutral" id="batchStep1Badge">waiting</span></li>
+                <li id="batchStep2"><span class="ma-batch-dot"></span><div><strong>Per-case preflight</strong><span>Each case revalidated: triage, holds, IDV, state eligibility.</span></div><span class="ma-pill neutral" id="batchStep2Badge">pending</span></li>
+                <li id="batchStep3"><span class="ma-batch-dot"></span><div><strong>Provider attestation</strong><span>Confirm you have reviewed all passing cases before approving.</span></div><span class="ma-pill neutral" id="batchStep3Badge">pending</span></li>
+                <li id="batchStep4"><span class="ma-batch-dot"></span><div><strong>Approve batch</strong><span>Each passing case transitions to approved status. Webhooks fire per case.</span></div><span class="ma-pill neutral" id="batchStep4Badge">pending</span></li>
             </ol>
-            <button class="btn btn-sm btn-primary" disabled title="Coming soon">Attest &amp; submit batch</button>
+            <button class="btn btn-sm btn-primary" id="batchPreflightBtn" disabled>Run preflight</button>
+        </div>
+    </div>
+
+    {{-- Batch preflight/attest modal --}}
+    <div class="modal fade" id="batchModal" tabindex="-1" aria-labelledby="batchModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="batchModalLabel">Batch preflight results</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="batchPreflightResults"></div>
+                    <div id="batchAttestSection" style="display:none" class="mt-3 p-3 border rounded bg-light">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="batchAttestCheck">
+                            <label class="form-check-label fw-semibold" for="batchAttestCheck">
+                                I have reviewed all passing cases above and attest that approving them is clinically appropriate.
+                            </label>
+                        </div>
+                    </div>
+                    <div id="batchSubmitResults" class="mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="batchSubmitBtn" disabled>Approve passing cases</button>
+                </div>
+            </div>
         </div>
     </div>
 
 </div>
+@endsection
+
+@section('scripts')
+<script>
+(function () {
+    const preflightUrl = '{{ route('clinician.cases.batch.preflight') }}';
+    const submitUrl    = '{{ route('clinician.cases.batch.submit') }}';
+    const csrf         = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    const selectAll      = document.getElementById('batchSelectAll');
+    const preflightBtn   = document.getElementById('batchPreflightBtn');
+    const batchCountEl   = document.getElementById('batchCount');
+    const batchStep1El   = document.getElementById('batchStep1');
+    const batchStep1Badge= document.getElementById('batchStep1Badge');
+    const batchStep2Badge= document.getElementById('batchStep2Badge');
+    const batchStep3Badge= document.getElementById('batchStep3Badge');
+    const batchStep4Badge= document.getElementById('batchStep4Badge');
+    const batchModal     = new bootstrap.Modal(document.getElementById('batchModal'));
+    const resultsEl      = document.getElementById('batchPreflightResults');
+    const attestSection  = document.getElementById('batchAttestSection');
+    const attestCheck    = document.getElementById('batchAttestCheck');
+    const submitBtn      = document.getElementById('batchSubmitBtn');
+    const submitResultsEl= document.getElementById('batchSubmitResults');
+
+    function getChecked() {
+        return [...document.querySelectorAll('.batch-cb:checked')].map(cb => cb.dataset.uuid);
+    }
+
+    function updateCount() {
+        const uuids = getChecked();
+        const n = uuids.length;
+        batchCountEl.textContent = n + ' selected';
+        batchCountEl.className = 'ma-pill ' + (n > 0 ? 'green' : 'neutral');
+        preflightBtn.disabled = n === 0;
+        batchStep1Badge.textContent = n > 0 ? n + ' selected' : 'waiting';
+        batchStep1Badge.className = 'ma-pill ' + (n > 0 ? 'green' : 'neutral');
+        if (batchStep1El) batchStep1El.className = n > 0 ? 'done' : '';
+    }
+
+    document.querySelectorAll('.batch-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+            updateCount();
+            const allCbs = document.querySelectorAll('.batch-cb');
+            selectAll.checked = allCbs.length > 0 && [...allCbs].every(c => c.checked);
+        });
+    });
+
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            document.querySelectorAll('.batch-cb').forEach(cb => { cb.checked = selectAll.checked; });
+            updateCount();
+        });
+    }
+
+    preflightBtn.addEventListener('click', async () => {
+        const uuids = getChecked();
+        if (!uuids.length) return;
+
+        preflightBtn.disabled = true;
+        preflightBtn.textContent = 'Running…';
+        batchStep2Badge.textContent = 'running';
+        batchStep2Badge.className = 'ma-pill yellow';
+        resultsEl.innerHTML = '';
+        attestSection.style.display = 'none';
+        attestCheck.checked = false;
+        submitBtn.disabled = true;
+        submitResultsEl.innerHTML = '';
+        batchModal.show();
+
+        try {
+            const res = await fetch(preflightUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ uuids })
+            });
+            const data = await res.json();
+
+            let passUuids = [];
+            let html = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Patient</th><th>Triage</th><th>Status</th><th>State</th><th>Result</th></tr></thead><tbody>';
+            for (const [uuid, r] of Object.entries(data)) {
+                if (r.pass) {
+                    passUuids.push(uuid);
+                    html += `<tr class="table-success"><td>${esc(r.patient)}</td><td>${esc(r.triage)}</td><td>${esc(r.status)}</td><td>${esc(r.state)}</td><td><span class="badge bg-success">Pass</span></td></tr>`;
+                } else {
+                    html += `<tr class="table-danger"><td colspan="4">${esc(r.reason ?? 'Unknown error')}</td><td><span class="badge bg-danger">Fail</span></td></tr>`;
+                }
+            }
+            html += '</tbody></table>';
+            resultsEl.innerHTML = html;
+
+            if (passUuids.length > 0) {
+                attestSection.style.display = '';
+                attestSection.dataset.passUuids = JSON.stringify(passUuids);
+                batchStep2Badge.textContent = passUuids.length + ' passing';
+                batchStep2Badge.className = 'ma-pill green';
+                batchStep3Badge.textContent = 'awaiting';
+                batchStep3Badge.className = 'ma-pill yellow';
+                document.getElementById('batchStep2').className = 'done';
+                document.getElementById('batchStep3').className = 'active';
+            } else {
+                batchStep2Badge.textContent = '0 passing';
+                batchStep2Badge.className = 'ma-pill red';
+            }
+        } catch (err) {
+            resultsEl.innerHTML = '<div class="alert alert-danger">Preflight request failed. Please try again.</div>';
+            batchStep2Badge.textContent = 'error';
+            batchStep2Badge.className = 'ma-pill red';
+        } finally {
+            preflightBtn.disabled = false;
+            preflightBtn.textContent = 'Run preflight';
+        }
+    });
+
+    attestCheck.addEventListener('change', () => {
+        submitBtn.disabled = !attestCheck.checked;
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        const passUuids = JSON.parse(attestSection.dataset.passUuids || '[]');
+        if (!passUuids.length) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Approving…';
+        batchStep4Badge.textContent = 'processing';
+        batchStep4Badge.className = 'ma-pill yellow';
+        document.getElementById('batchStep3').className = 'done';
+        document.getElementById('batchStep4').className = 'active';
+        submitResultsEl.innerHTML = '';
+
+        try {
+            const res = await fetch(submitUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ uuids: passUuids })
+            });
+            const data = await res.json();
+
+            let successCount = 0, failCount = 0;
+            let html = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Patient</th><th>Result</th></tr></thead><tbody>';
+            for (const [uuid, r] of Object.entries(data)) {
+                if (r.success) {
+                    successCount++;
+                    html += `<tr class="table-success"><td>${esc(r.patient)}</td><td><span class="badge bg-success">Approved</span></td></tr>`;
+                } else {
+                    failCount++;
+                    html += `<tr class="table-danger"><td>${esc(r.error ?? 'Unknown error')}</td><td><span class="badge bg-danger">Failed</span></td></tr>`;
+                }
+            }
+            html += '</tbody></table>';
+            submitResultsEl.innerHTML = html;
+
+            batchStep4Badge.textContent = successCount + ' approved';
+            batchStep4Badge.className = successCount > 0 ? 'ma-pill green' : 'ma-pill red';
+            document.getElementById('batchStep4').className = 'done';
+            submitBtn.textContent = 'Done';
+
+            if (successCount > 0) {
+                setTimeout(() => window.location.reload(), 2500);
+            }
+        } catch (err) {
+            submitResultsEl.innerHTML = '<div class="alert alert-danger">Submit request failed. Please try again.</div>';
+            batchStep4Badge.textContent = 'error';
+            batchStep4Badge.className = 'ma-pill red';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Approve passing cases';
+        }
+    });
+
+    function esc(str) {
+        if (str == null) return '—';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+})();
+</script>
 @endsection

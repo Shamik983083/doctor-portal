@@ -112,7 +112,6 @@ class CaseController extends Controller
 
         $heldCases   = $cases->getCollection()->filter(fn($c) => $c->hold_status || $c->status === 'support')->values();
         $messages    = \App\Models\Message::with(['patient', 'case.patient'])->latest()->limit(6)->get();
-        $videoStates = ['CA', 'NY', 'TX'];
         $note        = \App\Models\ClinicalNote::with(['clinician.user', 'case.patient'])->latest()->first();
         $reasonCodes = [
             'Dose exceeds protocol titration step',
@@ -125,7 +124,7 @@ class CaseController extends Controller
         return view('clinician.cases.queue', compact(
             'cases', 'clinician', 'triageMetrics',
             'topCase', 'intake', 'aiSummary',
-            'heldCases', 'messages', 'videoStates', 'note', 'reasonCodes'
+            'heldCases', 'messages', 'note', 'reasonCodes'
         ));
     }
 
@@ -479,5 +478,141 @@ class CaseController extends Controller
         $this->fileUploader->delete($file);
 
         return back()->with('success', 'File deleted.');
+    }
+
+    public function batchPreflight(Request $request)
+    {
+        $request->validate(['uuids' => 'required|array|min:1|max:20', 'uuids.*' => 'string']);
+
+        $clinician = Auth::user()->clinician;
+        $results   = [];
+
+        $cases = PatientCase::with(['patient', 'caseOfferings.offering'])
+            ->whereIn('uuid', $request->uuids)
+            ->get()
+            ->keyBy('uuid');
+
+        foreach ($request->uuids as $uuid) {
+            $case = $cases->get($uuid);
+
+            if (!$case) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case not found.'];
+                continue;
+            }
+
+            if ($case->triage !== PatientCase::TRIAGE_GREEN) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Only Green-triage cases are batch-eligible.'];
+                continue;
+            }
+
+            if ($case->hold_status) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case has an active workflow hold.'];
+                continue;
+            }
+
+            if ($case->status === PatientCase::STATUS_SUPPORT) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case is escalated to support.'];
+                continue;
+            }
+
+            if (!in_array($case->status, [PatientCase::STATUS_WAITING, PatientCase::STATUS_ASSIGNED])) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case is not in a reviewable status.'];
+                continue;
+            }
+
+            if ($case->status === PatientCase::STATUS_ASSIGNED && $case->clinician_id !== $clinician?->id) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case is assigned to another clinician.'];
+                continue;
+            }
+
+            $idv = strtolower($case->patient?->id_verified_status ?? '');
+            if ($idv !== 'verified') {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Patient identity not verified.'];
+                continue;
+            }
+
+            $state = strtoupper($case->patient_state ?? $case->patient?->state ?? '');
+            if ($state) {
+                foreach ($case->caseOfferings as $co) {
+                    if ($co->offering && !$co->offering->isAvailableInState($state)) {
+                        $results[$uuid] = ['pass' => false, 'reason' => "Offering \"{$co->offering->name}\" not available in {$state}."];
+                        continue 2;
+                    }
+                }
+            }
+
+            $results[$uuid] = [
+                'pass'    => true,
+                'patient' => $case->patient?->full_name ?? 'Patient',
+                'triage'  => $case->triage,
+                'status'  => $case->status,
+                'state'   => $state ?: '—',
+            ];
+        }
+
+        return response()->json($results);
+    }
+
+    public function batchSubmit(Request $request)
+    {
+        $request->validate(['uuids' => 'required|array|min:1|max:20', 'uuids.*' => 'string']);
+
+        $clinician = Auth::user()->clinician;
+
+        if (!$clinician) {
+            return response()->json(['error' => 'No clinician profile found for this user.'], 403);
+        }
+
+        $results = [];
+
+        $cases = PatientCase::with(['patient', 'caseOfferings.offering'])
+            ->whereIn('uuid', $request->uuids)
+            ->get()
+            ->keyBy('uuid');
+
+        foreach ($request->uuids as $uuid) {
+            $case = $cases->get($uuid);
+
+            if (!$case) {
+                $results[$uuid] = ['success' => false, 'error' => 'Case not found.'];
+                continue;
+            }
+
+            // Re-run preflight guards — never trust client-side pass list
+            if ($case->triage !== PatientCase::TRIAGE_GREEN || $case->hold_status) {
+                $results[$uuid] = ['success' => false, 'error' => 'Failed re-validation (triage/hold changed).'];
+                continue;
+            }
+
+            if ($case->status === PatientCase::STATUS_ASSIGNED && $case->clinician_id !== $clinician->id) {
+                $results[$uuid] = ['success' => false, 'error' => 'Case reassigned since preflight.'];
+                continue;
+            }
+
+            if (!in_array($case->status, [PatientCase::STATUS_WAITING, PatientCase::STATUS_ASSIGNED])) {
+                $results[$uuid] = ['success' => false, 'error' => 'Case status changed since preflight.'];
+                continue;
+            }
+
+            try {
+                \Illuminate\Support\Facades\DB::transaction(function () use ($case, $clinician) {
+                    if ($case->status === PatientCase::STATUS_WAITING) {
+                        $this->stateMachine->assignToClinician($case, $clinician);
+                        $case->refresh();
+                    }
+                    $this->stateMachine->approve($case, $clinician->id);
+                });
+
+                $results[$uuid] = ['success' => true, 'patient' => $case->patient?->full_name ?? 'Patient'];
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Batch submit failed for case', [
+                    'uuid'  => $uuid,
+                    'error' => $e->getMessage(),
+                ]);
+                $results[$uuid] = ['success' => false, 'error' => 'Transition failed: ' . $e->getMessage()];
+            }
+        }
+
+        return response()->json($results);
     }
 }

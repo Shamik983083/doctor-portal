@@ -81,6 +81,8 @@ class OfferingController extends Controller
             'boothwyn_compound_id'    => 'nullable|string|max:100',
             'available_states'        => 'nullable|array',
             'available_states.*'      => 'string|size:2',
+            'video_required_states'   => 'nullable|array',
+            'video_required_states.*' => 'string|size:2',
             'is_active'               => 'boolean',
             'is_controlled_substance' => 'boolean',
             'questionnaire_ids'       => 'required|array|min:1',
@@ -230,6 +232,8 @@ class OfferingController extends Controller
             'boothwyn_compound_id'    => 'nullable|string|max:100',
             'available_states'        => 'nullable|array',
             'available_states.*'      => 'string|size:2',
+            'video_required_states'   => 'nullable|array',
+            'video_required_states.*' => 'string|size:2',
             'is_active'               => 'boolean',
             'is_controlled_substance' => 'boolean',
         ]);
