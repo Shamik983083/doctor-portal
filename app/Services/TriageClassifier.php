@@ -3,17 +3,21 @@
 namespace App\Services;
 
 use App\Models\PatientCase;
+use App\Models\TriageRule;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Slice B — Triage classifier.
  *
- * Deterministic, config-driven (see config/triage.php). Given a case it
- * returns the highest-severity band any rule fires, plus the machine-readable
- * reason codes that got it there. It is a REVIEW-PRIORITY signal only — it
- * never approves, prescribes, holds, or cancels anything.
+ * Rules are loaded from the `triage_rules` DB table (managed via the admin
+ * Triage Rule Set page). Falls back to config/triage.php static thresholds
+ * when the table is empty or unavailable (graceful pre-migration degradation).
  *
- * Ordering guarantee: RED dominates YELLOW dominates GREEN. A case is only
- * Green when no Yellow/Red rule fired.
+ * Identity-verification and workflow-hold rules remain config-only because
+ * they involve multi-value set logic that doesn't fit a simple threshold row.
+ *
+ * Ordering guarantee: RED dominates YELLOW dominates GREEN.
  */
 class TriageClassifier
 {
@@ -25,13 +29,14 @@ class TriageClassifier
 
     /**
      * Classify a case. Returns:
-     *   ['level' => 'green|yellow|red', 'reasons' => ['CODE: human text', ...], 'ruleset' => 'triage-v1']
+     *   ['level' => 'green|yellow|red', 'reasons' => [...], 'ruleset' => 'triage-v1']
      */
     public function classify(PatientCase $case): array
     {
         $cfg     = config('triage');
         $level   = self::GREEN;
         $reasons = [];
+        $db      = $this->loadDbRules();
 
         $bump = function (string $to, string $reason) use (&$level, &$reasons) {
             if (self::RANK[$to] > self::RANK[$level]) {
@@ -45,26 +50,46 @@ class TriageClassifier
         // ── BMI ─────────────────────────────────────────────────────────
         $bmi = $patient?->bmi;
         if ($bmi !== null) {
-            if ($bmi >= $cfg['bmi']['red_at_or_above']) {
-                $bump(self::RED, "BMI_CRITICAL: BMI {$bmi} at/above " . $cfg['bmi']['red_at_or_above']);
-            } elseif ($bmi >= $cfg['bmi']['yellow_at_or_above']) {
-                $bump(self::YELLOW, "BMI_HIGH: BMI {$bmi} at/above " . $cfg['bmi']['yellow_at_or_above']);
-            } elseif ($bmi <= $cfg['bmi']['yellow_at_or_below']) {
-                $bump(self::YELLOW, "BMI_LOW: BMI {$bmi} at/below " . $cfg['bmi']['yellow_at_or_below']);
+            $bmiRules = $db->where('type', 'bmi_threshold');
+            if ($bmiRules->isNotEmpty()) {
+                foreach ($bmiRules as $rule) {
+                    if ($this->evalNumeric((float) $bmi, $rule->operator, (float) $rule->value)) {
+                        $bump($rule->triage_result, "{$rule->label}: BMI {$bmi}");
+                    }
+                }
+            } else {
+                // config fallback
+                if ($bmi >= $cfg['bmi']['red_at_or_above']) {
+                    $bump(self::RED, "BMI_CRITICAL: BMI {$bmi} at/above " . $cfg['bmi']['red_at_or_above']);
+                } elseif ($bmi >= $cfg['bmi']['yellow_at_or_above']) {
+                    $bump(self::YELLOW, "BMI_HIGH: BMI {$bmi} at/above " . $cfg['bmi']['yellow_at_or_above']);
+                } elseif ($bmi <= $cfg['bmi']['yellow_at_or_below']) {
+                    $bump(self::YELLOW, "BMI_LOW: BMI {$bmi} at/below " . $cfg['bmi']['yellow_at_or_below']);
+                }
             }
         }
 
         // ── Age ─────────────────────────────────────────────────────────
         $age = $patient?->age ?? $patient?->date_of_birth?->age;
         if ($age !== null) {
-            if ($age < $cfg['age']['red_below']) {
-                $bump(self::RED, "MINOR: patient age {$age} below " . $cfg['age']['red_below']);
-            } elseif ($age >= $cfg['age']['yellow_at_or_above']) {
-                $bump(self::YELLOW, "GERIATRIC: patient age {$age} at/above " . $cfg['age']['yellow_at_or_above']);
+            $ageRules = $db->where('type', 'age_threshold');
+            if ($ageRules->isNotEmpty()) {
+                foreach ($ageRules as $rule) {
+                    if ($this->evalNumeric((float) $age, $rule->operator, (float) $rule->value)) {
+                        $bump($rule->triage_result, "{$rule->label}: age {$age}");
+                    }
+                }
+            } else {
+                // config fallback
+                if ($age < $cfg['age']['red_below']) {
+                    $bump(self::RED, "MINOR: patient age {$age} below " . $cfg['age']['red_below']);
+                } elseif ($age >= $cfg['age']['yellow_at_or_above']) {
+                    $bump(self::YELLOW, "GERIATRIC: patient age {$age} at/above " . $cfg['age']['yellow_at_or_above']);
+                }
             }
         }
 
-        // ── Identity verification ───────────────────────────────────────
+        // ── Identity verification (config only — multi-value set logic) ──
         $idStatus = strtolower((string) $patient?->id_verified_status);
         if ($idStatus !== '' && ! in_array($idStatus, $cfg['id_verification']['cleared'], true)) {
             if (in_array($idStatus, $cfg['id_verification']['failed_values'], true)) {
@@ -74,30 +99,56 @@ class TriageClassifier
             }
         }
 
-        // ── Workflow hold ───────────────────────────────────────────────
+        // ── Workflow hold (config only) ──────────────────────────────────
         if ($case->hold_status) {
             $bump($cfg['hold_is_at_least'], 'ON_HOLD: case carries a workflow hold');
         }
 
-        // ── Elevated offerings (compounded GLP-1s, etc.) ────────────────
+        // ── Elevated offerings ───────────────────────────────────────────
         $offeringNames = $case->relationLoaded('caseOfferings')
             ? $case->caseOfferings->map(fn ($co) => strtolower((string) $co->offering?->name))->all()
             : $case->offerings->map(fn ($o) => strtolower((string) $o->name))->all();
-        foreach ($cfg['elevated_offerings'] as $needle) {
-            foreach ($offeringNames as $name) {
-                if ($name !== '' && str_contains($name, $needle)) {
-                    $bump(self::YELLOW, "ELEVATED_RX: offering matches '{$needle}'");
-                    break 2;
+
+        $offeringRules = $db->where('type', 'offering');
+        if ($offeringRules->isNotEmpty()) {
+            foreach ($offeringRules as $rule) {
+                $needle = strtolower((string) $rule->value);
+                foreach ($offeringNames as $name) {
+                    if ($name !== '' && str_contains($name, $needle)) {
+                        $bump($rule->triage_result, "{$rule->label}: offering matches '{$rule->value}'");
+                        break;
+                    }
+                }
+            }
+        } else {
+            // config fallback
+            foreach ($cfg['elevated_offerings'] as $needle) {
+                foreach ($offeringNames as $name) {
+                    if ($name !== '' && str_contains($name, $needle)) {
+                        $bump(self::YELLOW, "ELEVATED_RX: offering matches '{$needle}'");
+                        break 2;
+                    }
                 }
             }
         }
 
-        // ── Free-text red-flag scan (questionnaire answers + notes) ─────
-        $haystack = strtolower($this->collectText($case));
-        foreach (['red' => self::RED, 'yellow' => self::YELLOW] as $band => $to) {
-            foreach ($cfg['red_flag_keywords'][$band] as $needle) {
+        // ── Free-text red-flag scan ──────────────────────────────────────
+        $haystack     = strtolower($this->collectText($case));
+        $keywordRules = $db->where('type', 'keyword');
+        if ($keywordRules->isNotEmpty()) {
+            foreach ($keywordRules as $rule) {
+                $needle = strtolower((string) $rule->value);
                 if ($needle !== '' && str_contains($haystack, $needle)) {
-                    $bump($to, strtoupper($band) . "_FLAG: intake mentions '{$needle}'");
+                    $bump($rule->triage_result, "{$rule->label}: intake mentions '{$rule->value}'");
+                }
+            }
+        } else {
+            // config fallback
+            foreach (['red' => self::RED, 'yellow' => self::YELLOW] as $band => $to) {
+                foreach ($cfg['red_flag_keywords'][$band] as $needle) {
+                    if ($needle !== '' && str_contains($haystack, $needle)) {
+                        $bump($to, strtoupper($band) . "_FLAG: intake mentions '{$needle}'");
+                    }
                 }
             }
         }
@@ -110,8 +161,7 @@ class TriageClassifier
     }
 
     /**
-     * Classify and persist onto the case (does not touch clinical timestamps
-     * or workflow status). Safe to call repeatedly.
+     * Classify and persist onto the case (safe to call repeatedly).
      */
     public function apply(PatientCase $case): PatientCase
     {
@@ -127,10 +177,36 @@ class TriageClassifier
         return $case;
     }
 
-    /**
-     * Gather the free text the red-flag scan runs over, defensively handling
-     * whichever relations happen to be loaded.
-     */
+    // ────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ────────────────────────────────────────────────────────────────────────
+
+    private function evalNumeric(float $actual, string $operator, float $threshold): bool
+    {
+        return match ($operator) {
+            'gte'  => $actual >= $threshold,
+            'lte'  => $actual <= $threshold,
+            'gt'   => $actual > $threshold,
+            'lt'   => $actual < $threshold,
+            default => false,
+        };
+    }
+
+    /** Load active DB rules, cached for 5 minutes. Falls back to empty collection on error. */
+    private function loadDbRules(): Collection
+    {
+        try {
+            return Cache::remember('triage_rules_active', 300, function () {
+                return TriageRule::where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
+                    ->get();
+            });
+        } catch (\Throwable) {
+            return collect();
+        }
+    }
+
     private function collectText(PatientCase $case): string
     {
         $parts = [];

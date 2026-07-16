@@ -95,7 +95,12 @@
     <li><span class="sidebar-section">Configuration</span></li>
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.settings*') ? 'active' : '' }}" href="{{ route('admin.settings') }}">
-            <i class="bi bi-sliders"></i> Settings
+            <i class="bi bi-sliders"></i> SLA Settings
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.triage-rules.*') ? 'active' : '' }}" href="{{ route('admin.triage-rules.index') }}">
+            <i class="bi bi-funnel"></i> Triage Rule Set
         </a>
     </li>
     @role('super_admin')
