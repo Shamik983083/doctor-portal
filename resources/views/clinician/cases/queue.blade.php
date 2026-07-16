@@ -421,9 +421,86 @@
 @endsection
 
 @section('scripts')
+{{-- Pusher JS — used by the Provider Inbox real-time listener (Reverb WebSocket server) --}}
+<script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
 <style>
 .batch-reason { font-size: .72rem; color: #6c757d; margin-top: .2rem; line-height: 1.3; }
 </style>
+<script>
+/* ── Provider Inbox — real-time via Reverb ────────────────────────────────
+   Subscribes to the private-provider-inbox channel. When a new inbound
+   patient message arrives, it is prepended to the inbox list without a
+   page reload. The inbox badge counter is not tracked here; the user sees
+   the message immediately and can click through to the case.
+   ──────────────────────────────────────────────────────────────────────── */
+(function () {
+    var csrfToken   = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var caseBaseUrl = '{{ url('/clinician/cases') }}';
+    var inboxList   = document.querySelector('.ma-inbox-list');
+
+    var pusher = new Pusher('{{ config('reverb.apps.apps.0.key') }}', {
+        wsHost:            '{{ config('reverb.servers.reverb.hostname', 'localhost') }}',
+        wsPort:            {{ config('reverb.servers.reverb.port', env('REVERB_PORT', 8080)) }},
+        wssPort:           {{ config('reverb.servers.reverb.port', env('REVERB_PORT', 8080)) }},
+        forceTLS:          false,
+        disableStats:      true,
+        enabledTransports: ['ws', 'wss'],
+        authEndpoint:      '{{ url('/broadcasting/auth') }}',
+        auth: {
+            headers: { 'X-CSRF-TOKEN': csrfToken }
+        },
+    });
+
+    var channel = pusher.subscribe('private-provider-inbox');
+
+    channel.bind('NewPatientMessage', function (data) {
+        if (!inboxList) return;
+
+        /* Compute two-letter initials from patient name */
+        var ini = (data.patientName || 'P')
+            .split(' ')
+            .map(function (w) { return w.charAt(0).toUpperCase(); })
+            .slice(0, 2)
+            .join('');
+
+        var caseUrl  = caseBaseUrl + '/' + data.caseUuid + '#tab-messages';
+        var timeAgo  = 'just now';
+
+        var li = document.createElement('li');
+        li.className = 'ma-inbox-thread unread';
+        li.innerHTML =
+            '<a href="' + escHtml(caseUrl) + '" class="d-flex align-items-center gap-3 text-decoration-none text-reset w-100">' +
+            '<span class="ma-inbox-avatar flex-shrink-0">' + escHtml(ini) + '</span>' +
+            '<span class="ma-inbox-body flex-grow-1 min-w-0">' +
+                '<span class="ma-inbox-top">' +
+                    '<strong>' + escHtml(data.patientName || 'Patient') + '</strong>' +
+                    '<span class="ma-inbox-waiting">' + timeAgo + '</span>' +
+                '</span>' +
+                '<span class="ma-inbox-snippet d-block text-truncate">' + escHtml(data.snippet || '') + '</span>' +
+            '</span>' +
+            '<i class="bi bi-chevron-right text-muted flex-shrink-0 small"></i>' +
+            '</a>';
+
+        /* Remove the "No patient messages yet" placeholder if present */
+        var placeholder = inboxList.querySelector('.ma-inbox-thread:only-child .ma-inbox-snippet');
+        if (placeholder && placeholder.textContent.trim() === 'No patient messages yet.') {
+            inboxList.innerHTML = '';
+        }
+
+        inboxList.insertBefore(li, inboxList.firstChild);
+
+        /* Brief highlight to draw the clinician's eye */
+        li.style.transition = 'background .4s';
+        li.style.background = 'rgba(59,130,246,.08)';
+        setTimeout(function () { li.style.background = ''; }, 2000);
+    });
+
+    function escHtml(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+})();
+</script>
+
 <script>
 (function () {
     const preflightUrl = '{{ route('clinician.cases.batch.preflight') }}';

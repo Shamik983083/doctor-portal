@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Partner;
 
+use App\Events\NewPatientMessage;
 use App\Http\Controllers\Controller;
 use App\Models\Message;
 use App\Services\WebhookDispatcher;
@@ -54,6 +55,9 @@ class MessageController extends Controller
             'message_id' => $message->uuid,
             'timestamp'  => now()->timestamp,
         ]);
+
+        // Broadcast to clinician Provider Inbox in real-time via Reverb
+        broadcast(new NewPatientMessage($message, $case));
 
         return response()->json($message, 201);
     }
