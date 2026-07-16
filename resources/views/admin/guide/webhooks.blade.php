@@ -59,6 +59,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
             <li><a class="toc-link text-decoration-none" href="#ev-patient-message">patient_message_received</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-order-status">order_status_changed</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-tracking">tracking_number_changed</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-patient-modified">patient_modified</a></li>
         </ol>
     </li>
     <li><a class="toc-link text-decoration-none" href="#checklist">Checklist</a></li>
@@ -569,6 +570,31 @@ def webhook():
 </div>
 </div>
 
+{{-- patient_modified --}}
+<div id="ev-patient-modified" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge">patient_modified</span>
+    <span class="text-muted small">Fired when patient fields are updated via <code>PATCH /api/partner/patients/{uuid}</code></span>
+</div>
+<div class="card-body">
+<pre id="code-ev-patient-modified">{
+  "patient_id": "a1b2c3d4-...",
+  "timestamp":  1751599300
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-modified')">Copy</button>
+<div class="alert alert-info mt-3 mb-0 small">
+    <i class="bi bi-shield-check me-1"></i>
+    <strong>Vouched / async IDV:</strong> The most common reason to call <code>PATCH /api/partner/patients/{uuid}</code> is to push a Vouched identity-verification result after it resolves. Send <code>{ "id_verified_status": "verified", "id_verified_at": "…" }</code> — the portal immediately re-classifies all open cases for that patient and this <code>patient_modified</code> event fires as confirmation.
+    Accepted values for <code>id_verified_status</code>: <code>verified</code> (triage unaffected), <code>pending</code> (Yellow triage), <code>failed</code> (Red hard stop).
+</div>
+<div class="endpoint-row mt-2">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/patients/{patient_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— confirm updated <code>id_verified_status</code> and <code>id_verified_at</code> on the patient record</span>
+</div>
+</div>
+</div>
+
 {{-- 6. CHECKLIST --}}
 <div id="checklist" class="card mb-4 section-anchor">
 <div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">6</span>Integration Checklist</div>
@@ -583,6 +609,7 @@ def webhook():
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — fetch the <code>support_note</code> and notify your team; respond via API or portal</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Make your handler <strong>idempotent</strong> — the same event may be delivered more than once on retry</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Return <code>200</code> immediately, then process asynchronously — do not do heavy work before responding</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Push Vouched IDV results via <code>PATCH /api/partner/patients/{uuid}</code> with <code>id_verified_status</code> = <code>verified</code> / <code>failed</code> / <code>pending</code> — you will receive a <code>patient_modified</code> event as confirmation and open cases re-triage automatically</li>
     <li class="mb-0"><i class="bi bi-check-square text-success me-2"></i>Monitor failed deliveries at <code>GET /api/partner/webhooks/deliveries</code> or ask the portal admin to resend</li>
 </ul>
 </div>
