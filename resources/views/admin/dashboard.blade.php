@@ -38,11 +38,11 @@ $totalCases = array_sum($donutData);
         <a href="{{ route('admin.patients.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Patients</div><div class="ma-metric-value">{{ $stats['patients'] }}</div></div>
         </a>
-        <a href="{{ route('admin.cases.index') }}" class="text-decoration-none">
-            <div class="ma-metric accent"><div class="ma-metric-label">Active Cases</div><div class="ma-metric-value">{{ $stats['active_cases'] }}</div></div>
-        </a>
         <a href="{{ route('admin.clinicians.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Clinicians</div><div class="ma-metric-value">{{ $stats['clinicians'] }}</div></div>
+        </a>
+        <a href="{{ route('admin.cases.index') }}" class="text-decoration-none">
+            <div class="ma-metric accent"><div class="ma-metric-label">Active Cases</div><div class="ma-metric-value">{{ $stats['active_cases'] }}</div></div>
         </a>
         <a href="{{ route('admin.cases.index') }}?status=assigned" class="text-decoration-none">
             <div class="ma-metric {{ $stats['sla_at_risk'] > 0 ? 'warn' : '' }}">
