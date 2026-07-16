@@ -223,6 +223,8 @@
                         @endif
                         @if(in_array($topCase->status, ['assigned']) && optional(Auth::user()->clinician)->id === $topCase->clinician_id)
                         <a class="btn btn-sm btn-outline-primary" href="{{ route('clinician.cases.prescribe.form', $topCase->uuid) }}">Prescribe &rarr;</a>
+                        <a class="btn btn-sm btn-outline-warning" href="{{ route('clinician.cases.show', $topCase->uuid) }}#supportModal">Escalate to Support &rarr;</a>
+                        <a class="btn btn-sm btn-outline-danger" href="{{ route('clinician.cases.show', $topCase->uuid) }}#cancelModal">Reject &rarr;</a>
                         @endif
                     </div>
                     <div class="ma-subheading">Reason codes</div>

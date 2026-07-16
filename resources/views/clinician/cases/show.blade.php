@@ -635,6 +635,16 @@
 
 @section('scripts')
 <script>
+// Auto-open modal when arriving via hash from quick review panel
+(function () {
+    const hash = window.location.hash;
+    if (hash === '#supportModal' || hash === '#cancelModal') {
+        const el = document.querySelector(hash);
+        if (el) { bootstrap.Modal.getOrCreateInstance(el).show(); }
+        history.replaceState(null, '', window.location.pathname);
+    }
+})();
+
 document.addEventListener('click', function (e) {
     var btn = e.target.closest('.q-toggle');
     if (!btn) return;
