@@ -57,11 +57,9 @@ return [
         ],
     ],
 
-    // Offering/medication names that always warrant at least a Yellow band
-    // (compounded GLP-1s etc.). Substring match on the offering name.
-    'elevated_offerings' => [
-        'semaglutide', 'tirzepatide', 'compound',
-    ],
+    // Offering/medication names that always warrant at least a Yellow band.
+    // Substring match on the offering name. Empty = no offerings trigger Yellow.
+    'elevated_offerings' => [],
 
     // A case already flagged onto a workflow hold is at least Yellow.
     'hold_is_at_least' => 'yellow',
