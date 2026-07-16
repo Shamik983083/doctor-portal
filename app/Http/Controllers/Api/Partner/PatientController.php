@@ -93,13 +93,15 @@ class PatientController extends Controller
             'first_name'   => 'sometimes|string|max:100',
             'last_name'    => 'sometimes|string|max:100',
             'email'        => 'sometimes|email',
-            'phone'        => 'nullable|string|max:20',
-            'date_of_birth' => 'nullable|date',
-            'gender'       => 'nullable|in:male,female,other',
-            'address'      => 'nullable|string',
-            'city'         => 'nullable|string',
-            'state'        => 'nullable|string|size:2',
-            'zip'          => 'nullable|string|max:10',
+            'phone'              => 'nullable|string|max:20',
+            'date_of_birth'      => 'nullable|date',
+            'gender'             => 'nullable|in:male,female,other',
+            'address'            => 'nullable|string',
+            'city'               => 'nullable|string',
+            'state'              => 'nullable|string|size:2',
+            'zip'                => 'nullable|string|max:10',
+            'id_verified_status' => 'nullable|in:verified,failed,pending',
+            'id_verified_at'     => 'nullable|date',
         ]);
 
         $patient->update($data);
