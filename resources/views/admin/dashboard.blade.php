@@ -248,10 +248,11 @@ $totalCases = array_sum($donutData);
                 @if($webhookFailedCount > 0)
                     <span class="ma-pill red">{{ $webhookFailedCount }} failed</span>
                 @endif
+                <button type="button" id="webhookToggleBtn" class="btn btn-sm btn-outline-secondary" onclick="toggleWebhookLog()">Show</button>
                 <a href="{{ route('admin.webhooks.index') }}" class="btn btn-sm btn-outline-primary">Full log</a>
             </div>
         </div>
-        <div class="card-body p-0">
+        <div id="webhookLogBody" class="card-body p-0" style="display:none;">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead><tr><th>Event</th><th>Status</th><th>Code</th><th>When</th></tr></thead>
@@ -343,6 +344,14 @@ $totalCases = array_sum($donutData);
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+function toggleWebhookLog() {
+    const body = document.getElementById('webhookLogBody');
+    const btn  = document.getElementById('webhookToggleBtn');
+    const hidden = body.style.display === 'none';
+    body.style.display = hidden ? '' : 'none';
+    btn.textContent    = hidden ? 'Hide' : 'Show';
+}
+
 (function () {
     Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
 
