@@ -81,6 +81,7 @@
                             <th>Offerings</th>
                             <th>Video visit</th>
                             <th>Company</th>
+                            <th>Batch Eligibility</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -97,6 +98,32 @@
                                 && in_array($case->status, ['waiting', 'assigned'])
                                 && !$case->hold_status
                                 && $case->status !== 'support';
+
+                            if ($case->triage === 'red') {
+                                $batchBand   = 'red';
+                                $batchLabel  = 'Blocked';
+                                $batchReason = 'Red triage · hard stop';
+                            } elseif ($case->triage === 'yellow') {
+                                $batchBand   = 'yellow';
+                                $batchLabel  = 'Review';
+                                $batchReason = 'Yellow triage · review required';
+                            } elseif ($case->hold_status) {
+                                $batchBand   = 'red';
+                                $batchLabel  = 'Blocked';
+                                $batchReason = 'Workflow hold active';
+                            } elseif ($case->status === 'support') {
+                                $batchBand   = 'red';
+                                $batchLabel  = 'Blocked';
+                                $batchReason = 'Escalated to support';
+                            } elseif (!in_array($case->status, ['waiting', 'assigned'])) {
+                                $batchBand   = 'red';
+                                $batchLabel  = 'Blocked';
+                                $batchReason = 'Status: ' . ucfirst($case->status);
+                            } else {
+                                $batchBand   = 'green';
+                                $batchLabel  = 'Eligible';
+                                $batchReason = null;
+                            }
                         @endphp
                         <tr data-uuid="{{ $case->uuid }}" data-batch="{{ $batchEligible ? '1' : '0' }}">
                             <td>
@@ -131,6 +158,10 @@
                                 @endif
                             </td>
                             <td>{{ $case->partner?->name ?? '—' }}</td>
+                            <td>
+                                <span class="ma-pill {{ $batchBand }}">{{ $batchLabel }}</span>
+                                @if($batchReason)<div class="batch-reason">{{ $batchReason }}</div>@endif
+                            </td>
                             <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>
                             <td class="text-nowrap">
                                 <a href="{{ route('clinician.cases.show', $case->uuid) }}" class="btn btn-sm btn-outline-primary">Review</a>
@@ -143,7 +174,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="13" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
+                        <tr><td colspan="14" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -367,6 +398,9 @@
 @endsection
 
 @section('scripts')
+<style>
+.batch-reason { font-size: .72rem; color: #6c757d; margin-top: .2rem; line-height: 1.3; }
+</style>
 <script>
 (function () {
     const preflightUrl = '{{ route('clinician.cases.batch.preflight') }}';
