@@ -193,12 +193,16 @@
                 <div class="ma-title">{{ $topCase->patient?->full_name ?? 'Patient' }}</div>
                 <div class="ma-sub">{{ $topCase->partner?->name ?? '—' }} · highest-attention case in current view.</div>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex align-items-center gap-2">
                 <x-triage-pill :case="$topCase" />
                 @if($tcVideo)<span class="ma-pill yellow">Video required</span>@endif
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="quickReviewToggle"
+                        onclick="(function(btn){var body=document.getElementById('quickReviewBody');var hidden=body.style.display==='none'||body.style.display==='';body.style.display=hidden?'block':'none';btn.textContent=hidden?'Hide':'Show details';})(this)">
+                    Show details
+                </button>
             </div>
         </div>
-        <div class="card-body">
+        <div class="card-body" id="quickReviewBody" style="display:none">
             <div class="ma-quick-grid">
                 {{-- AI draft summary --}}
                 <div>
