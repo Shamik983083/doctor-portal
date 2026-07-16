@@ -118,7 +118,6 @@ class CaseController extends Controller
             ->unique(fn($m) => $m->patient_id ?? $m->case?->patient_id)
             ->take(6)
             ->values();
-        $note        = \App\Models\ClinicalNote::with(['clinician.user', 'case.patient'])->latest()->first();
         $reasonCodes = [
             'Dose exceeds protocol titration step',
             'Active workflow hold not cleared',
@@ -130,7 +129,7 @@ class CaseController extends Controller
         return view('clinician.cases.queue', compact(
             'cases', 'clinician', 'triageMetrics',
             'topCase', 'intake', 'aiSummary',
-            'heldCases', 'messages', 'note', 'reasonCodes'
+            'heldCases', 'messages', 'reasonCodes'
         ));
     }
 

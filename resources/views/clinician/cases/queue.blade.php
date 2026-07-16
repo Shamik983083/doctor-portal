@@ -323,26 +323,6 @@
         </div>
     </div>
 
-    {{-- Chart note --}}
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <div>
-                <div class="ma-eyebrow">Clinical documentation</div>
-                <div class="ma-title">Chart note</div>
-                <div class="ma-sub">Most recent clinical note across your cases.</div>
-            </div>
-            <span class="ma-pill neutral">DRAFT</span>
-        </div>
-        <div class="card-body">
-            @if($note)
-                <div class="ma-sub mb-2">{{ $note->case?->patient?->full_name ?? 'Patient' }} · {{ $note->clinician?->user?->name ?? 'Clinician' }} · {{ ucfirst($note->type ?? 'note') }}</div>
-                <p style="margin:0">{{ \Illuminate\Support\Str::limit($note->note, 400) }}</p>
-            @else
-                <p class="text-muted mb-0">No chart notes yet. Notes will appear here as they are created from case screens.</p>
-            @endif
-        </div>
-    </div>
-
     {{-- Batch preflight / prescription / attest modal --}}
     <div class="modal fade" id="batchModal" tabindex="-1" aria-labelledby="batchModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
