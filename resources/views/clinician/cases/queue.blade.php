@@ -62,7 +62,7 @@
                     @endif
                 </div>
             </form>
-            <div id="batchToolbar" style="display:none; border-top:1px solid #dee2e6; margin-top:.5rem; padding-top:.5rem;" class="d-flex align-items-center justify-content-between">
+            <div id="batchToolbar" style="display:none; border-top:1px solid #dee2e6; margin-top:.5rem; padding-top:.5rem; align-items:center; justify-content:space-between;">
                 <span id="batchCount" class="ma-pill neutral">0 selected</span>
                 <label class="form-check-label d-flex align-items-center gap-2 text-muted small" style="cursor:pointer">
                     <input type="checkbox" id="batchSelectAll" class="form-check-input m-0" title="Select all eligible">
@@ -460,8 +460,8 @@
     const batchCountEl     = document.getElementById('batchCount');
     const batchToolbar     = document.getElementById('batchToolbar');
 
-    // Modal elements
-    const batchModal       = new bootstrap.Modal(document.getElementById('batchModal'));
+    // Modal elements — lazy init so Bootstrap defer-load doesn't crash our IIFE
+    const batchModalEl     = document.getElementById('batchModal');
     const resultsEl        = document.getElementById('batchPreflightResults');
     const prescriptionSection = document.getElementById('batchPrescriptionSection');
     const attestSection    = document.getElementById('batchAttestSection');
@@ -494,7 +494,7 @@
         batchCountEl.className = 'ma-pill ' + (n > 0 ? 'green' : 'neutral');
         preflightBtn.disabled = n === 0;
         preflightCountEl.textContent = n;
-        batchToolbar.style.display = n > 0 ? '' : 'none';
+        batchToolbar.style.display = n > 0 ? 'flex' : 'none';
     }
 
     document.querySelectorAll('.batch-cb').forEach(cb => {
@@ -524,7 +524,7 @@
         attestCheck.checked = false;
         submitBtn.disabled = true;
         submitResultsEl.innerHTML = '';
-        batchModal.show();
+        bootstrap.Modal.getOrCreateInstance(batchModalEl).show();
 
         try {
             const res = await fetch(preflightUrl, {
