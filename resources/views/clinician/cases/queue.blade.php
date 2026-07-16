@@ -292,25 +292,6 @@
         </div>
     </div>
 
-    {{-- Intake summary --}}
-    <div class="card">
-        <div class="card-header">
-            <div class="ma-eyebrow">Recorded intake</div>
-            <div class="ma-title">Intake summary
-                @if($topCase)<span class="ma-sub" style="font-weight:400"> · {{ optional($topCase->patient)->full_name ?? 'Patient' }}</span>@endif</div>
-            <div class="ma-sub">Questionnaire answers for the top case — source of truth behind triage classification.</div>
-        </div>
-        <div class="card-body">
-            @if($intake->isNotEmpty())
-            <dl class="ma-source-answers">
-                @foreach($intake as $row)<div><dt>{{ $row['q'] }}</dt><dd>{{ $row['a'] ?: '—' }}</dd></div>@endforeach
-            </dl>
-            @else
-            <p class="text-muted mb-0">No recorded intake answers for the top case.</p>
-            @endif
-        </div>
-    </div>
-
     {{-- Chart note --}}
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
