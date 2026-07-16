@@ -635,12 +635,22 @@
 
 @section('scripts')
 <script>
-// Auto-open modal when arriving via hash from quick review panel
+// Auto-activate tab or open modal when arriving via URL hash
 document.addEventListener('DOMContentLoaded', function () {
     const hash = window.location.hash;
+    if (!hash) return;
+
     if (hash === '#supportModal' || hash === '#cancelModal') {
         const el = document.querySelector(hash);
         if (el) { bootstrap.Modal.getOrCreateInstance(el).show(); }
+        history.replaceState(null, '', window.location.pathname);
+        return;
+    }
+
+    // Tab hashes: #tab-messages, #tab-prescriptions, #tab-questionnaires, etc.
+    const tabLink = document.querySelector('a[href="' + hash + '"][data-bs-toggle="tab"]');
+    if (tabLink) {
+        bootstrap.Tab.getOrCreateInstance(tabLink).show();
         history.replaceState(null, '', window.location.pathname);
     }
 });

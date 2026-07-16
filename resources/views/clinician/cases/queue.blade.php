@@ -299,7 +299,7 @@
                 @php
                     $pname   = optional($m->patient)->full_name ?? optional($m->case?->patient)->full_name ?? 'Patient';
                     $ini     = collect(explode(' ', trim($pname)))->map(fn($w) => strtoupper(substr($w,0,1)))->take(2)->implode('');
-                    $caseUrl = $m->case ? route('clinician.cases.show', $m->case->uuid) : '#';
+                    $caseUrl = $m->case ? route('clinician.cases.show', $m->case->uuid) . '#tab-messages' : '#';
                 @endphp
                 <li class="ma-inbox-thread {{ !$m->is_read ? 'unread' : '' }}">
                     <a href="{{ $caseUrl }}" class="d-flex align-items-center gap-3 text-decoration-none text-reset w-100">
