@@ -108,9 +108,4 @@
     </li>
     @endrole
 </ul>
-@role('super_admin')
-<div class="px-3 mt-3 pb-3" style="border-top:1px solid rgba(255,255,255,.06);">
-    <small class="sidebar-section" style="padding:.5rem 0 0;">Admin Console</small>
-</div>
-@endrole
 @endsection
