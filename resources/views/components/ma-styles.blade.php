@@ -71,6 +71,9 @@
     .ma-metric .ma-metric-label { color: var(--ma-muted); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
     .ma-metric .ma-metric-value { font-size: 1.6rem; font-weight: 700; line-height: 1.15; margin-top: .15rem; }
     .ma-metric.accent .ma-metric-value { color: var(--ma-accent-ink); }
+    .ma-metric.warn { background: #fffbeb; border-color: #fde68a; }
+    .ma-metric.warn .ma-metric-label { color: #92400e; }
+    .ma-metric.warn .ma-metric-value { color: #b45309; }
 
     /* ── Tables (MA review-grid) ────────────────────────────── */
     .ma-surface .table { margin: 0; }

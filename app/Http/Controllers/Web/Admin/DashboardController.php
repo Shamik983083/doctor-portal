@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Web\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Clinician;
 use App\Models\Offering;
-use App\Models\Order;
 use App\Models\Partner;
 use App\Models\Patient;
 use App\Models\PatientCase;
+use App\Models\Setting;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
 
@@ -19,12 +19,19 @@ class DashboardController extends Controller
     public function index()
     {
         // ── Core stat cards ──────────────────────────────────────────────
+        $slaReviewHours  = (int) Setting::get('sla_review_hours', 24);
+        $slaRiskMinutes  = $slaReviewHours * 60 * 0.7; // ≥70% elapsed = at risk or breached
+
         $stats = [
             'partners'        => Partner::count(),
             'patients'        => Patient::count(),
             'active_cases'    => PatientCase::whereNotIn('status', ['completed', 'cancelled'])->count(),
             'clinicians'      => Clinician::where('status', 'active')->count(),
-            'orders_today'    => Order::whereDate('created_at', today())->count(),
+            'sla_at_risk'     => PatientCase::whereIn('status', ['assigned', 'approved', 'processing'])
+                                    ->whereRaw(
+                                        'TIMESTAMPDIFF(MINUTE, COALESCE(assigned_at, created_at), NOW()) >= ?',
+                                        [$slaRiskMinutes]
+                                    )->count(),
             'completed_today' => PatientCase::where('status', 'completed')->count(),
         ];
 
