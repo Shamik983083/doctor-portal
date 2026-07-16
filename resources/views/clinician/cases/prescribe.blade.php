@@ -61,8 +61,17 @@
             </div>
         </div>
 
+        <div class="p-3 border rounded bg-light mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prescribeAttestCheck">
+                <label class="form-check-label fw-semibold" for="prescribeAttestCheck">
+                    I have reviewed this case and attest that approving it and submitting this prescription is clinically appropriate.
+                </label>
+            </div>
+        </div>
+
         <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-success flex-grow-1">
+            <button type="submit" id="prescribeSubmitBtn" class="btn btn-success flex-grow-1" disabled>
                 <i class="bi bi-check-lg me-1"></i>Approve &amp; Submit Prescription
             </button>
             <a href="{{ route('clinician.cases.show', $case->uuid) }}" class="btn btn-outline-secondary">Cancel</a>
@@ -262,5 +271,12 @@ function addMedication(o) {
 
 // Pre-load the medications the patient ordered on this case
 CASE_OFFERINGS.forEach(o => addMedication(o));
+
+// Attestation gate — submit stays disabled until checkbox is ticked
+const prescribeAttestCheck = document.getElementById('prescribeAttestCheck');
+const prescribeSubmitBtn   = document.getElementById('prescribeSubmitBtn');
+prescribeAttestCheck.addEventListener('change', () => {
+    prescribeSubmitBtn.disabled = !prescribeAttestCheck.checked;
+});
 </script>
 @endsection
