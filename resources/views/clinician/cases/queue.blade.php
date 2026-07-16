@@ -23,10 +23,8 @@
                     <div class="ma-title">Fast review, full context one click away</div>
                     <div class="ma-sub">Highest-attention cases surface first. Triage is a review-priority signal, not a clinical decision.</div>
                 </div>
-                <div class="ma-legend align-self-center">
-                    <span class="ma-pill red"><span class="ma-dot"></span>Red · review carefully</span>
-                    <span class="ma-pill yellow"><span class="ma-dot"></span>Yellow · closer look</span>
-                    <span class="ma-pill green"><span class="ma-dot"></span>Green · routine</span>
+                <div class="align-self-center">
+                    <button id="batchPreflightBtn" class="btn btn-sm btn-primary" disabled>Run batch preflight (<span id="batchPreflightCount">0</span>)</button>
                 </div>
             </div>
             <form action="{{ route('clinician.queue') }}" method="GET" class="row g-2 align-items-center">
@@ -64,13 +62,20 @@
                     @endif
                 </div>
             </form>
+            <div id="batchToolbar" style="display:none; border-top:1px solid #dee2e6; margin-top:.5rem; padding-top:.5rem;" class="d-flex align-items-center justify-content-between">
+                <span id="batchCount" class="ma-pill neutral">0 selected</span>
+                <label class="form-check-label d-flex align-items-center gap-2 text-muted small" style="cursor:pointer">
+                    <input type="checkbox" id="batchSelectAll" class="form-check-input m-0" title="Select all eligible">
+                    Select all batch-eligible Green cases
+                </label>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
-                            <th style="width:2rem"><input type="checkbox" id="batchSelectAll" class="form-check-input" title="Select all eligible"></th>
+                            <th style="width:2rem"></th>
                             <th>Triage</th>
                             <th>Time</th>
                             <th>Patient</th>
@@ -345,27 +350,6 @@
         </div>
     </div>
 
-    {{-- Batch review --}}
-    <div class="card" id="batchReviewCard">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <div>
-                <div class="ma-eyebrow">Batch review</div>
-                <div class="ma-title">Green batch: preflight → attest → approve</div>
-                <div class="ma-sub">Select Green cases from the table above, run preflight, attest, and approve in one action.</div>
-            </div>
-            <span class="ma-pill neutral" id="batchCount">0 selected</span>
-        </div>
-        <div class="card-body">
-            <ol class="ma-batch-steps">
-                <li id="batchStep1"><span class="ma-batch-dot"></span><div><strong>Select Green cases</strong><span>Check rows in the queue table above. Only Green-triage cases in waiting or assigned status are eligible.</span></div><span class="ma-pill neutral" id="batchStep1Badge">waiting</span></li>
-                <li id="batchStep2"><span class="ma-batch-dot"></span><div><strong>Per-case preflight</strong><span>Each case revalidated: triage, holds, IDV, state eligibility.</span></div><span class="ma-pill neutral" id="batchStep2Badge">pending</span></li>
-                <li id="batchStep3"><span class="ma-batch-dot"></span><div><strong>Provider attestation</strong><span>Confirm you have reviewed all passing cases before approving.</span></div><span class="ma-pill neutral" id="batchStep3Badge">pending</span></li>
-                <li id="batchStep4"><span class="ma-batch-dot"></span><div><strong>Approve batch</strong><span>Each passing case transitions to approved status. Webhooks fire per case.</span></div><span class="ma-pill neutral" id="batchStep4Badge">pending</span></li>
-            </ol>
-            <button class="btn btn-sm btn-primary" id="batchPreflightBtn" disabled>Run preflight</button>
-        </div>
-    </div>
-
     {{-- Batch preflight/attest modal --}}
     <div class="modal fade" id="batchModal" tabindex="-1" aria-labelledby="batchModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -407,15 +391,12 @@
     const submitUrl    = '{{ route('clinician.cases.batch.submit') }}';
     const csrf         = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    const selectAll      = document.getElementById('batchSelectAll');
-    const preflightBtn   = document.getElementById('batchPreflightBtn');
-    const batchCountEl   = document.getElementById('batchCount');
-    const batchStep1El   = document.getElementById('batchStep1');
-    const batchStep1Badge= document.getElementById('batchStep1Badge');
-    const batchStep2Badge= document.getElementById('batchStep2Badge');
-    const batchStep3Badge= document.getElementById('batchStep3Badge');
-    const batchStep4Badge= document.getElementById('batchStep4Badge');
-    const batchModal     = new bootstrap.Modal(document.getElementById('batchModal'));
+    const selectAll        = document.getElementById('batchSelectAll');
+    const preflightBtn     = document.getElementById('batchPreflightBtn');
+    const preflightCountEl = document.getElementById('batchPreflightCount');
+    const batchCountEl     = document.getElementById('batchCount');
+    const batchToolbar     = document.getElementById('batchToolbar');
+    const batchModal       = new bootstrap.Modal(document.getElementById('batchModal'));
     const resultsEl      = document.getElementById('batchPreflightResults');
     const attestSection  = document.getElementById('batchAttestSection');
     const attestCheck    = document.getElementById('batchAttestCheck');
@@ -432,9 +413,8 @@
         batchCountEl.textContent = n + ' selected';
         batchCountEl.className = 'ma-pill ' + (n > 0 ? 'green' : 'neutral');
         preflightBtn.disabled = n === 0;
-        batchStep1Badge.textContent = n > 0 ? n + ' selected' : 'waiting';
-        batchStep1Badge.className = 'ma-pill ' + (n > 0 ? 'green' : 'neutral');
-        if (batchStep1El) batchStep1El.className = n > 0 ? 'done' : '';
+        preflightCountEl.textContent = n;
+        batchToolbar.style.display = n > 0 ? '' : 'none';
     }
 
     document.querySelectorAll('.batch-cb').forEach(cb => {
@@ -457,9 +437,6 @@
         if (!uuids.length) return;
 
         preflightBtn.disabled = true;
-        preflightBtn.textContent = 'Running…';
-        batchStep2Badge.textContent = 'running';
-        batchStep2Badge.className = 'ma-pill yellow';
         resultsEl.innerHTML = '';
         attestSection.style.display = 'none';
         attestCheck.checked = false;
@@ -491,23 +468,11 @@
             if (passUuids.length > 0) {
                 attestSection.style.display = '';
                 attestSection.dataset.passUuids = JSON.stringify(passUuids);
-                batchStep2Badge.textContent = passUuids.length + ' passing';
-                batchStep2Badge.className = 'ma-pill green';
-                batchStep3Badge.textContent = 'awaiting';
-                batchStep3Badge.className = 'ma-pill yellow';
-                document.getElementById('batchStep2').className = 'done';
-                document.getElementById('batchStep3').className = 'active';
-            } else {
-                batchStep2Badge.textContent = '0 passing';
-                batchStep2Badge.className = 'ma-pill red';
             }
         } catch (err) {
             resultsEl.innerHTML = '<div class="alert alert-danger">Preflight request failed. Please try again.</div>';
-            batchStep2Badge.textContent = 'error';
-            batchStep2Badge.className = 'ma-pill red';
         } finally {
             preflightBtn.disabled = false;
-            preflightBtn.textContent = 'Run preflight';
         }
     });
 
@@ -521,10 +486,6 @@
 
         submitBtn.disabled = true;
         submitBtn.textContent = 'Approving…';
-        batchStep4Badge.textContent = 'processing';
-        batchStep4Badge.className = 'ma-pill yellow';
-        document.getElementById('batchStep3').className = 'done';
-        document.getElementById('batchStep4').className = 'active';
         submitResultsEl.innerHTML = '';
 
         try {
@@ -549,9 +510,6 @@
             html += '</tbody></table>';
             submitResultsEl.innerHTML = html;
 
-            batchStep4Badge.textContent = successCount + ' approved';
-            batchStep4Badge.className = successCount > 0 ? 'ma-pill green' : 'ma-pill red';
-            document.getElementById('batchStep4').className = 'done';
             submitBtn.textContent = 'Done';
 
             if (successCount > 0) {
@@ -559,8 +517,6 @@
             }
         } catch (err) {
             submitResultsEl.innerHTML = '<div class="alert alert-danger">Submit request failed. Please try again.</div>';
-            batchStep4Badge.textContent = 'error';
-            batchStep4Badge.className = 'ma-pill red';
             submitBtn.disabled = false;
             submitBtn.textContent = 'Approve passing cases';
         }
