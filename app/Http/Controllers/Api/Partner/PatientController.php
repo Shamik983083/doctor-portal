@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\Api\Partner;
 
 use App\Http\Controllers\Controller;
-use App\Models\Patient;
 use App\Models\Partner;
+use App\Models\PatientCase;
+use App\Services\TriageClassifier;
 use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class PatientController extends Controller
 {
-    public function __construct(private WebhookDispatcher $webhooks) {}
+    public function __construct(
+        private WebhookDispatcher $webhooks,
+        private TriageClassifier $triageClassifier,
+    ) {}
 
     private function partner(Request $request): Partner
     {
@@ -35,18 +38,18 @@ class PatientController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'external_id'  => 'nullable|string|max:255',
-            'first_name'   => 'required|string|max:100',
-            'last_name'    => 'required|string|max:100',
-            'email'        => 'required|email',
-            'phone'        => 'nullable|string|max:20',
+            'external_id'   => 'nullable|string|max:255',
+            'first_name'    => 'required|string|max:100',
+            'last_name'     => 'required|string|max:100',
+            'email'         => 'required|email',
+            'phone'         => 'nullable|string|max:20',
             'date_of_birth' => 'nullable|date',
-            'gender'       => 'nullable|in:male,female,other',
-            'address'      => 'nullable|string',
-            'address2'     => 'nullable|string',
-            'city'         => 'nullable|string',
-            'state'        => 'nullable|string|size:2',
-            'zip'          => 'nullable|string|max:10',
+            'gender'        => 'nullable|in:male,female,other',
+            'address'       => 'nullable|string',
+            'address2'      => 'nullable|string',
+            'city'          => 'nullable|string',
+            'state'         => 'nullable|string|size:2',
+            'zip'           => 'nullable|string|max:10',
         ]);
 
         $partner = $this->partner($request);
@@ -90,9 +93,9 @@ class PatientController extends Controller
             ->where('uuid', $id)->firstOrFail();
 
         $data = $request->validate([
-            'first_name'   => 'sometimes|string|max:100',
-            'last_name'    => 'sometimes|string|max:100',
-            'email'        => 'sometimes|email',
+            'first_name'         => 'sometimes|string|max:100',
+            'last_name'          => 'sometimes|string|max:100',
+            'email'              => 'sometimes|email',
             'phone'              => 'nullable|string|max:20',
             'date_of_birth'      => 'nullable|date',
             'gender'             => 'nullable|in:male,female,other',
@@ -104,14 +107,27 @@ class PatientController extends Controller
             'id_verified_at'     => 'nullable|date',
         ]);
 
+        $idvChanged = isset($data['id_verified_status'])
+            && $data['id_verified_status'] !== $patient->id_verified_status;
+
         $patient->update($data);
+
+        // Re-triage all open cases when IDV status changes so triage reflects
+        // the Vouched result without waiting for a manual re-submission.
+        if ($idvChanged) {
+            $patient->cases()
+                ->whereIn('status', [PatientCase::STATUS_WAITING, PatientCase::STATUS_ASSIGNED])
+                ->with(['patient', 'caseOfferings.offering', 'questionnaireResponses.answers', 'caseQuestions'])
+                ->get()
+                ->each(fn($case) => $this->triageClassifier->apply($case));
+        }
 
         $this->webhooks->dispatch($patient->partner_id, 'patient_modified', [
             'patient_id' => $patient->uuid,
             'timestamp'  => now()->timestamp,
         ]);
 
-        return response()->json($patient);
+        return response()->json($patient->fresh());
     }
 
     public function destroy(Request $request, string $id)
