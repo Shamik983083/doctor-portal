@@ -169,7 +169,6 @@
                             </td>
                             <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>
                             <td class="text-nowrap">
-                                <a href="{{ route('clinician.cases.show', $case->uuid) }}" class="btn btn-sm btn-outline-primary">Review</a>
                                 @if($case->status === 'waiting')
                                 <form method="POST" action="{{ route('clinician.cases.assign', $case->uuid) }}" class="d-inline">
                                     @csrf
