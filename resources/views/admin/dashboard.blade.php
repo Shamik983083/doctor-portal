@@ -236,23 +236,6 @@ $totalCases = array_sum($donutData);
         </div>
     </div>
 
-    {{-- Clinician workload --}}
-    @if($casesByClinician->isNotEmpty())
-    <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between">
-            <div>
-                <div class="ma-eyebrow">Providers</div>
-                <div class="ma-title">Clinician workload</div>
-                <div class="ma-sub">Active cases per clinician (excluding completed &amp; cancelled).</div>
-            </div>
-            <a href="{{ route('admin.clinicians.index') }}" class="btn btn-sm btn-outline-primary">All clinicians</a>
-        </div>
-        <div class="card-body" style="padding:20px 24px;">
-            <canvas id="clinicianChart" style="width:100%;max-height:{{ max(160, $casesByClinician->count() * 40) }}px;"></canvas>
-        </div>
-    </div>
-    @endif
-
     {{-- Webhook delivery log --}}
     <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
@@ -362,35 +345,6 @@ $totalCases = array_sum($donutData);
 <script>
 (function () {
     Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
-
-    // ── Clinician workload ───────────────────────────────────────────
-    const clinicianEl = document.getElementById('clinicianChart');
-    if (clinicianEl) {
-        const cData   = @json($casesByClinician);
-        const cNames  = cData.map(r => r.name);
-        const cCounts = cData.map(r => r.count);
-        const maxLoad = Math.max(...cCounts, 1);
-        const palette = cNames.map((_, i) => {
-            const ratio = cNames.length > 1 ? i / (cNames.length - 1) : 0;
-            const r = Math.round(67  + ratio * (124 - 67));
-            const g = Math.round(97  + ratio * (58  - 97));
-            const b = Math.round(238 + ratio * (237 - 238));
-            return `rgba(${r},${g},${b},0.85)`;
-        });
-        new Chart(clinicianEl, {
-            type: 'bar',
-            data: { labels: cNames, datasets: [{ label: 'Active Cases', data: cCounts, backgroundColor: palette, borderRadius: 6, borderSkipped: false, barThickness: 24 }] },
-            options: {
-                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                scales: {
-                    x: { beginAtZero: true, suggestedMax: maxLoad + 1, grid: { color: '#f1f3f5', drawBorder: false }, border: { display: false }, ticks: { color: '#adb5bd', font: { size: 11 }, precision: 0, maxTicksLimit: 6 } },
-                    y: { grid: { display: false }, border: { display: false }, ticks: { color: '#495057', font: { size: 12, weight: '500' } } }
-                },
-                plugins: { legend: { display: false }, tooltip: { backgroundColor: '#212529', titleColor: '#fff', bodyColor: '#adb5bd', padding: 10, cornerRadius: 8, callbacks: { title: i => i[0].label, label: c => ` ${c.parsed.x} active case${c.parsed.x !== 1 ? 's' : ''}` } } },
-                animation: { duration: 900, easing: 'easeInOutQuart' }
-            }
-        });
-    }
 
     // ── Doughnut ────────────────────────────────────────────────────
     const donutEl = document.getElementById('donutChart');

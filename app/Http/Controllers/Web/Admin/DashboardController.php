@@ -57,22 +57,6 @@ class DashboardController extends Controller
             $trendCounts[] = $rawTrend[$day] ?? 0;
         }
 
-        // ── Clinician workload ───────────────────────────────────────────
-        $casesByClinician = Clinician::with('user')
-            ->withCount(['cases as active_count' => fn($q) =>
-                $q->whereNotIn('status', ['completed', 'cancelled'])
-            ])
-            ->where('status', 'active')
-            ->having('active_count', '>', 0)
-            ->orderByDesc('active_count')
-            ->take(10)
-            ->get()
-            ->map(fn($c) => [
-                'name'  => $c->full_name,
-                'count' => $c->active_count,
-            ])
-            ->values();
-
         // ── Recent cases ─────────────────────────────────────────────────
         $recentCases = PatientCase::with(['patient', 'partner', 'clinician.user'])
             ->latest()->take(10)->get();
@@ -188,7 +172,6 @@ class DashboardController extends Controller
         return view('admin.dashboard', compact(
             'stats', 'casesByStatus',
             'trendLabels', 'trendCounts',
-            'casesByClinician',
             'recentCases',
             'storefronts',
             'providerLoads',
