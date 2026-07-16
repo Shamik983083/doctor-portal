@@ -439,10 +439,10 @@
     var inboxList   = document.querySelector('.ma-inbox-list');
 
     var pusher = new Pusher('{{ config('reverb.apps.apps.0.key') }}', {
-        wsHost:            '{{ config('reverb.servers.reverb.hostname', 'localhost') }}',
-        wsPort:            {{ config('reverb.servers.reverb.port', env('REVERB_PORT', 8080)) }},
-        wssPort:           {{ config('reverb.servers.reverb.port', env('REVERB_PORT', 8080)) }},
-        forceTLS:          false,
+        wsHost:            '{{ config('reverb.apps.apps.0.options.host', 'localhost') }}',
+        wsPort:            {{ config('reverb.apps.apps.0.options.port', 8080) }},
+        wssPort:           {{ config('reverb.apps.apps.0.options.port', 8080) }},
+        forceTLS:          {{ config('reverb.apps.apps.0.options.useTLS', false) ? 'true' : 'false' }},
         disableStats:      true,
         enabledTransports: ['ws', 'wss'],
         authEndpoint:      '{{ url('/broadcasting/auth') }}',
