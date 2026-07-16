@@ -350,29 +350,91 @@
         </div>
     </div>
 
-    {{-- Batch preflight/attest modal --}}
+    {{-- Batch preflight / prescription / attest modal --}}
     <div class="modal fade" id="batchModal" tabindex="-1" aria-labelledby="batchModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="batchModalLabel">Batch preflight results</h5>
+                    <h5 class="modal-title" id="batchModalLabel"><i class="bi bi-check2-all me-2"></i>Batch Approve &amp; Prescribe</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" style="max-height:80vh; overflow-y:auto;">
+
+                    {{-- Step 1: preflight results table --}}
                     <div id="batchPreflightResults"></div>
+
+                    {{-- Step 2: Prescription form — shown after preflight when passes exist --}}
+                    <div id="batchPrescriptionSection" style="display:none" class="mt-3">
+                        <hr class="my-3">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <i class="bi bi-clipboard2-pulse text-primary fs-5"></i>
+                            <h6 class="fw-semibold mb-0">Prescription — applied to all passing cases</h6>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border small fw-normal">shared</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-lg-5">
+                                <div class="card h-100">
+                                    <div class="card-header py-2 bg-light">
+                                        <small class="fw-semibold text-secondary"><i class="bi bi-file-medical me-1"></i>Clinical Information</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label form-label-sm fw-semibold">Diagnoses <span class="text-danger">*</span></label>
+                                            <textarea id="batchDiagnoses" class="form-control form-control-sm" rows="4"
+                                                      placeholder="e.g. E66.01 – Morbid obesity due to excess calories…"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label form-label-sm fw-semibold">Directions</label>
+                                            <textarea id="batchDirections" class="form-control form-control-sm" rows="3"
+                                                      placeholder="General administration instructions for the patient…"></textarea>
+                                        </div>
+                                        <div class="mb-0">
+                                            <label class="form-label form-label-sm fw-semibold">Medical Necessity</label>
+                                            <textarea id="batchMedNecessity" class="form-control form-control-sm" rows="3"
+                                                      placeholder="Justify medical necessity for prescribed medications…"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-7">
+                                <div class="card h-100">
+                                    <div class="card-header py-2 bg-light">
+                                        <small class="fw-semibold text-secondary"><i class="bi bi-capsule me-1"></i>Medications</small>
+                                    </div>
+                                    <div class="card-body pb-2">
+                                        <div class="position-relative mb-3">
+                                            <input type="text" id="batchMedSearch" class="form-control form-control-sm"
+                                                   placeholder="Search and add a medication…" autocomplete="off">
+                                            <div id="batchMedDropdown" class="border rounded bg-white shadow-sm position-absolute w-100 d-none"
+                                                 style="z-index:2000; max-height:200px; overflow-y:auto; top:100%; left:0;"></div>
+                                        </div>
+                                        <div id="batchMedContainer"></div>
+                                        <p id="batchNoMedsMsg" class="text-muted small text-center py-2 mb-0">
+                                            <i class="bi bi-info-circle me-1"></i>Medications from passing cases are pre-loaded. Add or remove as needed.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Step 3: attestation --}}
                     <div id="batchAttestSection" style="display:none" class="mt-3 p-3 border rounded bg-light">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="batchAttestCheck">
                             <label class="form-check-label fw-semibold" for="batchAttestCheck">
-                                I have reviewed all passing cases above and attest that approving them is clinically appropriate.
+                                I have reviewed all passing cases above and attest that approving them and submitting this prescription is clinically appropriate.
                             </label>
                         </div>
                     </div>
+
                     <div id="batchSubmitResults" class="mt-3"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" id="batchSubmitBtn" disabled>Approve passing cases</button>
+                    <button type="button" class="btn btn-success" id="batchSubmitBtn" disabled>
+                        <i class="bi bi-check-lg me-1"></i>Approve &amp; Submit Prescriptions
+                    </button>
                 </div>
             </div>
         </div>
@@ -391,18 +453,36 @@
     const submitUrl    = '{{ route('clinician.cases.batch.submit') }}';
     const csrf         = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
+    // Queue toolbar elements
     const selectAll        = document.getElementById('batchSelectAll');
     const preflightBtn     = document.getElementById('batchPreflightBtn');
     const preflightCountEl = document.getElementById('batchPreflightCount');
     const batchCountEl     = document.getElementById('batchCount');
     const batchToolbar     = document.getElementById('batchToolbar');
-    const batchModal       = new bootstrap.Modal(document.getElementById('batchModal'));
-    const resultsEl      = document.getElementById('batchPreflightResults');
-    const attestSection  = document.getElementById('batchAttestSection');
-    const attestCheck    = document.getElementById('batchAttestCheck');
-    const submitBtn      = document.getElementById('batchSubmitBtn');
-    const submitResultsEl= document.getElementById('batchSubmitResults');
 
+    // Modal elements
+    const batchModal       = new bootstrap.Modal(document.getElementById('batchModal'));
+    const resultsEl        = document.getElementById('batchPreflightResults');
+    const prescriptionSection = document.getElementById('batchPrescriptionSection');
+    const attestSection    = document.getElementById('batchAttestSection');
+    const attestCheck      = document.getElementById('batchAttestCheck');
+    const submitBtn        = document.getElementById('batchSubmitBtn');
+    const submitResultsEl  = document.getElementById('batchSubmitResults');
+
+    // Prescription form elements
+    const batchDiagnoses   = document.getElementById('batchDiagnoses');
+    const batchDirections  = document.getElementById('batchDirections');
+    const batchMedNecessity= document.getElementById('batchMedNecessity');
+    const batchMedSearch   = document.getElementById('batchMedSearch');
+    const batchMedDropdown = document.getElementById('batchMedDropdown');
+    const batchMedContainer= document.getElementById('batchMedContainer');
+    const batchNoMedsMsg   = document.getElementById('batchNoMedsMsg');
+
+    // Offerings pool — populated from preflight results for passing cases
+    let batchOfferings = [];
+    let batchMedIdx    = 0;
+
+    // ── Checkbox / toolbar ──────────────────────────────────────────────────
     function getChecked() {
         return [...document.querySelectorAll('.batch-cb:checked')].map(cb => cb.dataset.uuid);
     }
@@ -432,12 +512,14 @@
         });
     }
 
+    // ── Preflight ────────────────────────────────────────────────────────────
     preflightBtn.addEventListener('click', async () => {
         const uuids = getChecked();
         if (!uuids.length) return;
 
         preflightBtn.disabled = true;
         resultsEl.innerHTML = '';
+        prescriptionSection.style.display = 'none';
         attestSection.style.display = 'none';
         attestCheck.checked = false;
         submitBtn.disabled = true;
@@ -453,7 +535,9 @@
             const data = await res.json();
 
             let passUuids = [];
-            let html = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Patient</th><th>Triage</th><th>Status</th><th>State</th><th>Result</th></tr></thead><tbody>';
+            let html = '<table class="table table-sm table-bordered mb-0"><thead><tr>'
+                + '<th>Patient</th><th>Triage</th><th>Status</th><th>State</th><th>Result</th>'
+                + '</tr></thead><tbody>';
             for (const [uuid, r] of Object.entries(data)) {
                 if (r.pass) {
                     passUuids.push(uuid);
@@ -466,8 +550,35 @@
             resultsEl.innerHTML = html;
 
             if (passUuids.length > 0) {
-                attestSection.style.display = '';
-                attestSection.dataset.passUuids = JSON.stringify(passUuids);
+                // Build union of offerings from all passing cases (dedup by id)
+                const seen = new Set();
+                batchOfferings = [];
+                for (const [uuid, r] of Object.entries(data)) {
+                    if (r.pass && Array.isArray(r.offerings)) {
+                        r.offerings.forEach(o => {
+                            if (!seen.has(o.id)) {
+                                seen.add(o.id);
+                                batchOfferings.push(o);
+                            }
+                        });
+                    }
+                }
+
+                // Reset prescription section
+                batchMedContainer.innerHTML = '';
+                batchNoMedsMsg.classList.remove('d-none');
+                batchMedIdx = 0;
+                batchDiagnoses.value     = '';
+                batchDirections.value    = '';
+                batchMedNecessity.value  = '';
+                batchDiagnoses.classList.remove('is-invalid');
+
+                // Pre-populate medications from passing cases
+                batchOfferings.forEach(o => addBatchMedication(o));
+
+                prescriptionSection.style.display = '';
+                attestSection.style.display       = '';
+                attestSection.dataset.passUuids   = JSON.stringify(passUuids);
             }
         } catch (err) {
             resultsEl.innerHTML = '<div class="alert alert-danger">Preflight request failed. Please try again.</div>';
@@ -476,41 +587,166 @@
         }
     });
 
-    attestCheck.addEventListener('change', () => {
-        submitBtn.disabled = !attestCheck.checked;
+    // ── Medication search ────────────────────────────────────────────────────
+    batchMedSearch.addEventListener('input', function () {
+        const q = this.value.trim().toLowerCase();
+        batchMedDropdown.innerHTML = '';
+        if (!q) { batchMedDropdown.classList.add('d-none'); return; }
+
+        const matches = batchOfferings.filter(o =>
+            o.name.toLowerCase().includes(q) ||
+            (o.internal_name || '').toLowerCase().includes(q)
+        );
+
+        if (!matches.length) {
+            batchMedDropdown.innerHTML = '<div class="px-3 py-2 text-muted small">No matches found.</div>';
+        } else {
+            matches.forEach(o => {
+                const item = document.createElement('div');
+                item.className = 'px-3 py-2 border-bottom';
+                item.style.cursor = 'pointer';
+                item.innerHTML = `<span class="fw-semibold">${esc(o.name)}</span>`
+                    + (o.internal_name ? ` <small class="text-muted ms-1">${esc(o.internal_name)}</small>` : '');
+                item.addEventListener('click', () => addBatchMedication(o));
+                batchMedDropdown.appendChild(item);
+            });
+        }
+        batchMedDropdown.classList.remove('d-none');
     });
 
+    document.addEventListener('click', function (e) {
+        if (!batchMedSearch.contains(e.target) && !batchMedDropdown.contains(e.target)) {
+            batchMedDropdown.classList.add('d-none');
+        }
+    });
+
+    function addBatchMedication(o) {
+        batchMedDropdown.classList.add('d-none');
+        batchMedSearch.value = '';
+        batchNoMedsMsg.classList.add('d-none');
+
+        if (batchDirections && !batchDirections.value.trim() && o.directions) {
+            batchDirections.value = o.directions;
+        }
+
+        const row = document.createElement('div');
+        row.className = 'border rounded mb-3 p-3 position-relative bg-light';
+        row.dataset.offeringId = o.id || '';
+
+        row.innerHTML = `
+            <button type="button" class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2 batch-remove-med"
+                    style="line-height:1; padding:2px 7px; font-size:.75rem;">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-semibold mb-1">Medication Name</label>
+                <input type="text" data-field="name" class="form-control form-control-sm" value="${esc(o.name)}" required>
+            </div>
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-semibold mb-1">Compound Formula</label>
+                <input type="text" data-field="compound_formula" class="form-control form-control-sm" value="${esc(o.compound_formula || '')}">
+            </div>
+            <div class="row g-2 mb-1">
+                <div class="col-4 col-md-2">
+                    <label class="form-label form-label-sm fw-semibold mb-1">Refills</label>
+                    <input type="number" data-field="refills" min="0" class="form-control form-control-sm" value="${esc(o.refills || '')}">
+                </div>
+                <div class="col-4 col-md-2">
+                    <label class="form-label form-label-sm fw-semibold mb-1">Quantity</label>
+                    <input type="number" data-field="quantity" min="0" step="0.01" class="form-control form-control-sm" value="${esc(o.quantity || '')}">
+                </div>
+                <div class="col-4 col-md-2">
+                    <label class="form-label form-label-sm fw-semibold mb-1">Days Supply</label>
+                    <input type="number" data-field="days_supply" min="0" class="form-control form-control-sm" value="${esc(o.days_supply || '')}">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label form-label-sm fw-semibold mb-1">Dispense Unit</label>
+                    <input type="text" data-field="dispense_unit" class="form-control form-control-sm" value="${esc(o.dispense_unit || '')}">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label form-label-sm fw-semibold mb-1">Days Until Dispense</label>
+                    <input type="number" data-field="days_until_dispense" min="0" class="form-control form-control-sm" value="${esc(o.days_until_dispense || '')}">
+                </div>
+            </div>
+        `;
+
+        row.querySelector('.batch-remove-med').addEventListener('click', () => {
+            row.remove();
+            if (!batchMedContainer.children.length) batchNoMedsMsg.classList.remove('d-none');
+        });
+
+        batchMedContainer.appendChild(row);
+    }
+
+    function collectBatchMedications() {
+        const meds = [];
+        batchMedContainer.querySelectorAll('[data-offering-id]').forEach(card => {
+            meds.push({
+                offering_id:         card.dataset.offeringId || null,
+                name:                card.querySelector('[data-field="name"]').value,
+                compound_formula:    card.querySelector('[data-field="compound_formula"]').value,
+                refills:             card.querySelector('[data-field="refills"]').value || null,
+                quantity:            card.querySelector('[data-field="quantity"]').value || null,
+                days_supply:         card.querySelector('[data-field="days_supply"]').value || null,
+                dispense_unit:       card.querySelector('[data-field="dispense_unit"]').value,
+                days_until_dispense: card.querySelector('[data-field="days_until_dispense"]').value || null,
+            });
+        });
+        return meds;
+    }
+
+    // ── Attest + diagnoses gate ───────────────────────────────────────────────
+    function updateSubmitBtn() {
+        submitBtn.disabled = !(attestCheck.checked && batchDiagnoses.value.trim().length > 0);
+    }
+    attestCheck.addEventListener('change', updateSubmitBtn);
+    batchDiagnoses.addEventListener('input', updateSubmitBtn);
+
+    // ── Submit ───────────────────────────────────────────────────────────────
     submitBtn.addEventListener('click', async () => {
         const passUuids = JSON.parse(attestSection.dataset.passUuids || '[]');
         if (!passUuids.length) return;
 
+        const diagnoses = batchDiagnoses.value.trim();
+        if (!diagnoses) {
+            batchDiagnoses.classList.add('is-invalid');
+            batchDiagnoses.focus();
+            return;
+        }
+        batchDiagnoses.classList.remove('is-invalid');
+
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Approving…';
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Submitting…';
         submitResultsEl.innerHTML = '';
 
         try {
             const res = await fetch(submitUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-                body: JSON.stringify({ uuids: passUuids })
+                body: JSON.stringify({
+                    uuids:             passUuids,
+                    diagnoses:         diagnoses,
+                    directions:        batchDirections.value,
+                    medical_necessity: batchMedNecessity.value,
+                    medications:       collectBatchMedications(),
+                })
             });
             const data = await res.json();
 
-            let successCount = 0, failCount = 0;
+            let successCount = 0;
             let html = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Patient</th><th>Result</th></tr></thead><tbody>';
             for (const [uuid, r] of Object.entries(data)) {
                 if (r.success) {
                     successCount++;
-                    html += `<tr class="table-success"><td>${esc(r.patient)}</td><td><span class="badge bg-success">Approved</span></td></tr>`;
+                    html += `<tr class="table-success"><td>${esc(r.patient)}</td><td><span class="badge bg-success">Approved &amp; Prescribed</span></td></tr>`;
                 } else {
-                    failCount++;
                     html += `<tr class="table-danger"><td>${esc(r.error ?? 'Unknown error')}</td><td><span class="badge bg-danger">Failed</span></td></tr>`;
                 }
             }
             html += '</tbody></table>';
             submitResultsEl.innerHTML = html;
 
-            submitBtn.textContent = 'Done';
+            submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Done';
 
             if (successCount > 0) {
                 setTimeout(() => window.location.reload(), 2500);
@@ -518,7 +754,7 @@
         } catch (err) {
             submitResultsEl.innerHTML = '<div class="alert alert-danger">Submit request failed. Please try again.</div>';
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Approve passing cases';
+            submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Approve &amp; Submit Prescriptions';
         }
     });
 

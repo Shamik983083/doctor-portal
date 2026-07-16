@@ -542,11 +542,23 @@ class CaseController extends Controller
             }
 
             $results[$uuid] = [
-                'pass'    => true,
-                'patient' => $case->patient?->full_name ?? 'Patient',
-                'triage'  => $case->triage,
-                'status'  => $case->status,
-                'state'   => $state ?: '—',
+                'pass'      => true,
+                'patient'   => $case->patient?->full_name ?? 'Patient',
+                'triage'    => $case->triage,
+                'status'    => $case->status,
+                'state'     => $state ?: '—',
+                'offerings' => $case->caseOfferings->map(fn($co) => $co->offering ? [
+                    'id'                  => $co->offering->id,
+                    'name'                => $co->offering->name,
+                    'internal_name'       => $co->offering->internal_name ?? '',
+                    'compound_formula'    => $co->offering->compound_formula ?? '',
+                    'refills'             => $co->offering->refills ?? '',
+                    'quantity'            => $co->offering->quantity ?? '',
+                    'days_supply'         => $co->offering->days_supply ?? '',
+                    'dispense_unit'       => $co->offering->dispense_unit ?? '',
+                    'days_until_dispense' => $co->offering->days_until_dispense ?? '',
+                    'directions'          => $co->offering->directions ?? '',
+                ] : null)->filter()->values()->toArray(),
             ];
         }
 
@@ -555,7 +567,22 @@ class CaseController extends Controller
 
     public function batchSubmit(Request $request)
     {
-        $request->validate(['uuids' => 'required|array|min:1|max:20', 'uuids.*' => 'string']);
+        $request->validate([
+            'uuids'                             => 'required|array|min:1|max:20',
+            'uuids.*'                           => 'string',
+            'diagnoses'                         => 'required|string',
+            'directions'                        => 'nullable|string',
+            'medical_necessity'                 => 'nullable|string',
+            'medications'                       => 'nullable|array',
+            'medications.*.offering_id'         => 'nullable|exists:offerings,id',
+            'medications.*.name'                => 'required_with:medications|string|max:255',
+            'medications.*.compound_formula'    => 'nullable|string',
+            'medications.*.refills'             => 'nullable|integer|min:0',
+            'medications.*.quantity'            => 'nullable|numeric|min:0',
+            'medications.*.days_supply'         => 'nullable|integer|min:0',
+            'medications.*.dispense_unit'       => 'nullable|string|max:100',
+            'medications.*.days_until_dispense' => 'nullable|integer|min:0',
+        ]);
 
         $clinician = Auth::user()->clinician;
 
@@ -594,18 +621,73 @@ class CaseController extends Controller
                 continue;
             }
 
+            $prescription = null;
+
             try {
-                \Illuminate\Support\Facades\DB::transaction(function () use ($case, $clinician) {
+                DB::transaction(function () use ($request, $case, $clinician, &$prescription) {
                     if ($case->status === PatientCase::STATUS_WAITING) {
                         $this->stateMachine->assignToClinician($case, $clinician);
                         $case->refresh();
                     }
+
+                    $prescription = CasePrescription::create([
+                        'case_id'           => $case->id,
+                        'clinician_id'      => $clinician->id,
+                        'diagnoses'         => $request->input('diagnoses'),
+                        'directions'        => $request->input('directions'),
+                        'medical_necessity' => $request->input('medical_necessity'),
+                        'prescribed_at'     => now(),
+                    ]);
+
+                    foreach ($request->input('medications', []) as $med) {
+                        $prescription->medications()->create([
+                            'offering_id'         => $med['offering_id'] ?? null,
+                            'name'                => $med['name'],
+                            'compound_formula'    => $med['compound_formula'] ?? null,
+                            'refills'             => $med['refills'] ?? null,
+                            'quantity'            => $med['quantity'] ?? null,
+                            'days_supply'         => $med['days_supply'] ?? null,
+                            'dispense_unit'       => $med['dispense_unit'] ?? null,
+                            'days_until_dispense' => $med['days_until_dispense'] ?? null,
+                        ]);
+                    }
+
                     $this->stateMachine->approve($case, $clinician->id);
                 });
 
+                $this->stateMachine->complete($case);
+
+                try {
+                    $document = $this->prescriptionDocuments->generate($case, $prescription);
+                    $this->pharmacyDispatch->queue($document);
+                } catch (\Throwable $e) {
+                    Log::error('Batch prescription document/dispatch failed', [
+                        'uuid'  => $uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
+                    'case_id'         => $case->uuid,
+                    'external_id'     => $case->external_id,
+                    'patient_id'      => $case->patient->uuid ?? null,
+                    'clinician_name'  => $clinician->full_name,
+                    'clinician_npi'   => $clinician->npi,
+                    'diagnoses'       => $prescription->diagnoses,
+                    'meds_prescribed' => $prescription->load('medications')->medications->map(fn($m) => [
+                        'name'             => $m->name,
+                        'compound_formula' => $m->compound_formula,
+                        'refills'          => (string) $m->refills,
+                        'quantity'         => (string) $m->quantity,
+                        'days_supply'      => (string) $m->days_supply,
+                        'dispense_unit'    => $m->dispense_unit,
+                    ])->toArray(),
+                    'timestamp'       => now()->timestamp,
+                ]);
+
                 $results[$uuid] = ['success' => true, 'patient' => $case->patient?->full_name ?? 'Patient'];
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Batch submit failed for case', [
+                Log::error('Batch submit failed for case', [
                     'uuid'  => $uuid,
                     'error' => $e->getMessage(),
                 ]);
