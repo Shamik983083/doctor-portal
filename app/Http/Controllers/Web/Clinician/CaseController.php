@@ -111,7 +111,13 @@ class CaseController extends Controller
         }
 
         $heldCases   = $cases->getCollection()->filter(fn($c) => $c->hold_status || $c->status === 'support')->values();
-        $messages    = \App\Models\Message::with(['patient', 'case.patient'])->latest()->limit(6)->get();
+        $messages    = \App\Models\Message::with(['patient', 'case'])
+            ->where('direction', 'inbound')
+            ->latest()
+            ->get()
+            ->unique(fn($m) => $m->patient_id ?? $m->case?->patient_id)
+            ->take(6)
+            ->values();
         $note        = \App\Models\ClinicalNote::with(['clinician.user', 'case.patient'])->latest()->first();
         $reasonCodes = [
             'Dose exceeds protocol titration step',

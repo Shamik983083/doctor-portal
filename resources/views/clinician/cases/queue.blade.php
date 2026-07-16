@@ -297,19 +297,22 @@
             <ul class="ma-inbox-list">
                 @forelse($messages as $m)
                 @php
-                    $pname = optional($m->patient)->full_name ?? optional(optional($m->case)->patient)->full_name ?? 'Patient';
-                    $ini   = collect(explode(' ', trim($pname)))->map(fn($w) => strtoupper(substr($w,0,1)))->take(2)->implode('');
+                    $pname   = optional($m->patient)->full_name ?? optional($m->case?->patient)->full_name ?? 'Patient';
+                    $ini     = collect(explode(' ', trim($pname)))->map(fn($w) => strtoupper(substr($w,0,1)))->take(2)->implode('');
+                    $caseUrl = $m->case ? route('clinician.cases.show', $m->case->uuid) : '#';
                 @endphp
-                <li class="ma-inbox-thread {{ ($m->direction === 'inbound' && !$m->is_read) ? 'unread' : '' }}">
-                    <span class="ma-inbox-avatar">{{ $ini ?: '?' }}</span>
-                    <span class="ma-inbox-body">
-                        <span class="ma-inbox-top">
-                            <strong>{{ $pname }}</strong>
-                            <span class="ma-pill neutral">{{ ucfirst($m->direction ?? 'msg') }}</span>
-                            <span class="ma-inbox-waiting">{{ $m->created_at?->diffForHumans() }}</span>
+                <li class="ma-inbox-thread {{ !$m->is_read ? 'unread' : '' }}">
+                    <a href="{{ $caseUrl }}" class="d-flex align-items-center gap-3 text-decoration-none text-reset w-100">
+                        <span class="ma-inbox-avatar flex-shrink-0">{{ $ini ?: '?' }}</span>
+                        <span class="ma-inbox-body flex-grow-1 min-w-0">
+                            <span class="ma-inbox-top">
+                                <strong>{{ $pname }}</strong>
+                                <span class="ma-inbox-waiting">{{ $m->created_at?->diffForHumans() }}</span>
+                            </span>
+                            <span class="ma-inbox-snippet d-block text-truncate">{{ \Illuminate\Support\Str::limit($m->body, 90) }}</span>
                         </span>
-                        <span class="ma-inbox-snippet">{{ \Illuminate\Support\Str::limit($m->body, 90) }}</span>
-                    </span>
+                        <i class="bi bi-chevron-right text-muted flex-shrink-0 small"></i>
+                    </a>
                 </li>
                 @empty
                 <li class="ma-inbox-thread">
