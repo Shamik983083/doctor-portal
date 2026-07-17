@@ -31,7 +31,7 @@
         border: 1px solid var(--ma-border);
         border-radius: var(--ma-radius);
         box-shadow: var(--ma-shadow);
-        overflow: hidden;
+        overflow: clip;
     }
     .ma-surface .card + .card { margin-top: 1rem; }
     .ma-surface .card-header {

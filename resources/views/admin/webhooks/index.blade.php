@@ -31,8 +31,8 @@
             @endif
         </form>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
+    <div class="card-body p-0" style="padding:0!important;overflow:visible">
+        <div class="table-responsive" style="overflow-x:auto;min-height:1px">
             <table class="table table-hover mb-0" style="font-size:.875rem">
                 <thead class="table-light">
                     <tr>
