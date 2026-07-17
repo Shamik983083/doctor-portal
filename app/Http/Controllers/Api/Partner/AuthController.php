@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Laravel\Passport\Http\Controllers\AccessTokenController;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use GuzzleHttp\Psr7\ServerRequest as Psr7Request;
-
 class AuthController extends Controller
 {
     public function token(Request $request, AccessTokenController $tokenController)

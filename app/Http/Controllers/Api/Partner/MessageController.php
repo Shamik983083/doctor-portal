@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Partner;
 
+use App\Events\CaseMessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\Message;
 use App\Services\WebhookDispatcher;
@@ -30,29 +31,31 @@ class MessageController extends Controller
     public function store(Request $request, string $caseId)
     {
         $data = $request->validate([
-            'body'        => 'required|string|max:10000',
+            'body' => 'required|string|max:10000',
             'sender_name' => 'nullable|string|max:100',
         ]);
 
         $partner = $this->partner($request);
-        $case    = $partner->cases()->where('uuid', $caseId)->firstOrFail();
+        $case = $partner->cases()->where('uuid', $caseId)->firstOrFail();
 
         $message = Message::create([
-            'case_id'     => $case->id,
-            'patient_id'  => $case->patient_id,
-            'partner_id'  => $partner->id,
-            'direction'   => 'inbound',
-            'channel'     => 'portal',
+            'case_id' => $case->id,
+            'patient_id' => $case->patient_id,
+            'partner_id' => $partner->id,
+            'direction' => 'inbound',
+            'channel' => 'portal',
             'sender_type' => 'patient',
-            'body'        => $data['body'],
-            'is_read'     => false,
+            'body' => $data['body'],
+            'is_read' => false,
         ]);
+
+        broadcast(new CaseMessageSent($message));
 
         // Notify any other partner webhooks subscribed to this event
         $this->webhooks->dispatch($partner->id, 'patient_message_received', [
-            'case_id'    => $case->uuid,
+            'case_id' => $case->uuid,
             'message_id' => $message->uuid,
-            'timestamp'  => now()->timestamp,
+            'timestamp' => now()->timestamp,
         ]);
 
         return response()->json($message, 201);

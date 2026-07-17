@@ -395,13 +395,11 @@
                     @endif
                 </div>
 
-                <form method="POST" action="{{ route('clinician.cases.messages.store', $case->uuid) }}">
-                    @csrf
-                    <div class="input-group">
-                        <input type="text" name="body" class="form-control" placeholder="Type a message..." required>
-                        <button class="btn btn-primary"><i class="bi bi-send"></i></button>
-                    </div>
-                </form>
+                <div class="input-group" id="clinMsgForm">
+                    <input type="text" id="clinMsgInput" class="form-control" placeholder="Type a message..." required
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();clinSendMessage();}">
+                    <button class="btn btn-primary" onclick="clinSendMessage()"><i class="bi bi-send"></i></button>
+                </div>
             </div>
 
             {{-- Files --}}
@@ -622,23 +620,18 @@ document.addEventListener('click', function (e) {
 });
 </script>
 
+<script src="https://js.pusher.com/8.0/pusher.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/2.2.4/echo.iife.min.js"></script>
+
 <script>
 (function () {
     var thread = document.getElementById('clinThread');
     if (!thread) return;
 
-    var pollUrl     = thread.dataset.pollUrl;
     var patientName = thread.dataset.patientName;
     var patientInit = thread.dataset.patientInitials;
     var clinicInit  = thread.dataset.clinicianInitials;
-    var lastId      = parseInt(thread.dataset.lastId, 10) || 0;
-    var polling     = false;
-    var interval    = null;
-
-    function isMessagesTabActive() {
-        var pane = document.getElementById('tab-messages');
-        return pane && pane.classList.contains('active') && pane.classList.contains('show');
-    }
+    var caseId      = {{ $case->id }};
 
     function scrollToBottom() {
         thread.scrollTop = thread.scrollHeight;
@@ -691,63 +684,152 @@ document.addEventListener('click', function (e) {
             '</div></div>';
     }
 
-    function poll() {
-        if (polling || !isMessagesTabActive() || document.visibilityState !== 'visible') return;
-        polling = true;
-        fetch(pollUrl + '?after=' + lastId)
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (data) {
-                if (!data || !data.messages || data.messages.length === 0) return;
+    function appendMessage(msg) {
+        var empty = document.getElementById('clinThreadEmpty');
+        if (empty) empty.remove();
 
-                var empty = document.getElementById('clinThreadEmpty');
-                if (empty) empty.remove();
-
-                var html = '';
-                data.messages.forEach(function (msg) {
-                    if (!hasSeparatorForDate(msg.date)) {
-                        html += buildSeparator(msg.date, msg.date_label);
-                    }
-                    html += buildBubble(msg);
-                    lastId = msg.id;
-                });
-
-                thread.insertAdjacentHTML('beforeend', html);
-                thread.dataset.lastId = lastId;
-                scrollToBottom();
-            })
-            .catch(function () {})
-            .finally(function () { polling = false; });
-    }
-
-    function startPolling() {
-        if (!interval) {
-            poll();
-            interval = setInterval(poll, 5000);
+        if (!hasSeparatorForDate(msg.date)) {
+            thread.insertAdjacentHTML('beforeend', buildSeparator(msg.date, msg.date_label));
         }
-    }
-
-    function stopPolling() {
-        if (interval) { clearInterval(interval); interval = null; }
-    }
-
-    var messagesTabLink = document.querySelector('a[href="#tab-messages"]');
-    if (messagesTabLink) {
-        messagesTabLink.addEventListener('shown.bs.tab', function () {
-            scrollToBottom();
-            startPolling();
-        });
-        messagesTabLink.addEventListener('hidden.bs.tab', stopPolling);
-    }
-
-    document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'hidden') { stopPolling(); }
-        else if (isMessagesTabActive()) { startPolling(); }
-    });
-
-    if (isMessagesTabActive()) {
+        thread.insertAdjacentHTML('beforeend', buildBubble(msg));
         scrollToBottom();
-        startPolling();
     }
+
+    // ── AJAX send message ──────────────────────────────────
+    window.clinSendMessage = function () {
+        var input = document.getElementById('clinMsgInput');
+        if (!input) return;
+        var body = input.value.trim();
+        if (!body) return;
+
+        input.value = '';
+
+        // Optimistic: show the bubble immediately
+        var now = new Date();
+        var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        var dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
+        appendMessage({ body: body, sender_type: 'clinician', time: timeStr, date: dateStr, date_label: 'Today' });
+
+        fetch("{{ route('clinician.cases.messages.store', $case->uuid) }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ body: body }),
+        })
+        .then(function (r) {
+            if (!r.ok) r.text().then(function (t) { console.error('[Chat] Send error:', t); });
+        })
+        .catch(function (err) { console.error('[Chat] Send failed:', err); });
+    };
+
+    // ── Echo real-time ─────────────────────────────────────
+    var EchoConstructor = null;
+    if (typeof Echo === 'object' && typeof Echo.default === 'function') {
+        EchoConstructor = Echo.default;
+    } else if (typeof Echo === 'function') {
+        EchoConstructor = Echo;
+    }
+
+    if (EchoConstructor) {
+        window.Pusher = Pusher;
+
+        window.Echo = new EchoConstructor({
+            broadcaster: 'pusher',
+            key: "{{ config('reverb.apps.apps.0.key') }}",
+            wsHost: "{{ config('reverb.apps.apps.0.options.host') }}",
+            wsPort: {{ config('reverb.apps.apps.0.options.port') }},
+            wssPort: {{ config('reverb.apps.apps.0.options.port') }},
+            disableStats: true,
+            forceTLS: {{ config('reverb.apps.apps.0.options.useTLS') }},
+            cluster: 'mt1',
+            enabledTransports: ['ws', 'wss'],
+            authEndpoint: "/broadcasting/auth",
+            auth: {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }
+        });
+
+        window.Echo.private('case.' + caseId)
+            .listen('.CaseMessageSent', function (e) {
+                // Skip own clinician messages (already shown optimistically)
+                if (e.sender_type === 'clinician') return;
+
+                var created = new Date(e.created_at);
+                var timeStr = created.getHours().toString().padStart(2, '0') + ':' + created.getMinutes().toString().padStart(2, '0');
+                var dateStr = created.getFullYear() + '-' + (created.getMonth()+1).toString().padStart(2, '0') + '-' + created.getDate().toString().padStart(2, '0');
+                var dateLabel = isToday(created) ? 'Today' : (isYesterday(created) ? 'Yesterday' : created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+
+                appendMessage({
+                    body: e.body,
+                    sender_type: e.sender_type,
+                    time: timeStr,
+                    date: dateStr,
+                    date_label: dateLabel,
+                });
+            });
+
+        console.log('[Chat] Echo subscribed to case.' + caseId);
+    } else {
+        // Fallback to polling if Echo not available
+        console.warn('[Chat] Echo not available, falling back to polling');
+        fallbackPolling();
+    }
+
+    function isToday(d) {
+        var t = new Date();
+        return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
+    }
+    function isYesterday(d) {
+        var t = new Date(); t.setDate(t.getDate() - 1);
+        return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
+    }
+
+    // ── Fallback polling (if Echo fails to load) ───────────
+    function fallbackPolling() {
+        var pollUrl = thread.dataset.pollUrl;
+        var lastId  = parseInt(thread.dataset.lastId, 10) || 0;
+        var interval = null;
+
+        function isMessagesTabActive() {
+            var pane = document.getElementById('tab-messages');
+            return pane && pane.classList.contains('active') && pane.classList.contains('show');
+        }
+
+        function poll() {
+            if (!isMessagesTabActive() || document.visibilityState !== 'visible') return;
+            fetch(pollUrl + '?after=' + lastId)
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    if (!data || !data.messages || data.messages.length === 0) return;
+                    data.messages.forEach(function (msg) { appendMessage(msg); lastId = msg.id; });
+                    thread.dataset.lastId = lastId;
+                })
+                .catch(function () {});
+        }
+
+        function startPolling() { if (!interval) { poll(); interval = setInterval(poll, 5000); } }
+        function stopPolling() { if (interval) { clearInterval(interval); interval = null; } }
+
+        var tabLink = document.querySelector('a[href="#tab-messages"]');
+        if (tabLink) {
+            tabLink.addEventListener('shown.bs.tab', function () { scrollToBottom(); startPolling(); });
+            tabLink.addEventListener('hidden.bs.tab', stopPolling);
+        }
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') stopPolling();
+            else if (isMessagesTabActive()) startPolling();
+        });
+        if (isMessagesTabActive()) { scrollToBottom(); startPolling(); }
+    }
+
+    // ── Initial scroll ─────────────────────────────────────
+    scrollToBottom();
 })();
 </script>
 @endsection
