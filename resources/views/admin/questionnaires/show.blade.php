@@ -46,11 +46,6 @@ $typeMap = [
     </div>
 </div>
 
-@if(session('success'))
-<div class="alert alert-success alert-dismissible fade show mb-3">
-    {{ session('success') }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-@endif
 
 <div class="row g-4">
 

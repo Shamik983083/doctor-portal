@@ -167,6 +167,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
         <li>A single <strong>GET</strong> call to the Anti-Aging questionnaire returns <em>all</em> questions — standard intake (Step 1), program-specific medical history (Step 2), and consents (Step 3) — in one list, each tagged with a stable <code>slug</code>.</li>
         <li>A single <strong>POST</strong> to <code>/api/partner/cases</code> with your <strong>Offering ID</strong> + a flat <code>answers</code> array of slug/answer pairs. <strong>No questionnaire UUID needed at submission time.</strong></li>
         <li>The <code>patient</code> block must include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> — these are required fields stored directly on the patient record.</li>
+        <li>Send your <strong>Vouched IDV result</strong> in <code>patient.id_verified_status</code> (<code>verified</code> / <code>failed</code> / <code>pending</code>) — the portal uses it for clinical triage. For async Vouched flows where the result arrives after case creation, push it later via <code>PATCH /api/partner/patients/{uuid}</code> and open cases re-triage automatically.</li>
         <li>The portal uses the offering to determine which questionnaire applies, then stores answers internally.</li>
         <li>Use <code>slug</code> instead of <code>question_id</code> — slugs are stable and survive question rebuilds; numeric IDs change when a questionnaire is edited.</li>
     </ul>
@@ -290,7 +291,9 @@ Content-Type: application/json
     "city":          "Austin",
     "state":         "TX",
     "zip":           "78701",
-    "external_id":   "portal-user-9002"
+    "external_id":   "portal-user-9002",
+    "id_verified_status": "verified",   ← Vouched result: verified | failed | pending
+    "id_verified_at":     "2026-07-16T10:30:00Z"
   },
   "patient_state":  "TX",
   "external_id":    "order-aa-20240701-001",
@@ -323,7 +326,15 @@ Content-Type: application/json
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-create-resp')">Copy</button>
 
-<div class="alert alert-warning mt-3 mb-0 small">
+<div class="alert alert-info mt-3 small">
+    <i class="bi bi-shield-check me-1"></i>
+    <strong>Async Vouched flow:</strong> If your Vouched check completes <em>after</em> the case is created, push the result via
+    <code>PATCH {{ $base }}/api/partner/patients/{patient_uuid}</code> with
+    <code>{ "id_verified_status": "verified", "id_verified_at": "…" }</code>.
+    The portal immediately re-classifies all open cases for that patient — no re-submission needed.
+</div>
+
+<div class="alert alert-warning mt-0 mb-0 small">
     <strong><i class="bi bi-exclamation-triangle me-1"></i>Payload is generated live from the DB.</strong>
     Lines marked <code>// conditional</code> must be <strong>omitted</strong> when the parent condition was not met.
     Lines marked <code>// optional</code> may always be omitted.
@@ -517,6 +528,7 @@ function renderAAQRows($rows, $allRows) {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs — no questionnaire UUID required. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> as required fields in the <code>patient</code> block</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Include <code>patient.id_verified_status</code> = <code>"verified"</code> (or <code>"failed"</code> / <code>"pending"</code>) with your Vouched result at case creation time. If Vouched completes asynchronously, push it later via <code>PATCH /api/partner/patients/{uuid}</code> — open cases re-triage automatically</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Only send conditional answers when the parent condition was met — omit <code>aa_primary_reason_other</code>, <code>aa_current_symptoms_other</code>, <code>aa_prior_treatment_reactions</code>, and <code>aa_prior_treatment_reaction_details</code> unless triggered</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Register a webhook at <code>POST /api/partner/webhooks</code> to receive status events — the portal fires: <code>case_waiting</code>, <code>case_assigned_to_clinician</code>, <code>case_support</code>, <code>case_approved</code>, <code>prescription_written</code>, <code>case_completed</code>, <code>case_cancelled</code>, <code>message_created</code></li>

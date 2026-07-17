@@ -1,105 +1,174 @@
 @extends('layouts.app')
 
 @section('sidebar-nav')
-<ul class="nav flex-column mt-2">
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
-            <i class="bi bi-speedometer2"></i> Dashboard
-        </a>
-    </li>
-    <hr>
-    <li><span class="sidebar-section">Management</span></li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.cases.*') ? 'active' : '' }}" href="{{ route('admin.cases.index') }}">
+@php
+    $mgmtActive  = request()->routeIs(
+        'admin.cases.*', 'admin.patients.*', 'admin.partners.*',
+        'admin.clinicians.*', 'admin.offerings.*', 'admin.categories.*',
+        'admin.questionnaires.*', 'admin.questions.*'
+    );
+    $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
+    $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*');
+    $superActive = request()->routeIs('admin.admins.*');
+@endphp
+
+<div class="mt-1 pb-3">
+
+    {{-- Dashboard (always visible) --}}
+    <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}"
+       href="{{ route('admin.dashboard') }}">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </a>
+
+    {{-- ── Management ──────────────────────────────────────── --}}
+    <button class="sidebar-section-toggle {{ $mgmtActive ? '' : 'collapsed' }}"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#snav-management"
+            aria-expanded="{{ $mgmtActive ? 'true' : 'false' }}">
+        <span>Management</span>
+        <i class="bi bi-chevron-down sidebar-chevron"></i>
+    </button>
+    <div class="collapse {{ $mgmtActive ? 'show' : '' }}" id="snav-management">
+
+        <a class="nav-link {{ request()->routeIs('admin.cases.*') ? 'active' : '' }}"
+           href="{{ route('admin.cases.index') }}">
             <i class="bi bi-folder2-open"></i> Cases
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.patients.*') ? 'active' : '' }}" href="{{ route('admin.patients.index') }}">
+        <a class="nav-link {{ request()->routeIs('admin.patients.*') ? 'active' : '' }}"
+           href="{{ route('admin.patients.index') }}">
             <i class="bi bi-people"></i> Patients
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.partners.*') ? 'active' : '' }}" href="{{ route('admin.partners.index') }}">
+        <a class="nav-link {{ request()->routeIs('admin.partners.*') ? 'active' : '' }}"
+           href="{{ route('admin.partners.index') }}">
             <i class="bi bi-building"></i> Partners
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.clinicians.*') ? 'active' : '' }}" href="{{ route('admin.clinicians.index') }}">
+        <a class="nav-link {{ request()->routeIs('admin.clinicians.*') && !request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
+           href="{{ route('admin.clinicians.index') }}">
             <i class="bi bi-person-badge"></i> Clinicians
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link sub {{ request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}" href="{{ route('admin.clinicians.priority') }}">
+        <a class="nav-link sub {{ request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
+           href="{{ route('admin.clinicians.priority') }}">
             <i class="bi bi-sort-numeric-down"></i> Assignment Priority
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.offerings.*') ? 'active' : '' }}" href="{{ route('admin.offerings.index') }}">
+        <a class="nav-link {{ request()->routeIs('admin.offerings.*') ? 'active' : '' }}"
+           href="{{ route('admin.offerings.index') }}">
             <i class="bi bi-capsule"></i> Offerings
             @php $pendingOfferingsCount = \App\Models\Offering::where('approval_status', 'pending')->count(); @endphp
             @if($pendingOfferingsCount > 0)
                 <span class="badge bg-warning text-dark ms-auto" style="font-size:.6rem;">{{ $pendingOfferingsCount }}</span>
             @endif
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link sub {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">
+        <a class="nav-link sub {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}"
+           href="{{ route('admin.categories.index') }}">
             <i class="bi bi-tags"></i> Categories
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.questionnaires.*') ? 'active' : '' }}" href="{{ route('admin.questionnaires.index') }}">
+        <a class="nav-link {{ request()->routeIs('admin.questionnaires.*') ? 'active' : '' }}"
+           href="{{ route('admin.questionnaires.index') }}">
             <i class="bi bi-ui-checks"></i> Questionnaires
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link sub {{ request()->routeIs('admin.questions.*') ? 'active' : '' }}" href="{{ route('admin.questions.index') }}">
+        <a class="nav-link sub {{ request()->routeIs('admin.questions.*') ? 'active' : '' }}"
+           href="{{ route('admin.questions.index') }}">
             <i class="bi bi-question-circle"></i> Question Bank
         </a>
-    </li>
-    <hr>
-    <li><span class="sidebar-section">Integration Guides</span></li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.guide.messaging') ? 'active' : '' }}" href="{{ route('admin.guide.messaging') }}">
+
+    </div>
+
+    {{-- ── API & Developer ─────────────────────────────────── --}}
+    <button class="sidebar-section-toggle {{ $apiActive ? '' : 'collapsed' }}"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#snav-api"
+            aria-expanded="{{ $apiActive ? 'true' : 'false' }}">
+        <span>API &amp; Developer</span>
+        <i class="bi bi-chevron-down sidebar-chevron"></i>
+    </button>
+    <div class="collapse {{ $apiActive ? 'show' : '' }}" id="snav-api">
+
+        <a class="nav-link {{ request()->routeIs('admin.guide.messaging') ? 'active' : '' }}"
+           href="{{ route('admin.guide.messaging') }}">
             <i class="bi bi-chat-dots"></i> Messaging API
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.guide.weightloss-api') ? 'active' : '' }}" href="{{ route('admin.guide.weightloss-api') }}">
+        <a class="nav-link {{ request()->routeIs('admin.guide.weightloss-api') ? 'active' : '' }}"
+           href="{{ route('admin.guide.weightloss-api') }}">
             <i class="bi bi-journal-medical"></i> Weight Loss API
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}" href="{{ route('admin.guide.antiaging-api') }}">
+        <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}"
+           href="{{ route('admin.guide.antiaging-api') }}">
             <i class="bi bi-stars"></i> Anti-Aging API
         </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.guide.webhooks') ? 'active' : '' }}" href="{{ route('admin.guide.webhooks') }}">
-            <i class="bi bi-broadcast-pin"></i> Webhooks
+        <a class="nav-link {{ request()->routeIs('admin.guide.webhooks') ? 'active' : '' }}"
+           href="{{ route('admin.guide.webhooks') }}">
+            <i class="bi bi-broadcast-pin"></i> Webhook Guide
         </a>
-    </li>
-    <hr>
-    <li><span class="sidebar-section">Developer</span></li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.webhooks.*') ? 'active' : '' }}" href="{{ route('admin.webhooks.index') }}">
+        <a class="nav-link {{ request()->routeIs('admin.webhooks.*') ? 'active' : '' }}"
+           href="{{ route('admin.webhooks.index') }}">
             <i class="bi bi-broadcast"></i> Webhook Logs
             @php $failedWebhooksCount = \App\Models\WebhookDelivery::where('status', 'failed')->count(); @endphp
             @if($failedWebhooksCount > 0)
                 <span class="badge bg-danger ms-auto" style="font-size:.6rem;">{{ $failedWebhooksCount }}</span>
             @endif
         </a>
-    </li>
-    <hr>
-    <li><span class="sidebar-section">Configuration</span></li>
-    <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('admin.settings*') ? 'active' : '' }}" href="{{ route('admin.settings') }}">
-            <i class="bi bi-sliders"></i> Settings
+
+    </div>
+
+    {{-- ── Configuration ───────────────────────────────────── --}}
+    <button class="sidebar-section-toggle {{ $cfgActive ? '' : 'collapsed' }}"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#snav-config"
+            aria-expanded="{{ $cfgActive ? 'true' : 'false' }}">
+        <span>Configuration</span>
+        <i class="bi bi-chevron-down sidebar-chevron"></i>
+    </button>
+    <div class="collapse {{ $cfgActive ? 'show' : '' }}" id="snav-config">
+
+        <a class="nav-link {{ request()->routeIs('admin.settings*') ? 'active' : '' }}"
+           href="{{ route('admin.settings') }}">
+            <i class="bi bi-sliders"></i> SLA Settings
         </a>
-    </li>
-</ul>
-<div class="px-3 mt-3 pb-3" style="border-top:1px solid rgba(255,255,255,.06);">
-    <small class="sidebar-section" style="padding:.5rem 0 0;">Admin Console</small>
+        <a class="nav-link {{ request()->routeIs('admin.triage-rules.*') ? 'active' : '' }}"
+           href="{{ route('admin.triage-rules.index') }}">
+            <i class="bi bi-funnel"></i> Triage Rule Set
+        </a>
+
+    </div>
+
+    {{-- ── Super Admin ──────────────────────────────────────── --}}
+    @role('super_admin')
+    <button class="sidebar-section-toggle {{ $superActive ? '' : 'collapsed' }}"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#snav-super"
+            aria-expanded="{{ $superActive ? 'true' : 'false' }}">
+        <span>Super Admin</span>
+        <i class="bi bi-chevron-down sidebar-chevron"></i>
+    </button>
+    <div class="collapse {{ $superActive ? 'show' : '' }}" id="snav-super">
+
+        <a class="nav-link {{ request()->routeIs('admin.admins.*') ? 'active' : '' }}"
+           href="{{ route('admin.admins.index') }}">
+            <i class="bi bi-shield-lock"></i> Admin Users
+        </a>
+
+    </div>
+    @endrole
+
 </div>
+
+<script>
+/* Save collapse state per group in localStorage so user preference survives navigation */
+document.addEventListener('DOMContentLoaded', function () {
+    var KEY = 'admin_sidebar_v1';
+    function getSaved() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } }
+    function setSaved(s) { localStorage.setItem(KEY, JSON.stringify(s)); }
+
+    ['management', 'api', 'config', 'super'].forEach(function (g) {
+        var el = document.getElementById('snav-' + g);
+        if (!el) return;
+        el.addEventListener('hidden.bs.collapse', function () { var s = getSaved(); s[g] = false; setSaved(s); });
+        el.addEventListener('shown.bs.collapse',  function () { var s = getSaved(); s[g] = true;  setSaved(s); });
+    });
+});
+</script>
 @endsection

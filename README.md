@@ -21,12 +21,13 @@ A multi-role telehealth platform where healthcare partners submit patient cases 
 
 ## Roles
 
-| Role | Login URL | Auth Method |
-|------|-----------|-------------|
-| Admin | `/admin/dashboard` | Email + password |
-| Clinician | `/clinician/dashboard` | Email + password |
-| Partner (web) | `/partner/dashboard` | Email + password |
-| Partner (API) | `POST /api/partner/auth/token` | OAuth2 client_credentials |
+| Role | Login URL | Auth Method | Notes |
+|------|-----------|-------------|-------|
+| Super Admin | `/admin/dashboard` | Email + password | Full access + Admin Users management |
+| Admin | `/admin/dashboard` | Email + password | All admin features except Admin Users |
+| Clinician | `/clinician/dashboard` | Email + password | |
+| Partner (web) | `/partner/dashboard` | Email + password | |
+| Partner (API) | `POST /api/partner/auth/token` | OAuth2 client_credentials | |
 
 ---
 
@@ -282,11 +283,12 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 
 | Module | URL | Description |
 |--------|-----|-------------|
-| Dashboard | `/admin/dashboard` | Chart.js analytics: doughnut by status, 30-day area trend, clinician workload bar, recent cases table |
+| Dashboard | `/admin/dashboard` | MA Portal design system; 6 metric cards; storefront workload; provider load bars; exception panel; operational report; Chart.js doughnut, trend, workload bar; webhook delivery log; recent cases with triage pills |
+| Admin Users | `/admin/admins` | **Super Admin only** — create/promote/demote/delete admin users; icon action buttons |
 | Partners | `/admin/partners` | Create partners; auto-generates OAuth2 client credentials; manage portal users |
 | Clinicians | `/admin/clinicians` | Create clinicians; specialty, credentials, licensed states (US state grid), availability |
 | Priority Queue | `/admin/clinicians/priority` | Drag-and-drop assignment priority; inline max daily case load; live capacity badge |
-| Cases | `/admin/cases` | Full case list with filters; assign/reassign clinicians; professional chat UI on Messages tab |
+| Cases | `/admin/cases` | MA Portal design; filters include triage dropdown; triage `ma-pill` column; assign/reassign clinicians |
 | Patients | `/admin/patients` | Read-only patient list and detail |
 | Offerings | `/admin/offerings` | Full CRUD; approve/reject partner offerings; state availability; dispensing fields |
 | Questionnaires | `/admin/questionnaires` | Visual question builder (16 field types); multi-step; conditional logic; drag-and-drop |
@@ -296,14 +298,17 @@ CREATED → WAITING → ASSIGNED → APPROVED → PROCESSING → COMPLETED
 | Guide: Weight Loss API | `/admin/guide/weightloss-api` | Full integration guide for MWL cases (dynamic live question IDs, print-friendly) |
 | Guide: Anti-Aging API | `/admin/guide/antiaging-api` | Integration guide for Anti-Aging program cases |
 | Settings | `/admin/settings` | Configurable SLA deadlines (pickup, review, end-to-end hours); changes take effect immediately |
+| MA Portal Preview | `/ma-portal/practitioner` | Design preview — practitioner view |
+| MA Portal Preview | `/ma-portal/admin` | Design preview — admin view |
+| MA Portal Preview | `/ma-portal/super-admin` | Design preview — super admin view |
 
 ### Clinician
 
 | Module | URL | Description |
 |--------|-----|-------------|
 | Dashboard | `/clinician/dashboard` | 5 stat cards; dual-line 30-day trend; visit type bar; SVG completion rate ring; SLA status card; active cases table with per-case SLA progress bar |
-| Queue | `/clinician/cases/queue` | See waiting cases; self-claim |
-| Case Detail | `/clinician/cases/{uuid}` | Tabs: Questionnaires, Prescriptions, Notes, Messages (professional chat UI), Files, Timeline |
+| Queue | `/clinician/cases/queue` | MA Portal design; 4 triage metric cards; triage/state/status filters; TRIAGE column; batch review (preflight → attest → approve) |
+| Case Detail | `/clinician/cases/{uuid}` | Triage banner at top; tabs: Questionnaires, Prescriptions, Notes, Messages (chat + real-time polling), Files, Timeline |
 | Prescribe | `/clinician/cases/{uuid}/prescribe` | Prescription form with medication search; transitions to `approved` |
 
 ### Partner (Web)
@@ -467,9 +472,14 @@ Admin changes these at `/admin/settings`. Values are cached for 1 hour and inval
 - **File token flow**: Partners upload files before case creation; `file_token` UUID links the `PatientFile` to the case inside the `POST /api/partner/cases` DB transaction.
 - **Two-pass `syncQuestions()`**: Pass 1 creates all questions; Pass 2 resolves self-referencing `depends_on_question_id` FK. All question IDs change on each questionnaire edit (delete + recreate).
 - **Offerings approval**: Partner offerings start `pending`; admin approves/rejects. Pending count badge visible in admin sidebar.
-- **Queue dependency**: Webhook delivery and virus scans are async. Production requires a running queue worker.
+- **Queue dependency**: Webhook delivery, virus scans, and pharmacy dispatch are async. Production requires a running queue worker.
 - **Passport 13**: Client IDs are ULIDs; `createClientCredentialsGrantClient()` takes only a name string (no `$userId`). Schema uses `owner_type`, `owner_id`, `grant_types` columns.
 - **No Vite**: All assets via CDN. JS is vanilla, inline in Blade `@section('scripts')`.
+- **Triage classification**: `TriageClassifier::apply()` runs automatically on every `waiting` transition inside `CaseStateMachine`. Never needs to be called manually for new cases. Existing cases with `NULL` triage can be backfilled with `php artisan triage:backfill`.
+- **Super Admin role**: Uses Spatie OR middleware syntax `role:admin|super_admin` for all admin routes. Admin Users routes additionally gate to `role:super_admin`. Login redirect checks `super_admin` first to avoid infinite redirect loop.
+- **Flash message ownership**: `layouts/app.blade.php` renders flash messages globally. Views must never add their own flash blocks.
+- **MA design system**: `<x-ma-styles />` Blade component injects the MA Portal CSS. Used on admin dashboard, admin cases index, clinician queue, and clinician case show.
+- **Real-time message polling**: Clinician case show polls `GET /clinician/cases/{uuid}/messages/poll` every 5 seconds via vanilla JS `setInterval`. New messages are appended to the chat without a page reload.
 
 ---
 
@@ -485,6 +495,16 @@ php artisan migrate:fresh --seed     # WARNING: destroys all data
 
 # Seed questionnaires only
 php artisan db:seed --class=IntakeQuestionnairesSeeder
+
+# Seed roles and permissions (includes super_admin role)
+php artisan db:seed --class=RolesAndPermissionsSeeder
+
+# Seed demo triage cases (for UI testing)
+php artisan db:seed --class=TriageDemoCasesSeeder
+
+# Triage backfill — classify existing cases that have NULL triage
+# Run once after deploying the triage feature; new cases are classified automatically
+php artisan triage:backfill
 
 # Passport
 php artisan passport:install         # first time setup

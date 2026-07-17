@@ -19,6 +19,7 @@ class PatientCase extends Model
         'support_note', 'support_at', 'cancellation_reason', 'patient_state', 'visit_type',
         'assigned_at', 'approved_at', 'processing_at', 'completed_at', 'cancelled_at',
         'metadata',
+        'triage', 'triage_reasons', 'triage_ruleset', 'triaged_at',
     ];
 
     protected $casts = [
@@ -31,6 +32,8 @@ class PatientCase extends Model
         'completed_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'metadata' => 'array',
+        'triage_reasons' => 'array',
+        'triaged_at' => 'datetime',
     ];
 
     // Status constants
@@ -42,6 +45,36 @@ class PatientCase extends Model
     const STATUS_PROCESSING = 'processing';
     const STATUS_COMPLETED  = 'completed';
     const STATUS_CANCELLED  = 'cancelled';
+
+    // Triage constants — review-priority band, separate from status
+    const TRIAGE_GREEN  = 'green';
+    const TRIAGE_YELLOW = 'yellow';
+    const TRIAGE_RED    = 'red';
+
+    public function triageLabel(): string
+    {
+        return match ($this->triage) {
+            self::TRIAGE_GREEN  => 'Green',
+            self::TRIAGE_YELLOW => 'Yellow',
+            self::TRIAGE_RED    => 'Red',
+            default             => 'Unclassified',
+        };
+    }
+
+    public function triageMeaning(): string
+    {
+        return match ($this->triage) {
+            self::TRIAGE_GREEN  => 'Routine — no elevated-risk signals detected.',
+            self::TRIAGE_YELLOW => 'Elevated — closer clinician review advised.',
+            self::TRIAGE_RED    => 'High-attention — do not fast-track; review carefully.',
+            default             => 'Not yet classified.',
+        };
+    }
+
+    public function scopeTriage($query, string $level)
+    {
+        return $query->where('triage', $level);
+    }
 
     protected static function boot(): void
     {

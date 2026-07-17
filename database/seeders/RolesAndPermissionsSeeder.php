@@ -28,6 +28,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage partners', 'manage clinicians', 'manage system',
             // Webhooks
             'manage webhooks',
+            // Super Admin
+            'manage admins',
         ];
 
         foreach ($permissions as $perm) {
@@ -44,6 +46,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'add clinical notes', 'send messages',
             'view orders',
         ]);
+
+        $superAdminRole = Role::firstOrCreate(['name' => 'super_admin']);
+        $superAdminRole->syncPermissions(Permission::all());
 
         $partnerRole = Role::firstOrCreate(['name' => 'partner']);
         $partnerRole->syncPermissions([

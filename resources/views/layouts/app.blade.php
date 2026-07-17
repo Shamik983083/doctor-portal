@@ -18,7 +18,7 @@
         }
 
         /* ── Base ───────────────────────────────────────────── */
-        body { background: #f1f5f9; }
+        body { background: #f6f8fb; }
 
         /* ── Sidebar ────────────────────────────────────────── */
         .sidebar {
@@ -164,11 +164,42 @@
             }
         }
 
+        /* ── Sidebar collapsible group toggles ──────────────── */
+        .sidebar-section-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: .65rem 1.1rem .15rem;
+            font-size: .59rem;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: rgba(255,255,255,.3);
+            font-weight: 600;
+            transition: color .15s;
+        }
+        .sidebar-section-toggle:hover { color: rgba(255,255,255,.55); }
+        .sidebar-chevron {
+            font-size: .6rem;
+            opacity: .45;
+            flex-shrink: 0;
+            transition: transform .2s ease, opacity .15s;
+        }
+        .sidebar-section-toggle:hover .sidebar-chevron { opacity: .8; }
+        .sidebar-section-toggle.collapsed .sidebar-chevron { transform: rotate(-90deg); }
+
         /* ── Reduced motion ─────────────────────────────────── */
         @media (prefers-reduced-motion: reduce) {
             .sidebar, .sidebar-overlay { transition: none; }
+            .sidebar-chevron { transition: none; }
         }
     </style>
+
+    {{-- MA-DOCPORTAL design system promoted to global shell (O0.1) --}}
+    <x-ma-styles />
 </head>
 <body>
 
@@ -214,7 +245,7 @@
         </div>
 
         {{-- Flash messages + content --}}
-        <div class="page-content">
+        <div class="page-content ma-surface">
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show">
                     <i class="bi bi-check-circle me-2"></i>{{ session('success') }}

@@ -12,17 +12,22 @@ use App\Models\PatientCase;
 use App\Models\PatientFile;
 use App\Services\CaseStateMachine;
 use App\Services\FileUploadService;
+use App\Services\PharmacyDispatchService;
+use App\Services\PrescriptionDocumentService;
 use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CaseController extends Controller
 {
     public function __construct(
-        private CaseStateMachine $stateMachine,
-        private WebhookDispatcher $webhooks,
-        private FileUploadService $fileUploader,
+        private CaseStateMachine            $stateMachine,
+        private WebhookDispatcher           $webhooks,
+        private FileUploadService           $fileUploader,
+        private PrescriptionDocumentService $prescriptionDocuments,
+        private PharmacyDispatchService     $pharmacyDispatch,
     ) {}
 
     public function queue(Request $request)
@@ -39,12 +44,92 @@ class CaseController extends Controller
             ))
             ->when($request->filled('search'), fn ($q) => $q->whereHas('patient', fn ($p) => $p->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ['%'.$request->search.'%'])
             ))
-            ->when($request->filled('partner_id'), fn ($q) => $q->where('partner_id', $request->partner_id))
+            ->when($request->filled('partner_id'), fn($q) => $q->where('partner_id', $request->partner_id))
+            ->when($request->filled('triage'), fn($q) => $q->where('triage', $request->triage))
+            ->orderByRaw("FIELD(triage, 'red', 'yellow', 'green') DESC")
             ->orderBy('created_at')
             ->paginate(20)
             ->withQueryString();
 
-        return view('clinician.cases.queue', compact('cases', 'clinician'));
+        $openStatuses = [
+            PatientCase::STATUS_WAITING,
+            PatientCase::STATUS_ASSIGNED,
+            PatientCase::STATUS_SUPPORT,
+        ];
+        $triageCounts = PatientCase::whereIn('status', $openStatuses)
+            ->selectRaw('triage, COUNT(*) as total')
+            ->groupBy('triage')
+            ->pluck('total', 'triage');
+
+        $triageMetrics = [
+            'open'   => (int) $triageCounts->sum(),
+            'red'    => (int) $triageCounts->get(PatientCase::TRIAGE_RED, 0),
+            'yellow' => (int) $triageCounts->get(PatientCase::TRIAGE_YELLOW, 0),
+            'green'  => (int) $triageCounts->get(PatientCase::TRIAGE_GREEN, 0),
+        ];
+
+        // Quick-review panel — top case drives summary, intake, and triage findings
+        $topCase = $cases->first();
+        if ($topCase) {
+            $topCase->load(['caseQuestions', 'questionnaireResponses.answers', 'clinician.user']);
+        }
+
+        $intake = collect();
+        if ($topCase) {
+            $fromQuestions = $topCase->caseQuestions
+                ->map(fn($q) => ['q' => $q->question, 'a' => $q->answer])
+                ->filter(fn($r) => filled($r['q']));
+            $intake = $fromQuestions->isNotEmpty()
+                ? $fromQuestions->values()
+                : $topCase->questionnaireResponses->flatMap->answers
+                    ->map(fn($a) => ['q' => $a->question_text, 'a' => $a->answer])
+                    ->filter(fn($r) => filled($r['q']))->values();
+        }
+
+        $aiSummary = [];
+        if ($topCase) {
+            $bullets = ['Triage classification: ' . $topCase->triageLabel() . ' — ' . $topCase->triageMeaning()];
+            $p = $topCase->patient;
+            if ($p) {
+                $demo = array_filter([
+                    $p->gender ? ucfirst($p->gender) : null,
+                    $p->age    ? $p->age . ' yrs'   : null,
+                    !is_null($p->bmi) ? 'BMI ' . number_format((float) $p->bmi, 1) : null,
+                ]);
+                if ($demo) { $bullets[] = 'Patient: ' . implode(' · ', $demo) . '.'; }
+                $bullets[] = 'Identity verification: ' . (strtolower($p->id_verified_status ?? '') === 'verified' ? 'verified.' : 'not verified.');
+            }
+            $offerings = $topCase->caseOfferings->map(fn($co) => optional($co->offering)->name)->filter()->implode(', ');
+            if ($offerings) { $bullets[] = 'Requested offerings: ' . $offerings . '.'; }
+            $reasons = collect($topCase->triage_reasons ?? []);
+            if ($reasons->isNotEmpty()) { $bullets[] = 'Triage signals: ' . $reasons->take(3)->implode('; ') . '.'; }
+            foreach (collect($intake)->take(4) as $a) {
+                $bullets[] = $a['q'] . ': ' . \Illuminate\Support\Str::limit((string) $a['a'], 80);
+            }
+            $aiSummary = $bullets;
+        }
+
+        $heldCases   = $cases->getCollection()->filter(fn($c) => $c->hold_status || $c->status === 'support')->values();
+        $messages    = \App\Models\Message::with(['patient', 'case'])
+            ->where('direction', 'inbound')
+            ->latest()
+            ->get()
+            ->unique(fn($m) => $m->patient_id ?? $m->case?->patient_id)
+            ->take(6)
+            ->values();
+        $reasonCodes = [
+            'Dose exceeds protocol titration step',
+            'Active workflow hold not cleared',
+            'Identity verification incomplete',
+            'Allergy conflict requires clinician review',
+            'Out-of-catalog request for patient state',
+        ];
+
+        return view('clinician.cases.queue', compact(
+            'cases', 'clinician', 'triageMetrics',
+            'topCase', 'intake', 'aiSummary',
+            'heldCases', 'messages', 'reasonCodes'
+        ));
     }
 
     public function show(string $uuid)
@@ -165,6 +250,18 @@ class CaseController extends Controller
 
         // Complete immediately — no manual pharmacy step required.
         $this->stateMachine->complete($case);
+
+        // Generate the signed prescription PDF and queue it for pharmacy dispatch.
+        // Best-effort and fully feature-flagged — a failure here must never break case completion.
+        try {
+            $document = $this->prescriptionDocuments->generate($case, $prescription);
+            $this->pharmacyDispatch->queue($document);
+        } catch (\Throwable $e) {
+            Log::error('Prescription document/dispatch generation failed', [
+                'case_id' => $case->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
 
         // Fire prescription_written webhook alongside case_approved + case_completed.
         $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
@@ -364,6 +461,29 @@ class CaseController extends Controller
         return back()->with('success', 'File uploaded successfully.');
     }
 
+    public function downloadPrescriptionDocument(string $uuid, string $documentUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $document = \App\Models\PrescriptionDocument::where('uuid', $documentUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        $disk = config('dispatch.documents_disk', 'local');
+
+        abort_unless(
+            \Illuminate\Support\Facades\Storage::disk($disk)->exists($document->document_path),
+            404,
+            'Prescription document is no longer available.'
+        );
+
+        return \Illuminate\Support\Facades\Storage::disk($disk)->download(
+            $document->document_path,
+            "prescription-{$case->uuid}.pdf",
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
     public function deleteFile(string $uuid, string $fileUuid)
     {
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
@@ -375,5 +495,223 @@ class CaseController extends Controller
         $this->fileUploader->delete($file);
 
         return back()->with('success', 'File deleted.');
+    }
+
+    public function batchPreflight(Request $request)
+    {
+        $request->validate(['uuids' => 'required|array|min:1|max:20', 'uuids.*' => 'string']);
+
+        $clinician = Auth::user()->clinician;
+        $results   = [];
+
+        $cases = PatientCase::with(['patient', 'caseOfferings.offering'])
+            ->whereIn('uuid', $request->uuids)
+            ->get()
+            ->keyBy('uuid');
+
+        foreach ($request->uuids as $uuid) {
+            $case = $cases->get($uuid);
+
+            if (!$case) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case not found.'];
+                continue;
+            }
+
+            if ($case->triage !== PatientCase::TRIAGE_GREEN) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Only Green-triage cases are batch-eligible.'];
+                continue;
+            }
+
+            if ($case->hold_status) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case has an active workflow hold.'];
+                continue;
+            }
+
+            if ($case->status === PatientCase::STATUS_SUPPORT) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case is escalated to support.'];
+                continue;
+            }
+
+            if (!in_array($case->status, [PatientCase::STATUS_WAITING, PatientCase::STATUS_ASSIGNED])) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case is not in a reviewable status.'];
+                continue;
+            }
+
+            if ($case->status === PatientCase::STATUS_ASSIGNED && $case->clinician_id !== $clinician?->id) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Case is assigned to another clinician.'];
+                continue;
+            }
+
+            $idv = strtolower($case->patient?->id_verified_status ?? '');
+            if ($idv !== 'verified') {
+                $results[$uuid] = ['pass' => false, 'reason' => 'Patient identity not verified.'];
+                continue;
+            }
+
+            $state = strtoupper($case->patient_state ?? $case->patient?->state ?? '');
+            if ($state) {
+                foreach ($case->caseOfferings as $co) {
+                    if ($co->offering && !$co->offering->isAvailableInState($state)) {
+                        $results[$uuid] = ['pass' => false, 'reason' => "Offering \"{$co->offering->name}\" not available in {$state}."];
+                        continue 2;
+                    }
+                }
+            }
+
+            $results[$uuid] = [
+                'pass'      => true,
+                'patient'   => $case->patient?->full_name ?? 'Patient',
+                'triage'    => $case->triage,
+                'status'    => $case->status,
+                'state'     => $state ?: '—',
+                'offerings' => $case->caseOfferings->map(fn($co) => $co->offering ? [
+                    'id'                  => $co->offering->id,
+                    'name'                => $co->offering->name,
+                    'internal_name'       => $co->offering->internal_name ?? '',
+                    'compound_formula'    => $co->offering->compound_formula ?? '',
+                    'refills'             => $co->offering->refills ?? '',
+                    'quantity'            => $co->offering->quantity ?? '',
+                    'days_supply'         => $co->offering->days_supply ?? '',
+                    'dispense_unit'       => $co->offering->dispense_unit ?? '',
+                    'days_until_dispense' => $co->offering->days_until_dispense ?? '',
+                    'directions'          => $co->offering->directions ?? '',
+                ] : null)->filter()->values()->toArray(),
+            ];
+        }
+
+        return response()->json($results);
+    }
+
+    public function batchSubmit(Request $request)
+    {
+        $request->validate([
+            'uuids'                             => 'required|array|min:1|max:20',
+            'uuids.*'                           => 'string',
+            'diagnoses'                         => 'required|string',
+            'directions'                        => 'nullable|string',
+            'medical_necessity'                 => 'nullable|string',
+            'medications'                       => 'nullable|array',
+            'medications.*.offering_id'         => 'nullable|exists:offerings,id',
+            'medications.*.name'                => 'required_with:medications|string|max:255',
+            'medications.*.compound_formula'    => 'nullable|string',
+            'medications.*.refills'             => 'nullable|integer|min:0',
+            'medications.*.quantity'            => 'nullable|numeric|min:0',
+            'medications.*.days_supply'         => 'nullable|integer|min:0',
+            'medications.*.dispense_unit'       => 'nullable|string|max:100',
+            'medications.*.days_until_dispense' => 'nullable|integer|min:0',
+        ]);
+
+        $clinician = Auth::user()->clinician;
+
+        if (!$clinician) {
+            return response()->json(['error' => 'No clinician profile found for this user.'], 403);
+        }
+
+        $results = [];
+
+        $cases = PatientCase::with(['patient', 'caseOfferings.offering'])
+            ->whereIn('uuid', $request->uuids)
+            ->get()
+            ->keyBy('uuid');
+
+        foreach ($request->uuids as $uuid) {
+            $case = $cases->get($uuid);
+
+            if (!$case) {
+                $results[$uuid] = ['success' => false, 'error' => 'Case not found.'];
+                continue;
+            }
+
+            // Re-run preflight guards — never trust client-side pass list
+            if ($case->triage !== PatientCase::TRIAGE_GREEN || $case->hold_status) {
+                $results[$uuid] = ['success' => false, 'error' => 'Failed re-validation (triage/hold changed).'];
+                continue;
+            }
+
+            if ($case->status === PatientCase::STATUS_ASSIGNED && $case->clinician_id !== $clinician->id) {
+                $results[$uuid] = ['success' => false, 'error' => 'Case reassigned since preflight.'];
+                continue;
+            }
+
+            if (!in_array($case->status, [PatientCase::STATUS_WAITING, PatientCase::STATUS_ASSIGNED])) {
+                $results[$uuid] = ['success' => false, 'error' => 'Case status changed since preflight.'];
+                continue;
+            }
+
+            $prescription = null;
+
+            try {
+                DB::transaction(function () use ($request, $case, $clinician, &$prescription) {
+                    if ($case->status === PatientCase::STATUS_WAITING) {
+                        $this->stateMachine->assignToClinician($case, $clinician);
+                        $case->refresh();
+                    }
+
+                    $prescription = CasePrescription::create([
+                        'case_id'           => $case->id,
+                        'clinician_id'      => $clinician->id,
+                        'diagnoses'         => $request->input('diagnoses'),
+                        'directions'        => $request->input('directions'),
+                        'medical_necessity' => $request->input('medical_necessity'),
+                        'prescribed_at'     => now(),
+                    ]);
+
+                    foreach ($request->input('medications', []) as $med) {
+                        $prescription->medications()->create([
+                            'offering_id'         => $med['offering_id'] ?? null,
+                            'name'                => $med['name'],
+                            'compound_formula'    => $med['compound_formula'] ?? null,
+                            'refills'             => $med['refills'] ?? null,
+                            'quantity'            => $med['quantity'] ?? null,
+                            'days_supply'         => $med['days_supply'] ?? null,
+                            'dispense_unit'       => $med['dispense_unit'] ?? null,
+                            'days_until_dispense' => $med['days_until_dispense'] ?? null,
+                        ]);
+                    }
+
+                    $this->stateMachine->approve($case, $clinician->id);
+                });
+
+                $this->stateMachine->complete($case);
+
+                try {
+                    $document = $this->prescriptionDocuments->generate($case, $prescription);
+                    $this->pharmacyDispatch->queue($document);
+                } catch (\Throwable $e) {
+                    Log::error('Batch prescription document/dispatch failed', [
+                        'uuid'  => $uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
+                    'case_id'         => $case->uuid,
+                    'external_id'     => $case->external_id,
+                    'patient_id'      => $case->patient->uuid ?? null,
+                    'clinician_name'  => $clinician->full_name,
+                    'clinician_npi'   => $clinician->npi,
+                    'diagnoses'       => $prescription->diagnoses,
+                    'meds_prescribed' => $prescription->load('medications')->medications->map(fn($m) => [
+                        'name'             => $m->name,
+                        'compound_formula' => $m->compound_formula,
+                        'refills'          => (string) $m->refills,
+                        'quantity'         => (string) $m->quantity,
+                        'days_supply'      => (string) $m->days_supply,
+                        'dispense_unit'    => $m->dispense_unit,
+                    ])->toArray(),
+                    'timestamp'       => now()->timestamp,
+                ]);
+
+                $results[$uuid] = ['success' => true, 'patient' => $case->patient?->full_name ?? 'Patient'];
+            } catch (\Throwable $e) {
+                Log::error('Batch submit failed for case', [
+                    'uuid'  => $uuid,
+                    'error' => $e->getMessage(),
+                ]);
+                $results[$uuid] = ['success' => false, 'error' => 'Transition failed: ' . $e->getMessage()];
+            }
+        }
+
+        return response()->json($results);
     }
 }

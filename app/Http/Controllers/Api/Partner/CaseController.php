@@ -53,6 +53,8 @@ class CaseController extends Controller
             'patient.state'                                   => 'nullable|string|size:2',
             'patient.zip'                                     => 'nullable|string|max:10',
             'patient.external_id'                             => 'nullable|string|max:255',
+            'patient.id_verified_status'                      => 'nullable|in:verified,failed,pending',
+            'patient.id_verified_at'                          => 'nullable|date',
             'external_id'                                     => 'nullable|string|max:255',
             'visit_type'                                      => 'nullable|string|max:100',
             'hold_status'                                     => 'boolean',

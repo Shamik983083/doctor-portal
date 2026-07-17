@@ -16,7 +16,9 @@ use App\Http\Controllers\Web\Admin\QuestionnaireController as AdminQuestionnaire
 use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController;
 use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeliveryController;
 use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Web\Admin\TriageRuleController as AdminTriageRuleController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
+use App\Http\Controllers\Web\MaPortalController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
 use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingController;
 use App\Http\Controllers\Web\Partner\PatientController as PartnerPatientController;
@@ -43,6 +45,14 @@ Route::prefix('forms')->name('forms.')->group(function () {
     Route::post('/{uuid}', [QuestionnaireFormController::class, 'submit'])->name('submit');
 });
 
+// MA-Portal role-view preview — read-only showcase, any authenticated user
+Route::prefix('ma-portal')->middleware(['auth'])->name('ma-portal.')->group(function () {
+    Route::get('/', fn () => redirect()->route('ma-portal.practitioner'));
+    Route::get('/practitioner', [MaPortalController::class, 'practitioner'])->name('practitioner');
+    Route::get('/admin', [MaPortalController::class, 'admin'])->name('admin');
+    Route::get('/super-admin', [MaPortalController::class, 'superAdmin'])->name('super-admin');
+});
+
 // Clinician Portal
 Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('clinician.')->group(function () {
     Route::get('/dashboard', [ClinicianDashboard::class, 'index'])->name('dashboard');
@@ -61,13 +71,16 @@ Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name(
         Route::get('/{uuid}/messages/poll', [ClinicianCaseController::class, 'pollMessages'])->name('messages.poll');
         Route::post('/{uuid}/files', [ClinicianCaseController::class, 'uploadFile'])->name('files.store');
         Route::delete('/{uuid}/files/{fileUuid}', [ClinicianCaseController::class, 'deleteFile'])->name('files.destroy');
+        Route::get('/{uuid}/prescription-document/{documentUuid}', [ClinicianCaseController::class, 'downloadPrescriptionDocument'])->name('prescription-document.download');
+        Route::post('/batch/preflight', [ClinicianCaseController::class, 'batchPreflight'])->name('batch.preflight');
+        Route::post('/batch/submit',    [ClinicianCaseController::class, 'batchSubmit'])->name('batch.submit');
     });
 
     Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
 });
 
 // Admin Console
-Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->group(function () {
+Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
 
     // Patients
@@ -179,9 +192,30 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         Route::post('/{uuid}/resend',[AdminWebhookDeliveryController::class, 'resend'])->name('resend');
     });
 
-    // Settings
+    // SLA Settings
     Route::get('/settings',  [AdminSettingsController::class, 'index'])->name('settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
+
+    // Triage Rule Set
+    Route::prefix('triage-rules')->name('triage-rules.')->group(function () {
+        Route::get('/',           [AdminTriageRuleController::class, 'index'])->name('index');
+        Route::post('/',          [AdminTriageRuleController::class, 'store'])->name('store');
+        Route::put('/{triageRule}',    [AdminTriageRuleController::class, 'update'])->name('update');
+        Route::delete('/{triageRule}', [AdminTriageRuleController::class, 'destroy'])->name('destroy');
+        Route::patch('/{triageRule}/toggle', [AdminTriageRuleController::class, 'toggleActive'])->name('toggle');
+    });
+
+    // Admin Users (Super Admin only)
+    Route::prefix('admins')->name('admins.')->middleware('role:super_admin')->group(function () {
+        Route::get('/',         [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'index'])->name('index');
+        Route::get('/create',   [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'create'])->name('create');
+        Route::post('/',        [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'store'])->name('store');
+        Route::get('/{id}',     [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'show'])->name('show');
+        Route::patch('/{id}/toggle-active', [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'toggleActive'])->name('toggle-active');
+        Route::patch('/{id}/promote',       [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'promote'])->name('promote');
+        Route::patch('/{id}/demote',        [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'demote'])->name('demote');
+        Route::delete('/{id}',  [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'destroy'])->name('destroy');
+    });
 
     // Offering Categories
     Route::prefix('categories')->name('categories.')->group(function () {
