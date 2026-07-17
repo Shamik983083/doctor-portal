@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Partner;
 
+use App\Events\CaseMessageSent;
 use App\Events\NewPatientMessage;
 use App\Http\Controllers\Controller;
 use App\Models\Message;
@@ -48,6 +49,9 @@ class MessageController extends Controller
             'body'        => $data['body'],
             'is_read'     => false,
         ]);
+
+        // Broadcast to case messaging channel (clinician case view)
+        broadcast(new CaseMessageSent($message));
 
         // Notify any other partner webhooks subscribed to this event
         $this->webhooks->dispatch($partner->id, 'patient_message_received', [

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Clinician;
 
+use App\Events\CaseMessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\CasePrescription;
 use App\Models\ClinicalNote;
@@ -34,16 +35,14 @@ class CaseController extends Controller
         $clinician = Auth::user()->clinician;
 
         $cases = PatientCase::with(['patient', 'partner', 'caseOfferings.offering'])
-            ->withCount(['messages as unread_messages_count' => fn($q) =>
-                $q->where('direction', 'inbound')->where('is_read', false)
+            ->withCount(['messages as unread_messages_count' => fn ($q) => $q->where('direction', 'inbound')->where('is_read', false),
             ])
-            ->when($request->filled('status'), fn($q) => $q->where('status', $request->status))
-            ->when($request->filled('state'), fn($q) => $q->where(
-                fn($q) => $q->where('patient_state', $request->state)
-                             ->orWhereHas('patient', fn($p) => $p->where('state', $request->state))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('state'), fn ($q) => $q->where(
+                fn ($q) => $q->where('patient_state', $request->state)
+                    ->orWhereHas('patient', fn ($p) => $p->where('state', $request->state))
             ))
-            ->when($request->filled('search'), fn($q) => $q->whereHas('patient', fn($p) =>
-                $p->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ['%' . $request->search . '%'])
+            ->when($request->filled('search'), fn ($q) => $q->whereHas('patient', fn ($p) => $p->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ['%'.$request->search.'%'])
             ))
             ->when($request->filled('partner_id'), fn($q) => $q->where('partner_id', $request->partner_id))
             ->when($request->filled('triage'), fn($q) => $q->where('triage', $request->triage))
@@ -193,10 +192,10 @@ class CaseController extends Controller
         $offerings = Offering::with('category')
             ->where('is_active', true)
             ->approved()
-            ->when($categoryIds->count(), fn($q) => $q->whereIn('category_id', $categoryIds))
+            ->when($categoryIds->count(), fn ($q) => $q->whereIn('category_id', $categoryIds))
             ->orderBy('name')
             ->get(['id', 'name', 'internal_name', 'compound_formula', 'refills',
-                   'quantity', 'days_supply', 'dispense_unit', 'days_until_dispense', 'directions']);
+                'quantity', 'days_supply', 'dispense_unit', 'days_until_dispense', 'directions']);
 
         return view('clinician.cases.prescribe', compact('case', 'offerings'));
     }
@@ -204,45 +203,45 @@ class CaseController extends Controller
     public function prescribe(Request $request, string $uuid)
     {
         $request->validate([
-            'diagnoses'                              => 'required|string',
-            'directions'                             => 'nullable|string',
-            'medical_necessity'                      => 'nullable|string',
-            'medications'                            => 'nullable|array',
-            'medications.*.offering_id'              => 'nullable|exists:offerings,id',
-            'medications.*.name'                     => 'required_with:medications|string|max:255',
-            'medications.*.compound_formula'         => 'nullable|string',
-            'medications.*.refills'                  => 'nullable|integer|min:0',
-            'medications.*.quantity'                 => 'nullable|numeric|min:0',
-            'medications.*.days_supply'              => 'nullable|integer|min:0',
-            'medications.*.dispense_unit'            => 'nullable|string|max:100',
-            'medications.*.days_until_dispense'      => 'nullable|integer|min:0',
+            'diagnoses' => 'required|string',
+            'directions' => 'nullable|string',
+            'medical_necessity' => 'nullable|string',
+            'medications' => 'nullable|array',
+            'medications.*.offering_id' => 'nullable|exists:offerings,id',
+            'medications.*.name' => 'required_with:medications|string|max:255',
+            'medications.*.compound_formula' => 'nullable|string',
+            'medications.*.refills' => 'nullable|integer|min:0',
+            'medications.*.quantity' => 'nullable|numeric|min:0',
+            'medications.*.days_supply' => 'nullable|integer|min:0',
+            'medications.*.dispense_unit' => 'nullable|string|max:100',
+            'medications.*.days_until_dispense' => 'nullable|integer|min:0',
         ]);
 
-        $case      = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
         $clinician = Auth::user()->clinician;
 
         $prescription = null;
 
         DB::transaction(function () use ($request, $case, $clinician, &$prescription) {
             $prescription = CasePrescription::create([
-                'case_id'          => $case->id,
-                'clinician_id'     => $clinician->id,
-                'diagnoses'        => $request->input('diagnoses'),
-                'directions'       => $request->input('directions'),
-                'medical_necessity'=> $request->input('medical_necessity'),
-                'prescribed_at'    => now(),
+                'case_id' => $case->id,
+                'clinician_id' => $clinician->id,
+                'diagnoses' => $request->input('diagnoses'),
+                'directions' => $request->input('directions'),
+                'medical_necessity' => $request->input('medical_necessity'),
+                'prescribed_at' => now(),
             ]);
 
             foreach ($request->input('medications', []) as $med) {
                 $prescription->medications()->create([
-                    'offering_id'        => $med['offering_id'] ?? null,
-                    'name'               => $med['name'],
-                    'compound_formula'   => $med['compound_formula'] ?? null,
-                    'refills'            => $med['refills'] ?? null,
-                    'quantity'           => $med['quantity'] ?? null,
-                    'days_supply'        => $med['days_supply'] ?? null,
-                    'dispense_unit'      => $med['dispense_unit'] ?? null,
-                    'days_until_dispense'=> $med['days_until_dispense'] ?? null,
+                    'offering_id' => $med['offering_id'] ?? null,
+                    'name' => $med['name'],
+                    'compound_formula' => $med['compound_formula'] ?? null,
+                    'refills' => $med['refills'] ?? null,
+                    'quantity' => $med['quantity'] ?? null,
+                    'days_supply' => $med['days_supply'] ?? null,
+                    'dispense_unit' => $med['dispense_unit'] ?? null,
+                    'days_until_dispense' => $med['days_until_dispense'] ?? null,
                 ]);
             }
 
@@ -266,21 +265,21 @@ class CaseController extends Controller
 
         // Fire prescription_written webhook alongside case_approved + case_completed.
         $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
-            'case_id'          => $case->uuid,
-            'external_id'      => $case->external_id,
-            'patient_id'       => $case->patient->uuid ?? null,
-            'clinician_name'   => $clinician->full_name,
-            'clinician_npi'    => $clinician->npi,
-            'diagnoses'        => $prescription->diagnoses,
-            'meds_prescribed'  => $prescription->load('medications')->medications->map(fn($m) => [
-                'name'             => $m->name,
+            'case_id' => $case->uuid,
+            'external_id' => $case->external_id,
+            'patient_id' => $case->patient->uuid ?? null,
+            'clinician_name' => $clinician->full_name,
+            'clinician_npi' => $clinician->npi,
+            'diagnoses' => $prescription->diagnoses,
+            'meds_prescribed' => $prescription->load('medications')->medications->map(fn ($m) => [
+                'name' => $m->name,
                 'compound_formula' => $m->compound_formula,
-                'refills'          => (string) $m->refills,
-                'quantity'         => (string) $m->quantity,
-                'days_supply'      => (string) $m->days_supply,
-                'dispense_unit'    => $m->dispense_unit,
+                'refills' => (string) $m->refills,
+                'quantity' => (string) $m->quantity,
+                'days_supply' => (string) $m->days_supply,
+                'dispense_unit' => $m->dispense_unit,
             ])->toArray(),
-            'timestamp'        => now()->timestamp,
+            'timestamp' => now()->timestamp,
         ]);
 
         return redirect()->route('clinician.cases.show', $uuid)
@@ -298,10 +297,10 @@ class CaseController extends Controller
 
         if ($request->note) {
             ClinicalNote::create([
-                'case_id'      => $case->id,
+                'case_id' => $case->id,
                 'clinician_id' => $clinician->id,
-                'type'         => 'approval',
-                'note'         => $request->note,
+                'type' => 'approval',
+                'note' => $request->note,
             ]);
         }
 
@@ -320,10 +319,10 @@ class CaseController extends Controller
         $this->stateMachine->cancel($case, $request->reason, $clinician->id, 'clinician');
 
         ClinicalNote::create([
-            'case_id'      => $case->id,
+            'case_id' => $case->id,
             'clinician_id' => $clinician->id,
-            'type'         => 'cancellation',
-            'note'         => $request->reason,
+            'type' => 'cancellation',
+            'note' => $request->reason,
         ]);
 
         return redirect()->route('clinician.queue')->with('success', 'Case declined.');
@@ -332,8 +331,8 @@ class CaseController extends Controller
     public function addNote(Request $request, string $uuid)
     {
         $request->validate([
-            'note'       => 'required|string',
-            'type'       => 'nullable|in:general,soap,progress',
+            'note' => 'required|string',
+            'type' => 'nullable|in:general,soap,progress',
             'is_private' => 'boolean',
         ]);
 
@@ -341,15 +340,15 @@ class CaseController extends Controller
         $clinician = Auth::user()->clinician;
 
         ClinicalNote::create([
-            'case_id'      => $case->id,
+            'case_id' => $case->id,
             'clinician_id' => $clinician->id,
-            'type'         => $request->type ?? 'general',
-            'note'         => $request->note,
-            'is_private'   => $request->boolean('is_private'),
+            'type' => $request->type ?? 'general',
+            'note' => $request->note,
+            'is_private' => $request->boolean('is_private'),
         ]);
 
         $this->webhooks->dispatch($case->partner_id, 'clinical_note_added', [
-            'case_id'   => $case->uuid,
+            'case_id' => $case->uuid,
             'timestamp' => now()->timestamp,
         ]);
 
@@ -366,10 +365,10 @@ class CaseController extends Controller
         $this->stateMachine->escalateToSupport($case, $request->input('support_note'));
 
         ClinicalNote::create([
-            'case_id'      => $case->id,
+            'case_id' => $case->id,
             'clinician_id' => $clinician->id,
-            'type'         => 'general',
-            'note'         => 'Escalated to support: ' . $request->input('support_note'),
+            'type' => 'general',
+            'note' => 'Escalated to support: '.$request->input('support_note'),
         ]);
 
         return back()->with('success', 'Case escalated to support. Partner has been notified.');
@@ -377,20 +376,20 @@ class CaseController extends Controller
 
     public function pollMessages(Request $request, string $uuid)
     {
-        $case    = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
         $afterId = (int) $request->query('after', 0);
 
         $messages = $case->messages()
             ->where('id', '>', $afterId)
             ->orderBy('id')
             ->get(['id', 'body', 'sender_type', 'created_at'])
-            ->map(fn($msg) => [
-                'id'          => $msg->id,
-                'body'        => $msg->body,
+            ->map(fn ($msg) => [
+                'id' => $msg->id,
+                'body' => $msg->body,
                 'sender_type' => $msg->sender_type,
-                'time'        => $msg->created_at->format('H:i'),
-                'date'        => $msg->created_at->format('Y-m-d'),
-                'date_label'  => $msg->created_at->isToday()
+                'time' => $msg->created_at->format('H:i'),
+                'date' => $msg->created_at->format('Y-m-d'),
+                'date_label' => $msg->created_at->isToday()
                                     ? 'Today'
                                     : ($msg->created_at->isYesterday()
                                         ? 'Yesterday'
@@ -407,22 +406,35 @@ class CaseController extends Controller
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
         $clinician = Auth::user()->clinician;
 
-        Message::create([
-            'case_id'      => $case->id,
-            'patient_id'   => $case->patient_id,
+        $message = Message::create([
+            'case_id' => $case->id,
+            'patient_id' => $case->patient_id,
             'clinician_id' => $clinician->id,
-            'partner_id'   => $case->partner_id,
-            'direction'    => 'outbound',
-            'channel'      => 'portal',
-            'sender_type'  => 'clinician',
-            'body'         => $request->body,
+            'partner_id' => $case->partner_id,
+            'direction' => 'outbound',
+            'channel' => 'portal',
+            'sender_type' => 'clinician',
+            'body' => $request->body,
         ]);
 
+        broadcast(new CaseMessageSent($message))->toOthers();
+
         $this->webhooks->dispatch($case->partner_id, 'message_created', [
-            'case_id'    => $case->uuid,
-            'sender'     => 'clinician',
-            'timestamp'  => now()->timestamp,
+            'case_id' => $case->uuid,
+            'sender' => 'clinician',
+            'timestamp' => now()->timestamp,
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'id' => $message->id,
+                'body' => $message->body,
+                'sender_type' => $message->sender_type,
+                'time' => $message->created_at->format('H:i'),
+                'date' => $message->created_at->format('Y-m-d'),
+                'date_label' => 'Today',
+            ]);
+        }
 
         return back()->with('success', 'Message sent.');
     }
@@ -430,8 +442,8 @@ class CaseController extends Controller
     public function uploadFile(Request $request, string $uuid)
     {
         $request->validate([
-            'file'  => 'required|file|mimes:pdf,jpg,jpeg,png|max:' . FileUploadService::MAX_SIZE_KB,
-            'type'  => 'nullable|in:lab_result,id_doc,consent,medical_necessity,intake,other',
+            'file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:'.FileUploadService::MAX_SIZE_KB,
+            'type' => 'nullable|in:lab_result,id_doc,consent,medical_necessity,intake,other',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -440,10 +452,10 @@ class CaseController extends Controller
         $this->fileUploader->store(
             $request->file('file'),
             $request->input('type', 'other'),
-            caseId:    $case->id,
+            caseId: $case->id,
             patientId: $case->patient_id,
             partnerId: $case->partner_id,
-            notes:     $request->input('notes'),
+            notes: $request->input('notes'),
         );
 
         return back()->with('success', 'File uploaded successfully.');
