@@ -30,26 +30,42 @@ A multi-role telehealth platform where healthcare partners submit patient cases 
 
 ---
 
-## Local Setup
+## Local Setup (Full Guide)
 
 ### Prerequisites
-- PHP 8.2+
-- MySQL running via XAMPP (or equivalent)
-- Composer
 
-### Install
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| PHP | 8.2+ | With extensions: `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath` |
+| MySQL | 5.7+ / 8.0+ | XAMPP, WAMP, Laragon, or standalone MySQL |
+| Composer | 2.x | [getcomposer.org](https://getcomposer.org) |
+| Git | Any | [git-scm.com](https://git-scm.com) |
+
+### Step 1 — Clone the Repository
 
 ```bash
-git clone <repo-url> doctor-portal
+git clone https://github.com/INV2025/MEDAXIS-DOCTOR.git doctor-portal
 cd doctor-portal
+```
+
+### Step 2 — Install PHP Dependencies
+
+```bash
 composer install
+```
+
+### Step 3 — Environment Configuration
+
+```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-Configure your `.env`:
+Now open `.env` and update these values:
+
 ```env
-APP_URL=http://localhost/doctor-portal/public
+APP_NAME="Doctor Portal"
+APP_URL=http://localhost:8000
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -57,51 +73,114 @@ DB_PORT=3306
 DB_DATABASE=doctor_portal
 DB_USERNAME=root
 DB_PASSWORD=
-
-FILESYSTEM_DISK=local
-QUEUE_CONNECTION=database
-SESSION_DRIVER=database
-CACHE_STORE=database
 ```
 
-### Database
+> **Note:** If you use XAMPP, the default MySQL user is `root` with no password. If you use a different setup, update `DB_USERNAME` and `DB_PASSWORD` accordingly.
+
+### Step 4 — Create the Database
+
+Create the `doctor_portal` database in MySQL. You can do this via:
+
+**Option A — Using XAMPP MySQL CLI:**
+```bash
+# Windows (XAMPP)
+C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS doctor_portal;"
+
+# Linux/Mac
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS doctor_portal;"
+```
+
+**Option B — Using phpMyAdmin:**
+1. Open `http://localhost/phpmyadmin`
+2. Click "New" in the left sidebar
+3. Enter `doctor_portal` as the database name
+4. Click "Create"
+
+### Step 5 — Run Migrations & Seed Data
 
 ```bash
 php artisan migrate
-php artisan db:seed       # seeds roles, admin user, and sample questionnaires
+php artisan db:seed
 ```
 
-### Passport (API auth)
+This creates all tables and seeds:
+- **Roles & Permissions** — admin, clinician, partner
+- **Intake Questionnaires** — Standard Intake, Weight Loss, Anti-Aging
+- **Demo Users** (see login credentials below)
+
+### Step 6 — Setup Passport (API Authentication)
 
 ```bash
 php artisan passport:install
 ```
 
-This generates `storage/oauth-private.key` and `storage/oauth-public.key` and creates the personal access client. Partner clients are created automatically when an admin creates a partner via the web portal.
+This generates OAuth2 encryption keys (`storage/oauth-private.key` and `storage/oauth-public.key`). Partner API clients are created automatically when an admin adds a partner via the web portal.
 
-### Storage symlink
+### Step 7 — Create Storage Symlink
 
 ```bash
 php artisan storage:link
 ```
 
-Required for any uploaded files to be publicly accessible.
+Required for uploaded files (prescriptions, patient documents) to be publicly accessible.
 
-### Queue Worker (webhooks + virus scan)
+### Step 8 — Run the Application
+
+```bash
+php artisan serve
+```
+
+The app will be available at **http://localhost:8000**
+
+Alternatively, point your XAMPP/Nginx/Apache virtual host document root to the `public/` directory.
+
+### Step 9 (Optional) — Start the Queue Worker
 
 ```bash
 php artisan queue:work --queue=webhooks,default --sleep=3 --tries=3
 ```
 
-Without this, webhook deliveries and ClamAV virus scans will queue up in the `jobs` table but never run. On local dev this is optional — API calls and case creation still work; webhooks just don't fire.
+Required for webhook deliveries and ClamAV virus scans to process. Without this, the app still works but webhooks won't fire and file scans won't run.
 
-### Run
+---
 
-Point XAMPP virtual host at the `public/` directory, or:
+## Demo Login Credentials
+
+| Role | Email | Password | URL |
+|------|-------|----------|-----|
+| Admin | `admin@doctorportal.com` | `password` | `/admin/dashboard` |
+| Clinician | `dr.smith@doctorportal.com` | `password` | `/clinician/dashboard` |
+| Partner | `partner@demostore.com` | `password` | `/partner/dashboard` |
+
+---
+
+## Quick Start (TL;DR)
+
+Run all setup commands at once:
 
 ```bash
+git clone https://github.com/INV2025/MEDAXIS-DOCTOR.git doctor-portal
+cd doctor-portal
+composer install
+cp .env.example .env
+php artisan key:generate
+```
+
+Update `.env` with your MySQL credentials, then:
+
+```bash
+# Create database (adjust path for your OS)
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS doctor_portal;"
+
+# Run everything
+php artisan migrate
+php artisan db:seed
+php artisan passport:install
+php artisan storage:link
 php artisan serve
 ```
+
+Open **http://localhost:8000** and login with `admin@doctorportal.com` / `password`.
 
 ---
 
