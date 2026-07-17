@@ -137,6 +137,7 @@
                             <th>Company</th>
                             <th>Batch Eligibility</th>
                             <th>Status</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -222,9 +223,12 @@
                                 @if($batchReason)<div class="batch-reason">{{ $batchReason }}</div>@endif
                             </td>
                             <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>
+                            <td class="text-end">
+                                <a href="{{ route('clinician.cases.show', $case->uuid) }}" class="btn btn-sm btn-primary">Review &rarr;</a>
+                            </td>
                         </tr>
                         @empty
-                        <tr><td colspan="14" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
+                        <tr><td colspan="15" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
