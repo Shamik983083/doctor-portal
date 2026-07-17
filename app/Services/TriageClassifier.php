@@ -90,12 +90,14 @@ class TriageClassifier
         }
 
         // ── Identity verification (config only — multi-value set logic) ──
-        $idStatus = strtolower((string) $patient?->id_verified_status);
-        if ($idStatus !== '' && ! in_array($idStatus, $cfg['id_verification']['cleared'], true)) {
+        // null/empty = status never provided → treated as unverified (Yellow).
+        $idStatus  = strtolower((string) ($patient?->id_verified_status ?? ''));
+        $idLabel   = $idStatus === '' ? 'not provided' : $idStatus;
+        if (! in_array($idStatus, $cfg['id_verification']['cleared'], true)) {
             if (in_array($idStatus, $cfg['id_verification']['failed_values'], true)) {
-                $bump($cfg['id_verification']['failed_to'], "ID_FAILED: identity verification returned '{$idStatus}'");
+                $bump($cfg['id_verification']['failed_to'], "ID_FAILED: identity verification returned '{$idLabel}'");
             } else {
-                $bump($cfg['id_verification']['unverified_to'], "ID_UNVERIFIED: identity status '{$idStatus}'");
+                $bump($cfg['id_verification']['unverified_to'], "ID_UNVERIFIED: identity status '{$idLabel}'");
             }
         }
 

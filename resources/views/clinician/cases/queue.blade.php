@@ -103,14 +103,20 @@
                                 && !$case->hold_status
                                 && $case->status !== 'support';
 
+                            // Extract the first IDV-related triage reason for display
+                            $idvTriageReason = collect($case->triage_reasons ?? [])
+                                ->filter(fn($r) => str_starts_with($r, 'ID_'))
+                                ->map(fn($r) => 'IDV: ' . trim(substr($r, strpos($r, ':') + 1)))
+                                ->first();
+
                             if ($case->triage === 'red') {
                                 $batchBand   = 'red';
                                 $batchLabel  = 'Blocked';
-                                $batchReason = 'Red triage · hard stop';
+                                $batchReason = $idvTriageReason ?? 'Red triage · hard stop';
                             } elseif ($case->triage === 'yellow') {
                                 $batchBand   = 'yellow';
                                 $batchLabel  = 'Review';
-                                $batchReason = 'Yellow triage · review required';
+                                $batchReason = $idvTriageReason ?? 'Yellow triage · review required';
                             } elseif ($case->hold_status) {
                                 $batchBand   = 'red';
                                 $batchLabel  = 'Blocked';
