@@ -6,22 +6,24 @@
 @section('content')
 <div class="ma-surface">
 
-    {{-- Tab strip --}}
+    {{-- Tab cards --}}
+    @php
+        $tabs = [
+            'active'    => ['label' => 'Active',    'icon' => 'bi-activity',      'color' => '#0d6efd', 'bg' => '#eff6ff'],
+            'completed' => ['label' => 'Completed', 'icon' => 'bi-check-circle',  'color' => '#198754', 'bg' => '#f0fdf4'],
+            'cancelled' => ['label' => 'Cancelled', 'icon' => 'bi-x-circle',      'color' => '#6c757d', 'bg' => '#f8f9fa'],
+            'all'       => ['label' => 'All cases', 'icon' => 'bi-grid',          'color' => '#00897b', 'bg' => '#f0fdf9'],
+        ];
+    @endphp
     <div class="mc-tab-strip">
-        @php
-            $tabs = [
-                'active'    => ['label' => 'Active',    'icon' => 'bi-activity'],
-                'completed' => ['label' => 'Completed', 'icon' => 'bi-check-circle'],
-                'cancelled' => ['label' => 'Cancelled', 'icon' => 'bi-x-circle'],
-                'all'       => ['label' => 'All cases', 'icon' => 'bi-grid'],
-            ];
-        @endphp
         @foreach($tabs as $key => $meta)
+        @php $isActive = $tab === $key; @endphp
         <a href="{{ route('clinician.cases.my-cases', array_merge(request()->except('tab','page'), ['tab' => $key])) }}"
-           class="mc-tab {{ $tab === $key ? 'active' : '' }}">
-            <i class="bi {{ $meta['icon'] }}"></i>
-            {{ $meta['label'] }}
-            <span class="mc-tab-count">{{ number_format($counts[$key]) }}</span>
+           class="mc-tab-card {{ $isActive ? 'active' : '' }}"
+           style="border-left-color:{{ $meta['color'] }};{{ $isActive ? 'background:'.$meta['bg'].';' : '' }}">
+            <div class="mc-tab-card-icon" style="color:{{ $meta['color'] }}"><i class="bi {{ $meta['icon'] }}"></i></div>
+            <div class="mc-tab-card-label">{{ $meta['label'] }}</div>
+            <div class="mc-tab-card-count" style="color:{{ $isActive ? $meta['color'] : '#343a40' }}">{{ number_format($counts[$key]) }}</div>
         </a>
         @endforeach
     </div>
@@ -196,53 +198,38 @@
 
 @section('scripts')
 <style>
-/* ── Tab strip ────────────────────────────────────────────────── */
+/* ── Tab cards ────────────────────────────────────────────────── */
 .mc-tab-strip {
-    display: flex;
-    gap: .25rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: .85rem;
     margin-bottom: 1.25rem;
-    border-bottom: 2px solid var(--ma-border, #e5e7eb);
-    padding-bottom: 0;
 }
-.mc-tab {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .5rem 1rem;
-    font-size: .8rem;
-    font-weight: 600;
-    color: #6c757d;
+.mc-tab-card {
+    display: flex;
+    flex-direction: column;
+    padding: .85rem 1rem;
+    background: var(--ma-surface, #fff);
+    border: 1px solid var(--ma-border, #e5e7eb);
+    border-left: 4px solid transparent;
+    border-radius: var(--ma-radius, .5rem);
+    box-shadow: var(--ma-shadow, 0 1px 3px rgba(0,0,0,.06));
     text-decoration: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    border-radius: .25rem .25rem 0 0;
-    transition: color .15s, border-color .15s;
-    white-space: nowrap;
+    color: inherit;
+    transition: box-shadow .15s, transform .1s;
 }
-.mc-tab:hover { color: #0d6efd; }
-.mc-tab.active {
-    color: #0d6efd;
-    border-bottom-color: #0d6efd;
-    background: rgba(13,110,253,.04);
-}
-.mc-tab-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.4rem;
-    height: 1.4rem;
-    padding: 0 .35rem;
-    font-size: .7rem;
+.mc-tab-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); transform: translateY(-1px); }
+.mc-tab-card.active { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.mc-tab-card-icon { font-size: .95rem; margin-bottom: .35rem; opacity: .7; }
+.mc-tab-card-label {
+    font-size: .68rem;
     font-weight: 700;
-    border-radius: 999px;
-    background: #e9ecef;
-    color: #495057;
-    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #6c757d;
+    margin-bottom: .2rem;
 }
-.mc-tab.active .mc-tab-count {
-    background: #dbeafe;
-    color: #1d4ed8;
-}
+.mc-tab-card-count { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
 
 /* ── Table ────────────────────────────────────────────────────── */
 .mc-case-table thead th {
@@ -267,24 +254,19 @@
 .mc-triage-closed { color: #ced4da; font-size: .85rem; }
 
 @media (prefers-color-scheme: dark) {
-    .mc-tab { color: #9ca3af; border-bottom-color: transparent; }
-    .mc-tab:hover { color: #60a5fa; }
-    .mc-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; background: rgba(96,165,250,.06); }
-    .mc-tab-count { background: #374151; color: #d1d5db; }
-    .mc-tab.active .mc-tab-count { background: #1e3a5f; color: #93c5fd; }
-    .mc-tab-strip { border-bottom-color: #374151; }
+    .mc-tab-card { background: #1f2937; border-color: #374151; }
+    .mc-tab-card-label { color: #9ca3af; }
+    .mc-tab-card-count { color: #f3f4f6; }
     .mc-case-table thead th { color: #9ca3af; border-bottom-color: #374151; }
     .mc-case-table tbody .mc-row td { border-bottom-color: #1f2937; }
     .mc-case-table tbody .mc-row:hover td { background: #1f2937; }
     .mc-meta { color: #6b7280; }
 }
-:root[data-theme="dark"] .mc-tab { color: #9ca3af; }
-:root[data-theme="dark"] .mc-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; background: rgba(96,165,250,.06); }
-:root[data-theme="dark"] .mc-tab-strip { border-bottom-color: #374151; }
+:root[data-theme="dark"] .mc-tab-card { background: #1f2937; border-color: #374151; }
+:root[data-theme="dark"] .mc-tab-card-label { color: #9ca3af; }
 :root[data-theme="dark"] .mc-case-table thead th { color: #9ca3af; border-bottom-color: #374151; }
 :root[data-theme="dark"] .mc-case-table tbody .mc-row td { border-bottom-color: #1f2937; }
 :root[data-theme="dark"] .mc-case-table tbody .mc-row:hover td { background: #1f2937; }
-:root[data-theme="light"] .mc-tab { color: #6c757d; }
-:root[data-theme="light"] .mc-tab.active { color: #0d6efd; border-bottom-color: #0d6efd; }
+:root[data-theme="light"] .mc-tab-card { background: #fff; }
 </style>
 @endsection
