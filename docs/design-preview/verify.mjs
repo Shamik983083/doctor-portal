@@ -574,18 +574,36 @@ section("The approval modal fits, it does not hide fields behind an inner scroll
   await page.click(".decision-btn.approve");
   ok((await page.locator(".months-grid .field").count()) === 4, "the tallest case really is showing 4 months");
 
-  // No descendant of the modal may be its own scroll region. One scrolling
-  // surface, not a pane inside a pane.
-  const inner = await page.evaluate(() => {
+  // No descendant of the modal may be its own scroll region. This is asserted
+  // STRUCTURALLY, on the declaration, not on whether it happens to overflow
+  // today: the reflow means .modal-body no longer overruns, so a check for
+  // actual overflow passes even with overflow:auto restored (proven, it stayed
+  // green under that exact planted break). A taller case later would then start
+  // scrolling a pane again with nothing failing. Form controls are excluded,
+  // a textarea scrolling its own text is not a "separate scrolling section".
+  const declared = await page.evaluate(() => {
     const out = [];
     for(const el of document.querySelectorAll(".modal *")){
+      if(/^(TEXTAREA|SELECT|INPUT)$/.test(el.tagName)) continue;
       const s = getComputedStyle(el);
-      const scrolls = /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1;
-      if(scrolls) out.push(el.className || el.tagName);
+      if(/auto|scroll/.test(s.overflowY) || /auto|scroll/.test(s.overflowX))
+        out.push((el.className || el.tagName) + " (" + s.overflowY + "/" + s.overflowX + ")");
     }
     return out;
   });
-  ok(inner.length === 0, `nothing inside the modal scrolls on its own (${inner.join(", ") || "none"})`);
+  ok(declared.length === 0, `no section inside the modal declares its own scroll (${declared.join(", ") || "none"})`);
+
+  // And nothing is actually clipped right now either.
+  const clipped = await page.evaluate(() => {
+    const out = [];
+    for(const el of document.querySelectorAll(".modal *")){
+      if(/^(TEXTAREA|SELECT|INPUT)$/.test(el.tagName)) continue;
+      if(el.scrollHeight > el.clientHeight + 1 && /auto|scroll|hidden/.test(getComputedStyle(el).overflowY))
+        out.push(el.className || el.tagName);
+    }
+    return out;
+  });
+  ok(clipped.length === 0, `and nothing inside it is cut off (${clipped.join(", ") || "none"})`);
 
   // And at the review viewport the whole thing fits, so it does not scroll at all.
   const fit = await page.evaluate(() => {
