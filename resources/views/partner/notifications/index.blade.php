@@ -107,4 +107,4 @@ function markRead(id) {
     });
 }
 </script>
-@endsection
+@endpush
