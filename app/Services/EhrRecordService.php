@@ -44,7 +44,10 @@ class EhrRecordService
         }
 
         $payload = $this->buildPayload($case, $note, $decisions);
-        $enabled = $this->gateway->pushEnabled();
+
+        // Company-scoped: a storefront that is not fully configured previews
+        // rather than erroring on every approval.
+        $enabled = $this->gateway->pushEnabled($case->partner_id);
 
         $record = DB::transaction(function () use ($case, $note, $payload, $enabled) {
             $record = EhrRecord::create([
@@ -94,7 +97,10 @@ class EhrRecordService
     public function push(EhrRecord $record): EhrRecord
     {
         try {
-            $result = $this->gateway->resolve()->createRecord($record->payload);
+            // Resolved for THIS record's company, so the credential used is
+            // always the one belonging to the storefront that owns the case.
+            $partnerId = $record->payload['company']['partner_id'] ?? $record->partner_id;
+            $result = $this->gateway->resolve($partnerId)->createRecord($record->payload);
         } catch (\Throwable $e) {
             $record->update([
                 'status'     => EhrRecord::STATUS_FAILED,

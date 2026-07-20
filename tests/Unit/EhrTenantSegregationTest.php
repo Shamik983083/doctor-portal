@@ -3,9 +3,11 @@
 namespace Tests\Unit;
 
 use App\Models\Partner;
+use App\Models\PartnerEhrSetting;
 use App\Models\Patient;
 use App\Models\PatientCase;
 use App\Services\Ehr\EhrGatewayManager;
+use App\Services\Ehr\HealthieEhrAdapter;
 use App\Services\EhrRecordService;
 use RuntimeException;
 use Tests\TestCase;
@@ -164,7 +166,22 @@ class EhrTenantSegregationTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/sandbox_validated/');
 
-        (new EhrGatewayManager())->resolve();
+        (new EhrGatewayManager())->resolve(1);
+    }
+
+    /**
+     * Even with both platform flags set, a real adapter cannot be resolved
+     * without naming a company. This is the signature that makes a shared
+     * credential impossible rather than merely discouraged.
+     */
+    public function test_a_real_adapter_cannot_be_resolved_without_naming_a_company(): void
+    {
+        config(['ehr.adapter' => 'healthie', 'ehr.enabled' => true, 'ehr.sandbox_validated' => true]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/specific company|no shared credential/i');
+
+        (new EhrGatewayManager())->resolve(null);
     }
 
     /** And the mock is always safe, so staging can exercise the pipeline. */
@@ -172,7 +189,46 @@ class EhrTenantSegregationTest extends TestCase
     {
         config(['ehr.adapter' => 'mock', 'ehr.enabled' => false, 'ehr.sandbox_validated' => false]);
 
-        $this->assertSame('mock', (new EhrGatewayManager())->resolve()->key());
-        $this->assertFalse((new EhrGatewayManager())->pushEnabled());
+        $this->assertSame('mock', (new EhrGatewayManager())->resolve(1)->key());
+        $this->assertFalse((new EhrGatewayManager())->pushEnabled(1));
+    }
+
+    /**
+     * The last line of defence: a payload built for one company can never be
+     * pushed with another company's credential, even if something upstream
+     * resolved the wrong settings.
+     */
+    public function test_the_adapter_refuses_a_payload_belonging_to_another_company(): void
+    {
+        $settings = new PartnerEhrSetting([
+            'provider' => 'healthie', 'api_key' => 'k', 'endpoint' => 'https://example.test/graphql',
+            'is_enabled' => true, 'sandbox_validated' => true,
+        ]);
+        $settings->partner_id = 2;
+
+        $adapter = new HealthieEhrAdapter($settings);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/cross one storefront/i');
+
+        // Payload says partner 1, credentials belong to partner 2.
+        $adapter->createRecord(['company' => ['partner_id' => 1], 'note' => ['text' => 'x']]);
+    }
+
+    /** Healthie's documented auth headers, including the conditional shard. */
+    public function test_auth_headers_match_healthie_documented_shape(): void
+    {
+        $settings = new PartnerEhrSetting(['api_key' => 'SECRET', 'provider' => 'healthie']);
+
+        $headers = $settings->authHeaders();
+        $this->assertSame('Basic SECRET', $headers['Authorization']);
+        $this->assertSame('API', $headers['AuthorizationSource']);
+        $this->assertArrayNotHasKey('AuthorizationShard', $headers,
+            'the shard header is only sent when the account is actually sharded');
+
+        $sharded = new PartnerEhrSetting([
+            'api_key' => 'SECRET', 'provider' => 'healthie', 'authorization_shard' => 'SHARD-1',
+        ]);
+        $this->assertSame('SHARD-1', $sharded->authHeaders()['AuthorizationShard']);
     }
 }

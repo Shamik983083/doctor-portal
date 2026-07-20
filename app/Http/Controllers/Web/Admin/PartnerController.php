@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Partner;
+use App\Models\PartnerEhrSetting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -42,11 +43,28 @@ class PartnerController extends Controller
             'phone'       => 'nullable|string',
             'website'     => 'nullable|url',
             'description' => 'nullable|string',
+
+            // Healthie values, captured at company creation so a new storefront
+            // is configured to push from the moment it exists rather than being
+            // wired up later and quietly failing in between.
+            'healthie_api_key'             => 'nullable|string|max:500',
+            'healthie_endpoint'            => 'nullable|url|max:255',
+            'healthie_authorization_shard' => 'nullable|string|max:255',
+            'healthie_organization_id'     => 'nullable|string|max:255',
+            'healthie_default_provider_id' => 'nullable|string|max:255',
+            'healthie_note_form_id'        => 'nullable|string|max:255',
         ]);
 
-        $data['slug'] = Str::slug($data['name']);
+        $partnerData = collect($data)->except([
+            'healthie_api_key', 'healthie_endpoint', 'healthie_authorization_shard',
+            'healthie_organization_id', 'healthie_default_provider_id', 'healthie_note_form_id',
+        ])->all();
 
-        $partner = Partner::create($data);
+        $partnerData['slug'] = Str::slug($partnerData['name']);
+
+        $partner = Partner::create($partnerData);
+
+        $this->saveHealthieSettings($partner, $request);
 
         // Create Passport client for this partner
         $clientRepo = app(ClientRepository::class);
@@ -60,7 +78,74 @@ class PartnerController extends Controller
             'client_secret'   => $client->plainSecret ?? $client->secret,
         ]);
 
-        return redirect()->route('admin.partners.index')->with('success', "Partner created. Client ID: {$client->id}");
+        $warning = $this->healthieConfigWarning($partner);
+
+        return redirect()->route('admin.partners.index')
+            ->with('success', "Partner created. Client ID: {$client->id}")
+            ->with('warning', $warning);
+    }
+
+    /**
+     * Persist this company's Healthie values.
+     *
+     * ALWAYS creates the settings row, even when the fields were left blank, so
+     * every company has one place its EHR configuration lives and a half-set-up
+     * storefront is visible as incomplete rather than absent. The row starts
+     * disabled: turning a company on is a deliberate act after its sandbox has
+     * been checked, never a side effect of creating it.
+     *
+     * The API key is encrypted by the model cast. Blank input never overwrites a
+     * stored key, so editing a company without retyping the secret does not wipe it.
+     */
+    private function saveHealthieSettings(Partner $partner, Request $request): PartnerEhrSetting
+    {
+        $settings = PartnerEhrSetting::firstOrNew([
+            'partner_id' => $partner->id,
+            'provider'   => 'healthie',
+        ]);
+
+        $settings->fill([
+            'endpoint'            => $request->input('healthie_endpoint') ?: $settings->endpoint,
+            'authorization_shard' => $request->input('healthie_authorization_shard') ?: $settings->authorization_shard,
+            'organization_id'     => $request->input('healthie_organization_id') ?: $settings->organization_id,
+            'default_provider_id' => $request->input('healthie_default_provider_id') ?: $settings->default_provider_id,
+            'note_form_id'        => $request->input('healthie_note_form_id') ?: $settings->note_form_id,
+        ]);
+
+        if ($request->filled('healthie_api_key')) {
+            $settings->api_key = $request->input('healthie_api_key');
+        }
+
+        $settings->partner_id = $partner->id;
+        $settings->provider   = 'healthie';
+        $settings->save();
+
+        return $settings;
+    }
+
+    /**
+     * Tell the admin plainly if this company cannot push yet, at the moment they
+     * create it. A storefront that silently previews forever because a field was
+     * missed is the failure this exists to prevent.
+     */
+    private function healthieConfigWarning(Partner $partner): ?string
+    {
+        $settings = PartnerEhrSetting::where('partner_id', $partner->id)->where('provider', 'healthie')->first();
+
+        if (! $settings) {
+            return null;
+        }
+
+        $missing = $settings->missingValues();
+
+        if ($missing === []) {
+            return 'Healthie values saved. The company is still disabled for push: enable it once its sandbox '
+                . 'has been validated. See docs/integrations/HEALTHIE-SETUP.md.';
+        }
+
+        return 'Healthie is not fully configured for this company (missing: ' . implode(', ', $missing)
+            . '). Records will be built and stored for preview but nothing will be pushed. '
+            . 'See docs/integrations/HEALTHIE-SETUP.md.';
     }
 
     public function show(int $id)
@@ -88,11 +173,33 @@ class PartnerController extends Controller
             'website'     => 'nullable|url',
             'description' => 'nullable|string',
             'status'      => 'nullable|in:active,suspended,inactive',
+
+            'healthie_api_key'             => 'nullable|string|max:500',
+            'healthie_endpoint'            => 'nullable|url|max:255',
+            'healthie_authorization_shard' => 'nullable|string|max:255',
+            'healthie_organization_id'     => 'nullable|string|max:255',
+            'healthie_default_provider_id' => 'nullable|string|max:255',
+            'healthie_note_form_id'        => 'nullable|string|max:255',
+
+            // Enabling push for a company is deliberate and separate from
+            // entering its values, so a paste of credentials never switches a
+            // storefront live by itself.
+            'healthie_is_enabled'        => 'nullable|boolean',
+            'healthie_sandbox_validated' => 'nullable|boolean',
         ]);
 
-        $partner->update($data);
+        $partner->update(collect($data)->reject(fn ($v, $k) => str_starts_with($k, 'healthie_'))->all());
 
-        return redirect()->route('admin.partners.index')->with('success', 'Partner updated.');
+        $settings = $this->saveHealthieSettings($partner, $request);
+
+        $settings->update([
+            'is_enabled'        => $request->boolean('healthie_is_enabled'),
+            'sandbox_validated' => $request->boolean('healthie_sandbox_validated'),
+        ]);
+
+        return redirect()->route('admin.partners.index')
+            ->with('success', 'Partner updated.')
+            ->with('warning', $this->healthieConfigWarning($partner));
     }
 
     public function createUser(int $id)

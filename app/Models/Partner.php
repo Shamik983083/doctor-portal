@@ -38,6 +38,10 @@ class Partner extends Model
     public function offerings() { return $this->hasMany(Offering::class); }
     public function webhooks() { return $this->hasMany(Webhook::class); }
     public function vouchers() { return $this->hasMany(Voucher::class); }
+
+    /** Per-company EHR credentials. One row per provider; there is no shared credential. */
+    public function ehrSettings() { return $this->hasMany(PartnerEhrSetting::class); }
+    public function healthieSettings() { return $this->hasOne(PartnerEhrSetting::class)->where('provider', 'healthie'); }
     public function subscriptions() { return $this->hasMany(PatientSubscription::class); }
     public function orders() { return $this->hasMany(Order::class); }
     public function tags() { return $this->hasMany(Tag::class); }

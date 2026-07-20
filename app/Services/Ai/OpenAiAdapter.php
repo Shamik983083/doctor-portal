@@ -55,6 +55,24 @@ class OpenAiAdapter implements AiAssistAdapter
             $body['instructions'] = $prompt['instructions'] ?? '';
         }
 
+        /*
+         * Attach the uploaded criteria so the model retrieves from them rather
+         * than relying on what is in the prompt. This is what makes the skill
+         * set extensible by uploading a document instead of editing code.
+         *
+         * Only attached when a stored prompt is NOT in use: a stored prompt
+         * carries its own tool configuration on the OpenAI side, and attaching
+         * here as well would override what was configured there.
+         */
+        $vectorStoreIds = config('ai.openai.vector_store_ids', []);
+
+        if (empty($promptId) && ! empty($vectorStoreIds)) {
+            $body['tools'] = [[
+                'type'             => 'file_search',
+                'vector_store_ids' => array_values($vectorStoreIds),
+            ]];
+        }
+
         try {
             $response = Http::withToken($key)
                 ->timeout((int) config('ai.openai.timeout', 30))

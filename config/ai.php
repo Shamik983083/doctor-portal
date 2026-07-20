@@ -57,6 +57,29 @@ return [
         'prompt_id'      => env('OPENAI_PROMPT_ID'),
         'prompt_version' => env('OPENAI_PROMPT_VERSION'),
 
+        /*
+         * THE UPLOADED CRITERIA THE MODEL CALLS FROM.
+         *
+         * Criteria documents (clinical protocols, dosing rules, message
+         * standards) are uploaded once to a vector store on the OpenAI account,
+         * and the model retrieves from them per request via the file_search
+         * tool. That is what makes the skill set updatable by uploading a new
+         * document rather than by editing a prompt or shipping a deploy.
+         *
+         * Comma-separated so more than one store can be attached, e.g. shared
+         * clinical criteria plus a brand's own message standards.
+         *
+         * WHAT GOES IN HERE: criteria, protocols, standards, worked examples.
+         * WHAT MUST NOT: patient data. The vector store is persistent storage on
+         * the provider's side. Case material belongs in the request, which is
+         * covered by the BAA and sent with store=false, not in a document that
+         * sits there permanently.
+         */
+        'vector_store_ids' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('OPENAI_VECTOR_STORE_IDS', ''))
+        ))),
+
         // Zero data retention. Required for the BAA-covered path.
         'store'   => env('OPENAI_STORE', false),
         'timeout' => (int) env('OPENAI_TIMEOUT', 30),
