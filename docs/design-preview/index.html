@@ -258,8 +258,14 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 
 /* --------------------------------------------------- approval / case review */
 .modal-back{position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:60;display:grid;place-items:center;padding:24px}
-.modal{background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(16,24,40,.3);width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
-.modal-head{display:flex;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap}
+/* ONE scrolling surface, not a pane inside a pane (Devin msg 2079). The right
+   column used to have its own scrollbar and cut Administration frequency and
+   Duration off the bottom on a 4-month case. The modal itself is now the only
+   scroller, and the header and footer stay put, so Submit is never scrolled
+   away. The field reflow below is what makes it FIT at 1440x950 so this scroll
+   should not engage at all. */
+.modal{background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(16,24,40,.3);width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:auto}
+.modal-head{display:flex;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;top:0;z-index:3;flex:0 0 auto}
 .modal-head h2{margin:0;font-size:19px;letter-spacing:-.03em}
 .modal-who{display:flex;align-items:center;gap:11px}
 .modal-avatar{width:40px;height:40px;border-radius:99px;background:#e7edf8;color:#41537a;display:grid;place-items:center;font-size:13px;font-weight:770;flex:0 0 auto}
@@ -269,7 +275,7 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .modal-facts div{font-size:11.5px}
 .modal-facts dt{color:var(--muted);margin:0 0 2px}
 .modal-facts dd{margin:0;font-weight:700}
-.modal-body{display:grid;grid-template-columns:.85fr 1.15fr;gap:0;overflow:auto;min-height:0}
+.modal-body{display:grid;grid-template-columns:.85fr 1.15fr;gap:0;overflow:visible;min-height:0}
 .modal-left{padding:20px;border-right:1px solid var(--line);background:#fcfdff}
 .modal-right{padding:20px;display:grid;gap:14px;align-content:start}
 .rx-meta{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
@@ -317,6 +323,7 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .field.bad select{border-color:#e6a29c;background:#fff8f7}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .check-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink)}
+.check-stack{display:grid;gap:9px;align-content:end;padding-bottom:9px}
 .term-warn{font-size:11.5px;color:var(--yellow);margin:0}
 .months{display:grid;gap:8px}
 .months-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
@@ -324,7 +331,7 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .months-note{font-size:11.5px;color:var(--soft-muted)}
 .months-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
 .months-grid .field label{font-size:11px;color:var(--accent-ink);font-weight:780}
-.modal-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 22px;border-top:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap}
+.modal-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 22px;border-top:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;bottom:0;z-index:3;flex:0 0 auto}
 .foot-status{font-size:12px;color:var(--muted)}
 .foot-status strong{color:var(--ink)}
 .foot-actions{display:flex;gap:9px;margin-left:auto}
@@ -1225,9 +1232,14 @@ const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(
    record, exactly like MA's summary placeholder, so the surface can be reviewed
    before an approved clinical AI service and its BAA are in place.
    --------------------------------------------------------------------------- */
-function draftNote(row, decisionsMap){
+/* providerText is whatever the provider has already typed into the note. It is
+   an INPUT to the draft, never something the draft discards (Devin msg 2079:
+   "we can write the basics or instructions then say draft with AI and it reads
+   that and the base"). Their words lead, the record composes around them. */
+function draftNote(row, decisionsMap, providerText){
   const meds = requestedMeds(row);
   const lines = [];
+  const own = String(providerText || "").trim();
   const approved = meds.filter((m) => (decisionsMap[m.key] || {}).decision === "approve");
   const denied   = meds.filter((m) => (decisionsMap[m.key] || {}).decision === "deny");
 
@@ -1255,7 +1267,16 @@ function draftNote(row, decisionsMap){
   for(const m of denied) lines.push("Declined "+m.name+" at this time.");
 
   lines.push("Patient advised to report severe or persistent side effects and to contact the clinic with any concerns.");
-  return lines.join(" ");
+
+  /* Anything the record would state that the provider has ALREADY stated is
+     dropped rather than repeated. This is also what makes Regenerate safe: the
+     previous draft comes back in as providerText, every fact in it is already
+     present, so a regenerate with no edits returns the same note instead of
+     stacking a second copy of itself. Edits the provider made survive, and only
+     genuinely new facts (a changed decision, a widened term) get added. */
+  const fresh = lines.filter((l) => !own.includes(l));
+  if(!own) return fresh.join(" ");
+  return [own.replace(/([^.!?])$/, "$1.")].concat(fresh).join(" ");
 }
 
 const REPLY_TONES = ["Answer the question","Ask for more detail","Explain the hold"];
@@ -1367,6 +1388,11 @@ let decisions = {};       // medKey -> { decision, product, medication, dosage, 
 function openApproval(rowId){
   const row = QUEUE.find((r) => r.id === rowId);
   approvalFor = rowId;
+  /* The note belongs to ONE patient. Carrying it into the next case would put one
+     patient's clinical note in front of another's record, so it clears when the
+     case changes. Reopening the SAME case keeps it, because closing the modal to
+     go and check something must not destroy what was typed. */
+  if(noteFor !== rowId){ noteText = ""; noteSteered = false; noteFor = rowId; }
   decisions = {};
   for(const m of requestedMeds(row)){
     decisions[m.key] = {
@@ -1411,6 +1437,8 @@ let showPreflight = false;
 let compact = false;
 let submitted = null;
 let noteText = "";      // the clinical note in the approval modal
+let noteFor = null;     // the case that note belongs to, so it cannot follow a patient
+let noteSteered = false;// whether the last draft was steered by the provider's own text
 let replyDraft = "";    // the AI-suggested reply sitting in the compose box
 const onlyEligible = (ids) => ids.filter((id) => ELIGIBLE_IDS.includes(id));
 
@@ -1419,9 +1447,18 @@ const onlyEligible = (ids) => ids.filter((id) => ELIGIBLE_IDS.includes(id));
    Med 2/3/4, and it gains a name column, which MA never had. MA showed a dose
    and a plan but never said WHICH drug, so a Semaglutide and a Tirzepatide row
    were indistinguishable at a glance. */
-const QUEUE_COLS = ["Triage","Time in Queue","Full Name","ID Verified","Sex","Age","BMI","On GLP",
-  "Med 1 Req","M1 Dose","M1 Term","Titration or Hold","Med 2 Req","Med 3 Req","Med 4 Req","Company",
-  "Concerning Allergies","Standing Zofran","Video Visit","Batch Eligibility"];
+const QUEUE_COLS = ["Triage","Queue Time","Full Name","ID VER","Sex","Age","BMI","On GLP",
+  "Med 1 Req","Med 1 Dose","Med 1 Term","Titrate?","Med 2 Req","Med 3 Req","Med 4 Req","Company",
+  "Allergies","STD ZOF","Video Visit","Batch Eligibility"];
+
+/* The column header asks a question, "Titrate?", and the CELL answers it with
+   Titrate or Hold (Devin msg 2077). The stored value stays "Titration"/"Hold":
+   prefillMonths() branches on it, the intake answer dosePlan carries it, and the
+   case summary reads it inside a sentence where "Standard titration" is the
+   correct clinical word. So this is a display label over an internal value, the
+   same separation already used for question slugs. */
+const PLAN_LABEL = { Titration:"Titrate", Hold:"Hold" };
+const planLabel = (p) => PLAN_LABEL[p] || p;
 
 function renderQueue(filter){
   // The rows on screen for THIS view. Everything below counts against these,
@@ -1452,7 +1489,7 @@ function renderQueue(filter){
     + '</div></div>'
     + '<div class="review-grid-scroll"><table class="review-grid'+(compact?" compact":"")+'"><thead><tr>'
     + '<th class="pin pin-select"></th><th class="pin pin-triage">Triage</th>'
-    + '<th class="pin pin-time">Time in Queue</th><th class="pin pin-name">Full Name</th>'
+    + '<th class="pin pin-time">Queue Time</th><th class="pin pin-name">Full Name</th>'
     + QUEUE_COLS.slice(3).map((c) => '<th>'+c+'</th>').join("")
     + '</tr></thead><tbody>';
 
@@ -1469,7 +1506,7 @@ function renderQueue(filter){
       + '<td class="pin pin-name"><button class="patient-link">'+esc(r.name)+'</button></td>'
       + '<td><span class="pill '+(r.idv==="Y"?"green":"red")+'">'+r.idv+'</span></td>'
       + '<td>'+r.sex+'</td><td>'+r.age+'</td><td>'+r.bmi+'</td><td>'+r.onGlp+'</td>'
-      + '<td>'+esc(r.product)+'</td><td>'+esc(r.dose)+'</td><td>'+r.term+'</td><td>'+r.plan+'</td>'
+      + '<td>'+esc(r.product)+'</td><td>'+esc(r.dose)+'</td><td>'+r.term+'</td><td>'+planLabel(r.plan)+'</td>'
       + '<td>'+r.med2+'</td><td>'+r.med3+'</td><td>'+r.med4+'</td>'
       + '<td>'+esc(r.company)+'</td>'
       + '<td>'+(r.allergy==="Y"
@@ -1573,7 +1610,7 @@ function renderApproval(){
     + '<div><dt>BMI</dt><dd>'+row.bmi+'</dd></div>'
     + '<div><dt>On GLP-1</dt><dd>'+(row.onGlp==="Y"?"Yes":"No")+'</dd></div>'
     + '<div><dt>Requested dose</dt><dd>'+esc(row.dose)+'</dd></div>'
-    + '<div><dt>Plan</dt><dd>'+row.plan+'</dd></div>'
+    + '<div><dt>Plan</dt><dd>'+planLabel(row.plan)+'</dd></div>'
     + '<div><dt>Storefront</dt><dd>'+esc(row.company)+'</dd></div>'
     + '<div><dt>Batch</dt><dd>'+row.batch+(row.batchReason?", "+esc(row.batchReason):"")+'</dd></div>'
     + '</div></div></div>';
@@ -1598,12 +1635,17 @@ function renderApproval(){
   const dis = approving ? "" : " disabled";
   const bad = (v) => approving && !v ? " bad" : "";
 
-  h += '<div class="field'+bad(d.product)+'"><label>Product selection <span class="req">*</span></label>'
+  /* Paired into rows rather than one tall single-column stack. On a 4-month case
+     the stack overran the modal and the last fields were only reachable by
+     scrolling the panel (Devin msg 2079). Pairing recovers that height, so the
+     tallest case fits without a scroll. */
+  h += '<div class="field-row">'
+    + '<div class="field'+bad(d.product)+'"><label>Product selection <span class="req">*</span></label>'
     + sel("product", d.product, [d.product].filter(Boolean), dis) + '</div>'
     + '<div class="field'+bad(d.medication)+'"><label>Medication <span class="req">*</span></label>'
     + sel("medication", d.medication, Object.keys(DOSAGES), dis) + '</div>'
+    + '</div>'
     + renderDoseFields(d, approving, dis)
-    + '<label class="check-line"><input type="checkbox" data-f="custom"'+(d.custom?" checked":"")+dis+' /> Use custom dosage</label>'
     + '<div class="field-row">'
     + '<div class="field'+bad(d.freq)+'"><label>Administration frequency <span class="req">*</span></label>'
     + sel("freq", d.freq, FREQUENCIES, dis) + '</div>'
@@ -1613,9 +1655,13 @@ function renderApproval(){
     + (termChanged && approving
         ? '<p class="term-warn">Duration differs from the '+TERM_LABEL[m.term]+' the storefront sold. This is allowed, but it will not match the order.</p>'
         : '')
-    + '<label class="check-line"><input type="checkbox" data-f="startToday"'+(d.startToday?" checked":"")+dis+' /> Start date: today</label>'
+    + '<div class="field-row">'
     + '<div class="field'+bad(d.refills)+'"><label>Refills <span class="req">*</span></label>'
-    + sel("refills", d.refills, REFILLS, dis) + '</div>';
+    + sel("refills", d.refills, REFILLS, dis) + '</div>'
+    + '<div class="check-stack">'
+    + '<label class="check-line"><input type="checkbox" data-f="custom"'+(d.custom?" checked":"")+dis+' /> Use custom dosage</label>'
+    + '<label class="check-line"><input type="checkbox" data-f="startToday"'+(d.startToday?" checked":"")+dis+' /> Start date: today</label>'
+    + '</div></div>';
 
   if(d.decision === "deny") h += '<p class="action-reason">Denied. No prescription is created for this medication.</p>';
   if(d.decision === "none") h += '<p class="action-reason">Marked none. This medication is left undecided on the order.</p>';
@@ -1627,9 +1673,11 @@ function renderApproval(){
     + '<div><div class="subheading">Clinical note</div>'
     + '<span class="pill neutral">AI draft · provider edits and signs</span></div>'
     + '<button class="button-secondary" id="genNote">'+(noteText?"Regenerate":"Draft with AI")+'</button></div>'
-    + '<textarea class="note-area" id="noteArea" data-f="note" rows="4" placeholder="Write the note, or draft it with AI and edit.">'
+    + '<textarea class="note-area" id="noteArea" data-f="note" rows="4" placeholder="Write the basics or your instructions here, then draft with AI. What you write is used, not replaced.">'
     + esc(noteText) + '</textarea>'
-    + '<p class="ai-honesty">Composed from this case\'s recorded answers and your decisions. '
+    + '<p class="ai-honesty">'
+    + (noteSteered ? 'Your text is kept and used as the steer, then this case\'s recorded answers and your decisions are composed around it. '
+                   : 'Composed from this case\'s recorded answers and your decisions. ')
     + 'No model ran in this preview, and nothing is signed or sent until you submit.</p></div>';
 
   h += '<div class="modal-foot">'
@@ -1828,7 +1876,12 @@ document.getElementById("view").addEventListener("click", (e) => {
     return;
   }
   if(e.target.id === "genNote"){
-    noteText = draftNote(QUEUE.find((r) => r.id === approvalFor), decisions);
+    // Read the box itself, not just the last input event, so nothing the
+    // provider has typed can be lost between typing and clicking.
+    const box = document.getElementById("noteArea");
+    const typed = box ? box.value : noteText;
+    noteSteered = String(typed).trim().length > 0;
+    noteText = draftNote(QUEUE.find((r) => r.id === approvalFor), decisions, typed);
     renderView(); return;
   }
 

@@ -3,7 +3,10 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 
-const DIR = path.resolve("C:/Users/AgentService/AppData/Local/Temp/claude/C--Agent-workspace-dp-agent/1b4b27d9-75ea-4c1a-a84c-66f32fe7e36f/scratchpad/medaxis-preview");
+// Staging copy, deliberately OUTSIDE the repo: the deployed HTML gets a noindex
+// injected into it, and a transform applied in-tree cannot be reverted with
+// git checkout once the file is untracked. STAGE overrides it per session.
+const DIR = path.resolve(process.env.STAGE || "C:/Agent/workspace/_tmp/medaxis-preview");
 const BASE = process.env.LIVE || null;
 
 let pass = 0, fail = 0;
@@ -81,13 +84,15 @@ await page.locator('.nav-link[title="Case Queue"]').click();
   // This is a DELIBERATE divergence from MA, recorded here rather than quietly
   // relaxed: everything except that numbering still matches MA's grid.
   ok(heads.length === 21, `grid has 21 columns, MA's 20 plus the Med 1 name (got ${heads.length})`);
-  const expected = ["", "Triage", "Time in Queue", "Full Name", "ID Verified", "Sex", "Age", "BMI", "On GLP",
-    "Med 1 Req", "M1 Dose", "M1 Term", "Titration or Hold", "Med 2 Req", "Med 3 Req", "Med 4 Req",
-    "Company", "Concerning Allergies", "Standing Zofran", "Video Visit", "Batch Eligibility"];
+  // Labels are Devin's (msg 2077). The COLUMN SET is still MA's; only the words
+  // changed, so the divergence from MA remains exactly one column, not eleven.
+  const expected = ["", "Triage", "Queue Time", "Full Name", "ID VER", "Sex", "Age", "BMI", "On GLP",
+    "Med 1 Req", "Med 1 Dose", "Med 1 Term", "Titrate?", "Med 2 Req", "Med 3 Req", "Med 4 Req",
+    "Company", "Allergies", "STD ZOF", "Video Visit", "Batch Eligibility"];
   ok(JSON.stringify(heads) === JSON.stringify(expected), "column headers match the agreed set exactly");
-  const maUntouched = ["", "Triage", "Time in Queue", "Full Name", "ID Verified", "Sex", "Age", "BMI", "On GLP"];
+  const maUntouched = ["", "Triage", "Queue Time", "Full Name", "ID VER", "Sex", "Age", "BMI", "On GLP"];
   ok(JSON.stringify(heads.slice(0, 9)) === JSON.stringify(maUntouched),
-     "and everything ahead of the medication block is still MA's, unchanged");
+     "and everything ahead of the medication block is still MA's columns, relabelled only");
 
   ok((await page.locator(".review-grid th.pin").count()) === 4, "four pinned header columns");
   const pinPos = await page.evaluate(() =>
@@ -453,19 +458,30 @@ section("Med 1 is numbered like the rest, and named");
 {
   await page.locator('.nav-link[title="Case Queue"]').click();
   const heads = await page.locator(".review-grid thead th").allTextContents();
-  for(const h of ["Med 1 Req","M1 Dose","M1 Term","Med 2 Req","Med 3 Req","Med 4 Req"])
+  for(const h of ["Med 1 Req","Med 1 Dose","Med 1 Term","Med 2 Req","Med 3 Req","Med 4 Req"])
     ok(heads.includes(h), `column "${h}" is present`);
   ok(!heads.includes("Req Dose") && !heads.includes("Req Term"), "the old un-numbered labels are gone");
-  ok(heads.includes("Titration or Hold"), "titration or hold is kept, it drives the monthly dosing");
+  ok(!heads.includes("M1 Dose") && !heads.includes("M1 Term"), "and so are the M1 short forms");
+  ok(heads.includes("Titrate?"), "the titrate column is kept, it drives the monthly dosing");
+
+  // The header asks the question, the cell answers it. The stored value is still
+  // "Titration", which prefillMonths() and the intake answer sheet both rely on,
+  // so this pins the LABEL without letting the label leak into the data.
+  const pi = heads.indexOf("Titrate?");
+  const plans = await page.locator(".review-grid tbody tr").evaluateAll(
+    (rows, n) => rows.map((r) => r.querySelectorAll("td")[n].textContent.trim()), pi);
+  ok(plans.every((p) => p === "Titrate" || p === "Hold"),
+     `every cell reads Titrate or Hold, never Titration (${[...new Set(plans)].join(", ")})`);
+  ok(plans.includes("Titrate"), "and both answers are reachable in the queue: Titrate present");
 
   // Med 1 Req must actually carry the drug name, which MA's grid never showed.
   const i = heads.indexOf("Med 1 Req");
   const first = await page.locator(".review-grid tbody tr").first().locator("td").nth(i).textContent();
   ok(/Semaglutide|Tirzepatide/.test(first), `Med 1 Req names the drug (${first.trim()})`);
 
-  const di = heads.indexOf("M1 Dose");
+  const di = heads.indexOf("Med 1 Dose");
   const dose = await page.locator(".review-grid tbody tr").first().locator("td").nth(di).textContent();
-  ok(/mg/.test(dose), `M1 Dose still carries the dose (${dose.trim()})`);
+  ok(/mg/.test(dose), `Med 1 Dose still carries the dose (${dose.trim()})`);
 }
 
 section("AI assist drafts, the provider decides");
@@ -497,6 +513,31 @@ section("AI assist drafts, the provider decides");
   await page.click("#genNote");
   const note2 = await page.locator("#noteArea").inputValue();
   ok(/Declined Zofran/.test(note2), "a declined medication appears in the note as declined");
+
+  // Regenerating must not destroy what the provider wrote (Devin msg 2079). The
+  // sentence added by hand above has to survive the redraft, and the redraft must
+  // not stack a second copy of the note it just read back in.
+  ok(note2.includes("Reviewed with patient by phone."),
+     "regenerating keeps the sentence the provider typed by hand");
+  ok(note2.split("37 year old female").length - 1 === 1,
+     "and does not duplicate the facts it already wrote");
+  await page.click("#modalCancel");
+
+  // The other direction: basics typed FIRST, before any draft exists. The draft
+  // must read them and compose around them, not overwrite them.
+  await page.locator('.nav-link[title="My Cases"]').click();
+  await page.click('.review-grid tr[data-row="demo-007"] .pin-name');
+  await page.click("#openApproval");
+  await page.click(".decision-btn.approve");
+  await page.fill("#noteArea", "Discussed nausea management, patient comfortable proceeding");
+  await page.click("#genNote");
+  const steered = await page.locator("#noteArea").inputValue();
+  ok(steered.startsWith("Discussed nausea management, patient comfortable proceeding."),
+     "the provider's own words lead the draft, and are punctuated, not discarded");
+  ok(/BMI/.test(steered) && /Approved/.test(steered),
+     "with the record and the decision composed around them");
+  ok(/your text is kept and used as the steer/i.test(await page.locator(".note-block .ai-honesty").textContent()),
+     "and the helper line says their notes were used");
   await page.click("#modalCancel");
 
   // Reply drafting in messages.
@@ -520,6 +561,51 @@ section("AI assist drafts, the provider decides");
   await page.click('.tone-btn[data-tone="Answer the question"]');
   const d3 = await page.locator("#composeBox").inputValue();
   ok(/first few weeks while your body adjusts/i.test(d3), "and the draft responds to what was actually asked");
+}
+
+section("The approval modal fits, it does not hide fields behind an inner scrollbar");
+{
+  // demo-007 is the worst case on purpose: 4 months of dose fields plus an add-on,
+  // which is the case Devin screenshotted with Administration frequency and
+  // Duration cut off the bottom of the right-hand panel (msg 2079).
+  await page.locator('.nav-link[title="My Cases"]').click();
+  await page.click('.review-grid tr[data-row="demo-007"] .pin-name');
+  await page.click("#openApproval");
+  await page.click(".decision-btn.approve");
+  ok((await page.locator(".months-grid .field").count()) === 4, "the tallest case really is showing 4 months");
+
+  // No descendant of the modal may be its own scroll region. One scrolling
+  // surface, not a pane inside a pane.
+  const inner = await page.evaluate(() => {
+    const out = [];
+    for(const el of document.querySelectorAll(".modal *")){
+      const s = getComputedStyle(el);
+      const scrolls = /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1;
+      if(scrolls) out.push(el.className || el.tagName);
+    }
+    return out;
+  });
+  ok(inner.length === 0, `nothing inside the modal scrolls on its own (${inner.join(", ") || "none"})`);
+
+  // And at the review viewport the whole thing fits, so it does not scroll at all.
+  const fit = await page.evaluate(() => {
+    const m = document.querySelector(".modal");
+    return { over: m.scrollHeight - m.clientHeight, h: m.getBoundingClientRect().height };
+  });
+  ok(fit.over <= 1, `the modal fits at this viewport without scrolling (overflow ${fit.over}px)`);
+
+  // The fields he could not reach must be on screen, inside the modal box.
+  for(const label of ["Administration frequency", "Duration", "Refills"]){
+    const box = await page.locator(`.modal .field:has(label:has-text("${label}")) select`).first().boundingBox();
+    const modalBox = await page.locator(".modal").boundingBox();
+    ok(box && box.y + box.height <= modalBox.y + modalBox.height + 1,
+       `"${label}" sits inside the modal, not below its bottom edge`);
+  }
+
+  // Submit stays reachable: it must not have scrolled away with the content.
+  const footPos = await page.evaluate(() => getComputedStyle(document.querySelector(".modal-foot")).position);
+  ok(footPos === "sticky", "and the footer is pinned, so Submit is always reachable");
+  await page.click("#modalCancel");
 }
 
 section("Provider sees questions, never slugs");
