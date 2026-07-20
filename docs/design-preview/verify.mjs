@@ -197,15 +197,22 @@ section("Approval: one decision per requested medication");
   ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
      "approving one medication is not enough to submit while another is undecided");
 
+  // This is a 3M case, so the primary needs a dose for each of its three months.
+  ok((await page.locator(".months-grid .field").count()) === 3, "the 3M primary asks for three monthly doses");
+  await page.selectOption('.field select[data-f="month1"]', "L2 · 5 mg");
+  await page.selectOption('.field select[data-f="month2"]', "L3 · 7.5 mg");
+
   // Second medication, and its dosage list must belong to that drug.
   await page.click('.med-tab[data-med="med2"]');
   await page.click(".decision-btn.approve");
-  const doseOpts = await page.locator('.field select[data-f="dosage"]').allTextContents();
+  const doseOpts = await page.locator('.field select[data-f="month0"]').allTextContents();
   ok(doseOpts.join(" ").includes("8 mg") && !doseOpts.join(" ").includes("12.5 mg"),
      "dosage options follow the selected medication, not the primary one");
   ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
      "still blocked while the add-on is missing a required dosage");
-  await page.selectOption('.field select[data-f="dosage"]', "8 mg");
+  await page.selectOption('.field select[data-f="month0"]', "8 mg");
+  await page.selectOption('.field select[data-f="month1"]', "8 mg");
+  await page.selectOption('.field select[data-f="month2"]', "8 mg");
   ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
      "an add-on still needs its own frequency, it is not inherited from the primary");
   await page.selectOption('.field select[data-f="freq"]', "As needed");
@@ -214,18 +221,24 @@ section("Approval: one decision per requested medication");
 
   // Deny needs no prescription fields at all.
   await page.click(".decision-btn.deny");
-  ok((await page.locator('.field select[data-f="dosage"]').getAttribute("disabled")) !== null,
+  ok((await page.locator('.field select[data-f="month0"]').getAttribute("disabled")) !== null,
      "denying disables the prescription fields");
   ok((await page.locator("#modalSubmit").getAttribute("disabled")) === null,
      "a denied medication needs no dosage to submit");
 
   // Changing the term away from what was sold must be called out, not silent.
   await page.click(".decision-btn.approve");
-  await page.selectOption('.field select[data-f="dosage"]', "8 mg");
   await page.selectOption('.field select[data-f="term"]', "1 month");
   ok((await page.locator(".term-warn").count()) === 1, "changing duration warns that it will not match the order");
   await page.selectOption('.field select[data-f="term"]', "3 months");
   ok((await page.locator(".term-warn").count()) === 0, "and the warning clears when it matches again");
+
+  // Shrinking to 1M dropped months 2 and 3; growing back re-adds them EMPTY, so
+  // a dose is never silently resurrected. Refill them to submit.
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
+     "narrowing then widening the term does not resurrect the old monthly doses");
+  await page.selectOption('.field select[data-f="month1"]', "8 mg");
+  await page.selectOption('.field select[data-f="month2"]', "8 mg");
 
   await page.click("#modalSubmit");
   ok((await page.locator(".modal").count()) === 0, "submitting closes the modal");
@@ -237,6 +250,103 @@ section("Approval: one decision per requested medication");
   ok((await page.locator(".med-tab").count()) === 1, "a single-medication case shows one tab");
   await page.click("#modalCancel");
   ok((await page.locator(".modal").count()) === 0, "cancel closes without recording anything");
+}
+
+section("Consistent view, different content");
+{
+  // Every clinician case screen must be the SAME grid, only filtered. Messages
+  // is the one deliberate exception.
+  const caseViews = ["Case Queue","My Cases","My Escalations","SLA breached","Approaching deadline",
+    "Video visit required","Support thread open","Red","Yellow","Green"];
+  let shapesOk = 0, counts = {};
+  for(const name of caseViews){
+    await page.locator(`.nav-link[title="${name}"]`).click();
+    const grid = await page.locator(".review-grid").count();
+    const heads = await page.locator(".review-grid thead th").allTextContents();
+    const rows = await page.locator(".review-grid tbody tr").count();
+    counts[name] = rows;
+    if(grid === 1 && heads.length === 20 && rows > 0) shapesOk++;
+  }
+  ok(shapesOk === caseViews.length,
+     `all ${caseViews.length} case screens render the identical 20-column grid (${shapesOk} did)`);
+
+  ok(counts["Case Queue"] !== counts["My Cases"], "but the content differs between views");
+  ok(counts["Red"] < counts["Case Queue"], "a triage filter narrows the set");
+
+  // Filters must be honest: a Red view may not contain a Green row.
+  await page.locator('.nav-link[title="Red"]').click();
+  const triages = await page.locator(".review-grid tbody .pin-triage").allTextContents();
+  ok(triages.every((t) => t.trim() === "Red"), "the Red view contains only Red cases");
+  await page.locator('.nav-link[title="Green"]').click();
+  const g = await page.locator(".review-grid tbody .pin-triage").allTextContents();
+  ok(g.every((t) => t.trim() === "Green"), "the Green view contains only Green cases");
+
+  // Counts in the toolbar must describe THIS view, not the whole queue.
+  const toolbar = await page.locator(".queue-count span").textContent();
+  const shown = await page.locator(".review-grid tbody tr").count();
+  const elig = Number(toolbar.match(/(\d+) batch-eligible/)[1]);
+  const blk = Number(toolbar.match(/(\d+) rows blocked/)[1]);
+  ok(elig + blk === shown, `toolbar counts describe the filtered view (${elig}+${blk} = ${shown} rows)`);
+
+  // The drawer must belong to the view you are looking at.
+  const drawerName = await page.locator(".quick-review h2").textContent();
+  const names = await page.locator(".review-grid tbody .pin-name").allTextContents();
+  ok(names.some((n) => n.trim() === drawerName.trim()),
+     "the open drawer is a case from this view, not one left over from the last");
+
+  ok((await page.locator('.nav-link[title="Messages For Provider"]').count()) === 1, "Messages is still in the nav");
+  await page.locator('.nav-link[title="Messages For Provider"]').click();
+  ok((await page.locator(".review-grid").count()) === 0, "and Messages is deliberately NOT the case grid");
+}
+
+section("Multi-month terms take a dose per month");
+{
+  await page.locator('.nav-link[title="Case Queue"]').click();
+  await page.click('.review-grid tr[data-row="demo-003"] .pin-name');   // Riley Chen, 1M
+  await page.click("#openApproval");
+  await page.click(".decision-btn.approve");
+  ok((await page.locator(".months-grid").count()) === 0, "a 1 month term keeps a single dosage field");
+  ok((await page.locator('.field select[data-f="month0"]').count()) === 1, "and that field is month 1");
+
+  // Grow the term: the form must grow with it.
+  await page.selectOption('.field select[data-f="term"]', "3 months");
+  ok((await page.locator(".months-grid .field").count()) === 3, "switching to 3M gives three month fields");
+  const labels = await page.locator(".months-grid .field label").allTextContents();
+  ok(labels.join(",") === "M1,M2,M3", `months are labelled M1..M3 (got ${labels.join(",")})`);
+  ok((await page.locator('.field select[data-f="month0"]').inputValue()) !== "", "month 1 keeps the requested dose");
+  ok((await page.locator('.field select[data-f="month1"]').inputValue()) === "", "month 2 starts empty, no titration is assumed");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null, "and submit is blocked while a month is empty");
+
+  await page.selectOption('.field select[data-f="month1"]', "L2 · 5 mg");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null, "still blocked with month 3 empty");
+  await page.selectOption('.field select[data-f="month2"]', "L3 · 7.5 mg");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) === null, "unlocks once every month has a dose");
+
+  // Shrinking drops the extra months rather than keeping stale ones.
+  await page.selectOption('.field select[data-f="term"]', "1 month");
+  ok((await page.locator(".months-grid").count()) === 0, "back to 1M collapses to a single dosage field");
+  await page.selectOption('.field select[data-f="term"]', "4 months");
+  ok((await page.locator(".months-grid .field").count()) === 4, "4M gives four month fields");
+  ok((await page.locator('.field select[data-f="month3"]').inputValue()) === "", "the new fourth month is empty, not back-filled");
+  await page.click("#modalCancel");
+}
+
+section("Closing the rail expands the grid");
+{
+  await page.locator('.nav-link[title="Case Queue"]').click();
+  const countVisible = () => page.evaluate(() => {
+    const s = document.querySelector(".review-grid-scroll").getBoundingClientRect();
+    return [...document.querySelectorAll(".review-grid thead th")]
+      .filter((th) => { const r = th.getBoundingClientRect(); return r.left >= s.left - 1 && r.right <= s.right + 1; }).length;
+  });
+  const open = await countVisible();
+  await page.click("#toggle");
+  await page.waitForTimeout(340);
+  const shut = await countVisible();
+  ok(shut >= open + 4, `closing the rail reveals materially more columns (${open} -> ${shut})`);
+  await page.click("#toggle");
+  await page.waitForTimeout(340);
+  ok((await countVisible()) === open, "reopening restores the original density");
 }
 
 section("Clinician sidebar is a work queue, with counts");
@@ -270,6 +380,50 @@ await page.locator(".nav-link").nth(1).click();
 ok((await page.locator(".page-head h1").count()) === 1, "a click in the collapsed rail still routes");
 await page.click("#toggle");
 await page.waitForTimeout(320);
+
+section("Typography is one system across the portal");
+{
+  await page.click('.role-button:text-is("Clinician")');
+  await page.locator('.nav-link[title="Case Queue"]').click();
+  const bodyFont = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
+  ok(/-apple-system|BlinkMacSystemFont/.test(bodyFont), "body leads with the platform UI face, so Apple devices get SF");
+
+  // Controls must not fall back to the browser's default form font.
+  await page.click('.review-grid tr[data-row="demo-001"] .pin-name');
+  await page.click("#openApproval");
+  await page.click(".decision-btn.approve");
+  const selFont = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.field select[data-f="month0"]')).fontFamily);
+  ok(selFont === bodyFont, "form controls inherit the page face rather than the browser default");
+  const selApp = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.field select[data-f="month0"]')).appearance);
+  ok(selApp === "none", "and use the custom chevron, not the OS dropdown arrow");
+  // Checkboxes must stay checkboxes. Styling every input in the modal as a text
+  // control turned these into full-width dropdowns with a chevron.
+  const cb = await page.evaluate(() => {
+    const el = document.querySelector('.check-line input[type=checkbox]');
+    const s = getComputedStyle(el);
+    return { w: el.getBoundingClientRect().width, appearance: s.appearance, img: s.backgroundImage };
+  });
+  ok(cb.w < 40, `a checkbox is still checkbox-sized (${Math.round(cb.w)}px)`);
+  ok(cb.img === "none", "and carries no dropdown chevron");
+  await page.click("#modalCancel");
+
+  // Headings tighten as they grow; uppercase micro-labels open up.
+  const track = await page.evaluate(() => {
+    const h1 = document.querySelector(".page-head h1");
+    const eyebrow = document.querySelector(".eyebrow");
+    const px = (el, p) => parseFloat(getComputedStyle(el)[p]);
+    return { h1: px(h1, "letterSpacing") / px(h1, "fontSize"),
+             eye: px(eyebrow, "letterSpacing") / px(eyebrow, "fontSize") };
+  });
+  ok(track.h1 < -0.02, `headings are tracked tight (${track.h1.toFixed(3)}em)`);
+  ok(track.eye > 0.04, `uppercase labels are tracked open (${track.eye.toFixed(3)}em)`);
+
+  const nums = await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".metric-value")).fontVariantNumeric);
+  ok(/tabular-nums/.test(nums), "figures are tabular so columns of numbers line up");
+}
 
 section("Palette is MA-DOCPORTAL's, not invented");
 const tok = await page.evaluate(() => {

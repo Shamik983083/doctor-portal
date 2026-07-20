@@ -25,11 +25,34 @@
 }
 *{box-sizing:border-box}
 html{background:var(--bg)}
+/* Type. MA names Inter first but never self-hosts it, so in practice it falls
+   through to the platform UI face. Putting -apple-system first makes that
+   explicit: SF Pro on Apple, Segoe UI on Windows, which is the look Devin asked
+   for. Optical sizing, tabular numerals in data, and the tightened tracking on
+   headings are the parts that actually read as "Apple" rather than the family
+   name alone. */
 body{
   margin:0; color:var(--ink);
   background:radial-gradient(circle at top left,#fff 0,var(--bg) 42%,#f3f6fb 100%);
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  font-size:15px; line-height:1.5;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",Inter,ui-sans-serif,system-ui,sans-serif;
+  font-size:15px; line-height:1.47; letter-spacing:-.006em;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+  font-variant-numeric:tabular-nums;
+}
+/* Display face for headings, and progressively tighter tracking as size grows,
+   which is the single biggest tell of the Apple type ramp. */
+h1,h2,h3,.metric-value,.brand-text{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display","Segoe UI",Inter,sans-serif;
+}
+h1{letter-spacing:-.032em}
+h2{letter-spacing:-.024em}
+h3{letter-spacing:-.016em}
+/* Numbers in tables, metrics and counts align in columns. */
+.tbl td,.review-grid td,.metric-value,.nav-count,.months-grid select{font-variant-numeric:tabular-nums}
+/* Uppercase micro-labels need tracking OPENED, not tightened. */
+.eyebrow,.kicker,.subheading,.field label,.months-head label,.rx-meta dt,.tbl th,.review-grid th,.nav-section{
+  letter-spacing:.055em;
 }
 a{color:inherit;text-decoration:none}
 button,input,select{font:inherit}
@@ -209,9 +232,21 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .review-grid tr.selected-row td.pin{background:#f2f6ff}
 /* Compact density. Twenty columns need ~2017px; collapsing the rail only buys
    196px, so on a 1440 screen six columns stay off-screen either way. This trades
-   padding and type size for columns, and is a toggle rather than the default so
-   MA parity stays the baseline. */
+   padding and type size for columns.
+
+   Collapsing the rail now switches the grid into compact automatically, which is
+   what "closing the toolbar should expand it" actually has to mean: the reclaimed
+   196px is worth two columns on its own, and worth six once the padding shrinks
+   with it. Ticking Compact by hand still works independently. */
+.app.collapsed .review-grid,
 .review-grid.compact{min-width:0}
+.app.collapsed .review-grid th{padding:8px 7px;font-size:9.5px}
+.app.collapsed .review-grid td{padding:7px 7px;font-size:11.5px}
+.app.collapsed .review-grid .pin-select{min-width:34px;width:34px}
+.app.collapsed .review-grid .pin-triage{left:34px;min-width:74px;width:74px}
+.app.collapsed .review-grid .pin-time{left:108px;min-width:82px;width:82px}
+.app.collapsed .review-grid .pin-name{left:190px;min-width:132px;width:132px}
+.app.collapsed .review-grid .batch-reason{max-width:150px;font-size:10px}
 .review-grid.compact th{padding:8px 7px;font-size:9.5px}
 .review-grid.compact td{padding:7px 7px;font-size:11.5px}
 .review-grid.compact .pin-triage{left:34px;min-width:74px;width:74px}
@@ -264,15 +299,31 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .field{display:grid;gap:6px}
 .field label{font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .field label .req{color:var(--red)}
-.field select,.field input[type=text]{
+/* Controls inherit the page face rather than the browser default, which is what
+   makes a form stop looking like a form and start looking like the product. */
+/* Text-entry controls only. A bare `.modal input` here also caught the
+   checkboxes and painted them as full-width dropdowns with a chevron. */
+.field select,.field input[type=text],.modal select,.modal input[type=text]{
   width:100%;padding:10px 11px;border-radius:10px;border:1px solid var(--line-strong);
-  background:#fff;font-size:13px;color:var(--ink);
+  background:#fff;font-size:13px;color:var(--ink);font-family:inherit;letter-spacing:inherit;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23647188' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:11px;padding-right:32px;
 }
+.field select:focus-visible,.decision-btn:focus-visible,.button-primary:focus-visible,
+.button-secondary:focus-visible,.med-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.field input[type=checkbox],.check-line input,.select-all input,.density input{accent-color:var(--accent)}
 .field select:disabled{background:#f4f6fa;color:var(--soft-muted)}
 .field.bad select{border-color:#e6a29c;background:#fff8f7}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .check-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink)}
 .term-warn{font-size:11.5px;color:var(--yellow);margin:0}
+.months{display:grid;gap:8px}
+.months-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.months-head label{font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.months-note{font-size:11.5px;color:var(--soft-muted)}
+.months-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.months-grid .field label{font-size:11px;color:var(--accent-ink);font-weight:780}
 .modal-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 22px;border-top:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap}
 .foot-status{font-size:12px;color:var(--muted)}
 .foot-status strong{color:var(--ink)}
@@ -533,6 +584,76 @@ const QUEUE = [
                    identityVerified:"Yes (storefront verification passed)"} }
 ];
 
+/* ---------------------------------------------------------------------------
+   Routing attributes. Every clinician screen is the SAME grid over a different
+   slice of these rows, so a case can only appear in a bucket it genuinely
+   belongs to. Derived where the row already implies the answer (video holds,
+   triage) and declared where it does not (assignment, SLA, support).
+   --------------------------------------------------------------------------- */
+const ROUTING = {
+  "demo-001": { mine:false, sla:"ok",       support:true,  escalated:false },
+  "demo-002": { mine:false, sla:"due",      support:false, escalated:false },
+  "demo-003": { mine:false, sla:"due",      support:false, escalated:false },
+  "demo-004": { mine:false, sla:"breached", support:false, escalated:true  },
+  "demo-005": { mine:false, sla:"breached", support:false, escalated:false },
+  "demo-006": { mine:true,  sla:"ok",       support:false, escalated:false },
+  "demo-007": { mine:true,  sla:"ok",       support:false, escalated:false },
+  "demo-008": { mine:true,  sla:"due",      support:true,  escalated:false },
+  "demo-009": { mine:true,  sla:"ok",       support:false, escalated:false }
+};
+
+/* A compact factory for the extra rows. The five ported from MA's fixtures stay
+   written out in full above; these exist so the filtered views have enough to
+   show, and they carry the same shape so the drawer renders identically. */
+function mkRow(o){
+  const tone = o.triage === "Green" ? "green" : o.triage === "Yellow" ? "yellow" : "red";
+  return {
+    id:o.id, queue:o.queue, product:o.product, name:o.name, idv:o.idv || "Y", sex:o.sex, age:o.age,
+    bmi:o.bmi, onGlp:o.onGlp || "N", term:o.term, dose:o.dose, plan:o.plan || "Titration",
+    med2:o.med2 || "-", med3:"-", med4:"-", company:o.company,
+    allergy:o.allergy || "N", allergyDetail:o.allergyDetail || null, zofran:o.med2 === "Zofran" ? "Y" : "N",
+    triage:o.triage, video:o.video || "Clear", batch:o.batch,
+    batchReason:o.batchReason || null, holds:o.holds || [],
+    protocolVersion:"GLP-1 protocol v8",
+    findings:o.findings || [[tone, o.reason || "Triage classification "+o.triage+"."]],
+    summary:[
+      ["Requested regimen: "+o.term+" term, dose "+o.dose+", plan "+(o.plan||"Titration")+".",
+       ["requestedTerm","requestedDoseLevel","dosePlan"]],
+      ["Currently on GLP-1 therapy: "+(o.onGlp === "Y" ? "yes" : "no")+
+       (o.med2 && o.med2 !== "-" ? "; additional medication requests: "+o.med2+"." : "; no additional medication requests."),
+       ["currentlyOnGlp","additionalMedications"]],
+      ["Triage classification: "+o.triage.toUpperCase()+" (protocol version 8).", []]
+    ],
+    sourceAnswers:{
+      requestedTerm:TERM_TEXT[o.term], requestedDoseLevel:o.dose, dosePlan:o.plan || "Titration",
+      currentlyOnGlp:o.onGlp === "Y" ? "Yes" : "No",
+      additionalMedications:(o.med2 && o.med2 !== "-") ? o.med2 : "None",
+      concerningAllergies:o.allergy === "Y" ? "Yes" : "No",
+      identityVerified:(o.idv || "Y") === "Y" ? "Yes (storefront verification passed)" : "No"
+    }
+  };
+}
+const TERM_TEXT = { "1M":"1 month", "3M":"3 months", "4M":"4 months" };
+
+QUEUE.push(
+  mkRow({ id:"demo-006", queue:"2h 05m", product:"Semaglutide", name:"Noor Haddad", sex:"F", age:46, bmi:30.6,
+    term:"3M", dose:"L2 · 5 mg", company:"Vitality Direct", triage:"Yellow", batch:"Review",
+    batchReason:"Yellow triage · allergy flag needs review", allergy:"Y",
+    allergyDetail:"Reports rash after sulfa drugs; documented at intake.",
+    reason:"Allergy flag requires provider review." }),
+  mkRow({ id:"demo-007", queue:"2h 41m", product:"Tirzepatide", name:"Sam Okafor", sex:"M", age:48, bmi:34.2,
+    term:"4M", dose:"L2 · 5 mg", med2:"Zofran", company:"Meridian Wellness", triage:"Green", batch:"Eligible",
+    reason:"Requested dose matches the current protocol titration step." }),
+  mkRow({ id:"demo-008", queue:"3h 12m", product:"Semaglutide", name:"Devon Park", sex:"F", age:58, bmi:28.9,
+    term:"3M", dose:"L1 · 2.5 mg", company:"Northstar Health", triage:"Red", batch:"Blocked",
+    batchReason:"Red hard stop · thyroid cancer history",
+    findings:[["red","Thyroid cancer history is an absolute contraindication."],
+              ["red","Red triage classification blocks batch submission."]] }),
+  mkRow({ id:"demo-009", queue:"4h 20m", product:"Tirzepatide", name:"Ari Delgado", sex:"M", age:35, bmi:31.9,
+    term:"1M", dose:"L1 · 2.5 mg", company:"Northstar Health", triage:"Green", batch:"Eligible",
+    reason:"Clean intake, no flags raised." })
+);
+
 const ELIGIBLE_IDS = QUEUE.filter(r => r.batch === "Eligible").map(r => r.id);
 const batchTone = (b) => b === "Eligible" ? "green" : b === "Review" ? "yellow" : "red";
 
@@ -548,6 +669,7 @@ const batchTone = (b) => b === "Eligible" ? "green" : b === "Review" ? "yellow" 
    mismatch rather than a clinical one.
    --------------------------------------------------------------------------- */
 const TERMS = ["1M","3M","4M"];
+const monthsIn = (term) => Number(String(term).replace("M","")) || 1;
 const TERM_LABEL = { "1M":"1 month", "3M":"3 months", "4M":"4 months" };
 const DOSAGES = {
   Semaglutide: ["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg"],
@@ -705,53 +827,34 @@ const VIEWS = {
              ["Batch-ready","42","Green triage with no active workflow hold"],
              ["Yellow review","6","Needs clinician review or follow-up"],
              ["Video visit holds","2","Active synchronous-video holds in my queue"]],
-    queue:true
+    queue:(r) => !ROUTING[r.id].mine
   },
-  "clin.mycases": {
-    eyebrow:"Clinician", title:"My Cases", sub:"Cases assigned to you, in progress and completed.",
-    table:{title:"Assigned to me", cols:["Patient","Triage","Offerings","Company","Submitted","Status"], rows:[
-      ["Riley Chen",P("Green","pill green"),"Tirzepatide","Vitality Direct","38 min ago",P("In review","pill yellow")],
-      ["Sam Okafor",P("Green","pill green"),"Semaglutide","Meridian Wellness","2 hr ago",P("Approved","pill green")],
-      ["Ari Delgado",P("Yellow","pill yellow"),"NAD+","Northstar Health","Yesterday",P("Approved","pill green")]
-    ]}
-  },
-  "clin.messages":{eyebrow:"Tasks", title:"Messages For Provider", sub:"Storefront and patient messages waiting on a reply from you.",
+  /* Same grid, same drawer, same approval modal. Only the slice changes.
+     Messages is the one screen that is genuinely a different thing. */
+  "clin.mycases":{eyebrow:"Tasks", title:"My Cases", sub:"Cases assigned to you. Same grid, filtered to yours.",
+    queue:(r) => ROUTING[r.id].mine},
+  "clin.escalations":{eyebrow:"Tasks", title:"My Escalations", sub:"Escalated to you and waiting on a decision.",
+    queue:(r) => ROUTING[r.id].escalated},
+  "clin.sla.breach":{eyebrow:"Priority", title:"SLA breached", sub:"Past the review deadline. Clear these first.",
+    queue:(r) => ROUTING[r.id].sla === "breached"},
+  "clin.sla.due":{eyebrow:"Priority", title:"Approaching deadline", sub:"Inside the warning window before the review deadline.",
+    queue:(r) => ROUTING[r.id].sla === "due"},
+  "clin.hold.video":{eyebrow:"Priority", title:"Video visit required", sub:"Held on a synchronous video visit. Operational, not clinical.",
+    queue:(r) => r.video === "Required"},
+  "clin.support.open":{eyebrow:"Priority", title:"Support thread open", sub:"Cases with an open support conversation attached.",
+    queue:(r) => ROUTING[r.id].support},
+  "clin.triage.red":{eyebrow:"Triage", title:"Red", sub:"Hard stops. These cannot be batched and need a decision.",
+    queue:(r) => r.triage === "Red"},
+  "clin.triage.yellow":{eyebrow:"Triage", title:"Yellow", sub:"Needs clinician review before it can move.",
+    queue:(r) => r.triage === "Yellow"},
+  "clin.triage.green":{eyebrow:"Triage", title:"Green", sub:"Clean intake. Batch-eligible unless an operational hold applies.",
+    queue:(r) => r.triage === "Green"},
+
+  "clin.messages":{eyebrow:"Tasks", title:"Messages For Provider", sub:"The one screen that is not the case grid. Storefront and patient messages waiting on a reply.",
     table:{title:"Awaiting reply", cols:["Patient","From","Message","Case","Waiting"], rows:[
       ["Jordan Ellis","Northstar Health","Patient asking about the video visit slot","demo-002","22 min"],
       ["Casey Rivera","Meridian Wellness","Storefront query on the identity check","demo-004","1 hr"],
       ["Avery Morgan","Patient","Question about the nausea medication","demo-001","3 hr"]]}},
-  "clin.escalations":{eyebrow:"Tasks", title:"My Escalations", sub:"Cases escalated to you that need a decision.",
-    table:{title:"Escalated", cols:["Patient","Reason","Raised by","Triage","Waiting"], rows:[
-      ["Casey Rivera","Identity not verified, storefront disputes","Meridian Wellness",P("Red","pill red"),"1 hr"]]}},
-  "clin.sla.breach":{eyebrow:"Priority", title:"SLA breached", sub:"Past the review deadline. These are the ones to clear first.",
-    table:{title:"Breached", cols:["Patient","Triage","In queue","Deadline","Storefront"], rows:[
-      ["Morgan Blake",P("Green","pill green"),"1h 24m",P("Breached","pill red"),"Vitality Direct"],
-      ["Casey Rivera",P("Red","pill red"),"1h 07m",P("Breached","pill red"),"Meridian Wellness"]]}},
-  "clin.sla.due":{eyebrow:"Priority", title:"Approaching deadline", sub:"Inside the warning window before the review deadline.",
-    table:{title:"Due soon", cols:["Patient","Triage","In queue","Time left","Storefront"], rows:[
-      ["Riley Chen",P("Green","pill green"),"42m",P("4 hr","pill yellow"),"Vitality Direct"],
-      ["Jordan Ellis",P("Yellow","pill yellow"),"28m",P("6 hr","pill yellow"),"Northstar Health"]]}},
-  "clin.hold.video":{eyebrow:"Priority", title:"Video visit required", sub:"Blocked on a synchronous video visit, an operational hold rather than a clinical one.",
-    table:{title:"Held", cols:["Patient","Triage","Hold","Scheduled","Storefront"], rows:[
-      ["Jordan Ellis",P("Yellow","pill yellow"),"SYNCHRONOUS_VIDEO_VISIT_REQUIRED",P("Not booked","pill red"),"Northstar Health"],
-      ["Morgan Blake",P("Green","pill green"),"SYNCHRONOUS_VIDEO_VISIT_REQUIRED",P("Tomorrow 2pm","pill green"),"Vitality Direct"]]}},
-  "clin.support.open":{eyebrow:"Priority", title:"Support thread open", sub:"Cases with an open support conversation attached.",
-    table:{title:"Open threads", cols:["Patient","Opened by","Subject","Case","Age"], rows:[
-      ["Jordan Avery","Northstar Health","Dose change requested after submission","demo-001","14 min"]]}},
-  "clin.triage.red":{eyebrow:"Triage", title:"Red", sub:"Hard stops. These cannot be batched and need a provider decision.",
-    table:{title:"Red cases", cols:["Patient","Reason","In queue","Storefront"], rows:[
-      ["Casey Rivera","Identity not verified","1h 07m","Meridian Wellness"],
-      ["Devon Park","Thyroid cancer history","2h 11m","Northstar Health"],
-      ["Sam Okafor","BMI below threshold","3h 40m","Vitality Direct"]]}},
-  "clin.triage.yellow":{eyebrow:"Triage", title:"Yellow", sub:"Needs clinician review before it can move.",
-    table:{title:"Yellow cases", cols:["Patient","Reason","In queue","Storefront"], rows:[
-      ["Jordan Ellis","Dose hold while on active GLP-1","28m","Northstar Health"],
-      ["Noor Haddad","Allergy flag needs review","1h 02m","Vitality Direct"]]}},
-  "clin.triage.green":{eyebrow:"Triage", title:"Green", sub:"Clean intake. Batch-eligible unless an operational hold applies.",
-    table:{title:"Green cases", cols:["Patient","In queue","Batch","Storefront"], rows:[
-      ["Avery Morgan","11m",P("Eligible","pill green"),"Northstar Health"],
-      ["Riley Chen","42m",P("Eligible","pill green"),"Vitality Direct"],
-      ["Morgan Blake","1h 24m",P("Blocked","pill red"),"Vitality Direct"]]}},
   "clin.notifications":{eyebrow:"Clinician", title:"Notifications", sub:"Case assignments, SLA warnings and support requests.",
     table:{title:"Recent", cols:["Type","Message","When"], rows:[
       [P("SLA","pill yellow"),"Case for Jordan Avery approaching the 24h deadline","20 min ago"],
@@ -876,7 +979,11 @@ function openApproval(rowId){
     decisions[m.key] = {
       decision:null, product:m.primary ? m.name+"-"+m.term : m.name,
       medication:m.name, dosage:m.dose || "", custom:false,
-      freq:m.primary ? "Weekly" : "", term:m.term, startToday:true, refills:"0"
+      freq:m.primary ? "Weekly" : "", term:m.term, startToday:true, refills:"0",
+      // One dose per month for a multi-month term. Month 1 seeds from the
+      // requested dose; later months are the provider's titration decision and
+      // start empty so nothing is assumed on their behalf.
+      months:[m.dose || ""]
     };
   }
   activeMed = requestedMeds(row)[0].key;
@@ -888,7 +995,12 @@ function medComplete(m){
   const d = decisions[m.key];
   if(!d || !d.decision) return false;
   if(d.decision !== "approve") return true;
-  return Boolean(d.medication && d.dosage && d.freq && d.term && d.refills !== "");
+  // Every month of a multi-month term needs its own dose. A 3M script with
+  // months 2 and 3 blank is not a prescription, and silently repeating month 1
+  // would invent a titration the provider never chose.
+  const n = monthsIn(d.term);
+  for(let i = 0; i < n; i++) if(!d.months[i]) return false;
+  return Boolean(d.medication && d.freq && d.term && d.refills !== "");
 }
 function approvalReady(row){
   return requestedMeds(row).every(medComplete);
@@ -910,10 +1022,19 @@ const QUEUE_COLS = ["Triage","Time in Queue","Full Name","ID Verified","Sex","Ag
   "Req Dose","Titration or Hold","Medication 2 Req","Medication 3 Req","Medication 4 Req","Company",
   "Concerning Allergies","Standing Zofran","Video Visit","Batch Eligibility"];
 
-function renderQueue(){
-  const sel = onlyEligible(selected);
-  const allSel = ELIGIBLE_IDS.length > 0 && ELIGIBLE_IDS.every((id) => sel.includes(id));
-  const blocked = QUEUE.length - ELIGIBLE_IDS.length;
+function renderQueue(filter){
+  // The rows on screen for THIS view. Everything below counts against these,
+  // never the whole queue, so "2 batch-eligible" means two of what you can see.
+  const rows = QUEUE.filter(typeof filter === "function" ? filter : () => true);
+  const eligibleHere = rows.filter((r) => r.batch === "Eligible").map((r) => r.id);
+  const sel = onlyEligible(selected).filter((id) => eligibleHere.includes(id));
+  const allSel = eligibleHere.length > 0 && eligibleHere.every((id) => sel.includes(id));
+  const blocked = rows.length - eligibleHere.length;
+
+  if(rows.length === 0){
+    return '<section class="panel"><div class="stub"><strong>Nothing in this queue</strong>'
+      + 'No case currently matches this filter.</div></section>';
+  }
 
   let h = '<section class="panel queue-panel">'
     + '<div class="panel-heading"><div><div class="eyebrow">Provider review queue</div>'
@@ -923,7 +1044,7 @@ function renderQueue(){
     + '<button class="button-primary" id="preflight"'+(sel.length===0?" disabled":"")+'>Run batch preflight ('+sel.length+')</button>'
     + '</div></div>'
     + '<div class="queue-toolbar"><div class="queue-count"><strong>'+sel.length+'</strong> selected · '
-    + '<span>'+ELIGIBLE_IDS.length+' batch-eligible · '+blocked+' rows blocked from selection</span></div>'
+    + '<span>'+eligibleHere.length+' batch-eligible · '+blocked+' rows blocked from selection</span></div>'
     + '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">'
     + '<label class="density"><input type="checkbox" id="compact"'+(compact?" checked":"")+' /> Compact columns</label>'
     + '<label class="select-all"><input type="checkbox" id="selectAll"'+(allSel?" checked":"")+' /> Select batch-eligible Green cases</label>'
@@ -934,7 +1055,7 @@ function renderQueue(){
     + QUEUE_COLS.slice(3).map((c) => '<th>'+c+'</th>').join("")
     + '</tr></thead><tbody>';
 
-  for(const r of QUEUE){
+  for(const r of rows){
     const eligible = r.batch === "Eligible";
     const reason = r.batchReason || "Not batch eligible";
     h += '<tr data-row="'+r.id+'"'+(drawerId===r.id?' class="selected-row"':'')+'>'
@@ -975,7 +1096,9 @@ function renderQueue(){
   }
   h += '</section>';
 
-  const d = QUEUE.find((r) => r.id === drawerId);
+  // The drawer must show a case that is actually in this view. Switching views
+  // otherwise leaves the previous view's patient open underneath the new grid.
+  const d = rows.find((r) => r.id === drawerId) || rows[0];
   if(d) h += renderDrawer(d);
   h += renderApproval();
   return h;
@@ -986,6 +1109,29 @@ const sel = (name, value, opts, extra) =>
   + (value ? "" : '<option value="">Select...</option>')
   + opts.map((o) => '<option'+(o===value?" selected":"")+'>'+esc(o)+'</option>').join("")
   + '</select>';
+
+/* A 1M term keeps a single Dosage field. A 3M or 4M term becomes one dose per
+   month (M1..Mn), because that IS the titration: the whole point of a multi
+   month script is that the strength changes as it goes. */
+function renderDoseFields(d, approving, dis){
+  const opts = DOSAGES[d.medication] || [];
+  const n = monthsIn(d.term);
+  const bad = (v) => approving && !v ? " bad" : "";
+
+  if(n === 1){
+    return '<div class="field'+bad(d.months[0])+'"><label>Dosage <span class="req">*</span></label>'
+      + sel("month0", d.months[0] || "", opts, dis) + '</div>';
+  }
+
+  let h = '<div class="months"><div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
+    + '<span class="months-note">'+n+' month term, one dose per month</span></div>'
+    + '<div class="months-grid">';
+  for(let i = 0; i < n; i++){
+    h += '<div class="field'+bad(d.months[i])+'"><label>M'+(i+1)+'</label>'
+      + sel("month"+i, d.months[i] || "", opts, dis) + '</div>';
+  }
+  return h + '</div></div>';
+}
 
 function renderApproval(){
   if(!approvalFor) return "";
@@ -1054,8 +1200,7 @@ function renderApproval(){
     + sel("product", d.product, [d.product].filter(Boolean), dis) + '</div>'
     + '<div class="field'+bad(d.medication)+'"><label>Medication <span class="req">*</span></label>'
     + sel("medication", d.medication, Object.keys(DOSAGES), dis) + '</div>'
-    + '<div class="field'+bad(d.dosage)+'"><label>Dosage <span class="req">*</span></label>'
-    + sel("dosage", d.dosage, DOSAGES[d.medication] || [], dis) + '</div>'
+    + renderDoseFields(d, approving, dis)
     + '<label class="check-line"><input type="checkbox" data-f="custom"'+(d.custom?" checked":"")+dis+' /> Use custom dosage</label>'
     + '<div class="field-row">'
     + '<div class="field'+bad(d.freq)+'"><label>Administration frequency <span class="req">*</span></label>'
@@ -1152,7 +1297,7 @@ function renderView(){
     ).join("") + '</div>';
   }
 
-  if(v.queue){ h += renderQueue(); }
+  if(v.queue){ h += renderQueue(v.queue); }
 
   if(v.doc){
     h += '<div class="panel"><div class="panel-heading"><div><h2>Endpoints</h2>'
@@ -1250,12 +1395,23 @@ document.getElementById("view").addEventListener("change", (e) => {
   const d = decisions[activeMed];
   if(e.target.type === "checkbox"){ d[f] = e.target.checked; }
   else if(f === "term"){
-    const hit = TERMS.find((t) => TERM_LABEL[t] === e.target.value);
-    d.term = hit || e.target.value;
+    const hit = TERMS.find((t) => TERM_LABEL[t] === e.target.value) || e.target.value;
+    d.term = hit;
+    // Shrinking the term drops the months that no longer exist; growing it adds
+    // empty ones rather than back-filling a dose the provider never picked.
+    d.months = d.months.slice(0, monthsIn(hit));
+    while(d.months.length < monthsIn(hit)) d.months.push("");
+  }
+  else if(f.startsWith("month")){
+    d.months[Number(f.slice(5))] = e.target.value;
   }
   else {
     d[f] = e.target.value;
-    if(f === "medication" && !(DOSAGES[e.target.value] || []).includes(d.dosage)) d.dosage = "";
+    // A dose from the previous drug is not a valid dose for the new one.
+    if(f === "medication"){
+      const ok = DOSAGES[e.target.value] || [];
+      d.months = d.months.map((x) => ok.includes(x) ? x : "");
+    }
   }
   renderView();
 });
