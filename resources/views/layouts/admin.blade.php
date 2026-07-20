@@ -144,6 +144,10 @@
            href="{{ route('admin.triage-rules.index') }}">
             <i class="bi bi-funnel"></i> Triage Rule Set
         </a>
+        <a class="nav-link {{ request()->routeIs('admin.routing.*') ? 'active' : '' }}"
+           href="{{ route('admin.routing.index') }}">
+            <i class="bi bi-diagram-3"></i> Case Routing
+        </a>
 
     </div>
     @endrole

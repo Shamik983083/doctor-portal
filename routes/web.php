@@ -239,6 +239,14 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::patch('/{triageRule}/toggle', [AdminTriageRuleController::class, 'toggleActive'])->name('toggle');
     });
 
+    // Case routing policy. Decides which doctor sees which patient, so it sits
+    // with the other super-admin configuration.
+    Route::prefix('routing')->name('routing.')->group(function () {
+        Route::get('/',  [\App\Http\Controllers\Web\Admin\RoutingPolicyController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Web\Admin\RoutingPolicyController::class, 'store'])->name('store');
+        Route::post('/{id}/activate', [\App\Http\Controllers\Web\Admin\RoutingPolicyController::class, 'activate'])->name('activate');
+    });
+
     }); // end super-admin-only integration and configuration group
 
     // Admin Users (Super Admin only)
