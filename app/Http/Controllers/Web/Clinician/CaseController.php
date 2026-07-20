@@ -12,7 +12,9 @@ use App\Models\PatientCase;
 use App\Models\PatientFile;
 use App\Models\User;
 use App\Notifications\NewCaseMessage;
+use App\Services\AiAssistService;
 use App\Services\CaseStateMachine;
+use App\Services\EhrRecordService;
 use App\Services\FileUploadService;
 use App\Services\PharmacyDispatchService;
 use App\Services\PrescriptionDocumentService;
@@ -31,6 +33,8 @@ class CaseController extends Controller
         private FileUploadService           $fileUploader,
         private PrescriptionDocumentService $prescriptionDocuments,
         private PharmacyDispatchService     $pharmacyDispatch,
+        private EhrRecordService            $ehrRecords,
+        private AiAssistService             $aiAssist,
     ) {}
 
     public function queue(Request $request)
@@ -330,15 +334,28 @@ class CaseController extends Controller
 
     public function approve(Request $request, string $uuid)
     {
-        $request->validate(['note' => 'nullable|string']);
+        $request->validate([
+            'note'                  => 'nullable|string',
+            'decisions'             => 'nullable|array',
+            'decisions.*.name'      => 'required_with:decisions|string|max:255',
+            'decisions.*.decision'  => 'required_with:decisions|in:approve,deny,none',
+            'decisions.*.term'      => 'nullable|string|max:60',
+            'decisions.*.frequency' => 'nullable|string|max:60',
+            'decisions.*.months'    => 'nullable|array',
+            'decisions.*.months.*'  => 'nullable|string|max:60',
+            'decisions.*.refills'   => 'nullable|string|max:10',
+        ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
         $clinician = Auth::user()->clinician;
+        $decisions = $request->input('decisions', []);
 
         $this->stateMachine->approve($case, $clinician->id);
 
+        $note = null;
+
         if ($request->note) {
-            ClinicalNote::create([
+            $note = ClinicalNote::create([
                 'case_id' => $case->id,
                 'clinician_id' => $clinician->id,
                 'type' => 'approval',
@@ -348,7 +365,58 @@ class CaseController extends Controller
 
         // case_approved webhook is fired by the state machine transition above.
 
+        /*
+         * Hand the approved case and the provider's OWN note to the EHR seam.
+         *
+         * Best-effort and fully feature-flagged, exactly like the pharmacy
+         * dispatch above it: with the shipped defaults this builds the payload
+         * and stores it as a preview without sending anything. A failure here
+         * must never undo a clinical decision the provider has already made, so
+         * it is caught and logged rather than allowed to break the approval.
+         *
+         * The note passed on is the persisted ClinicalNote, which by definition
+         * has been through the provider's hands. An AI draft they never accepted
+         * cannot reach an EHR by this path.
+         */
+        try {
+            $this->ehrRecords->recordApproval($case->fresh(), $note, $decisions);
+        } catch (\Throwable $e) {
+            Log::error('EHR record build/push failed', [
+                'case_id' => $case->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
+
         return redirect()->route('clinician.cases.show', $uuid)->with('success', 'Case approved.');
+    }
+
+    /**
+     * Draft the clinical note for this case with AI assist.
+     *
+     * Returns the draft to the caller and persists NOTHING. The provider edits
+     * it and submits it through approve() like any other note, which is what
+     * keeps a human between the model and the chart.
+     */
+    public function draftNote(Request $request, string $uuid)
+    {
+        $request->validate([
+            'provider_text' => 'nullable|string',
+            'decisions'     => 'nullable|array',
+        ]);
+
+        $case = PatientCase::with(['patient', 'partner'])->where('uuid', $uuid)->firstOrFail();
+
+        $draft = $this->aiAssist->draftClinicalNote(
+            $case,
+            $request->input('decisions', []),
+            $request->input('provider_text')
+        );
+
+        return response()->json([
+            'text'   => $draft['text'],
+            'source' => $draft['source'],   // 'model' or 'local', so the UI can be honest about which
+            'notice' => $draft['notice'],
+        ]);
     }
 
     public function cancel(Request $request, string $uuid)
