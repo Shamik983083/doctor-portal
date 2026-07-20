@@ -59,6 +59,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('
 
     Route::prefix('cases')->name('cases.')->group(function () {
         Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
+        Route::get('/my-cases', [ClinicianCaseController::class, 'myCases'])->name('my-cases');
         Route::get('/{uuid}', [ClinicianCaseController::class, 'show'])->name('show');
         Route::post('/{uuid}/assign', [ClinicianCaseController::class, 'assign'])->name('assign');
         Route::get('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribeForm'])->name('prescribe.form');

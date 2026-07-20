@@ -8,8 +8,13 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ request()->routeIs('clinician.queue') || request()->routeIs('clinician.cases.*') ? 'active' : '' }}" href="{{ route('clinician.queue') }}">
+        <a class="nav-link {{ request()->routeIs('clinician.queue') || (request()->routeIs('clinician.cases.*') && !request()->routeIs('clinician.cases.my-cases')) ? 'active' : '' }}" href="{{ route('clinician.queue') }}">
             <i class="bi bi-inbox"></i> Case Queue
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases') }}">
+            <i class="bi bi-folder2-open"></i> My Cases
         </a>
     </li>
 </ul>

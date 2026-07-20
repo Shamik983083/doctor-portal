@@ -132,6 +132,45 @@ class CaseController extends Controller
         ));
     }
 
+    public function myCases(Request $request)
+    {
+        $clinician   = Auth::user()->clinician;
+        $tab         = $request->get('tab', 'active');
+
+        $activeStatuses    = ['waiting', 'assigned', 'support', 'approved', 'processing'];
+        $completedStatuses = ['completed'];
+        $cancelledStatuses = ['cancelled'];
+
+        $base = PatientCase::with(['patient', 'partner', 'caseOfferings.offering'])
+            ->withCount(['messages as unread_messages_count' => fn ($q) =>
+                $q->where('direction', 'inbound')->where('is_read', false)
+            ])
+            ->when($request->filled('search'), fn ($q) =>
+                $q->whereHas('patient', fn ($p) =>
+                    $p->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ['%'.$request->search.'%'])
+                )
+            )
+            ->when($request->filled('triage'), fn ($q) => $q->where('triage', $request->triage));
+
+        $counts = [
+            'active'    => (clone $base)->whereIn('status', $activeStatuses)->count(),
+            'completed' => (clone $base)->whereIn('status', $completedStatuses)->count(),
+            'cancelled' => (clone $base)->whereIn('status', $cancelledStatuses)->count(),
+            'all'       => (clone $base)->count(),
+        ];
+
+        $cases = (clone $base)
+            ->when($tab === 'active',    fn ($q) => $q->whereIn('status', $activeStatuses))
+            ->when($tab === 'completed', fn ($q) => $q->whereIn('status', $completedStatuses))
+            ->when($tab === 'cancelled', fn ($q) => $q->whereIn('status', $cancelledStatuses))
+            ->orderByRaw("FIELD(status, 'waiting','support','assigned','approved','processing','completed','cancelled')")
+            ->orderBy('created_at', 'desc')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('clinician.cases.my-cases', compact('cases', 'clinician', 'counts', 'tab'));
+    }
+
     public function show(string $uuid)
     {
         $case = PatientCase::with([
