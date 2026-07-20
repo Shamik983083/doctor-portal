@@ -8,6 +8,7 @@ use App\Models\CaseEvent;
 use App\Models\User;
 use App\Notifications\CaseAssigned;
 use App\Notifications\CaseCompleted;
+use App\Notifications\ClinicianCaseAssigned;
 use App\Notifications\NewCaseSubmitted;
 use App\Services\WebhookDispatcher;
 use App\Services\CaseAutoAssigner;
@@ -226,6 +227,18 @@ class CaseStateMachine
             );
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Admin notification failed: ' . $e->getMessage());
+        }
+
+        // Notify the assigned clinician when a case is assigned to them
+        if ($toStatus === PatientCase::STATUS_ASSIGNED) {
+            try {
+                $case->loadMissing(['clinician.user']);
+                if ($case->clinician?->user) {
+                    $case->clinician->user->notify(new ClinicianCaseAssigned($case));
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Clinician assignment notification failed: ' . $e->getMessage());
+            }
         }
     }
 }

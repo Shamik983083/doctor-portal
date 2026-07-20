@@ -18,6 +18,7 @@ use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeli
 use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Web\Admin\TriageRuleController as AdminTriageRuleController;
 use App\Http\Controllers\Web\Admin\NotificationController as AdminNotificationController;
+use App\Http\Controllers\Web\Clinician\NotificationController as ClinicianNotificationController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
 use App\Http\Controllers\Web\MaPortalController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
@@ -81,6 +82,10 @@ Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name(
     });
 
     Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
+
+    Route::get('/notifications', [ClinicianNotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [ClinicianNotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [ClinicianNotificationController::class, 'markAllRead'])->name('notifications.read-all');
 });
 
 // Admin Console

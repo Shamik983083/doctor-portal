@@ -234,8 +234,16 @@
             </div>
             <div class="d-flex align-items-center gap-2 gap-sm-3">
 
-                {{-- Notification bell — admin/super_admin only --}}
-                @if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin']))
+                {{-- Notification bell — admin/super_admin/clinician --}}
+                @if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin','clinician']))
+                @php
+                    $notifBase = Auth::user()->hasAnyRole(['admin','super_admin'])
+                        ? '/admin/notifications'
+                        : '/clinician/notifications';
+                    $notifViewAllRoute = Auth::user()->hasAnyRole(['admin','super_admin'])
+                        ? route('admin.notifications.index')
+                        : route('clinician.notifications.index');
+                @endphp
                 <div class="dropdown" id="notifDropdownWrap">
                     <button class="btn btn-sm notif-bell-btn position-relative"
                             id="notifBellBtn"
@@ -264,7 +272,7 @@
 
                         {{-- Panel footer --}}
                         <div class="notif-panel-footer text-center">
-                            <a href="{{ route('admin.notifications.index') }}" class="text-muted small" style="text-decoration:none;">View all notifications</a>
+                            <a href="{{ $notifViewAllRoute }}" class="text-muted small" style="text-decoration:none;">View all notifications</a>
                         </div>
                     </div>
                 </div>
@@ -308,7 +316,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
 
-@if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin']))
+@if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin','clinician']))
+@php
+    $notifBase = $notifBase ?? (Auth::user()->hasAnyRole(['admin','super_admin']) ? '/admin/notifications' : '/clinician/notifications');
+@endphp
 <style>
 /* ── Notification bell ───────────────────────────────────── */
 .notif-bell-btn {
@@ -449,7 +460,7 @@
             el.addEventListener('click', function (e) {
                 var id = el.dataset.id;
                 if (el.classList.contains('unread')) {
-                    fetch('/admin/notifications/' + id + '/read', {
+                    fetch('{{ $notifBase }}/' + id + '/read', {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
                     }).then(function () { el.classList.remove('unread'); refreshBadge(); });
@@ -459,7 +470,7 @@
     }
 
     function refreshBadge() {
-        fetch('/admin/notifications', { headers: { 'Accept': 'application/json' } })
+        fetch('{{ $notifBase }}', { headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 var count = data.unread || 0;
@@ -478,7 +489,7 @@
     // Load panel content when dropdown opens
     if (bellBtn) {
         bellBtn.addEventListener('click', function () {
-            fetch('/admin/notifications', { headers: { 'Accept': 'application/json' } })
+            fetch('{{ $notifBase }}', { headers: { 'Accept': 'application/json' } })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     loaded = true;
@@ -494,7 +505,7 @@
     // Mark all read
     if (markAllBtn) {
         markAllBtn.addEventListener('click', function () {
-            fetch('/admin/notifications/read-all', {
+            fetch('{{ $notifBase }}/read-all', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
             }).then(function () {
