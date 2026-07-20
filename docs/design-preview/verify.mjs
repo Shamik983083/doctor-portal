@@ -233,12 +233,11 @@ section("Approval: one decision per requested medication");
   await page.selectOption('.field select[data-f="term"]', "3 months");
   ok((await page.locator(".term-warn").count()) === 0, "and the warning clears when it matches again");
 
-  // Shrinking to 1M dropped months 2 and 3; growing back re-adds them EMPTY, so
-  // a dose is never silently resurrected. Refill them to submit.
-  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
-     "narrowing then widening the term does not resurrect the old monthly doses");
-  await page.selectOption('.field select[data-f="month1"]', "8 mg");
-  await page.selectOption('.field select[data-f="month2"]', "8 mg");
+  // Shrinking to 1M dropped months 2 and 3; widening continues the ladder from
+  // the last month set, so the form is complete again without retyping.
+  const regrown = await Promise.all([0, 1, 2].map((i) =>
+    page.locator(`.field select[data-f="month${i}"]`).inputValue()));
+  ok(regrown.every(Boolean), `widening the term refills the months from the ladder (${regrown.join(" / ")})`);
 
   await page.click("#modalSubmit");
   ok((await page.locator(".modal").count()) === 0, "submitting closes the modal");
@@ -314,20 +313,28 @@ section("Multi-month terms take a dose per month");
   const labels = await page.locator(".months-grid .field label").allTextContents();
   ok(labels.join(",") === "M1,M2,M3", `months are labelled M1..M3 (got ${labels.join(",")})`);
   ok((await page.locator('.field select[data-f="month0"]').inputValue()) !== "", "month 1 keeps the requested dose");
-  ok((await page.locator('.field select[data-f="month1"]').inputValue()) === "", "month 2 starts empty, no titration is assumed");
-  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null, "and submit is blocked while a month is empty");
+  ok((await page.locator('.field select[data-f="month1"]').inputValue()) !== "",
+     "later months are prefilled from the plan rather than left blank");
 
-  await page.selectOption('.field select[data-f="month1"]', "L2 · 5 mg");
-  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null, "still blocked with month 3 empty");
-  await page.selectOption('.field select[data-f="month2"]', "L3 · 7.5 mg");
-  ok((await page.locator("#modalSubmit").getAttribute("disabled")) === null, "unlocks once every month has a dose");
+  // Prefill is a starting point, not a guarantee. Switching the medication
+  // invalidates every strength that belonged to the old drug, which must empty
+  // those months and block submit rather than carrying a wrong dose forward.
+  await page.selectOption('.field select[data-f="medication"]', "Zofran");
+  const cleared = await Promise.all([0, 1, 2].map((i) =>
+    page.locator(`.field select[data-f="month${i}"]`).inputValue()));
+  ok(cleared.every((x) => x === ""), "changing the medication empties doses that belonged to the old drug");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null, "and that blocks submit");
+  await page.selectOption('.field select[data-f="medication"]', "Semaglutide");
+  for(const [i, v] of [[0,"L1 · 2.5 mg"],[1,"L2 · 5 mg"],[2,"L3 · 7.5 mg"]])
+    await page.selectOption(`.field select[data-f="month${i}"]`, v);
 
   // Shrinking drops the extra months rather than keeping stale ones.
   await page.selectOption('.field select[data-f="term"]', "1 month");
   ok((await page.locator(".months-grid").count()) === 0, "back to 1M collapses to a single dosage field");
   await page.selectOption('.field select[data-f="term"]', "4 months");
   ok((await page.locator(".months-grid .field").count()) === 4, "4M gives four month fields");
-  ok((await page.locator('.field select[data-f="month3"]').inputValue()) === "", "the new fourth month is empty, not back-filled");
+  ok((await page.locator('.field select[data-f="month3"]').inputValue()) !== "",
+     "and the new fourth month continues the ladder");
   await page.click("#modalCancel");
 }
 
@@ -380,6 +387,153 @@ await page.locator(".nav-link").nth(1).click();
 ok((await page.locator(".page-head h1").count()) === 1, "a click in the collapsed rail still routes");
 await page.click("#toggle");
 await page.waitForTimeout(320);
+
+section("Months prefill from the requested dose and the plan");
+{
+  await page.click('.role-button:text-is("Clinician")');
+  await page.locator('.nav-link[title="Case Queue"]').click();
+
+  // demo-001: Semaglutide, L1, 3M, Titration -> should step L1, L2, L3.
+  await page.click('.review-grid tr[data-row="demo-001"] .pin-name');
+  await page.click("#openApproval");
+  await page.click(".decision-btn.approve");
+  const tit = await Promise.all([0, 1, 2].map((i) =>
+    page.locator(`.field select[data-f="month${i}"]`).inputValue()));
+  ok(tit[0] === "L1 · 2.5 mg", "titration month 1 is the requested level");
+  ok(tit[1] === "L2 · 5 mg" && tit[2] === "L3 · 7.5 mg",
+     `titration steps up one level per month (${tit.join(" / ")})`);
+  ok((await page.locator(".foot-status").textContent()).includes("1 of 2"),
+     "the prefilled primary counts as decided without further typing");
+  await page.click("#modalCancel");
+
+  // demo-009: Tirzepatide, L3, 3M, HOLD -> should repeat L3 three times.
+  await page.locator('.nav-link[title="My Cases"]').click();
+  await page.click('.review-grid tr[data-row="demo-009"] .pin-name');
+  await page.click("#openApproval");
+  await page.click(".decision-btn.approve");
+  const hold = await Promise.all([0, 1, 2].map((i) =>
+    page.locator(`.field select[data-f="month${i}"]`).inputValue()));
+  ok(hold.every((x) => x === "L3 · 7.5 mg"),
+     `a hold repeats the requested level for the whole term (${hold.join(" / ")})`);
+
+  // Growing the term continues the ladder rather than leaving a hole.
+  await page.selectOption('.field select[data-f="term"]', "4 months");
+  const grown = await Promise.all([0, 1, 2, 3].map((i) =>
+    page.locator(`.field select[data-f="month${i}"]`).inputValue()));
+  ok(grown.every(Boolean), `widening the term continues the ladder, no empty months (${grown.join(" / ")})`);
+  ok(grown[3] === "L3 · 7.5 mg", "and a hold keeps holding when the term grows");
+  await page.click("#modalCancel");
+
+  // The blocked hold case still computes correctly, even though its approval
+  // screen cannot be opened. Checked through the same function the UI calls.
+  const blockedHold = await page.evaluate(() =>
+    prefillMonths("Tirzepatide", "L3 · 7.5 mg", "Hold", "4M"));
+  ok(blockedHold.length === 4 && blockedHold.every((x) => x === "L3 · 7.5 mg"),
+     "the 4M hold on the blocked Yellow case would prefill correctly too");
+
+  // Titration must stop at the top of the ladder, not run off the end.
+  await page.locator('.nav-link[title="My Cases"]').click();
+  await page.click('.review-grid tr[data-row="demo-007"] .pin-name');   // Tirzepatide L2, 4M titration
+  await page.click("#openApproval");
+  await page.click(".decision-btn.approve");
+  const cap = await Promise.all([0, 1, 2, 3].map((i) =>
+    page.locator(`.field select[data-f="month${i}"]`).inputValue()));
+  ok(cap.every(Boolean) && cap[3] === "L5 · 12.5 mg", `titration walks to the top of the ladder (${cap.join(" / ")})`);
+  await page.click("#modalCancel");
+}
+
+section("Source answers show the whole intake");
+{
+  await page.locator('.nav-link[title="Case Queue"]').click();
+  await page.click('.review-grid tr[data-row="demo-001"] .pin-name');
+  await page.click("#srcToggle");
+  const keys = await page.locator(".source-answers .source-key").count();
+  ok(keys >= 25, `the full intake is shown, not a handful of cited fields (${keys} answers)`);
+  const text = await page.locator(".source-answers").textContent();
+  for(const field of ["thyroidCancer", "pregnant", "consentTelehealth", "shippingState", "goalWeight"]){
+    ok(text.includes(field), `intake includes ${field}`);
+  }
+}
+
+section("AI summary and triage are derived from the answers");
+{
+  // Every statement in the draft must be traceable, and triage must agree with
+  // the rules rather than being a label pinned on by hand.
+  const agree = await page.evaluate(() =>
+    QUEUE.every((r) => r.triageEval.result === r.triage));
+  ok(agree, "every row's declared triage matches what the rule set computes");
+
+  const cited = await page.evaluate(() => {
+    const r = QUEUE.find((x) => x.id === "demo-001");
+    const keys = Object.keys(r.answers);
+    return r.summary.every(([, ks]) => ks.every((k) => keys.includes(k)));
+  });
+  ok(cited, "every answer key cited by the draft exists in the intake record");
+
+  // A Red case must name the rule that made it Red.
+  await page.locator('.nav-link[title="Red"]').click();
+  await page.click('.review-grid tr[data-row="demo-004"] .pin-name');
+  const sum = await page.locator(".summary-list").textContent();
+  ok(/RED/.test(sum) && /TR-0\d/.test(sum), "a Red case names the triage rule that fired");
+  ok(/NOT verified/.test(sum), "and the statement reflects the actual answer");
+
+  // Turning a rule off must change the outcome, which is what "admin can set it" means.
+  const flipped = await page.evaluate(() => {
+    const rule = TRIAGE_RULES.find((r) => r.id === "TR-02");
+    rule.active = false;
+    const after = evaluateTriage(QUEUE.find((x) => x.id === "demo-004").answers).result;
+    rule.active = true;
+    return after;
+  });
+  ok(flipped !== "Red", `disabling the identity rule changes that case's triage (became ${flipped})`);
+}
+
+section("Admin can see products, levels and combinations");
+{
+  await page.click('.role-button:text-is("Admin")');
+  const openAll = async () => { for(let i = 0; i < 12; i++){
+    const c = await page.locator(".nav-section.closed").count(); if(!c) break;
+    await page.locator(".nav-section.closed").first().click(); } };
+  await openAll();
+  await page.locator('.nav-link[title="Products & Levels"]').click();
+  ok((await page.locator(".catalog-card").count()) === 4, "every catalog product is listed");
+  const rungs = await page.locator(".catalog-card").first().locator(".rung").count();
+  ok(rungs === 4, `Semaglutide shows its four ordered levels (got ${rungs})`);
+  const combos = await page.locator(".catalog-card").first().locator(".combos .pill").allTextContents();
+  ok(combos.includes("Zofran"), "and the add-ons it may be combined with");
+
+  // The catalog is the same source the approval screen reads.
+  const same = await page.evaluate(() =>
+    JSON.stringify(DOSAGES.Semaglutide) === JSON.stringify(CATALOG.Semaglutide.levels));
+  ok(same, "the provider dropdowns read this same catalog, not a second copy");
+}
+
+section("Messages open an iPhone-style thread");
+{
+  await page.click('.role-button:text-is("Clinician")');
+  await page.locator('.nav-link[title="Messages For Provider"]').click();
+  ok((await page.locator(".msg-row").count()) === 3, "conversations are listed");
+  ok(await page.locator(".chat").isVisible(), "and a thread opens beside them");
+  ok((await page.locator(".bubble").count()) >= 3, "the thread shows its history");
+
+  const tones = await page.evaluate(() => {
+    const me = getComputedStyle(document.querySelector(".bubble.me"));
+    const them = getComputedStyle(document.querySelector(".bubble.them"));
+    return { me:me.backgroundColor, them:them.backgroundColor,
+             meRadius:me.borderBottomRightRadius, themRadius:them.borderBottomLeftRadius,
+             meAlign:document.querySelector(".bubble-row.me").style.justifyContent || getComputedStyle(document.querySelector(".bubble-row.me")).justifyContent };
+  });
+  ok(tones.me !== tones.them, "outgoing and incoming bubbles are visually distinct");
+  ok(tones.meAlign === "flex-end", "outgoing messages sit on the right, as on a phone");
+  ok(parseFloat(tones.meRadius) < 10 && parseFloat(tones.themRadius) < 10,
+     "each bubble squares off its tail corner, the iMessage detail");
+  ok(await page.locator(".chat-compose input").isVisible(), "there is a compose box");
+
+  await page.click('[data-thread="t2"]');
+  ok((await page.locator(".chat-head strong").textContent()) === "Meridian Wellness",
+     "picking another conversation swaps the thread");
+  ok((await page.locator(".msg-row.active").count()) === 1, "and the list shows which one is open");
+}
 
 section("Typography is one system across the portal");
 {

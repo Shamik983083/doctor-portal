@@ -365,6 +365,52 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .action-reason{font-size:11.5px;color:var(--soft-muted);margin:8px 0 0}
 @media (max-width:1100px){.quick-review-grid{grid-template-columns:1fr}}
 
+/* ------------------------------------------------------------ admin catalog */
+.catalog-list{display:grid;gap:12px;padding:0 20px 20px}
+.catalog-card{border:1px solid var(--line);border-radius:14px;padding:15px;background:#fff}
+.catalog-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.catalog-head > div{display:flex;align-items:center;gap:9px}
+.catalog-head strong{font-size:14px}
+.ladder{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:13px}
+.rung{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);border-radius:10px;padding:7px 11px;font-size:12.5px;background:#fbfcfe}
+.rung-n{display:grid;place-items:center;width:18px;height:18px;border-radius:99px;background:var(--blue-bg);color:var(--accent-ink);font-size:10px;font-weight:790}
+.rung-arrow{color:var(--soft-muted);font-size:13px}
+.combos{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.combos .subheading{margin:0}
+
+/* ------------------------------------------------- messages, iPhone styling */
+.msg-layout{display:grid;grid-template-columns:.8fr 1.2fr;gap:16px;align-items:start}
+.msg-list{padding-bottom:8px}
+.msg-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:0;
+  padding:11px 20px;border-top:1px solid var(--line)}
+.msg-row:hover{background:#fafcff}
+.msg-row.active{background:var(--blue-bg)}
+.msg-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:99px;background:#e7edf8;color:#41537a;font-size:12px;font-weight:770;flex:0 0 auto}
+.msg-avatar.big{width:40px;height:40px;font-size:13px}
+.msg-row-body{min-width:0;flex:1}
+.msg-row-body strong{display:block;font-size:13.5px}
+.msg-row-body span{display:block;color:var(--soft-muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-row-meta{display:flex;align-items:center;gap:7px;color:var(--soft-muted);font-size:11.5px;flex:0 0 auto}
+.msg-unread{display:grid;place-items:center;min-width:19px;height:19px;border-radius:99px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:780;padding:0 5px}
+
+.chat{display:flex;flex-direction:column;overflow:hidden;min-height:520px}
+.chat-head{display:flex;align-items:center;gap:11px;padding:14px 18px;border-bottom:1px solid var(--line);background:rgba(251,252,254,.9)}
+.chat-head strong{display:block;font-size:14px}
+.chat-head span{display:block;color:var(--soft-muted);font-size:11.5px}
+.chat-scroll{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:3px;background:#fff}
+.chat-time{align-self:center;color:var(--soft-muted);font-size:11px;font-weight:640;margin:12px 0 6px}
+.bubble-row{display:flex;margin-top:2px}
+.bubble-row.me{justify-content:flex-end}
+/* iMessage geometry: 18px radius, tail corner squared to 5px, blue out / grey in. */
+.bubble{max-width:74%;padding:8px 13px;border-radius:18px;font-size:13.5px;line-height:1.38;letter-spacing:-.004em;word-wrap:break-word}
+.bubble.them{background:#e9e9eb;color:#000;border-bottom-left-radius:5px}
+.bubble.me{background:#248bf5;color:#fff;border-bottom-right-radius:5px}
+.chat-read{align-self:flex-end;color:var(--soft-muted);font-size:10.5px;margin-top:5px}
+.chat-compose{display:flex;align-items:center;gap:9px;padding:12px 16px;border-top:1px solid var(--line);background:#fbfcfe}
+.chat-compose input{flex:1;border:1px solid var(--line-strong);border-radius:999px;padding:9px 15px;font-size:13.5px;font-family:inherit;background:#fff}
+.chat-send{display:grid;place-items:center;width:32px;height:32px;border-radius:99px;border:0;background:#248bf5;color:#fff;font-size:15px;font-weight:800;flex:0 0 auto}
+@media (max-width:900px){.msg-layout{grid-template-columns:1fr}}
+
 .endpoints{display:grid;gap:10px;padding:16px 20px 20px}
 .endpoint{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}
 .endpoint > div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -445,6 +491,7 @@ const PORTALS = {
         {id:"admin.webhooks",         ico:"\u{1F4E1}", label:"Webhook Logs"}
       ]},
       {type:"section", label:"Configuration", open:false, items:[
+        {id:"admin.catalog",  ico:"\u{1F9EA}", label:"Products & Levels"},
         {id:"admin.settings", ico:"⚙", label:"SLA Settings"},
         {id:"admin.triage",   ico:"\u{1F6A6}", label:"Triage Rule Set"}
       ]},
@@ -649,10 +696,98 @@ QUEUE.push(
     batchReason:"Red hard stop · thyroid cancer history",
     findings:[["red","Thyroid cancer history is an absolute contraindication."],
               ["red","Red triage classification blocks batch submission."]] }),
+  // Deliberately a HOLD on a 3M term, and eligible, so the hold path is
+  // reachable in the UI. demo-002 is the other hold but it is Yellow, so its
+  // approval screen cannot be opened.
   mkRow({ id:"demo-009", queue:"4h 20m", product:"Tirzepatide", name:"Ari Delgado", sex:"M", age:35, bmi:31.9,
-    term:"1M", dose:"L1 · 2.5 mg", company:"Northstar Health", triage:"Green", batch:"Eligible",
-    reason:"Clean intake, no flags raised." })
+    term:"3M", dose:"L3 · 7.5 mg", plan:"Hold", company:"Northstar Health", triage:"Green", batch:"Eligible",
+    reason:"Stable on the current level, continuing without escalation." })
 );
+
+/* ---------------------------------------------------------------------------
+   Triage rules. Admin owns these (the Triage Rule Set screen). Triage is a pure
+   function of the intake answers plus this list, so the provider is never told a
+   colour the answers do not support, and changing a rule changes the outcome.
+   Order matters: the first matching rule of the strongest colour wins.
+   --------------------------------------------------------------------------- */
+const TRIAGE_RULES = [
+  { id:"TR-01", label:"Thyroid cancer history",  result:"Red",    active:true, when:(a) => a.thyroidCancer === "Yes" },
+  { id:"TR-02", label:"Identity not verified",   result:"Red",    active:true, when:(a) => a.identityVerified === "No" },
+  { id:"TR-03", label:"BMI under 27",            result:"Red",    active:true, when:(a) => Number(a.bmi) < 27 },
+  { id:"TR-04", label:"Pregnant or breastfeeding", result:"Red",  active:true, when:(a) => a.pregnant === "Yes" },
+  { id:"TR-05", label:"Concerning allergy flag", result:"Yellow", active:true, when:(a) => a.concerningAllergies === "Yes" },
+  { id:"TR-06", label:"Dose hold while on GLP-1",result:"Yellow", active:true, when:(a) => a.currentlyOnGlp === "Yes" && a.dosePlan === "Hold" },
+  { id:"TR-07", label:"Age over 65",             result:"Yellow", active:true, when:(a) => Number(a.age) > 65 }
+];
+
+function evaluateTriage(answers){
+  const hits = TRIAGE_RULES.filter((r) => r.active && r.when(answers));
+  const red = hits.filter((r) => r.result === "Red");
+  const yellow = hits.filter((r) => r.result === "Yellow");
+  return { result: red.length ? "Red" : yellow.length ? "Yellow" : "Green", hits, red, yellow };
+}
+
+/* The AI draft summary is COMPOSED from the recorded answers, never invented.
+   Each statement carries the answer keys it was built from, which is what makes
+   it checkable: a provider can open the source answers and see the inputs. */
+function buildSummary(a){
+  const s = [];
+  s.push(["Requested regimen: "+a.requestedTerm+", "+a.requestedDoseLevel+", plan "+a.dosePlan+".",
+          ["requestedTerm","requestedDoseLevel","dosePlan"]]);
+  s.push(["Currently on GLP-1 therapy: "+a.currentlyOnGlp.toLowerCase()
+          +"; additional medication requests: "+(a.additionalMedications || "none")+".",
+          ["currentlyOnGlp","additionalMedications"]]);
+  s.push(["Reported weight "+a.currentWeight+" with BMI "+a.bmi+", goal "+a.goalWeight+".",
+          ["currentWeight","bmi","goalWeight"]]);
+  s.push(["Concerning allergies flagged: "+a.concerningAllergies.toLowerCase()
+          +(a.allergyDetail ? ", "+a.allergyDetail : "")+".",
+          a.allergyDetail ? ["concerningAllergies","allergyDetail"] : ["concerningAllergies"]]);
+  s.push(["Identity verification: "+(a.identityVerified === "Yes" ? "verified" : "NOT verified")+".",
+          ["identityVerified"]]);
+  const t = evaluateTriage(a);
+  s.push(["Triage classification: "+t.result.toUpperCase()
+          +(t.hits.length ? " on "+t.hits.map((r) => r.id).join(", ") : ", no rule matched")+".",
+          []]);
+  return s;
+}
+
+/* A full intake record. The provider must be able to see EVERYTHING the patient
+   filled out, not the handful of fields a summary happened to cite. */
+function fullAnswers(row){
+  const base = {
+    firstName:row.name.split(" ")[0], lastName:row.name.split(" ").slice(1).join(" "),
+    dateOfBirth:"See patient record", sexAtBirth:row.sex === "F" ? "Female" : "Male",
+    age:String(row.age), shippingState:({ "Northstar Health":"TN", "Vitality Direct":"TN", "Meridian Wellness":"KY" })[row.company] || "TN",
+    currentWeight:Math.round(row.bmi * 3.9) + " lbs", goalWeight:Math.round(row.bmi * 3.2) + " lbs",
+    heightFeet:"5", heightInches:row.sex === "F" ? "6" : "10", bmi:String(row.bmi),
+    requestedTerm:TERM_TEXT[row.term], requestedDoseLevel:row.dose, dosePlan:row.plan,
+    currentlyOnGlp:row.onGlp === "Y" ? "Yes" : "No",
+    lastDose:row.onGlp === "Y" ? "Within the last 7 days" : "Not applicable",
+    additionalMedications:[row.med2, row.med3, row.med4].filter((x) => x && x !== "-").join(", ") || "None",
+    concerningAllergies:row.allergy === "Y" ? "Yes" : "No",
+    allergyDetail:row.allergyDetail || "",
+    thyroidCancer:"No", pancreatitis:"No", pregnant:"No", type1Diabetes:"No",
+    gallbladderDisease:"No", eatingDisorder:"No",
+    currentMedications:"None reported", otherConditions:"None reported",
+    adverseReactions:"None reported",
+    identityVerified:row.idv === "Y" ? "Yes" : "No",
+    videoVisit:row.video === "Required" ? "Required by state" : "Not required",
+    consentTelehealth:"Agreed", consentSms:row.id.endsWith("1") || row.id.endsWith("3") ? "Agreed" : "Declined",
+    submittedAt:row.queue + " ago", storefront:row.company
+  };
+  if(row.id === "demo-008") base.thyroidCancer = "Yes";
+  if(row.id === "demo-004") base.identityVerified = "No";
+  return base;
+}
+
+/* Rebuild every row's answers, summary and triage from the rules above, so the
+   three can never disagree with each other. */
+for(const r of QUEUE){
+  r.answers = fullAnswers(r);
+  r.summary = buildSummary(r.answers);
+  r.triageEval = evaluateTriage(r.answers);
+  r.sourceAnswers = r.answers;
+}
 
 const ELIGIBLE_IDS = QUEUE.filter(r => r.batch === "Eligible").map(r => r.id);
 const batchTone = (b) => b === "Eligible" ? "green" : b === "Review" ? "yellow" : "red";
@@ -671,12 +806,36 @@ const batchTone = (b) => b === "Eligible" ? "green" : b === "Review" ? "yellow" 
 const TERMS = ["1M","3M","4M"];
 const monthsIn = (term) => Number(String(term).replace("M","")) || 1;
 const TERM_LABEL = { "1M":"1 month", "3M":"3 months", "4M":"4 months" };
-const DOSAGES = {
-  Semaglutide: ["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg"],
-  Tirzepatide: ["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg","L5 · 12.5 mg"],
-  Zofran: ["4 mg","8 mg"],
-  "NAD+": ["100 mg","200 mg"]
+/* ---------------------------------------------------------------------------
+   Product catalog. Admin owns this: the products, their ordered dose levels, and
+   which add-ons may be combined with them. Levels are ORDERED, because titration
+   means "the next level up", so the order is the clinical meaning and not just
+   display sequence.
+   --------------------------------------------------------------------------- */
+const CATALOG = {
+  Semaglutide: { kind:"GLP-1", levels:["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg"], combos:["Zofran","NAD+"] },
+  Tirzepatide: { kind:"GLP-1", levels:["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg","L5 · 12.5 mg"], combos:["Zofran","NAD+"] },
+  Zofran:      { kind:"Add-on", levels:["4 mg","8 mg"], combos:[] },
+  "NAD+":      { kind:"Add-on", levels:["100 mg","200 mg"], combos:[] }
 };
+const DOSAGES = Object.fromEntries(Object.entries(CATALOG).map(([k,v]) => [k, v.levels]));
+
+/* Month prefill is derived, never typed in.
+   TITRATION starts at the requested level and steps up one level per month,
+   stopping at the top of the ladder rather than running off the end.
+   HOLD repeats the requested level for the whole term.
+   An unknown starting dose yields blanks rather than a guess. */
+function prefillMonths(product, startDose, plan, term){
+  const levels = (CATALOG[product] || {}).levels || [];
+  const n = monthsIn(term);
+  const i = levels.indexOf(startDose);
+  if(i < 0) return Array(n).fill("");
+  const out = [];
+  for(let m = 0; m < n; m++){
+    out.push(plan === "Hold" ? levels[i] : levels[Math.min(i + m, levels.length - 1)]);
+  }
+  return out;
+}
 const FREQUENCIES = ["Weekly","Every 2 weeks","Daily","As needed"];
 const REFILLS = ["0","1","2","3","5","11"];
 
@@ -795,6 +954,8 @@ const VIEWS = {
       ["case.cancelled","Vitality Direct","/api/webhook",P("200 OK","pill green"),"1","22 min ago"],
       ["case.completed","Meridian Wellness","/inbound",P("500 Error","pill red"),"4","1 hr ago"],
       ["order.updated","Northstar Health","/hooks/medaxis",P("200 OK","pill green"),"1","2 hr ago"]]}},
+  "admin.catalog":{eyebrow:"Configuration", title:"Products & Levels", sub:"The catalog the approval screen reads. Levels are ordered, and that order is what titration steps through.",
+    catalog:true},
   "admin.settings":{eyebrow:"Configuration", title:"SLA Settings", sub:"Review deadlines and escalation thresholds.",
     table:{title:"Thresholds", cols:["Setting","Value","Applies to"], rows:[
       ["Review deadline","24 hours","All cases"],["Escalation warning","18 hours","All cases"],
@@ -850,11 +1011,8 @@ const VIEWS = {
   "clin.triage.green":{eyebrow:"Triage", title:"Green", sub:"Clean intake. Batch-eligible unless an operational hold applies.",
     queue:(r) => r.triage === "Green"},
 
-  "clin.messages":{eyebrow:"Tasks", title:"Messages For Provider", sub:"The one screen that is not the case grid. Storefront and patient messages waiting on a reply.",
-    table:{title:"Awaiting reply", cols:["Patient","From","Message","Case","Waiting"], rows:[
-      ["Jordan Ellis","Northstar Health","Patient asking about the video visit slot","demo-002","22 min"],
-      ["Casey Rivera","Meridian Wellness","Storefront query on the identity check","demo-004","1 hr"],
-      ["Avery Morgan","Patient","Question about the nausea medication","demo-001","3 hr"]]}},
+  "clin.messages":{eyebrow:"Tasks", title:"Messages For Provider", sub:"The one screen that is not the case grid. Pick a conversation and the thread opens below it.",
+    chat:true},
   "clin.notifications":{eyebrow:"Clinician", title:"Notifications", sub:"Case assignments, SLA warnings and support requests.",
     table:{title:"Recent", cols:["Type","Message","When"], rows:[
       [P("SLA","pill yellow"),"Case for Jordan Avery approaching the 24h deadline","20 min ago"],
@@ -966,6 +1124,81 @@ function cell(c){
 
 const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
+/* ------------------------------------------------------------ admin catalog */
+function renderCatalog(){
+  let h = '<div class="panel"><div class="panel-heading"><div><h2>Products</h2>'
+    + '<p>Each product carries an ordered ladder of dose levels. Titration walks up that ladder one step per month; hold repeats the requested step.</p></div>'
+    + '<button class="button-primary">Add product</button></div>'
+    + '<div class="catalog-list">';
+
+  for(const [name, p] of Object.entries(CATALOG)){
+    h += '<div class="catalog-card"><div class="catalog-head">'
+      + '<div><strong>'+esc(name)+'</strong><span class="pill neutral">'+p.kind+'</span></div>'
+      + '<button class="button-secondary">Edit</button></div>'
+      + '<div class="ladder">'
+      + p.levels.map((l, i) => '<div class="rung"><span class="rung-n">'+(i+1)+'</span>'+esc(l)+'</div>').join('<span class="rung-arrow">&rarr;</span>')
+      + '</div>'
+      + '<div class="combos"><span class="subheading">Allowed combinations</span>'
+      + (p.combos.length
+          ? p.combos.map((c) => '<span class="pill">'+esc(c)+'</span>').join(" ")
+          : '<span class="no-holds">None. This product is an add-on itself.</span>')
+      + '</div></div>';
+  }
+  return h + '</div></div>'
+    + '<div class="note">Editing is not wired in this preview. The point is that the approval screen '
+    + 'reads this catalog: adding a level here adds it to the provider dropdowns and extends what titration can reach.</div>';
+}
+
+/* ------------------------------------------------------- messages, iPhone style */
+const THREADS = [
+  { id:"t1", who:"Jordan Ellis", sub:"Patient · case demo-002", waiting:"22 min", unread:2,
+    msgs:[["them","Hi doctor, I got the email about needing a video visit. Do I have to do that before you can review?","9:41 AM"],
+          ["me","You do, yes. Kentucky requires a live visit before a first prescription.","9:44 AM"],
+          ["them","Okay. The link they sent me does not open on my phone.","9:46 AM"],
+          ["them","Can someone call me instead?","9:46 AM"]] },
+  { id:"t2", who:"Meridian Wellness", sub:"Storefront · case demo-004", waiting:"1 hr", unread:1,
+    msgs:[["them","We are seeing this case blocked for identity. The patient sent us a licence copy directly.","8:58 AM"],
+          ["me","It needs to come through the intake so it lands on the record. Re-send it that way and the block clears.","9:12 AM"],
+          ["them","Understood, resending now.","9:15 AM"]] },
+  { id:"t3", who:"Avery Morgan", sub:"Patient · case demo-001", waiting:"3 hr", unread:0,
+    msgs:[["them","Quick question about the nausea medication, do I take it every week or only when I feel sick?","7:20 AM"],
+          ["me","Only when you need it. It is there for the first few weeks while your body adjusts.","7:31 AM"],
+          ["them","Perfect, thank you.","7:33 AM"]] }
+];
+let thread = THREADS[0].id;
+
+function renderMessages(){
+  const t = THREADS.find((x) => x.id === thread) || THREADS[0];
+  let h = '<div class="msg-layout"><div class="panel msg-list">'
+    + '<div class="panel-heading"><div><h2>Awaiting reply</h2><p>Pick a conversation.</p></div></div>';
+  for(const x of THREADS){
+    h += '<button class="msg-row'+(x.id===t.id?" active":"")+'" data-thread="'+x.id+'">'
+      + '<span class="msg-avatar">'+x.who.split(" ").map((p)=>p[0]).join("").slice(0,2)+'</span>'
+      + '<span class="msg-row-body"><strong>'+esc(x.who)+'</strong>'
+      + '<span>'+esc(x.msgs[x.msgs.length-1][1]).slice(0,54)+'...</span></span>'
+      + '<span class="msg-row-meta">'+x.waiting+(x.unread?'<span class="msg-unread">'+x.unread+'</span>':'')+'</span>'
+      + '</button>';
+  }
+  h += '</div>';
+
+  // The thread itself, styled like an iPhone conversation.
+  h += '<div class="panel chat"><div class="chat-head">'
+    + '<span class="msg-avatar big">'+t.who.split(" ").map((p)=>p[0]).join("").slice(0,2)+'</span>'
+    + '<div><strong>'+esc(t.who)+'</strong><span>'+esc(t.sub)+'</span></div></div>'
+    + '<div class="chat-scroll">';
+  let lastSide = null;
+  for(const [side, text, time] of t.msgs){
+    if(side !== lastSide) h += '<div class="chat-time">'+time+'</div>';
+    h += '<div class="bubble-row '+side+'"><div class="bubble '+side+'">'+esc(text)+'</div></div>';
+    lastSide = side;
+  }
+  h += '<div class="chat-read">Delivered</div></div>'
+    + '<div class="chat-compose"><input type="text" placeholder="Message" aria-label="Message" />'
+    + '<button class="chat-send" aria-label="Send">&uarr;</button></div>'
+    + '</div></div>';
+  return h;
+}
+
 /* ------------------------------------------------------------ approval state */
 let approvalFor = null;   // row id, or null when the modal is shut
 let activeMed = null;     // which medication tab is open
@@ -980,10 +1213,11 @@ function openApproval(rowId){
       decision:null, product:m.primary ? m.name+"-"+m.term : m.name,
       medication:m.name, dosage:m.dose || "", custom:false,
       freq:m.primary ? "Weekly" : "", term:m.term, startToday:true, refills:"0",
-      // One dose per month for a multi-month term. Month 1 seeds from the
-      // requested dose; later months are the provider's titration decision and
-      // start empty so nothing is assumed on their behalf.
-      months:[m.dose || ""]
+      plan:row.plan,
+      // Months are prefilled from the requested dose and the requested plan:
+      // Titration steps up a level per month, Hold repeats it. Still editable,
+      // this is a starting point rather than a decision.
+      months:prefillMonths(m.name, m.dose, row.plan, m.term)
     };
   }
   activeMed = requestedMeds(row)[0].key;
@@ -1298,6 +1532,8 @@ function renderView(){
   }
 
   if(v.queue){ h += renderQueue(v.queue); }
+  if(v.catalog){ h += renderCatalog(); }
+  if(v.chat){ h += renderMessages(); }
 
   if(v.doc){
     h += '<div class="panel"><div class="panel-heading"><div><h2>Endpoints</h2>'
@@ -1372,6 +1608,8 @@ document.getElementById("view").addEventListener("click", (e) => {
   if(e.target.id === "preflight"){ showPreflight = true; renderView(); return; }
   if(e.target.id === "srcToggle"){ showSource = !showSource; renderView(); return; }
   if(e.target.id === "compact"){ compact = !compact; renderView(); return; }
+  const th = e.target.closest("[data-thread]");
+  if(th){ thread = th.dataset.thread; renderView(); return; }
 
   // Approval modal
   if(e.target.id === "openApproval"){ openApproval(drawerId); renderView(); return; }
@@ -1397,10 +1635,17 @@ document.getElementById("view").addEventListener("change", (e) => {
   else if(f === "term"){
     const hit = TERMS.find((t) => TERM_LABEL[t] === e.target.value) || e.target.value;
     d.term = hit;
-    // Shrinking the term drops the months that no longer exist; growing it adds
-    // empty ones rather than back-filling a dose the provider never picked.
-    d.months = d.months.slice(0, monthsIn(hit));
-    while(d.months.length < monthsIn(hit)) d.months.push("");
+    // Shrinking drops the months that no longer exist. Growing CONTINUES the
+    // ladder from the last month already set, rather than leaving a hole: a
+    // titration carries on stepping up, a hold repeats.
+    const want = monthsIn(hit);
+    d.months = d.months.slice(0, want);
+    const levels = (CATALOG[d.medication] || {}).levels || [];
+    while(d.months.length < want){
+      const last = d.months[d.months.length - 1] || "";
+      const li = levels.indexOf(last);
+      d.months.push(li < 0 ? "" : (d.plan === "Hold" ? last : levels[Math.min(li + 1, levels.length - 1)]));
+    }
   }
   else if(f.startsWith("month")){
     d.months[Number(f.slice(5))] = e.target.value;
