@@ -353,7 +353,17 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .ai-draft-chip{margin-bottom:9px}
 .summary-list{list-style:none;padding:0;margin:0 0 10px;display:grid;gap:9px;font-size:13px}
 .source-keys{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:6px;vertical-align:middle}
-.source-key{font-size:10px;background:#eef2f9;border:1px solid #dbe3f0;border-radius:5px;padding:1px 5px;color:#3d4a63;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+/* Question labels, not slugs, so no monospace: this is prose, not code. */
+.source-key{font-size:10.5px;background:#eef2f9;border:1px solid #dbe3f0;border-radius:6px;padding:1px 6px;color:#3d4a63;font-weight:640;white-space:nowrap}
+.answer-sheet{display:grid;gap:16px;margin-top:12px}
+.answer-group dl{margin:0;display:grid;gap:0}
+.qa{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.qa:last-child{border-bottom:0}
+.qa dt{margin:0;color:var(--muted);font-size:12.5px;line-height:1.4}
+.qa dd{margin:0;color:var(--ink);font-size:12.5px;font-weight:650}
+.qa.consent{grid-template-columns:minmax(0,1fr) auto}
+.qa.consent dt{color:var(--ink)}
+@media (max-width:700px){.qa,.qa.consent{grid-template-columns:1fr;gap:3px}}
 .ai-honesty{font-size:11.5px;color:var(--soft-muted);margin:0 0 10px}
 .source-answers{margin:10px 0 0;display:grid;gap:7px;font-size:12px}
 .source-answers > div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline}
@@ -727,6 +737,66 @@ function evaluateTriage(answers){
   return { result: red.length ? "Red" : yellow.length ? "Yellow" : "Green", hits, red, yellow };
 }
 
+/* ---------------------------------------------------------------------------
+   The intake questions, as the patient was actually asked them.
+
+   The slugs stay as the internal keys, because that is what the rules, the CRM
+   fields and the answer record are wired to. But a provider must never be shown
+   one. Every place an answer surfaces, it is rendered through this map: the full
+   question in the source-answer list, the short label anywhere space is tight.
+   A key with no entry here falls back to a de-slugged version of itself, so a
+   new question degrades to readable rather than leaking `camelCaseGibberish`.
+   --------------------------------------------------------------------------- */
+const QUESTIONS = {
+  firstName:      { group:"About you", q:"First name", short:"First name" },
+  lastName:       { group:"About you", q:"Last name", short:"Last name" },
+  dateOfBirth:    { group:"About you", q:"Date of birth", short:"Date of birth" },
+  sexAtBirth:     { group:"About you", q:"What was your sex assigned at birth?", short:"Sex at birth" },
+  age:            { group:"About you", q:"Age at submission", short:"Age" },
+  shippingState:  { group:"About you", q:"Which state will your medication ship to?", short:"Shipping state" },
+  storefront:     { group:"About you", q:"Which storefront submitted this case?", short:"Storefront" },
+  submittedAt:    { group:"About you", q:"When was this intake submitted?", short:"Submitted" },
+
+  heightFeet:     { group:"Measurements", q:"Height (feet)", short:"Height (ft)" },
+  heightInches:   { group:"Measurements", q:"Height (inches)", short:"Height (in)" },
+  currentWeight:  { group:"Measurements", q:"What is your current weight?", short:"Current weight" },
+  goalWeight:     { group:"Measurements", q:"What is your goal weight?", short:"Goal weight" },
+  bmi:            { group:"Measurements", q:"Calculated BMI", short:"BMI" },
+
+  requestedTerm:      { group:"What you are requesting", q:"Which program length are you requesting?", short:"Program length" },
+  requestedDoseLevel: { group:"What you are requesting", q:"Which dose level are you requesting?", short:"Requested dose" },
+  dosePlan:           { group:"What you are requesting", q:"Do you want to titrate up or hold at your current dose?", short:"Titration or hold" },
+  additionalMedications:{ group:"What you are requesting", q:"Are you requesting any additional medications?", short:"Additional medications" },
+
+  currentlyOnGlp: { group:"Medical history", q:"Are you currently taking a GLP-1 medication?", short:"Currently on GLP-1" },
+  lastDose:       { group:"Medical history", q:"When was your last dose?", short:"Last dose" },
+  concerningAllergies:{ group:"Medical history", q:"Do you have any drug allergies?", short:"Drug allergies" },
+  allergyDetail:  { group:"Medical history", q:"Please describe your allergy and what happened.", short:"Allergy detail" },
+  thyroidCancer:  { group:"Medical history", q:"Have you or a family member ever been diagnosed with medullary thyroid cancer or MEN2?", short:"Thyroid cancer history" },
+  pancreatitis:   { group:"Medical history", q:"Have you ever been diagnosed with pancreatitis?", short:"Pancreatitis" },
+  pregnant:       { group:"Medical history", q:"Are you pregnant, breastfeeding, or planning to become pregnant?", short:"Pregnant or breastfeeding" },
+  type1Diabetes:  { group:"Medical history", q:"Have you been diagnosed with type 1 diabetes?", short:"Type 1 diabetes" },
+  gallbladderDisease:{ group:"Medical history", q:"Have you been diagnosed with gallbladder disease?", short:"Gallbladder disease" },
+  eatingDisorder: { group:"Medical history", q:"Have you ever been treated for an eating disorder?", short:"Eating disorder" },
+  currentMedications:{ group:"Medical history", q:"What other medications are you currently taking?", short:"Other medications" },
+  otherConditions:{ group:"Medical history", q:"Do you have any other medical conditions we should know about?", short:"Other conditions" },
+  adverseReactions:{ group:"Medical history", q:"Have you had any adverse reactions to previous treatment?", short:"Adverse reactions" },
+
+  identityVerified:{ group:"Verification", q:"Was the patient's identity verified at intake?", short:"Identity verified" },
+  videoVisit:      { group:"Verification", q:"Is a synchronous video visit required in this state?", short:"Video visit" },
+
+  consentTelehealth:{ group:"Consents", q:"I consent to receive care by telehealth and have read the informed consent.", short:"Telehealth consent", consent:true },
+  consentSms:       { group:"Consents", q:"I agree to receive treatment updates by SMS. Message and data rates may apply.", short:"SMS updates consent", consent:true }
+};
+
+const GROUP_ORDER = ["About you","Measurements","What you are requesting","Medical history","Verification","Consents"];
+
+/* Never show a raw key. An unmapped one is de-slugged instead of leaking. */
+const deslug = (k) => k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+const questionOf = (k) => (QUESTIONS[k] && QUESTIONS[k].q) || deslug(k);
+const labelOf    = (k) => (QUESTIONS[k] && QUESTIONS[k].short) || deslug(k);
+const CONSENT_KEYS = Object.keys(QUESTIONS).filter((k) => QUESTIONS[k].consent);
+
 /* The AI draft summary is COMPOSED from the recorded answers, never invented.
    Each statement carries the answer keys it was built from, which is what makes
    it checkable: a provider can open the source answers and see the inputs. */
@@ -744,9 +814,14 @@ function buildSummary(a){
           a.allergyDetail ? ["concerningAllergies","allergyDetail"] : ["concerningAllergies"]]);
   s.push(["Identity verification: "+(a.identityVerified === "Yes" ? "verified" : "NOT verified")+".",
           ["identityVerified"]]);
+  // Consents are confirmed on the short list, not buried in the full record.
+  // A missing consent is a blocker, so it has to be visible without expanding.
+  const consents = CONSENT_KEYS.map((k) => labelOf(k)+": "+(a[k] || "not recorded").toLowerCase());
+  s.push(["Consents recorded, "+consents.join("; ")+".", CONSENT_KEYS.slice()]);
+
   const t = evaluateTriage(a);
   s.push(["Triage classification: "+t.result.toUpperCase()
-          +(t.hits.length ? " on "+t.hits.map((r) => r.id).join(", ") : ", no rule matched")+".",
+          +(t.hits.length ? " on "+t.hits.map((r) => r.label.toLowerCase()).join(", ") : ", no rule matched")+".",
           []]);
   return s;
 }
@@ -1476,19 +1551,50 @@ function renderDrawer(d){
   // 1. AI draft summary
   h += '<div><div class="subheading">AI draft summary</div>'
     + '<div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>'
+    // Chips name the QUESTION this line came from, in words. The slug stays on
+    // the element as data-key for the record, never on screen.
     + '<ul class="summary-list">'
     + d.summary.map(([text,keys]) => '<li>'+esc(text)
-        + (keys.length?'<span class="source-keys">'+keys.map((k)=>'<code class="source-key">'+k+'</code>').join("")+'</span>':'')
+        + (keys.length?'<span class="source-keys">'
+            + keys.map((k)=>'<span class="source-key" data-key="'+k+'">'+esc(labelOf(k))+'</span>').join("")
+            + '</span>':'')
         + '</li>').join("")
     + '</ul>'
     + '<p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the '
     + 'recorded intake answers. The draft never approves, prescribes, or sends anything.</p>'
     + '<button class="button-secondary" id="srcToggle">'+(showSource?"Hide source answers":"View source answers")+'</button>';
   if(showSource){
-    h += '<dl class="source-answers">'
-      + Object.entries(d.sourceAnswers).map(([k,v]) =>
-          '<div><dt><code class="source-key">'+k+'</code></dt><dd>'+esc(v)+'</dd></div>').join("")
-      + '</dl>';
+    // The full intake, grouped, showing the question the patient was asked and
+    // what they answered. Empty answers are shown as "not answered" rather than
+    // dropped, because a blank is itself information to a reviewer.
+    const answers = d.sourceAnswers || {};
+    const seen = new Set();
+    h += '<div class="answer-sheet">';
+    for(const group of GROUP_ORDER){
+      const keys = Object.keys(answers).filter((k) => (QUESTIONS[k] || {}).group === group);
+      if(!keys.length) continue;
+      const isConsent = group === "Consents";
+      h += '<div class="answer-group"><div class="subheading">'+group+'</div><dl>';
+      for(const k of keys){
+        seen.add(k);
+        const val = answers[k] === "" || answers[k] == null ? "Not answered" : String(answers[k]);
+        const agreed = /^(agreed|yes)$/i.test(val);
+        h += '<div class="qa'+(isConsent?" consent":"")+'">'
+          + '<dt>'+esc(questionOf(k))+'</dt>'
+          + '<dd>'+(isConsent
+              ? '<span class="pill '+(agreed?"green":"red")+'">'+(agreed?"Agreed":esc(val))+'</span>'
+              : esc(val))+'</dd></div>';
+      }
+      h += '</dl></div>';
+    }
+    // Anything not mapped to a group still has to appear, de-slugged.
+    const rest = Object.keys(answers).filter((k) => !seen.has(k));
+    if(rest.length){
+      h += '<div class="answer-group"><div class="subheading">Other</div><dl>'
+        + rest.map((k) => '<div class="qa"><dt>'+esc(questionOf(k))+'</dt><dd>'+esc(String(answers[k] || "Not answered"))+'</dd></div>').join("")
+        + '</dl></div>';
+    }
+    h += '</div>';
   }
   h += '</div>';
 

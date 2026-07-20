@@ -130,12 +130,12 @@ await page.locator('.nav-link[title="Case Queue"]').click();
   ok((await page.locator(".no-holds").count()) === 1, "a case with no holds says so explicitly");
 
   // Source answers toggle.
-  ok((await page.locator(".source-answers").count()) === 0, "source answers start hidden");
+  ok((await page.locator(".answer-sheet").count()) === 0, "source answers start hidden");
   await page.click("#srcToggle");
-  ok((await page.locator(".source-answers").count()) === 1, "the toggle reveals the source answers");
-  ok((await page.locator(".source-answers .source-key").count()) > 3, "and lists the intake answer keys");
+  ok((await page.locator(".answer-sheet").count()) === 1, "the toggle reveals the source answers");
+  ok((await page.locator(".answer-sheet .qa").count()) > 3, "and lists the intake questions with answers");
   await page.click("#srcToggle");
-  ok((await page.locator(".source-answers").count()) === 0, "and hides them again");
+  ok((await page.locator(".answer-sheet").count()) === 0, "and hides them again");
 
   // Ticking a checkbox must not also open the drawer underneath it.
   await page.click('.review-grid tr[data-row="demo-003"] [data-check]');
@@ -442,17 +442,71 @@ section("Months prefill from the requested dose and the plan");
   await page.click("#modalCancel");
 }
 
-section("Source answers show the whole intake");
+section("Provider sees questions, never slugs");
 {
   await page.locator('.nav-link[title="Case Queue"]').click();
   await page.click('.review-grid tr[data-row="demo-001"] .pin-name');
   await page.click("#srcToggle");
-  const keys = await page.locator(".source-answers .source-key").count();
-  ok(keys >= 25, `the full intake is shown, not a handful of cited fields (${keys} answers)`);
-  const text = await page.locator(".source-answers").textContent();
-  for(const field of ["thyroidCancer", "pregnant", "consentTelehealth", "shippingState", "goalWeight"]){
-    ok(text.includes(field), `intake includes ${field}`);
+
+  const rows = await page.locator(".answer-sheet .qa").count();
+  ok(rows >= 25, `the full intake is shown as question-and-answer rows (${rows})`);
+
+  const sheet = await page.locator(".answer-sheet").textContent();
+  ok(/medullary thyroid cancer/i.test(sheet), "a medical question appears in the words the patient was asked");
+  ok(/titrate up or hold/i.test(sheet), "so does the titration question");
+  ok(/Which state will your medication ship to/i.test(sheet), "and the shipping-state question");
+
+  // The whole provider surface must be slug-free. This sweeps every clinician
+  // screen, with the drawer expanded, for camelCase identifiers.
+  const slugs = ["thyroidCancer","consentTelehealth","consentSms","shippingState","goalWeight",
+    "requestedDoseLevel","currentlyOnGlp","identityVerified","allergyDetail","dosePlan",
+    "concerningAllergies","adverseReactions","eatingDisorder","gallbladderDisease"];
+  const screens = ["Case Queue","My Cases","SLA breached","Red","Yellow","Green","Video visit required"];
+  let leaked = [];
+  for(const name of screens){
+    await page.locator(`.nav-link[title="${name}"]`).click();
+    if(await page.locator("#srcToggle").count()){
+      const label = await page.locator("#srcToggle").textContent();
+      if(/View source/.test(label)) await page.click("#srcToggle");
+    }
+    const body = await page.locator(".wrap").innerText();
+    for(const s of slugs) if(body.includes(s)) leaked.push(`${name}: ${s}`);
   }
+  ok(leaked.length === 0, "no slug is rendered anywhere in the provider view" + (leaked.length ? " -> " + leaked.slice(0,4).join(", ") : ""));
+
+  // The slug still exists as data, it is just never displayed.
+  await page.locator('.nav-link[title="Case Queue"]').click();
+  const chip = page.locator(".summary-list .source-key").first();
+  ok((await chip.getAttribute("data-key")) !== null, "the underlying key is still carried on the element");
+  ok(!/[a-z][A-Z]/.test(await chip.textContent()), `but the chip reads as words ("${await chip.textContent()}")`);
+
+  // An unmapped key must degrade to readable rather than leaking raw.
+  const degraded = await page.evaluate(() => questionOf("someBrandNewQuestion"));
+  ok(degraded === "Some Brand New Question", `an unmapped key de-slugs rather than leaking (${degraded})`);
+}
+
+section("Consents are confirmed on the short list");
+{
+  await page.click('.review-grid tr[data-row="demo-001"] .pin-name');
+  const summary = await page.locator(".summary-list").textContent();
+  ok(/consent/i.test(summary), "the draft summary confirms consents without expanding the record");
+  ok(/telehealth/i.test(summary), "naming the telehealth consent");
+  ok(/SMS/i.test(summary), "and the SMS consent");
+
+  // And in the full sheet they read as a pass/fail, not a raw value.
+  const lbl = await page.locator("#srcToggle").textContent();
+  if(/View source/.test(lbl)) await page.click("#srcToggle");
+  const consentPills = await page.locator(".qa.consent .pill").allTextContents();
+  ok(consentPills.length === 2, `both consents render as a status (${consentPills.join(", ")})`);
+  ok(consentPills.includes("Agreed"), "an agreed consent reads Agreed");
+
+  // demo-002 declined SMS, which must be visible as a refusal rather than blank.
+  await page.locator('.nav-link[title="Yellow"]').click();
+  await page.click('.review-grid tr[data-row="demo-002"] .pin-name');
+  const l2 = await page.locator("#srcToggle").textContent();
+  if(/View source/.test(l2)) await page.click("#srcToggle");
+  const declined = await page.locator(".qa.consent .pill").allTextContents();
+  ok(declined.includes("Declined"), `a declined consent is shown as declined (${declined.join(", ")})`);
 }
 
 section("AI summary and triage are derived from the answers");
@@ -474,7 +528,10 @@ section("AI summary and triage are derived from the answers");
   await page.locator('.nav-link[title="Red"]').click();
   await page.click('.review-grid tr[data-row="demo-004"] .pin-name');
   const sum = await page.locator(".summary-list").textContent();
-  ok(/RED/.test(sum) && /TR-0\d/.test(sum), "a Red case names the triage rule that fired");
+  // The rule is named in words. Rule IDs are internal, like the slugs.
+  ok(/RED/.test(sum) && /identity not verified/i.test(sum),
+     "a Red case names the triage rule that fired, in words rather than a code");
+  ok(!/TR-0\d/.test(sum), "and does not show the internal rule id");
   ok(/NOT verified/.test(sum), "and the statement reflects the actual answer");
 
   // Turning a rule off must change the outcome, which is what "admin can set it" means.
