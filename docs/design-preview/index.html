@@ -416,6 +416,20 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .bubble.them{background:#e9e9eb;color:#000;border-bottom-left-radius:5px}
 .bubble.me{background:#248bf5;color:#fff;border-bottom-right-radius:5px}
 .chat-read{align-self:flex-end;color:var(--soft-muted);font-size:10.5px;margin-top:5px}
+.chat-assist{padding:10px 16px;border-top:1px solid var(--line);background:#fbfcfe}
+.assist-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.assist-tones{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.tone-btn{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.tone-btn:hover{background:#f2f6ff;border-color:#bcd2f8;color:var(--accent-ink)}
+.note-block{padding:16px 20px 4px;border-top:1px solid var(--line)}
+.note-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;flex-wrap:wrap}
+.note-head > div{display:flex;align-items:center;gap:9px}
+.note-head .subheading{margin:0}
+.note-area{
+  width:100%;border:1px solid var(--line-strong);border-radius:12px;padding:11px 12px;
+  font-family:inherit;font-size:13px;line-height:1.5;color:var(--ink);resize:vertical;background:#fff;
+}
+.note-area:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .chat-compose{display:flex;align-items:center;gap:9px;padding:12px 16px;border-top:1px solid var(--line);background:#fbfcfe}
 .chat-compose input{flex:1;border:1px solid var(--line-strong);border-radius:999px;padding:9px 15px;font-size:13.5px;font-family:inherit;background:#fff}
 .chat-send{display:grid;place-items:center;width:32px;height:32px;border-radius:99px;border:0;background:#248bf5;color:#fff;font-size:15px;font-weight:800;flex:0 0 auto}
@@ -1199,6 +1213,68 @@ function cell(c){
 
 const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
+/* ---------------------------------------------------------------------------
+   AI assist.
+
+   Two places a model would help: drafting the clinical note that accompanies a
+   decision, and drafting a reply to a patient or storefront message. Both are
+   DRAFTS. The provider edits and commits; nothing is sent or recorded from the
+   model's output directly, and the model never decides.
+
+   Nothing here calls a model. These are deterministic compositions over the
+   record, exactly like MA's summary placeholder, so the surface can be reviewed
+   before an approved clinical AI service and its BAA are in place.
+   --------------------------------------------------------------------------- */
+function draftNote(row, decisionsMap){
+  const meds = requestedMeds(row);
+  const lines = [];
+  const approved = meds.filter((m) => (decisionsMap[m.key] || {}).decision === "approve");
+  const denied   = meds.filter((m) => (decisionsMap[m.key] || {}).decision === "deny");
+
+  lines.push(row.age+" year old "+(row.sex === "F" ? "female" : "male")
+    +", BMI "+row.bmi+", presenting through "+row.company+" for weight management.");
+  lines.push(row.answers.currentlyOnGlp === "Yes"
+    ? "Currently on GLP-1 therapy, last dose "+String(row.answers.lastDose).toLowerCase()+"."
+    : "Not currently on GLP-1 therapy.");
+
+  const t = row.triageEval;
+  lines.push(t.hits.length
+    ? "Intake screening flagged: "+t.hits.map((r) => r.label.toLowerCase()).join(", ")+"."
+    : "Intake screening flagged no contraindications.");
+
+  if(row.answers.concerningAllergies === "Yes" && row.answers.allergyDetail)
+    lines.push("Allergy noted: "+row.answers.allergyDetail);
+
+  for(const m of approved){
+    const d = decisionsMap[m.key];
+    const ladder = d.months.filter(Boolean);
+    lines.push("Approved "+m.name+", "+TERM_LABEL[d.term]+", "+String(d.freq).toLowerCase()
+      +(ladder.length > 1 ? ", dosing "+ladder.join(" then ") : ", "+(ladder[0] || ""))
+      +", "+d.refills+" refills.");
+  }
+  for(const m of denied) lines.push("Declined "+m.name+" at this time.");
+
+  lines.push("Patient advised to report severe or persistent side effects and to contact the clinic with any concerns.");
+  return lines.join(" ");
+}
+
+const REPLY_TONES = ["Answer the question","Ask for more detail","Explain the hold"];
+function draftReply(t, tone){
+  // Read every inbound message, not just the most recent one. The last thing a
+  // patient sends is often "thanks", and drafting a reply to that instead of to
+  // their actual question is worse than useless.
+  const topic = t.msgs.filter((m) => m[0] === "them").map((m) => m[1]).join(" ");
+  if(tone === "Ask for more detail")
+    return "Thanks for getting in touch. So I can help properly, could you tell me a little more about what you are seeing? Any detail about when it started and how it has changed is useful.";
+  if(tone === "Explain the hold")
+    return "Your case is with me and is not lost. It is waiting on a step your state requires before I can prescribe. As soon as that is complete I will review it straight away.";
+  if(/not open|call me/i.test(topic))
+    return "Sorry the link is not opening. I can arrange for someone to call you instead and book the visit over the phone. Would later today or tomorrow morning suit you better?";
+  if(/every week|feel sick|nausea/i.test(topic))
+    return "Only when you need it. It is there for the first few weeks while your body adjusts, and most people find they need it less over time.";
+  return "Thanks for your message. I have reviewed your case and will follow up with the detail you asked for shortly.";
+}
+
 /* ------------------------------------------------------------ admin catalog */
 function renderCatalog(){
   let h = '<div class="panel"><div class="panel-heading"><div><h2>Products</h2>'
@@ -1267,8 +1343,17 @@ function renderMessages(){
     h += '<div class="bubble-row '+side+'"><div class="bubble '+side+'">'+esc(text)+'</div></div>';
     lastSide = side;
   }
-  h += '<div class="chat-read">Delivered</div></div>'
-    + '<div class="chat-compose"><input type="text" placeholder="Message" aria-label="Message" />'
+  h += '<div class="chat-read">Delivered</div></div>';
+
+  // AI assist for the reply. Suggests, never sends.
+  h += '<div class="chat-assist"><div class="assist-head">'
+    + '<span class="pill neutral">AI draft · you send it, not the model</span>'
+    + '<div class="assist-tones">'
+    + REPLY_TONES.map((t) => '<button class="tone-btn" data-tone="'+esc(t)+'">'+esc(t)+'</button>').join("")
+    + '</div></div></div>';
+
+  h += '<div class="chat-compose">'
+    + '<input type="text" id="composeBox" placeholder="Message" aria-label="Message" value="'+esc(replyDraft)+'" />'
     + '<button class="chat-send" aria-label="Send">&uarr;</button></div>'
     + '</div></div>';
   return h;
@@ -1325,10 +1410,17 @@ let showSource = false;
 let showPreflight = false;
 let compact = false;
 let submitted = null;
+let noteText = "";      // the clinical note in the approval modal
+let replyDraft = "";    // the AI-suggested reply sitting in the compose box
 const onlyEligible = (ids) => ids.filter((id) => ELIGIBLE_IDS.includes(id));
 
-const QUEUE_COLS = ["Triage","Time in Queue","Full Name","ID Verified","Sex","Age","BMI","On GLP","Req Term",
-  "Req Dose","Titration or Hold","Medication 2 Req","Medication 3 Req","Medication 4 Req","Company",
+/* Columns. This DIVERGES from MA's grid deliberately (Devin msg 2073): the
+   primary medication is now numbered Med 1 so it reads in the same series as
+   Med 2/3/4, and it gains a name column, which MA never had. MA showed a dose
+   and a plan but never said WHICH drug, so a Semaglutide and a Tirzepatide row
+   were indistinguishable at a glance. */
+const QUEUE_COLS = ["Triage","Time in Queue","Full Name","ID Verified","Sex","Age","BMI","On GLP",
+  "Med 1 Req","M1 Dose","M1 Term","Titration or Hold","Med 2 Req","Med 3 Req","Med 4 Req","Company",
   "Concerning Allergies","Standing Zofran","Video Visit","Batch Eligibility"];
 
 function renderQueue(filter){
@@ -1376,8 +1468,9 @@ function renderQueue(filter){
       + '<td class="pin pin-time">'+r.queue+'</td>'
       + '<td class="pin pin-name"><button class="patient-link">'+esc(r.name)+'</button></td>'
       + '<td><span class="pill '+(r.idv==="Y"?"green":"red")+'">'+r.idv+'</span></td>'
-      + '<td>'+r.sex+'</td><td>'+r.age+'</td><td>'+r.bmi+'</td><td>'+r.onGlp+'</td><td>'+r.term+'</td>'
-      + '<td>'+esc(r.dose)+'</td><td>'+r.plan+'</td><td>'+r.med2+'</td><td>'+r.med3+'</td><td>'+r.med4+'</td>'
+      + '<td>'+r.sex+'</td><td>'+r.age+'</td><td>'+r.bmi+'</td><td>'+r.onGlp+'</td>'
+      + '<td>'+esc(r.product)+'</td><td>'+esc(r.dose)+'</td><td>'+r.term+'</td><td>'+r.plan+'</td>'
+      + '<td>'+r.med2+'</td><td>'+r.med3+'</td><td>'+r.med4+'</td>'
       + '<td>'+esc(r.company)+'</td>'
       + '<td>'+(r.allergy==="Y"
           ? '<span class="allergy-detail-wrap" data-stop="1"><button type="button" class="allergy-flag">Y · &#9432;</button>'
@@ -1528,6 +1621,16 @@ function renderApproval(){
   if(d.decision === "none") h += '<p class="action-reason">Marked none. This medication is left undecided on the order.</p>';
 
   h += '</div></div>';
+
+  // Clinical note. The model drafts, the provider owns it.
+  h += '<div class="note-block"><div class="note-head">'
+    + '<div><div class="subheading">Clinical note</div>'
+    + '<span class="pill neutral">AI draft · provider edits and signs</span></div>'
+    + '<button class="button-secondary" id="genNote">'+(noteText?"Regenerate":"Draft with AI")+'</button></div>'
+    + '<textarea class="note-area" id="noteArea" data-f="note" rows="4" placeholder="Write the note, or draft it with AI and edit.">'
+    + esc(noteText) + '</textarea>'
+    + '<p class="ai-honesty">Composed from this case\'s recorded answers and your decisions. '
+    + 'No model ran in this preview, and nothing is signed or sent until you submit.</p></div>';
 
   h += '<div class="modal-foot">'
     + '<div class="foot-status"><strong>'+done+' of '+meds.length+'</strong> medication'+(meds.length===1?"":"s")+' decided'
@@ -1715,7 +1818,19 @@ document.getElementById("view").addEventListener("click", (e) => {
   if(e.target.id === "srcToggle"){ showSource = !showSource; renderView(); return; }
   if(e.target.id === "compact"){ compact = !compact; renderView(); return; }
   const th = e.target.closest("[data-thread]");
-  if(th){ thread = th.dataset.thread; renderView(); return; }
+  if(th){ thread = th.dataset.thread; replyDraft = ""; renderView(); return; }
+  const tone = e.target.closest("[data-tone]");
+  if(tone){
+    replyDraft = draftReply(THREADS.find((x) => x.id === thread), tone.dataset.tone);
+    renderView();
+    const box = document.getElementById("composeBox");
+    if(box){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    return;
+  }
+  if(e.target.id === "genNote"){
+    noteText = draftNote(QUEUE.find((r) => r.id === approvalFor), decisions);
+    renderView(); return;
+  }
 
   // Approval modal
   if(e.target.id === "openApproval"){ openApproval(drawerId); renderView(); return; }
@@ -1737,6 +1852,7 @@ document.getElementById("view").addEventListener("change", (e) => {
   const f = e.target.dataset ? e.target.dataset.f : null;
   if(!f || !approvalFor) return;
   const d = decisions[activeMed];
+  if(f === "note"){ noteText = e.target.value; return; }   // no re-render, keep the caret
   if(e.target.type === "checkbox"){ d[f] = e.target.checked; }
   else if(f === "term"){
     const hit = TERMS.find((t) => TERM_LABEL[t] === e.target.value) || e.target.value;

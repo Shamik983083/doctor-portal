@@ -76,11 +76,18 @@ await page.click('.role-button:text-is("Clinician")');
 await page.locator('.nav-link[title="Case Queue"]').click();
 {
   const heads = await page.locator(".review-grid thead th").allTextContents();
-  ok(heads.length === 20, `grid has MA's 20 columns (got ${heads.length})`);
+  // 21, not MA's 20. Devin msg 2073 asked for the primary medication to be
+  // numbered like the rest, which added a Med 1 Req name column MA never had.
+  // This is a DELIBERATE divergence from MA, recorded here rather than quietly
+  // relaxed: everything except that numbering still matches MA's grid.
+  ok(heads.length === 21, `grid has 21 columns, MA's 20 plus the Med 1 name (got ${heads.length})`);
   const expected = ["", "Triage", "Time in Queue", "Full Name", "ID Verified", "Sex", "Age", "BMI", "On GLP",
-    "Req Term", "Req Dose", "Titration or Hold", "Medication 2 Req", "Medication 3 Req", "Medication 4 Req",
+    "Med 1 Req", "M1 Dose", "M1 Term", "Titration or Hold", "Med 2 Req", "Med 3 Req", "Med 4 Req",
     "Company", "Concerning Allergies", "Standing Zofran", "Video Visit", "Batch Eligibility"];
-  ok(JSON.stringify(heads) === JSON.stringify(expected), "column headers match MA's practitioner grid exactly");
+  ok(JSON.stringify(heads) === JSON.stringify(expected), "column headers match the agreed set exactly");
+  const maUntouched = ["", "Triage", "Time in Queue", "Full Name", "ID Verified", "Sex", "Age", "BMI", "On GLP"];
+  ok(JSON.stringify(heads.slice(0, 9)) === JSON.stringify(maUntouched),
+     "and everything ahead of the medication block is still MA's, unchanged");
 
   ok((await page.locator(".review-grid th.pin").count()) === 4, "four pinned header columns");
   const pinPos = await page.evaluate(() =>
@@ -264,10 +271,10 @@ section("Consistent view, different content");
     const heads = await page.locator(".review-grid thead th").allTextContents();
     const rows = await page.locator(".review-grid tbody tr").count();
     counts[name] = rows;
-    if(grid === 1 && heads.length === 20 && rows > 0) shapesOk++;
+    if(grid === 1 && heads.length === 21 && rows > 0) shapesOk++;
   }
   ok(shapesOk === caseViews.length,
-     `all ${caseViews.length} case screens render the identical 20-column grid (${shapesOk} did)`);
+     `all ${caseViews.length} case screens render the identical 21-column grid (${shapesOk} did)`);
 
   ok(counts["Case Queue"] !== counts["My Cases"], "but the content differs between views");
   ok(counts["Red"] < counts["Case Queue"], "a triage filter narrows the set");
@@ -440,6 +447,79 @@ section("Months prefill from the requested dose and the plan");
     page.locator(`.field select[data-f="month${i}"]`).inputValue()));
   ok(cap.every(Boolean) && cap[3] === "L5 · 12.5 mg", `titration walks to the top of the ladder (${cap.join(" / ")})`);
   await page.click("#modalCancel");
+}
+
+section("Med 1 is numbered like the rest, and named");
+{
+  await page.locator('.nav-link[title="Case Queue"]').click();
+  const heads = await page.locator(".review-grid thead th").allTextContents();
+  for(const h of ["Med 1 Req","M1 Dose","M1 Term","Med 2 Req","Med 3 Req","Med 4 Req"])
+    ok(heads.includes(h), `column "${h}" is present`);
+  ok(!heads.includes("Req Dose") && !heads.includes("Req Term"), "the old un-numbered labels are gone");
+  ok(heads.includes("Titration or Hold"), "titration or hold is kept, it drives the monthly dosing");
+
+  // Med 1 Req must actually carry the drug name, which MA's grid never showed.
+  const i = heads.indexOf("Med 1 Req");
+  const first = await page.locator(".review-grid tbody tr").first().locator("td").nth(i).textContent();
+  ok(/Semaglutide|Tirzepatide/.test(first), `Med 1 Req names the drug (${first.trim()})`);
+
+  const di = heads.indexOf("M1 Dose");
+  const dose = await page.locator(".review-grid tbody tr").first().locator("td").nth(di).textContent();
+  ok(/mg/.test(dose), `M1 Dose still carries the dose (${dose.trim()})`);
+}
+
+section("AI assist drafts, the provider decides");
+{
+  // Clinical note on approval.
+  await page.click('.review-grid tr[data-row="demo-001"] .pin-name');
+  await page.click("#openApproval");
+  ok(await page.locator("#noteArea").isVisible(), "the approval screen has a clinical note field");
+  ok((await page.locator("#noteArea").inputValue()) === "", "which starts empty rather than pre-signed");
+  await page.click(".decision-btn.approve");
+  await page.click("#genNote");
+  const note = await page.locator("#noteArea").inputValue();
+  ok(note.length > 80, "AI drafts a note");
+  ok(/37 year old female/.test(note), "grounded in this patient's own record");
+  ok(/BMI 32.8/.test(note), "citing their real measurements");
+  ok(/Approved Semaglutide/.test(note), "and reflecting the decision just made");
+  ok(/L1 · 2.5 mg then L2 · 5 mg then L3 · 7.5 mg/.test(note), "including the month-by-month ladder");
+
+  // It is a draft: editable, and the label says so.
+  await page.fill("#noteArea", note + " Reviewed with patient by phone.");
+  ok((await page.locator("#noteArea").inputValue()).includes("Reviewed with patient by phone."),
+     "the provider can edit the draft");
+  const chip = await page.locator(".note-head .pill").textContent();
+  ok(/provider edits and signs/i.test(chip), "and it is labelled as a draft the provider owns");
+
+  // A denied medication must be reflected honestly, not glossed.
+  await page.click('.med-tab[data-med="med2"]');
+  await page.click(".decision-btn.deny");
+  await page.click("#genNote");
+  const note2 = await page.locator("#noteArea").inputValue();
+  ok(/Declined Zofran/.test(note2), "a declined medication appears in the note as declined");
+  await page.click("#modalCancel");
+
+  // Reply drafting in messages.
+  await page.locator('.nav-link[title="Messages For Provider"]').click();
+  ok((await page.locator(".tone-btn").count()) === 3, "the thread offers reply drafting options");
+  ok((await page.locator("#composeBox").inputValue()) === "", "the compose box starts empty");
+  await page.click('.tone-btn[data-tone="Explain the hold"]');
+  const draft = await page.locator("#composeBox").inputValue();
+  ok(draft.length > 40, "picking a tone drafts a reply into the compose box");
+  ok(/waiting on a step your state requires/i.test(draft), "and the draft matches the tone chosen");
+
+  // Crucially it is staged for sending, not sent.
+  const bubblesBefore = await page.locator(".bubble").count();
+  ok(bubblesBefore === 4, "drafting does not post anything to the thread");
+  const assistChip = await page.locator(".chat-assist .pill").textContent();
+  ok(/you send it, not the model/i.test(assistChip), "and the label makes clear the model does not send");
+
+  // The draft is answer-aware: a different thread gets a different reply.
+  await page.click('[data-thread="t3"]');
+  ok((await page.locator("#composeBox").inputValue()) === "", "switching thread clears the previous draft");
+  await page.click('.tone-btn[data-tone="Answer the question"]');
+  const d3 = await page.locator("#composeBox").inputValue();
+  ok(/first few weeks while your body adjusts/i.test(d3), "and the draft responds to what was actually asked");
 }
 
 section("Provider sees questions, never slugs");
