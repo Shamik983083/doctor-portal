@@ -19,6 +19,7 @@ use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController
 use App\Http\Controllers\Web\Admin\TriageRuleController as AdminTriageRuleController;
 use App\Http\Controllers\Web\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Web\Clinician\NotificationController as ClinicianNotificationController;
+use App\Http\Controllers\Web\Partner\NotificationController as PartnerNotificationController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
 use App\Http\Controllers\Web\MaPortalController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
@@ -270,6 +271,11 @@ Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])
         Route::post('/{uuid}/cancel', [PartnerCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/return-to-clinician', [PartnerCaseController::class, 'returnToClinician'])->name('return-to-clinician');
     });
+
+    // Notifications
+    Route::get('/notifications', [PartnerNotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [PartnerNotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [PartnerNotificationController::class, 'markAllRead'])->name('notifications.read-all');
 
     // API Credentials & Webhooks
     Route::get('/credentials', [PartnerCredentialController::class, 'show'])->name('credentials');

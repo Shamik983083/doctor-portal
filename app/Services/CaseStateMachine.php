@@ -10,6 +10,9 @@ use App\Notifications\CaseAssigned;
 use App\Notifications\CaseCompleted;
 use App\Notifications\ClinicianCaseAssigned;
 use App\Notifications\NewCaseSubmitted;
+use App\Notifications\PartnerCaseCancelled;
+use App\Notifications\PartnerCaseCompleted;
+use App\Notifications\PartnerCaseSupport;
 use App\Services\WebhookDispatcher;
 use App\Services\CaseAutoAssigner;
 use Illuminate\Support\Facades\DB;
@@ -229,6 +232,9 @@ class CaseStateMachine
             \Illuminate\Support\Facades\Log::warning('Admin notification failed: ' . $e->getMessage());
         }
 
+        // Notify the partner's users on completed / cancelled / support
+        $this->notifyPartner($case, $toStatus);
+
         // Notify the assigned clinician when a case is assigned to them
         if ($toStatus === PatientCase::STATUS_ASSIGNED) {
             try {
@@ -239,6 +245,30 @@ class CaseStateMachine
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Clinician assignment notification failed: ' . $e->getMessage());
             }
+        }
+    }
+
+    private function notifyPartner(PatientCase $case, string $toStatus): void
+    {
+        $notifiable = [
+            PatientCase::STATUS_COMPLETED => fn () => new PartnerCaseCompleted($case),
+            PatientCase::STATUS_CANCELLED => fn () => new PartnerCaseCancelled($case),
+            PatientCase::STATUS_SUPPORT   => fn () => new PartnerCaseSupport($case),
+        ];
+
+        if (!isset($notifiable[$toStatus])) {
+            return;
+        }
+
+        try {
+            $notification = $notifiable[$toStatus]();
+            $case->loadMissing(['patient', 'partner.users']);
+
+            $case->partner?->users->each(
+                fn ($user) => $user->notify($notification)
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Partner notification failed: ' . $e->getMessage());
         }
     }
 }

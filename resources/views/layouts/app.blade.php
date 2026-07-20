@@ -235,14 +235,18 @@
             <div class="d-flex align-items-center gap-2 gap-sm-3">
 
                 {{-- Notification bell — admin/super_admin/clinician --}}
-                @if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin','clinician']))
+                @if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin','clinician','partner']))
                 @php
-                    $notifBase = Auth::user()->hasAnyRole(['admin','super_admin'])
-                        ? '/admin/notifications'
-                        : '/clinician/notifications';
-                    $notifViewAllRoute = Auth::user()->hasAnyRole(['admin','super_admin'])
-                        ? route('admin.notifications.index')
-                        : route('clinician.notifications.index');
+                    $notifBase = match(true) {
+                        Auth::user()->hasAnyRole(['admin','super_admin']) => '/admin/notifications',
+                        Auth::user()->hasRole('clinician')                => '/clinician/notifications',
+                        default                                           => '/partner/notifications',
+                    };
+                    $notifViewAllRoute = match(true) {
+                        Auth::user()->hasAnyRole(['admin','super_admin']) => route('admin.notifications.index'),
+                        Auth::user()->hasRole('clinician')                => route('clinician.notifications.index'),
+                        default                                           => route('partner.notifications.index'),
+                    };
                 @endphp
                 <div class="dropdown" id="notifDropdownWrap">
                     <button class="btn btn-sm notif-bell-btn position-relative"
@@ -316,9 +320,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
 
-@if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin','clinician']))
+@if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin','clinician','partner']))
 @php
-    $notifBase = $notifBase ?? (Auth::user()->hasAnyRole(['admin','super_admin']) ? '/admin/notifications' : '/clinician/notifications');
+    $notifBase ??= match(true) {
+        Auth::user()->hasAnyRole(['admin','super_admin']) => '/admin/notifications',
+        Auth::user()->hasRole('clinician')                => '/clinician/notifications',
+        default                                           => '/partner/notifications',
+    };
 @endphp
 <style>
 /* ── Notification bell ───────────────────────────────────── */
