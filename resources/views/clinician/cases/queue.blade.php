@@ -190,55 +190,6 @@
         @endif
     </div>
 
-    {{-- Top 10 cases compact card --}}
-    <div class="card">
-        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-                <div class="ma-eyebrow">Pending review</div>
-                <div class="ma-title">Top cases</div>
-                <div class="ma-sub">Highest-attention cases sorted by triage priority.</div>
-            </div>
-            <a href="#fullQueue" class="btn btn-sm btn-outline-primary">View all cases &uarr;</a>
-        </div>
-        <div class="card-body p-0" style="overflow:visible">
-            <div class="table-responsive" style="overflow-x:auto;min-height:1px">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Triage</th>
-                            <th>Patient</th>
-                            <th>Company</th>
-                            <th>Time</th>
-                            <th>Status</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($cases->getCollection()->take(10) as $topRow)
-                        <tr>
-                            <td><x-triage-pill :case="$topRow" /></td>
-                            <td>
-                                <strong>{{ $topRow->patient?->full_name ?? 'N/A' }}</strong>
-                                @if($topRow->unread_messages_count > 0)
-                                    <span class="ma-pill accent ms-1">{{ $topRow->unread_messages_count }} new</span>
-                                @endif
-                            </td>
-                            <td>{{ $topRow->partner?->name ?? '—' }}</td>
-                            <td><small class="text-muted">{{ $topRow->created_at->diffForHumans(null, true) }}</small></td>
-                            <td><span class="badge badge-status-{{ $topRow->status }}">{{ ucfirst($topRow->status) }}</span></td>
-                            <td class="text-end">
-                                <a href="{{ route('clinician.cases.show', $topRow->uuid) }}" class="btn btn-sm btn-primary">Review &rarr;</a>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     {{-- Quick-review panel --}}
     @if($topCase)
     @php
