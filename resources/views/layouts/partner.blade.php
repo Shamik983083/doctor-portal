@@ -13,10 +13,16 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <style>
         /* ── Tokens ─────────────────────────────────────────── */
-        :root { --sidebar-w: 230px; }
+        :root {
+            --sidebar-w:      240px;
+            --sidebar-bg:     #0f172a;
+            --sidebar-border: rgba(255,255,255,.06);
+            --accent:         #38bdf8;
+            --accent-bg:      rgba(56,189,248,.12);
+        }
 
         /* ── Base ───────────────────────────────────────────── */
-        body { background: #f0f4f8; }
+        body { background: #f1f5f9; }
 
         /* ── Sidebar ────────────────────────────────────────── */
         #sidebar {
@@ -24,8 +30,8 @@
             min-height: 100vh;
             position: fixed;
             top: 0; left: 0; bottom: 0;
-            background: #0d47a1;
-            color: #fff;
+            background: var(--sidebar-bg);
+            color: #94a3b8;
             z-index: 1045;
             display: flex;
             flex-direction: column;
@@ -35,40 +41,89 @@
             will-change: transform;
         }
 
+        /* Brand */
         #sidebar .brand {
-            padding: 1rem 1.2rem;
-            font-size: .95rem;
+            padding: 1.1rem 1.25rem .95rem;
+            border-bottom: 1px solid var(--sidebar-border);
+            flex-shrink: 0;
+            text-decoration: none;
+        }
+        #sidebar .brand-title {
+            font-size: .92rem;
             font-weight: 700;
-            border-bottom: 1px solid rgba(255,255,255,.1);
+            color: #f1f5f9;
             display: flex;
-            flex-direction: column;
-            gap: .1rem;
+            align-items: center;
+            gap: .45rem;
+            line-height: 1.2;
+        }
+        #sidebar .brand-title .brand-icon {
+            width: 28px; height: 28px;
+            border-radius: 7px;
+            background: var(--accent-bg);
+            display: flex; align-items: center; justify-content: center;
             flex-shrink: 0;
         }
-        #sidebar .brand small { font-size: .68rem; font-weight: 400; opacity: .55; }
+        #sidebar .brand-title .brand-icon i { color: var(--accent); font-size: .85rem; }
+        #sidebar .brand-sub {
+            font-size: .68rem;
+            color: #64748b;
+            margin-top: .3rem;
+            padding-left: .1rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
+        /* Nav sections */
+        #sidebar .nav-section {
+            font-size: .58rem;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: #334155;
+            padding: .85rem 1.25rem .2rem;
+        }
+
+        /* Nav links */
         #sidebar .nav-link {
-            color: rgba(255,255,255,.72);
-            padding: .38rem 1.2rem;
+            color: #94a3b8;
+            padding: .42rem 1rem .42rem 1.25rem;
             display: flex;
             align-items: center;
             gap: .5rem;
             font-size: .82rem;
             font-weight: 500;
             border-left: 2px solid transparent;
+            border-radius: 0;
+            margin: 1px 0;
+            transition: background .15s, color .15s, border-color .15s;
+        }
+        #sidebar .nav-link i { width: 16px; text-align: center; font-size: .85rem; flex-shrink: 0; }
+        #sidebar .nav-link:hover  { color: #e2e8f0; background: rgba(255,255,255,.05); }
+        #sidebar .nav-link.active {
+            color: var(--accent);
+            background: var(--accent-bg);
+            border-left-color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Bottom sign-out area */
+        #sidebar .sidebar-footer {
+            padding: .85rem 1.25rem;
+            border-top: 1px solid var(--sidebar-border);
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+        #sidebar .sidebar-footer .btn {
+            font-size: .78rem;
+            color: #64748b;
+            border-color: #1e293b;
+            background: transparent;
             transition: background .15s, color .15s;
         }
-        #sidebar .nav-link:hover  { color: #fff; background: rgba(255,255,255,.1); }
-        #sidebar .nav-link.active { color: #fff; background: rgba(255,255,255,.12); border-left-color: #93c5fd; }
-
-        #sidebar .nav-section {
-            font-size: .58rem;
-            font-weight: 700;
-            letter-spacing: .1em;
-            text-transform: uppercase;
-            color: rgba(255,255,255,.35);
-            padding: .65rem 1.2rem .15rem;
-        }
+        #sidebar .sidebar-footer .btn:hover { background: rgba(255,255,255,.06); color: #cbd5e1; border-color: #334155; }
 
         /* ── Sidebar overlay (mobile) ───────────────────────── */
         .sidebar-overlay {
@@ -94,6 +149,7 @@
             position: sticky;
             top: 0;
             z-index: 1040;
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
         }
 
         /* ── Main content ───────────────────────────────────── */
@@ -117,34 +173,17 @@
 
         /* ── Responsive: tablet (< 992px) ──────────────────── */
         @media (max-width: 991.98px) {
-            #sidebar {
-                transform: translateX(-100%);
-            }
-            #sidebar.show {
-                transform: translateX(0);
-                box-shadow: 4px 0 24px rgba(0,0,0,.35);
-            }
-            #topbar {
-                margin-left: 0;
-                padding: .6rem 1rem;
-            }
-            #main {
-                margin-left: 0;
-                padding: 1.25rem;
-            }
+            #sidebar { transform: translateX(-100%); }
+            #sidebar.show { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,.35); }
+            #topbar { margin-left: 0; padding: .6rem 1rem; }
+            #main   { margin-left: 0; padding: 1.25rem; }
         }
 
         /* ── Responsive: mobile (< 576px) ──────────────────── */
         @media (max-width: 575.98px) {
             #main { padding: .75rem; }
             .table-responsive { -webkit-overflow-scrolling: touch; }
-            #topbar h6 {
-                font-size: .85rem;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 140px;
-            }
+            #topbar h6 { font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
         }
 
         /* ── Reduced motion ─────────────────────────────────── */
@@ -160,21 +199,30 @@
 
 {{-- ── Sidebar ── --}}
 <div id="sidebar" aria-label="Partner navigation">
+
+    {{-- Brand --}}
     <div class="brand">
-        <span><i class="bi bi-building me-1"></i> Partner Portal</span>
-        <small>{{ Auth::user()->partner->name ?? 'Partner' }}</small>
+        <div class="brand-title">
+            <div class="brand-icon"><i class="bi bi-building-fill"></i></div>
+            Partner Portal
+        </div>
+        <div class="brand-sub">{{ Auth::user()->partner->name ?? 'Partner' }}</div>
     </div>
+
+    {{-- Nav --}}
     <nav class="py-2 flex-grow-1">
         <div class="nav-section">Overview</div>
         <a href="{{ route('partner.dashboard') }}"
            class="nav-link {{ request()->routeIs('partner.dashboard') ? 'active' : '' }}">
             <i class="bi bi-speedometer2"></i> Dashboard
         </a>
+
         <div class="nav-section">Catalogue</div>
         <a href="{{ route('partner.offerings.index') }}"
            class="nav-link {{ request()->routeIs('partner.offerings.*') ? 'active' : '' }}">
             <i class="bi bi-box-seam"></i> Offerings
         </a>
+
         <div class="nav-section">Patients &amp; Cases</div>
         <a href="{{ route('partner.patients.index') }}"
            class="nav-link {{ request()->routeIs('partner.patients.*') ? 'active' : '' }}">
@@ -184,20 +232,24 @@
            class="nav-link {{ request()->routeIs('partner.cases.*') ? 'active' : '' }}">
             <i class="bi bi-folder2-open"></i> Cases
         </a>
+
         <div class="nav-section">Integration</div>
         <a href="{{ route('partner.credentials') }}"
            class="nav-link {{ request()->routeIs('partner.credentials') ? 'active' : '' }}">
             <i class="bi bi-key"></i> API Credentials
         </a>
     </nav>
-    <div class="px-3 py-3" style="border-top:1px solid rgba(255,255,255,.1);">
+
+    {{-- Sign out --}}
+    <div class="sidebar-footer">
         <form method="POST" action="{{ route('logout') }}">
             @csrf
-            <button type="submit" class="btn btn-sm btn-outline-light w-100">
-                <i class="bi bi-box-arrow-left"></i> Sign Out
+            <button type="submit" class="btn btn-sm w-100">
+                <i class="bi bi-box-arrow-left me-1"></i> Sign Out
             </button>
         </form>
     </div>
+
 </div>
 
 {{-- ── Topbar ── --}}
