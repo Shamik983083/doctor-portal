@@ -152,6 +152,92 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;m
 .stub{padding:34px 20px;text-align:center;color:var(--soft-muted);font-size:13px}
 .stub strong{display:block;color:var(--ink);font-size:14px;margin-bottom:6px}
 .note{border:1px solid #dce7fb;background:#f5f8ff;color:#47607f;padding:12px 14px;border-radius:12px;font-size:12.5px;margin-top:18px}
+/* ---------------------------------------------------------------------------
+   Provider review queue. Ported from MA-DOCPORTAL's practitioner demo:
+   apps/portal/components/demo/PractitionerDemo.tsx plus the matching rules in
+   apps/portal/app/globals.css. Same grid, same pinned columns, same drawer.
+   --------------------------------------------------------------------------- */
+.button-primary,.button-secondary,.button-danger{
+  display:inline-flex;justify-content:center;align-items:center;gap:8px;border-radius:10px;
+  padding:9px 14px;font-weight:740;font-size:13px;border:1px solid transparent;
+  transition:transform .15s ease,box-shadow .15s ease,background .15s ease;
+}
+.button-primary{background:var(--accent);color:#fff;box-shadow:0 7px 16px rgba(37,99,235,.16)}
+.button-primary:hover:not(:disabled){transform:translateY(-1px);background:var(--accent-ink)}
+.button-primary:disabled{cursor:not-allowed;opacity:.5;transform:none}
+.button-secondary{background:#fff;border-color:var(--line-strong);color:var(--ink)}
+.button-secondary:hover{background:#f7f9fc}
+.button-danger{background:#fff;border-color:#f0c3c1;color:var(--red)}
+.button-danger:hover{background:var(--red-bg)}
+.full-width{width:100%;margin-top:7px}
+
+.queue-panel{padding:0;overflow:hidden}
+.queue-actions{display:flex;gap:9px;flex-wrap:wrap}
+.queue-toolbar{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 20px;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fcfdff;
+  font-size:12px;color:var(--muted);flex-wrap:wrap;
+}
+.queue-count strong{color:var(--ink)}
+.select-all{display:flex;gap:7px;align-items:center;color:var(--ink);font-weight:650;cursor:pointer}
+.review-grid-scroll{overflow:auto}
+table.review-grid{width:100%;border-collapse:separate;border-spacing:0;background:#fff;min-width:1800px}
+.review-grid th{
+  font-weight:780;font-size:10px;line-height:1.2;color:var(--muted);letter-spacing:.075em;
+  text-transform:uppercase;text-align:left;padding:11px 12px;background:#fbfcfe;
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1;white-space:nowrap;
+}
+.review-grid td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px;color:#263248;vertical-align:middle;white-space:nowrap}
+.review-grid tbody tr:last-child td{border-bottom:0}
+.review-grid tr{cursor:pointer}
+.review-grid tr:hover td{background:#fafcff}
+.review-grid tr.selected-row td{background:#f2f6ff}
+/* Pinned first four columns, so triage and identity stay on screen while you
+   scroll the twenty-column grid sideways. */
+.review-grid th.pin,.review-grid td.pin{position:sticky;z-index:2;background:#fff}
+.review-grid th.pin{z-index:3;background:#fbfcfe}
+.review-grid .pin-select{left:0;min-width:44px;width:44px}
+.review-grid .pin-triage{left:44px;min-width:96px;width:96px}
+.review-grid .pin-time{left:140px;min-width:110px;width:110px}
+.review-grid .pin-name{left:250px;min-width:170px;width:170px;box-shadow:6px 0 8px -6px rgba(16,24,40,.14)}
+.review-grid tr:hover td.pin{background:#fafcff}
+.review-grid tr.selected-row td.pin{background:#f2f6ff}
+.patient-link{background:none;border:0;padding:0;color:var(--accent-ink);font-size:inherit;font-weight:700;cursor:pointer}
+.batch-cell .batch-reason{margin-top:4px;font-size:11px;color:var(--soft-muted);white-space:normal;max-width:230px}
+.allergy-detail-wrap{position:relative;display:inline-block}
+.allergy-flag{background:none;border:0;padding:0;cursor:pointer;color:var(--yellow);font-weight:770}
+.allergy-tooltip{
+  display:none;position:absolute;bottom:calc(100% + 6px);left:0;z-index:4;width:220px;
+  white-space:normal;background:#1d2433;color:#fff;font-size:11px;line-height:1.45;padding:8px 10px;border-radius:8px;
+}
+.allergy-detail-wrap:hover .allergy-tooltip,.allergy-flag:focus + .allergy-tooltip{display:block}
+.notice{border:1px solid #dce7fb;background:#f5f8ff;color:#47607f;padding:13px 14px;border-radius:12px;font-size:12.5px}
+.queue-notice{margin:12px 20px 18px}
+.audit-verb{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;font-weight:620;color:#31436a;background:#f2f5fa;border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+
+.quick-review{padding:20px;margin-top:16px}
+.quick-pills{display:flex;gap:6px}
+.quick-review-grid{display:grid;grid-template-columns:1.25fr 1.15fr .75fr;gap:20px}
+.subheading{color:var(--soft-muted);font-size:11px;font-weight:770;letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
+.finding-list{list-style:none;padding:0;margin:0;display:grid;gap:11px;font-size:13px}
+.finding-list li{display:flex;gap:8px}
+.finding-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:0 0 auto}
+.finding-dot.green{background:#2ca66c}.finding-dot.yellow{background:#d7981b}.finding-dot.red{background:#d44e44}
+.ai-draft-chip{margin-bottom:9px}
+.summary-list{list-style:none;padding:0;margin:0 0 10px;display:grid;gap:9px;font-size:13px}
+.source-keys{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:6px;vertical-align:middle}
+.source-key{font-size:10px;background:#eef2f9;border:1px solid #dbe3f0;border-radius:5px;padding:1px 5px;color:#3d4a63;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.ai-honesty{font-size:11.5px;color:var(--soft-muted);margin:0 0 10px}
+.source-answers{margin:10px 0 0;display:grid;gap:7px;font-size:12px}
+.source-answers > div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline}
+.source-answers dd{margin:0;color:#263248}
+.protocol-version{font-size:12px;color:var(--muted);margin:0 0 9px}
+.holds-heading{margin-top:14px}
+.holds-list{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.no-holds{font-size:12.5px;color:var(--soft-muted);margin:0}
+.action-reason{font-size:11.5px;color:var(--soft-muted);margin:8px 0 0}
+@media (max-width:1100px){.quick-review-grid{grid-template-columns:1fr}}
+
 .endpoints{display:grid;gap:10px;padding:16px 20px 20px}
 .endpoint{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}
 .endpoint > div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -263,6 +349,96 @@ const PORTALS = {
 };
 
 const P = (t,c) => ({t:t, c:c||""});
+
+/* ---------------------------------------------------------------------------
+   Provider review queue rows. Shape and content mirror MA-DOCPORTAL's
+   apps/portal/lib/demo-fixtures.ts queueRows, so the clinician surface here is
+   the same surface a provider sees in the MA demo. Fictional patients.
+   --------------------------------------------------------------------------- */
+const QUEUE = [
+  { id:"demo-001", queue:"11m", name:"Avery Morgan", idv:"Y", sex:"F", age:37, bmi:32.8, onGlp:"N",
+    term:"3M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"Zofran", med3:"-", med4:"-",
+    company:"Northstar Health", allergy:"N", allergyDetail:null, zofran:"Y",
+    triage:"Green", video:"Clear", batch:"Eligible", batchReason:null, holds:[],
+    protocolVersion:"GLP-1 protocol v8",
+    findings:[["green","Requested dose matches the current protocol titration step."],
+              ["green","No active workflow hold."],
+              ["green","No concerning allergy flag from intake."]],
+    summary:[["Requested regimen: 3M term, dose L1 · 2.5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no; additional medication requests: Zofran.",["currentlyOnGlp","additionalMedications"]],
+             ["Concerning allergies flagged: no.",["concerningAllergies"]],
+             ["Identity verification: verified.",["identityVerified"]],
+             ["Triage classification: GREEN (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"3 months", requestedDoseLevel:"Level 1 (2.5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", additionalMedications:"Zofran for nausea", concerningAllergies:"No",
+                   identityVerified:"Yes (storefront verification passed)"} },
+
+  { id:"demo-002", queue:"28m", name:"Jordan Ellis", idv:"Y", sex:"M", age:44, bmi:29.9, onGlp:"Y",
+    term:"4M", dose:"L3 · 7.5 mg", plan:"Hold", med2:"NAD+", med3:"-", med4:"-",
+    company:"Northstar Health", allergy:"Y", allergyDetail:"Reports hives after penicillin; documented at intake.", zofran:"N",
+    triage:"Yellow", video:"Required", batch:"Review", batchReason:"Yellow triage · video visit incomplete",
+    holds:["SYNCHRONOUS_VIDEO_VISIT_REQUIRED"], protocolVersion:"GLP-1 protocol v8",
+    findings:[["yellow","Dose hold requested while on active GLP-1 therapy, clinician review required."],
+              ["yellow","Synchronous-video requirement is not complete."],
+              ["yellow","Allergy flag requires provider review."]],
+    summary:[["Requested regimen: 4M term, dose L3 · 7.5 mg, plan Hold.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: yes; additional medication requests: NAD+.",["currentlyOnGlp","additionalMedications"]],
+             ["Concerning allergies flagged: yes, see the allergy detail for the patient's own words.",["concerningAllergies","allergyDetail"]],
+             ["Identity verification: verified.",["identityVerified"]],
+             ["Triage classification: YELLOW (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"4 months", requestedDoseLevel:"Level 3 (7.5 mg)", dosePlan:"Hold at current dose",
+                   currentlyOnGlp:"Yes", additionalMedications:"NAD+", concerningAllergies:"Yes",
+                   allergyDetail:"Hives after penicillin", identityVerified:"Yes (storefront verification passed)"} },
+
+  { id:"demo-003", queue:"42m", name:"Riley Chen", idv:"Y", sex:"F", age:31, bmi:34.1, onGlp:"N",
+    term:"1M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"-", med3:"-", med4:"-",
+    company:"Vitality Direct", allergy:"N", allergyDetail:null, zofran:"N",
+    triage:"Green", video:"Clear", batch:"Eligible", batchReason:null, holds:[],
+    protocolVersion:"GLP-1 protocol v8",
+    findings:[["green","Requested dose matches the current protocol titration step."],
+              ["green","No active workflow hold."],
+              ["green","Identity verified at intake."]],
+    summary:[["Requested regimen: 1M term, dose L1 · 2.5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no; no additional medication requests.",["currentlyOnGlp","additionalMedications"]],
+             ["Concerning allergies flagged: no.",["concerningAllergies"]],
+             ["Triage classification: GREEN (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"1 month", requestedDoseLevel:"Level 1 (2.5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", additionalMedications:"None", concerningAllergies:"No",
+                   identityVerified:"Yes (storefront verification passed)"} },
+
+  { id:"demo-004", queue:"1h 07m", name:"Casey Rivera", idv:"N", sex:"F", age:52, bmi:27.4, onGlp:"N",
+    term:"3M", dose:"L2 · 5 mg", plan:"Titration", med2:"-", med3:"-", med4:"-",
+    company:"Meridian Wellness", allergy:"N", allergyDetail:null, zofran:"N",
+    triage:"Red", video:"Clear", batch:"Blocked", batchReason:"Red hard stop · identity not verified",
+    holds:[], protocolVersion:"GLP-1 protocol v8",
+    findings:[["red","Identity was not verified at intake, this is a hard stop."],
+              ["red","Red triage classification blocks batch submission."],
+              ["green","No active workflow hold."]],
+    summary:[["Requested regimen: 3M term, dose L2 · 5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no.",["currentlyOnGlp"]],
+             ["Identity verification: NOT verified.",["identityVerified"]],
+             ["Triage classification: RED (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"3 months", requestedDoseLevel:"Level 2 (5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", concerningAllergies:"No", identityVerified:"No"} },
+
+  { id:"demo-005", queue:"1h 24m", name:"Morgan Blake", idv:"Y", sex:"M", age:39, bmi:31.2, onGlp:"N",
+    term:"3M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"Zofran", med3:"-", med4:"-",
+    company:"Vitality Direct", allergy:"N", allergyDetail:null, zofran:"Y",
+    triage:"Green", video:"Required", batch:"Blocked", batchReason:"Workflow hold · video visit required",
+    holds:["SYNCHRONOUS_VIDEO_VISIT_REQUIRED"], protocolVersion:"GLP-1 protocol v8",
+    findings:[["green","Triage is Green, the block is operational rather than clinical."],
+              ["yellow","State requires a synchronous video visit before dispatch."],
+              ["green","No concerning allergy flag from intake."]],
+    summary:[["Requested regimen: 3M term, dose L1 · 2.5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no; additional medication requests: Zofran.",["currentlyOnGlp","additionalMedications"]],
+             ["Triage classification: GREEN (protocol version 8), with an active workflow hold.",[]]],
+    sourceAnswers:{requestedTerm:"3 months", requestedDoseLevel:"Level 1 (2.5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", additionalMedications:"Zofran for nausea", concerningAllergies:"No",
+                   identityVerified:"Yes (storefront verification passed)"} }
+];
+
+const ELIGIBLE_IDS = QUEUE.filter(r => r.batch === "Eligible").map(r => r.id);
+const batchTone = (b) => b === "Eligible" ? "green" : b === "Review" ? "yellow" : "red";
 
 const VIEWS = {
   /* ------------------------------------------------------------- admin */
@@ -396,12 +572,11 @@ const VIEWS = {
   },
   "clin.queue": {
     eyebrow:"Clinician", title:"Case Queue", sub:"Unclaimed cases you are licensed to review. Claim one to start.",
-    table:{title:"Waiting queue", cols:["Triage","Time","Patient","IDV","Sex","Age","BMI","Offerings","Video visit","Company","Batch Eligibility","Status"], rows:[
-      [P("Red","pill red"),"14 min","Jordan Avery",P("Verified","pill green"),"F","41","32.4","Semaglutide",P("Not required","pill neutral"),"Northstar Health",P("Excluded","pill red"),P("Waiting","pill")],
-      [P("Yellow","pill yellow"),"1 hr","Casey Morgan",P("Verified","pill green"),"M","67","29.1","NAD+",P("Required","pill yellow"),"Northstar Health",P("Excluded","pill red"),P("Waiting","pill")],
-      [P("Green","pill green"),"3 hr","Devon Ellis",P("Verified","pill green"),"F","35","31.8","Peptide Therapy",P("Not required","pill neutral"),"Vitality Direct",P("Eligible","pill green"),P("Waiting","pill")],
-      [P("Green","pill green"),"4 hr","Sam Okafor",P("Verified","pill green"),"M","48","34.2","Semaglutide",P("Not required","pill neutral"),"Meridian Wellness",P("Eligible","pill green"),P("Waiting","pill")]
-    ]}
+    metrics:[["Assigned to me","18","Provider-owned and pool-claimed cases"],
+             ["Batch-ready","42","Green triage with no active workflow hold"],
+             ["Yellow review","6","Needs clinician review or follow-up"],
+             ["Video visit holds","2","Active synchronous-video holds in my queue"]],
+    queue:true
   },
   "clin.mycases": {
     eyebrow:"Clinician", title:"My Cases", sub:"Cases assigned to you, in progress and completed.",
@@ -519,6 +694,133 @@ function cell(c){
   return '<span class="'+c.c+'">'+c.t+'</span>';
 }
 
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+/* ----------------------------------------------------- provider review queue */
+/* Selection state. Only batch-eligible rows may ever enter it: Yellow, Red and
+   workflow-held rows are refused here as well as being disabled in the markup,
+   so the count can never disagree with what the grid allows. */
+let selected = [];
+let drawerId = QUEUE[0].id;
+let showSource = false;
+let showPreflight = false;
+const onlyEligible = (ids) => ids.filter((id) => ELIGIBLE_IDS.includes(id));
+
+const QUEUE_COLS = ["Triage","Time in Queue","Full Name","ID Verified","Sex","Age","BMI","On GLP","Req Term",
+  "Req Dose","Titration or Hold","Medication 2 Req","Medication 3 Req","Medication 4 Req","Company",
+  "Concerning Allergies","Standing Zofran","Video Visit","Batch Eligibility"];
+
+function renderQueue(){
+  const sel = onlyEligible(selected);
+  const allSel = ELIGIBLE_IDS.length > 0 && ELIGIBLE_IDS.every((id) => sel.includes(id));
+  const blocked = QUEUE.length - ELIGIBLE_IDS.length;
+
+  let h = '<section class="panel queue-panel">'
+    + '<div class="panel-heading"><div><div class="eyebrow">Provider review queue</div>'
+    + '<h2>Fast review, full context one click away</h2>'
+    + '<p>Desktop grid uses fictitious patients. Triage classification and operational workflow holds are separate axes.</p></div>'
+    + '<div class="queue-actions"><button class="button-secondary">Filters</button>'
+    + '<button class="button-primary" id="preflight"'+(sel.length===0?" disabled":"")+'>Run batch preflight ('+sel.length+')</button>'
+    + '</div></div>'
+    + '<div class="queue-toolbar"><div class="queue-count"><strong>'+sel.length+'</strong> selected · '
+    + '<span>'+ELIGIBLE_IDS.length+' batch-eligible · '+blocked+' rows blocked from selection</span></div>'
+    + '<label class="select-all"><input type="checkbox" id="selectAll"'+(allSel?" checked":"")+' /> Select batch-eligible Green cases</label></div>'
+    + '<div class="review-grid-scroll"><table class="review-grid"><thead><tr>'
+    + '<th class="pin pin-select"></th><th class="pin pin-triage">Triage</th>'
+    + '<th class="pin pin-time">Time in Queue</th><th class="pin pin-name">Full Name</th>'
+    + QUEUE_COLS.slice(3).map((c) => '<th>'+c+'</th>').join("")
+    + '</tr></thead><tbody>';
+
+  for(const r of QUEUE){
+    const eligible = r.batch === "Eligible";
+    const reason = r.batchReason || "Not batch eligible";
+    h += '<tr data-row="'+r.id+'"'+(drawerId===r.id?' class="selected-row"':'')+'>'
+      + '<td class="pin pin-select" data-stop="1"><input type="checkbox" data-check="'+r.id+'"'
+      + (eligible?"":" disabled")+(sel.includes(r.id)?" checked":"")
+      + ' title="'+esc(eligible?"Select "+r.name:reason)+'"'
+      + ' aria-label="'+esc(eligible?"Select "+r.name:"Select "+r.name+", blocked: "+reason)+'" /></td>'
+      + '<td class="pin pin-triage"><span class="pill '+r.triage.toLowerCase()+'">'+r.triage+'</span></td>'
+      + '<td class="pin pin-time">'+r.queue+'</td>'
+      + '<td class="pin pin-name"><button class="patient-link">'+esc(r.name)+'</button></td>'
+      + '<td><span class="pill '+(r.idv==="Y"?"green":"red")+'">'+r.idv+'</span></td>'
+      + '<td>'+r.sex+'</td><td>'+r.age+'</td><td>'+r.bmi+'</td><td>'+r.onGlp+'</td><td>'+r.term+'</td>'
+      + '<td>'+esc(r.dose)+'</td><td>'+r.plan+'</td><td>'+r.med2+'</td><td>'+r.med3+'</td><td>'+r.med4+'</td>'
+      + '<td>'+esc(r.company)+'</td>'
+      + '<td>'+(r.allergy==="Y"
+          ? '<span class="allergy-detail-wrap" data-stop="1"><button type="button" class="allergy-flag">Y · &#9432;</button>'
+            + '<span role="tooltip" class="allergy-tooltip">'+esc(r.allergyDetail||"")+'</span></span>'
+          : "N")+'</td>'
+      + '<td>'+r.zofran+'</td>'
+      + '<td><span class="pill '+(r.video==="Clear"?"green":"yellow")+'">'+r.video+'</span></td>'
+      + '<td class="batch-cell"><span class="pill '+batchTone(r.batch)+'">'+r.batch+'</span>'
+      + (r.batchReason?'<div class="batch-reason">'+esc(r.batchReason)+'</div>':'')+'</td></tr>';
+  }
+  h += '</tbody></table></div>';
+
+  if(showPreflight){
+    h += '<div class="notice queue-notice">Demo only, nothing is submitted. In production this calls '
+      + '<code class="audit-verb">POST /v1/cases/batch/preflight</code>: every selected case is revalidated '
+      + 'independently against true state (latest intake version, triage, holds, provider eligibility, catalog) '
+      + 'and only a passed preflight can seed a batch draft.</div>';
+  }
+  h += '</section>';
+
+  const d = QUEUE.find((r) => r.id === drawerId);
+  if(d) h += renderDrawer(d);
+  return h;
+}
+
+function renderDrawer(d){
+  const eligible = d.batch === "Eligible";
+  let h = '<section class="panel quick-review">'
+    + '<div class="panel-heading"><div><div class="eyebrow">Quick review · '+d.id+'</div>'
+    + '<h2>'+esc(d.name)+'</h2><p>'+esc(d.company)+' · Request '+d.term+' · '+esc(d.dose)+'</p></div>'
+    + '<div class="quick-pills"><span class="pill '+d.triage.toLowerCase()+'">'+d.triage+'</span>'
+    + '<span class="pill '+batchTone(d.batch)+'">'+d.batch+'</span></div></div>'
+    + '<div class="quick-review-grid">';
+
+  // 1. AI draft summary
+  h += '<div><div class="subheading">AI draft summary</div>'
+    + '<div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>'
+    + '<ul class="summary-list">'
+    + d.summary.map(([text,keys]) => '<li>'+esc(text)
+        + (keys.length?'<span class="source-keys">'+keys.map((k)=>'<code class="source-key">'+k+'</code>').join("")+'</span>':'')
+        + '</li>').join("")
+    + '</ul>'
+    + '<p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the '
+    + 'recorded intake answers. The draft never approves, prescribes, or sends anything.</p>'
+    + '<button class="button-secondary" id="srcToggle">'+(showSource?"Hide source answers":"View source answers")+'</button>';
+  if(showSource){
+    h += '<dl class="source-answers">'
+      + Object.entries(d.sourceAnswers).map(([k,v]) =>
+          '<div><dt><code class="source-key">'+k+'</code></dt><dd>'+esc(v)+'</dd></div>').join("")
+      + '</dl>';
+  }
+  h += '</div>';
+
+  // 2. Triage and findings
+  h += '<div><div class="subheading">Triage and findings</div>'
+    + '<p class="protocol-version">'+esc(d.protocolVersion)+' · classification '+d.triage+'</p>'
+    + '<ul class="finding-list">'
+    + d.findings.map(([tone,text]) => '<li><span class="finding-dot '+tone+'"></span> '+esc(text)+'</li>').join("")
+    + '</ul>'
+    + '<div class="subheading holds-heading">Active workflow holds</div>'
+    + (d.holds.length
+        ? '<ul class="holds-list">'+d.holds.map((x)=>'<li><code class="audit-verb">'+x+'</code></li>').join("")+'</ul>'
+        : '<p class="no-holds">No active workflow holds.</p>')
+    + '</div>';
+
+  // 3. Provider actions
+  h += '<div><div class="subheading">Provider actions</div>'
+    + '<button class="button-primary full-width"'+(eligible?"":' disabled title="'+esc(d.batchReason||"Not batch eligible")+'"')+'>Approve and queue order</button>'
+    + '<button class="button-secondary full-width">Request information</button>'
+    + '<button class="button-danger full-width">Reject</button>'
+    + (eligible?'':'<p class="action-reason">'+esc(d.batchReason||"")+'</p>')
+    + '</div>';
+
+  return h + '</div></section>';
+}
+
 function renderView(){
   const v = VIEWS[view];
   if(!v){
@@ -534,6 +836,8 @@ function renderView(){
       '<div class="metric"><div class="eyebrow">'+m[0]+'</div><div class="metric-value">'+m[1]+'</div><div class="metric-note">'+m[2]+'</div></div>'
     ).join("") + '</div>';
   }
+
+  if(v.queue){ h += renderQueue(); }
 
   if(v.doc){
     h += '<div class="panel"><div class="panel-heading"><div><h2>Endpoints</h2>'
@@ -588,6 +892,28 @@ document.getElementById("nav").addEventListener("click", e => {
     document.querySelector('[data-group="'+i+'"]').classList.toggle("closed", nowClosed);
     openState[skey(i)] = !nowClosed;   // remember it across re-renders
   }
+});
+
+/* Queue interactions. Delegated off the view container because the whole grid
+   is re-rendered on every state change. */
+document.getElementById("view").addEventListener("click", (e) => {
+  const check = e.target.closest("[data-check]");
+  if(check){
+    const id = check.dataset.check;
+    if(!ELIGIBLE_IDS.includes(id)) return;              // refuse, not just disable
+    selected = onlyEligible(selected.includes(id) ? selected.filter((x) => x !== id) : selected.concat(id));
+    renderView(); return;
+  }
+  if(e.target.id === "selectAll"){
+    const all = ELIGIBLE_IDS.every((id) => selected.includes(id));
+    selected = all ? [] : ELIGIBLE_IDS.slice();
+    renderView(); return;
+  }
+  if(e.target.id === "preflight"){ showPreflight = true; renderView(); return; }
+  if(e.target.id === "srcToggle"){ showSource = !showSource; renderView(); return; }
+  if(e.target.closest("[data-stop]")) return;           // checkbox + allergy cells never open the drawer
+  const row = e.target.closest("[data-row]");
+  if(row){ drawerId = row.dataset.row; showSource = false; renderView(); }
 });
 
 document.getElementById("toggle").addEventListener("click", () => {

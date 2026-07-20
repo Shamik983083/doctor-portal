@@ -71,6 +71,89 @@ for (const label of portals) {
 }
 ok(stubs.length === 0, `all ${visited} nav items render a built view` + (stubs.length ? " -> MISSING: " + stubs.join(", ") : ""));
 
+section("Clinician queue matches the MA practitioner surface");
+await page.click('.role-button:text-is("Clinician")');
+await page.locator('.nav-link[title="Case Queue"]').click();
+{
+  const heads = await page.locator(".review-grid thead th").allTextContents();
+  ok(heads.length === 20, `grid has MA's 20 columns (got ${heads.length})`);
+  const expected = ["", "Triage", "Time in Queue", "Full Name", "ID Verified", "Sex", "Age", "BMI", "On GLP",
+    "Req Term", "Req Dose", "Titration or Hold", "Medication 2 Req", "Medication 3 Req", "Medication 4 Req",
+    "Company", "Concerning Allergies", "Standing Zofran", "Video Visit", "Batch Eligibility"];
+  ok(JSON.stringify(heads) === JSON.stringify(expected), "column headers match MA's practitioner grid exactly");
+
+  ok((await page.locator(".review-grid th.pin").count()) === 4, "four pinned header columns");
+  const pinPos = await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".review-grid td.pin-name")).position);
+  ok(pinPos === "sticky", "the name column is genuinely sticky, not just classed");
+
+  // Blocked rows must be unselectable. This is the rule that matters clinically.
+  const boxes = page.locator(".review-grid [data-check]");
+  ok((await boxes.count()) === 5, "five queue rows");
+  // MA's fixtures are 2 Eligible, 1 Review, 2 Blocked, so 3 of the 5 refuse selection.
+  const disabled = await page.locator(".review-grid [data-check][disabled]").count();
+  ok(disabled === 3, `the three non-eligible rows are disabled (got ${disabled})`);
+
+  await page.click("#selectAll");
+  ok((await page.locator(".queue-count strong").textContent()) === "2", "select-all takes exactly the 2 eligible rows");
+  const checkedAfterAll = await page.locator(".review-grid [data-check]:checked").count();
+  ok(checkedAfterAll === 2, "and never ticks a blocked row");
+
+  // Preflight button reflects the selection.
+  ok((await page.locator("#preflight").textContent()).includes("(2)"), "preflight button counts the selection");
+  await page.click("#preflight");
+  ok(await page.locator(".queue-notice").isVisible(), "preflight shows the it-is-a-demo notice");
+  ok((await page.locator(".queue-notice .audit-verb").textContent()).includes("batch/preflight"), "notice names the real endpoint");
+
+  // Defence in depth: if the disabled attribute were ever lost, the handler must
+  // still refuse. Strip it at runtime and click the blocked row for real.
+  await page.evaluate(() => {
+    document.querySelector('[data-check="demo-004"]').removeAttribute("disabled");
+  });
+  await page.click('.review-grid tr[data-row="demo-004"] [data-check]');
+  ok((await page.locator(".queue-count strong").textContent()) === "2",
+     "a blocked row cannot enter the selection even with its disabled attribute stripped");
+
+  await page.click("#selectAll");
+  ok((await page.locator(".queue-count strong").textContent()) === "0", "select-all toggles back off");
+  ok((await page.locator("#preflight").getAttribute("disabled")) !== null, "preflight disables at zero selected");
+
+  // A blocked row must still be reviewable, it just cannot be batched.
+  await page.click('.review-grid tr[data-row="demo-004"] .pin-name');
+  ok((await page.locator(".quick-review h2").textContent()) === "Casey Rivera", "clicking a blocked row still opens quick review");
+  ok((await page.locator(".quick-review .button-primary").getAttribute("disabled")) !== null, "approve is disabled for a blocked case");
+  ok((await page.locator(".action-reason").textContent()).includes("identity not verified"), "and the reason is shown, not hidden");
+
+  await page.click('.review-grid tr[data-row="demo-001"] .pin-name');
+  ok((await page.locator(".quick-review h2").textContent()) === "Avery Morgan", "clicking an eligible row switches the drawer");
+  ok((await page.locator(".quick-review .button-primary").getAttribute("disabled")) === null, "approve is enabled for an eligible case");
+  ok((await page.locator(".no-holds").count()) === 1, "a case with no holds says so explicitly");
+
+  // Source answers toggle.
+  ok((await page.locator(".source-answers").count()) === 0, "source answers start hidden");
+  await page.click("#srcToggle");
+  ok((await page.locator(".source-answers").count()) === 1, "the toggle reveals the source answers");
+  ok((await page.locator(".source-answers .source-key").count()) > 3, "and lists the intake answer keys");
+  await page.click("#srcToggle");
+  ok((await page.locator(".source-answers").count()) === 0, "and hides them again");
+
+  // Ticking a checkbox must not also open the drawer underneath it.
+  await page.click('.review-grid tr[data-row="demo-003"] [data-check]');
+  ok((await page.locator(".quick-review h2").textContent()) === "Avery Morgan", "ticking a checkbox does not hijack the drawer");
+  ok((await page.locator(".queue-count strong").textContent()) === "1", "but it does register the selection");
+
+  // Workflow holds render as the real hold constant.
+  await page.click('.review-grid tr[data-row="demo-005"] .pin-name');
+  ok((await page.locator(".holds-list .audit-verb").textContent()).includes("SYNCHRONOUS_VIDEO_VISIT_REQUIRED"),
+     "an operationally-held case shows its hold constant");
+  ok((await page.locator(".quick-pills .pill").first().textContent()) === "Green",
+     "triage and batch state stay separate axes (Green triage, still blocked)");
+
+  // Allergy detail is reachable.
+  await page.click('.review-grid tr[data-row="demo-002"] .pin-name');
+  ok((await page.locator(".allergy-tooltip").count()) === 1, "the allergy flag carries a detail tooltip");
+}
+
 section("Sidebar collapses and restores");
 await page.click('.role-button:text-is("Admin")');
 const wideBefore = (await page.locator(".side").boundingBox()).width;

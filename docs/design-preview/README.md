@@ -47,6 +47,36 @@ It exists so the look can be agreed **before** anyone edits 56 Blade views.
   fictional. No real or production data appears anywhere in this file.
 - Metric values.
 
+## Clinician Case Queue: a port of MA's practitioner surface
+
+The clinician **Case Queue** is not a restyle of the current queue. It is a port
+of MA-DOCPORTAL's practitioner view, from
+`apps/portal/components/demo/PractitionerDemo.tsx` and the `queueRows` fixtures
+in `apps/portal/lib/demo-fixtures.ts`. Look and behaviour both carry over:
+
+- **The same 20-column quick-look grid**, headers verbatim, with the first four
+  columns (select, Triage, Time in Queue, Full Name) pinned so triage and identity
+  stay on screen while the rest scrolls sideways.
+- **Visible batch blocking with reasons.** Only batch-eligible rows can be
+  selected. Yellow, Red and workflow-held rows render a disabled checkbox whose
+  tooltip and aria-label state *why*, and the reason also prints under the Batch
+  Eligibility pill. Blocking is never silent.
+- **Triage and workflow holds as separate axes**, which is MA's design. `demo-005`
+  is the case that proves it: Green triage, still blocked, because a
+  `SYNCHRONOUS_VIDEO_VISIT_REQUIRED` hold is active.
+- **Quick review drawer**: AI draft summary explicitly labelled provider-assist
+  only, each statement carrying the intake answer keys it was composed from, a
+  "View source answers" toggle, triage findings, active workflow holds, and the
+  three provider actions with Approve disabled (and the reason shown) when the
+  case is not eligible.
+- **Batch preflight** counts the selection and names the real endpoint,
+  `POST /v1/cases/batch/preflight`, while submitting nothing.
+
+Selection is guarded twice: the handler refuses any non-eligible id, and
+`onlyEligible()` filters the resulting set. Either guard alone is sufficient,
+which is deliberate. `verify.mjs` pins the *combination* by stripping the
+disabled attribute at runtime and clicking a blocked row for real.
+
 ## Coverage
 
 28 screens across the three portals: 18 admin, 4 clinician, 6 partner. Detail
@@ -60,9 +90,17 @@ node docs/design-preview/verify.mjs                                  # local
 LIVE=https://livepainfreeagain.com/medaxis-preview/ node docs/design-preview/verify.mjs
 ```
 
-Requires Playwright. 20 checks: every nav item in every portal resolves to a
+Requires Playwright. 49 checks: every nav item in every portal resolves to a
 built screen, the rail collapses and restores, the collapsed rail still routes,
-the palette matches MA's tokens, and there is no horizontal scroll at 390px.
+the palette matches MA's tokens, there is no horizontal scroll at 390px, and the
+clinician queue behaves like MA's practitioner surface (column headers verbatim,
+pinned columns genuinely sticky, blocked rows unselectable, select-all taking only
+the eligible rows, preflight counting and disabling correctly, the drawer opening
+from any row including blocked ones, source answers toggling, and holds rendering).
+
+Four planted breaks were each proven to turn it red before being restored:
+dropping the disabled attribute, and removing both selection guards together
+(each guard alone is redundant by design, so only the pair fails the suite).
 
 ## Status
 
