@@ -498,6 +498,7 @@
     var inboxList   = document.querySelector('.ma-inbox-list');
 
     var pusher = new Pusher('{{ config('reverb.apps.apps.0.key') }}', {
+        cluster:           'mt1',
         wsHost:            '{{ config('reverb.apps.apps.0.options.host', 'localhost') }}',
         wsPort:            {{ config('reverb.apps.apps.0.options.port', 8080) }},
         wssPort:           {{ config('reverb.apps.apps.0.options.port', 8080) }},
