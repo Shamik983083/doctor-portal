@@ -6,8 +6,11 @@ use App\Events\CaseMessageSent;
 use App\Events\NewPatientMessage;
 use App\Http\Controllers\Controller;
 use App\Models\Message;
+use App\Models\User;
+use App\Notifications\NewCaseMessage;
 use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
@@ -62,6 +65,16 @@ class MessageController extends Controller
 
         // Broadcast to clinician Provider Inbox in real-time via Reverb
         broadcast(new NewPatientMessage($message, $case));
+
+        // Notify admins of new patient message
+        try {
+            $message->load(['case.clinician.user', 'patient']);
+            User::role(['admin', 'super_admin'])->each(
+                fn ($admin) => $admin->notify(new NewCaseMessage($message))
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Inbound message notification failed: ' . $e->getMessage());
+        }
 
         return response()->json($message, 201);
     }

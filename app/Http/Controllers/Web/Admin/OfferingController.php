@@ -7,6 +7,8 @@ use App\Models\Offering;
 use App\Models\OfferingCategory;
 use App\Models\Partner;
 use App\Models\Questionnaire;
+use App\Models\User;
+use App\Notifications\NewOfferingCreated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -97,6 +99,15 @@ class OfferingController extends Controller
         $data['approved_at']             = now();
 
         $offering = Offering::create($data);
+
+        try {
+            $offering->load('partner');
+            User::role(['admin', 'super_admin'])->each(
+                fn ($admin) => $admin->notify(new NewOfferingCreated($offering))
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Offering notification failed: ' . $e->getMessage());
+        }
 
         $qIds = $request->input('questionnaire_ids', []);
         if (!empty($qIds)) {

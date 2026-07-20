@@ -389,6 +389,8 @@
 .notif-icon.new_case      { background: #dbeafe; color: #1d4ed8; }
 .notif-icon.case_assigned { background: #fef3c7; color: #b45309; }
 .notif-icon.case_completed{ background: #dcfce7; color: #15803d; }
+.notif-icon.new_offering  { background: #ede9fe; color: #7c3aed; }
+.notif-icon.new_message   { background: #fce7f3; color: #be185d; }
 .notif-icon.info          { background: #f1f5f9; color: #64748b; }
 .notif-title { font-size: .8rem; font-weight: 600; color: #0f172a; line-height: 1.3; }
 .notif-body  { font-size: .75rem; color: #64748b; margin-top: .15rem; line-height: 1.4; }
@@ -411,10 +413,12 @@
     var loaded    = false;
 
     var iconMap = {
-        new_case:       { icon: 'bi-inbox-fill',      cls: 'new_case'       },
-        case_assigned:  { icon: 'bi-person-check-fill',cls: 'case_assigned'  },
-        case_completed: { icon: 'bi-check-circle-fill',cls: 'case_completed' },
-        info:           { icon: 'bi-info-circle-fill', cls: 'info'           },
+        new_case:       { icon: 'bi-inbox-fill',        cls: 'new_case'       },
+        case_assigned:  { icon: 'bi-person-check-fill', cls: 'case_assigned'  },
+        case_completed: { icon: 'bi-check-circle-fill', cls: 'case_completed' },
+        new_offering:   { icon: 'bi-box-seam-fill',     cls: 'new_offering'   },
+        new_message:    { icon: 'bi-chat-dots-fill',    cls: 'new_message'    },
+        info:           { icon: 'bi-info-circle-fill',  cls: 'info'           },
     };
 
     function esc(str) {

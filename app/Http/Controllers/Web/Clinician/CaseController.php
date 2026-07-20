@@ -10,6 +10,8 @@ use App\Models\Message;
 use App\Models\Offering;
 use App\Models\PatientCase;
 use App\Models\PatientFile;
+use App\Models\User;
+use App\Notifications\NewCaseMessage;
 use App\Services\CaseStateMachine;
 use App\Services\FileUploadService;
 use App\Services\PharmacyDispatchService;
@@ -467,6 +469,15 @@ class CaseController extends Controller
             'sender' => 'clinician',
             'timestamp' => now()->timestamp,
         ]);
+
+        try {
+            $message->load(['case.clinician.user', 'patient']);
+            User::role(['admin', 'super_admin'])->each(
+                fn ($admin) => $admin->notify(new NewCaseMessage($message))
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Message notification failed: ' . $e->getMessage());
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
