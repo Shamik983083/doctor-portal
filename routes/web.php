@@ -17,6 +17,7 @@ use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController
 use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeliveryController;
 use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Web\Admin\TriageRuleController as AdminTriageRuleController;
+use App\Http\Controllers\Web\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
 use App\Http\Controllers\Web\MaPortalController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
@@ -83,6 +84,11 @@ Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name(
 // Admin Console
 Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
+
+    // Notifications
+    Route::get('/notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [AdminNotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('notifications.read-all');
 
     // Patients
     Route::prefix('patients')->name('patients.')->group(function () {

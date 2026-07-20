@@ -233,6 +233,43 @@
                 <h6 class="mb-0 fw-semibold">@yield('page-title')</h6>
             </div>
             <div class="d-flex align-items-center gap-2 gap-sm-3">
+
+                {{-- Notification bell — admin/super_admin only --}}
+                @if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin']))
+                <div class="dropdown" id="notifDropdownWrap">
+                    <button class="btn btn-sm notif-bell-btn position-relative"
+                            id="notifBellBtn"
+                            aria-label="Notifications"
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            aria-expanded="false">
+                        <i class="bi bi-bell-fill" style="font-size:1.1rem;"></i>
+                        <span class="notif-badge d-none" id="notifBadge"></span>
+                    </button>
+
+                    <div class="dropdown-menu notif-panel p-0 shadow-lg" aria-labelledby="notifBellBtn">
+                        {{-- Panel header --}}
+                        <div class="notif-panel-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold" style="font-size:.9rem;">Notifications</span>
+                            <button class="btn btn-link btn-sm p-0 text-muted" id="notifMarkAllBtn" style="font-size:.75rem;">Mark all read</button>
+                        </div>
+
+                        {{-- Notification list --}}
+                        <div class="notif-list" id="notifList">
+                            <div class="notif-empty" id="notifEmpty">
+                                <i class="bi bi-bell-slash d-block fs-3 mb-2 text-muted"></i>
+                                <span class="text-muted small">You're all caught up!</span>
+                            </div>
+                        </div>
+
+                        {{-- Panel footer --}}
+                        <div class="notif-panel-footer text-center">
+                            <a href="{{ route('admin.notifications.index') }}" class="text-muted small" style="text-decoration:none;">View all notifications</a>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 <span class="text-muted small d-none d-sm-inline">{{ Auth::user()->name ?? '' }}</span>
                 <form method="POST" action="{{ route('logout') }}" class="d-inline">
                     @csrf
@@ -270,6 +307,205 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+
+@if(Auth::check() && Auth::user()->hasAnyRole(['admin','super_admin']))
+<style>
+/* ── Notification bell ───────────────────────────────────── */
+.notif-bell-btn {
+    color: #64748b;
+    background: transparent;
+    border: none;
+    padding: .3rem .45rem;
+    border-radius: .4rem;
+    transition: background .15s, color .15s;
+    line-height: 1;
+}
+.notif-bell-btn:hover { background: #f1f5f9; color: #0f172a; }
+.notif-bell-btn:focus { box-shadow: none; }
+
+.notif-badge {
+    position: absolute;
+    top: 2px; right: 2px;
+    min-width: 1rem; height: 1rem;
+    padding: 0 .25rem;
+    font-size: .6rem; font-weight: 700;
+    line-height: 1rem;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    text-align: center;
+    pointer-events: none;
+}
+
+/* ── Dropdown panel ─────────────────────────────────────── */
+.notif-panel {
+    width: 380px;
+    max-width: 95vw;
+    border-radius: .6rem;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    right: 0 !important;
+    left: auto !important;
+}
+.notif-panel-header {
+    padding: .85rem 1rem .75rem;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.notif-list {
+    max-height: 380px;
+    overflow-y: auto;
+    background: #fff;
+}
+.notif-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    border-bottom: 1px solid #f8fafc;
+    cursor: pointer;
+    transition: background .12s;
+    text-decoration: none;
+    color: inherit;
+}
+.notif-item:hover { background: #f8fafc; }
+.notif-item.unread { background: #eff6ff; border-left: 3px solid #3b82f6; }
+.notif-item.unread:hover { background: #dbeafe; }
+.notif-icon {
+    width: 2.2rem; height: 2.2rem;
+    border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .95rem;
+    flex-shrink: 0;
+    margin-top: .05rem;
+}
+.notif-icon.new_case      { background: #dbeafe; color: #1d4ed8; }
+.notif-icon.case_assigned { background: #fef3c7; color: #b45309; }
+.notif-icon.case_completed{ background: #dcfce7; color: #15803d; }
+.notif-icon.info          { background: #f1f5f9; color: #64748b; }
+.notif-title { font-size: .8rem; font-weight: 600; color: #0f172a; line-height: 1.3; }
+.notif-body  { font-size: .75rem; color: #64748b; margin-top: .15rem; line-height: 1.4; }
+.notif-time  { font-size: .68rem; color: #94a3b8; margin-top: .25rem; }
+.notif-panel-footer {
+    padding: .6rem 1rem;
+    border-top: 1px solid #f1f5f9;
+    background: #f8fafc;
+}
+</style>
+
+<script>
+(function () {
+    var csrf      = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var badge     = document.getElementById('notifBadge');
+    var list      = document.getElementById('notifList');
+    var empty     = document.getElementById('notifEmpty');
+    var markAllBtn= document.getElementById('notifMarkAllBtn');
+    var bellBtn   = document.getElementById('notifBellBtn');
+    var loaded    = false;
+
+    var iconMap = {
+        new_case:       { icon: 'bi-inbox-fill',      cls: 'new_case'       },
+        case_assigned:  { icon: 'bi-person-check-fill',cls: 'case_assigned'  },
+        case_completed: { icon: 'bi-check-circle-fill',cls: 'case_completed' },
+        info:           { icon: 'bi-info-circle-fill', cls: 'info'           },
+    };
+
+    function esc(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderNotifications(items) {
+        if (!items.length) {
+            list.innerHTML = '';
+            list.appendChild(empty);
+            return;
+        }
+        var html = '';
+        items.forEach(function (n) {
+            var meta = iconMap[n.type] || iconMap.info;
+            html += '<a href="' + esc(n.url) + '" class="notif-item' + (n.is_read ? '' : ' unread') + '" data-id="' + esc(n.id) + '">'
+                + '<div class="notif-icon ' + meta.cls + '"><i class="bi ' + meta.icon + '"></i></div>'
+                + '<div class="flex-grow-1 min-w-0">'
+                +   '<div class="notif-title">' + esc(n.title) + '</div>'
+                +   '<div class="notif-body">'  + esc(n.body)  + '</div>'
+                +   '<div class="notif-time">'  + esc(n.time)  + '</div>'
+                + '</div>'
+                + '</a>';
+        });
+        list.innerHTML = html;
+
+        list.querySelectorAll('.notif-item').forEach(function (el) {
+            el.addEventListener('click', function (e) {
+                var id = el.dataset.id;
+                if (el.classList.contains('unread')) {
+                    fetch('/admin/notifications/' + id + '/read', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+                    }).then(function () { el.classList.remove('unread'); refreshBadge(); });
+                }
+            });
+        });
+    }
+
+    function refreshBadge() {
+        fetch('/admin/notifications', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var count = data.unread || 0;
+                if (count > 0) {
+                    badge.textContent = count > 99 ? '99+' : count;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.classList.add('d-none');
+                }
+                if (loaded) return;
+                renderNotifications(data.notifications || []);
+            })
+            .catch(function () {});
+    }
+
+    // Load panel content when dropdown opens
+    if (bellBtn) {
+        bellBtn.addEventListener('click', function () {
+            fetch('/admin/notifications', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    loaded = true;
+                    renderNotifications(data.notifications || []);
+                    var count = data.unread || 0;
+                    if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.classList.remove('d-none'); }
+                    else { badge.classList.add('d-none'); }
+                })
+                .catch(function () {});
+        });
+    }
+
+    // Mark all read
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function () {
+            fetch('/admin/notifications/read-all', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+            }).then(function () {
+                list.querySelectorAll('.notif-item.unread').forEach(function (el) { el.classList.remove('unread'); });
+                badge.classList.add('d-none');
+            });
+        });
+    }
+
+    // Poll badge count every 60 seconds
+    refreshBadge();
+    setInterval(refreshBadge, 60000);
+})();
+</script>
+@endif
 
 <script>
 (function () {

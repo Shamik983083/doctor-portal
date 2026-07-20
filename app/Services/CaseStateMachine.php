@@ -5,6 +5,10 @@ namespace App\Services;
 use App\Models\PatientCase;
 use App\Models\Clinician;
 use App\Models\CaseEvent;
+use App\Models\User;
+use App\Notifications\CaseAssigned;
+use App\Notifications\CaseCompleted;
+use App\Notifications\NewCaseSubmitted;
 use App\Services\WebhookDispatcher;
 use App\Services\CaseAutoAssigner;
 use Illuminate\Support\Facades\DB;
@@ -80,6 +84,9 @@ class CaseStateMachine
             $case->loadMissing(['patient', 'caseOfferings.offering', 'caseQuestions']);
             $this->triageClassifier->apply($case);
         }
+
+        // Fire admin notifications for key status transitions
+        $this->notifyAdmins($case, $toStatus);
 
         // Auto-assign when entering the waiting queue, unless the caller is about to manually assign
         if ($toStatus === PatientCase::STATUS_WAITING && empty($context['skip_auto_assign'])) {
@@ -196,5 +203,29 @@ class CaseStateMachine
             'visit_type' => $case->visit_type,
             'timestamp'  => now()->timestamp,
         ]);
+    }
+
+    private function notifyAdmins(PatientCase $case, string $toStatus): void
+    {
+        $notifiable = [
+            PatientCase::STATUS_WAITING   => fn () => new NewCaseSubmitted($case),
+            PatientCase::STATUS_ASSIGNED  => fn () => new CaseAssigned($case),
+            PatientCase::STATUS_COMPLETED => fn () => new CaseCompleted($case),
+        ];
+
+        if (!isset($notifiable[$toStatus])) {
+            return;
+        }
+
+        try {
+            $notification = $notifiable[$toStatus]();
+            $case->loadMissing(['patient', 'caseOfferings.offering', 'clinician.user']);
+
+            User::role(['admin', 'super_admin'])->each(
+                fn ($admin) => $admin->notify($notification)
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Admin notification failed: ' . $e->getMessage());
+        }
     }
 }
