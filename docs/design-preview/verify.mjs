@@ -154,6 +154,101 @@ await page.locator('.nav-link[title="Case Queue"]').click();
   ok((await page.locator(".allergy-tooltip").count()) === 1, "the allergy flag carries a detail tooltip");
 }
 
+section("Compact density gains real columns");
+{
+  await page.click('.role-button:text-is("Clinician")');
+  await page.locator('.nav-link[title="Case Queue"]').click();
+  const countVisible = () => page.evaluate(() => {
+    const s = document.querySelector(".review-grid-scroll").getBoundingClientRect();
+    return [...document.querySelectorAll(".review-grid thead th")]
+      .filter((th) => { const r = th.getBoundingClientRect(); return r.left >= s.left - 1 && r.right <= s.right + 1; }).length;
+  });
+  const before = await countVisible();
+  await page.click("#compact");
+  await page.waitForTimeout(220);
+  const after = await countVisible();
+  ok(after > before, `compact reveals more columns (${before} -> ${after})`);
+  await page.click("#compact");
+  await page.waitForTimeout(200);
+  ok((await countVisible()) === before, "turning compact off restores the original density");
+}
+
+section("Approval: one decision per requested medication");
+{
+  await page.click('.review-grid tr[data-row="demo-001"] .pin-name');   // Semaglutide + Zofran
+  await page.click("#openApproval");
+  ok(await page.locator(".modal").isVisible(), "the review modal opens from the drawer");
+
+  const tabs = await page.locator(".med-tab").count();
+  ok(tabs === 2, `a case requesting two medications shows two tabs (got ${tabs})`);
+  const tabText = await page.locator(".med-tab").allTextContents();
+  ok(tabText.some((t) => t.includes("Semaglutide")) && tabText.some((t) => t.includes("Zofran")),
+     "tabs name the primary product and the add-on");
+
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null, "submit starts disabled");
+  ok((await page.locator(".foot-status").textContent()).includes("0 of 2"), "footer counts decisions made");
+
+  // Approving needs the required fields; the term must come from the catalog.
+  await page.click(".decision-btn.approve");
+  const terms = await page.locator('.field select[data-f="term"]').allTextContents();
+  ok(!terms.join(" ").includes("2 month"), "duration offers only the catalog terms");
+  const termVal = await page.locator('.field select[data-f="term"]').inputValue();
+  ok(termVal === "3 months", "duration is prefilled from the requested 3M term");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
+     "approving one medication is not enough to submit while another is undecided");
+
+  // Second medication, and its dosage list must belong to that drug.
+  await page.click('.med-tab[data-med="med2"]');
+  await page.click(".decision-btn.approve");
+  const doseOpts = await page.locator('.field select[data-f="dosage"]').allTextContents();
+  ok(doseOpts.join(" ").includes("8 mg") && !doseOpts.join(" ").includes("12.5 mg"),
+     "dosage options follow the selected medication, not the primary one");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
+     "still blocked while the add-on is missing a required dosage");
+  await page.selectOption('.field select[data-f="dosage"]', "8 mg");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) !== null,
+     "an add-on still needs its own frequency, it is not inherited from the primary");
+  await page.selectOption('.field select[data-f="freq"]', "As needed");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) === null,
+     "submit unlocks once every requested medication is complete");
+
+  // Deny needs no prescription fields at all.
+  await page.click(".decision-btn.deny");
+  ok((await page.locator('.field select[data-f="dosage"]').getAttribute("disabled")) !== null,
+     "denying disables the prescription fields");
+  ok((await page.locator("#modalSubmit").getAttribute("disabled")) === null,
+     "a denied medication needs no dosage to submit");
+
+  // Changing the term away from what was sold must be called out, not silent.
+  await page.click(".decision-btn.approve");
+  await page.selectOption('.field select[data-f="dosage"]', "8 mg");
+  await page.selectOption('.field select[data-f="term"]', "1 month");
+  ok((await page.locator(".term-warn").count()) === 1, "changing duration warns that it will not match the order");
+  await page.selectOption('.field select[data-f="term"]', "3 months");
+  ok((await page.locator(".term-warn").count()) === 0, "and the warning clears when it matches again");
+
+  await page.click("#modalSubmit");
+  ok((await page.locator(".modal").count()) === 0, "submitting closes the modal");
+  ok(await page.locator("#submitNote").isVisible(), "and says plainly that nothing was really submitted");
+
+  // A single-medication case must not show add-on tabs.
+  await page.click('.review-grid tr[data-row="demo-003"] .pin-name');
+  await page.click("#openApproval");
+  ok((await page.locator(".med-tab").count()) === 1, "a single-medication case shows one tab");
+  await page.click("#modalCancel");
+  ok((await page.locator(".modal").count()) === 0, "cancel closes without recording anything");
+}
+
+section("Clinician sidebar is a work queue, with counts");
+{
+  const labels = await page.locator(".nav-section span").allTextContents();
+  ok(labels.includes("Priority"), "sidebar has the Priority section");
+  ok(labels.includes("Tasks (General)"), "sidebar has the Tasks section");
+  ok(labels.includes("Triage"), "sidebar has the Triage section");
+  const counts = await page.locator(".nav-link .nav-count").count();
+  ok(counts >= 10, `work items carry counts (${counts} of them)`);
+}
+
 section("Sidebar collapses and restores");
 await page.click('.role-button:text-is("Admin")');
 const wideBefore = (await page.locator(".side").boundingBox()).width;

@@ -71,6 +71,11 @@ button{cursor:pointer}
 .nav-link.sub{padding-left:32px;font-size:12.5px}
 .nav-ico{width:18px;flex:0 0 auto;display:grid;place-items:center;font-size:13px;opacity:.85}
 .nav-badge{margin-left:auto;background:var(--yellow-bg);color:var(--yellow);border-radius:99px;padding:1px 7px;font-size:10px;font-weight:780}
+/* Work-queue counts sit flush right, like the reference. A zero is greyed
+   rather than hidden, so an empty queue still reads as "checked, nothing here". */
+.nav-count{margin-left:auto;color:var(--muted);font-size:11.5px;font-weight:730;font-variant-numeric:tabular-nums}
+.nav-count.zero{color:#b6bdc9;font-weight:650}
+.nav-link.active .nav-count{color:var(--accent-ink)}
 .side-foot{border-top:1px solid var(--line);padding:11px 12px;display:flex;align-items:center;gap:9px}
 .avatar{width:28px;height:28px;border-radius:99px;background:#e7edf8;color:#41537a;display:grid;place-items:center;font-size:11px;font-weight:760;flex:0 0 auto}
 .who{min-width:0}
@@ -202,6 +207,77 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .review-grid .pin-name{left:250px;min-width:170px;width:170px;box-shadow:6px 0 8px -6px rgba(16,24,40,.14)}
 .review-grid tr:hover td.pin{background:#fafcff}
 .review-grid tr.selected-row td.pin{background:#f2f6ff}
+/* Compact density. Twenty columns need ~2017px; collapsing the rail only buys
+   196px, so on a 1440 screen six columns stay off-screen either way. This trades
+   padding and type size for columns, and is a toggle rather than the default so
+   MA parity stays the baseline. */
+.review-grid.compact{min-width:0}
+.review-grid.compact th{padding:8px 7px;font-size:9.5px}
+.review-grid.compact td{padding:7px 7px;font-size:11.5px}
+.review-grid.compact .pin-triage{left:34px;min-width:74px;width:74px}
+.review-grid.compact .pin-time{left:108px;min-width:82px;width:82px}
+.review-grid.compact .pin-name{left:190px;min-width:132px;width:132px}
+.review-grid.compact .pin-select{min-width:34px;width:34px}
+.review-grid.compact .batch-reason{max-width:150px;font-size:10px}
+.density{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:650;cursor:pointer}
+
+/* --------------------------------------------------- approval / case review */
+.modal-back{position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:60;display:grid;place-items:center;padding:24px}
+.modal{background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(16,24,40,.3);width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.modal-head{display:flex;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap}
+.modal-head h2{margin:0;font-size:19px;letter-spacing:-.03em}
+.modal-who{display:flex;align-items:center;gap:11px}
+.modal-avatar{width:40px;height:40px;border-radius:99px;background:#e7edf8;color:#41537a;display:grid;place-items:center;font-size:13px;font-weight:770;flex:0 0 auto}
+.modal-demo{font-size:13px;font-weight:750}
+.modal-demo span{display:block;color:var(--soft-muted);font-size:11.5px;font-weight:600}
+.modal-facts{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
+.modal-facts div{font-size:11.5px}
+.modal-facts dt{color:var(--muted);margin:0 0 2px}
+.modal-facts dd{margin:0;font-weight:700}
+.modal-body{display:grid;grid-template-columns:.85fr 1.15fr;gap:0;overflow:auto;min-height:0}
+.modal-left{padding:20px;border-right:1px solid var(--line);background:#fcfdff}
+.modal-right{padding:20px;display:grid;gap:14px;align-content:start}
+.rx-meta{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.rx-meta dt{color:var(--muted);font-size:11px;font-weight:760;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px}
+.rx-meta dd{margin:0;font-size:13px;font-weight:650}
+.flags-panel{border:1px solid #f2c9c4;background:#fff5f4;border-radius:14px;padding:15px;margin-top:4px}
+.flags-panel.clean{border-color:#c9e7d5;background:#f2fbf6}
+.flags-title{font-weight:790;font-size:13px;color:var(--red);margin:0 0 10px}
+.flags-panel.clean .flags-title{color:var(--green)}
+.flags-grid{display:grid;gap:7px}
+.flags-grid > div{display:grid;grid-template-columns:130px 1fr;gap:10px;font-size:12px}
+.flags-grid dt{color:#8a5a55;margin:0}
+.flags-panel.clean .flags-grid dt{color:#4d7a62}
+.flags-grid dd{margin:0;font-weight:650;color:#2c3444}
+
+/* One tab per medication the storefront actually requested. */
+.med-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.med-tab{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:730;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
+.med-tab.active{background:var(--blue-bg);border-color:#bcd2f8;color:var(--accent-ink)}
+.med-tab .dot{width:7px;height:7px;border-radius:99px;background:#cfd6e2}
+.med-tab .dot.approve{background:#2ca66c}.med-tab .dot.deny{background:#d44e44}.med-tab .dot.none{background:#a8b1c0}
+.decision-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.decision-btn{border-radius:10px;padding:9px 18px;font-weight:750;font-size:13px;border:1px solid var(--line-strong);background:#fff;color:var(--ink)}
+.decision-btn.approve.on{background:#17834e;border-color:#17834e;color:#fff}
+.decision-btn.deny.on{background:var(--red);border-color:var(--red);color:#fff}
+.decision-btn.none.on{background:#5b6678;border-color:#5b6678;color:#fff}
+.field{display:grid;gap:6px}
+.field label{font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.field label .req{color:var(--red)}
+.field select,.field input[type=text]{
+  width:100%;padding:10px 11px;border-radius:10px;border:1px solid var(--line-strong);
+  background:#fff;font-size:13px;color:var(--ink);
+}
+.field select:disabled{background:#f4f6fa;color:var(--soft-muted)}
+.field.bad select{border-color:#e6a29c;background:#fff8f7}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.check-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink)}
+.term-warn{font-size:11.5px;color:var(--yellow);margin:0}
+.modal-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 22px;border-top:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap}
+.foot-status{font-size:12px;color:var(--muted)}
+.foot-status strong{color:var(--ink)}
+.foot-actions{display:flex;gap:9px;margin-left:auto}
+@media (max-width:900px){.modal-body{grid-template-columns:1fr}.modal-left{border-right:0;border-bottom:1px solid var(--line)}.field-row,.rx-meta{grid-template-columns:1fr}}
 .patient-link{background:none;border:0;padding:0;color:var(--accent-ink);font-size:inherit;font-weight:700;cursor:pointer}
 .batch-cell .batch-reason{margin-top:4px;font-size:11px;color:var(--soft-muted);white-space:normal;max-width:230px}
 .allergy-detail-wrap{position:relative;display:inline-block}
@@ -326,12 +402,32 @@ const PORTALS = {
       ]}
     ]
   },
+  /* Clinician nav follows the work-queue shape Devin referenced (CareValidate):
+     collapsible sections, a live count on every row, organised by what needs
+     doing rather than by entity type. Every bucket below maps to something
+     MEDAXIS-DOCTOR already models: triage colour, the SLA review deadline, the
+     synchronous-video hold, the support flag, and case assignment. */
   clinician: {
     label: "Clinician", who: ["AH","Dr. Alex Hart","Provider"],
     nav: [
       {type:"link", id:"clin.dashboard", ico:"◴", label:"Dashboard"},
-      {type:"link", id:"clin.queue",     ico:"\u{1F5C2}", label:"Case Queue", badge:"12"},
-      {type:"link", id:"clin.mycases",   ico:"\u{1F4CB}", label:"My Cases"},
+      {type:"section", label:"Tasks (General)", open:true, items:[
+        {id:"clin.queue",    ico:"\u{1F5C2}", label:"Case Queue", count:12},
+        {id:"clin.mycases",  ico:"\u{1F4CB}", label:"My Cases", count:8},
+        {id:"clin.messages", ico:"\u{1F4AC}", label:"Messages For Provider", count:3},
+        {id:"clin.escalations", ico:"\u{26A0}", label:"My Escalations", count:1}
+      ]},
+      {type:"section", label:"Priority", open:true, items:[
+        {id:"clin.sla.breach",   ico:"\u{1F534}", label:"SLA breached", count:2},
+        {id:"clin.sla.due",      ico:"\u{1F7E0}", label:"Approaching deadline", count:4},
+        {id:"clin.hold.video",   ico:"\u{1F4F9}", label:"Video visit required", count:2},
+        {id:"clin.support.open", ico:"\u{1F6E0}", label:"Support thread open", count:1}
+      ]},
+      {type:"section", label:"Triage", open:true, items:[
+        {id:"clin.triage.red",    ico:"\u{1F534}", label:"Red", count:3},
+        {id:"clin.triage.yellow", ico:"\u{1F7E1}", label:"Yellow", count:6},
+        {id:"clin.triage.green",  ico:"\u{1F7E2}", label:"Green", count:42}
+      ]},
       {type:"link", id:"clin.notifications", ico:"\u{1F514}", label:"Notifications"}
     ]
   },
@@ -356,7 +452,7 @@ const P = (t,c) => ({t:t, c:c||""});
    the same surface a provider sees in the MA demo. Fictional patients.
    --------------------------------------------------------------------------- */
 const QUEUE = [
-  { id:"demo-001", queue:"11m", name:"Avery Morgan", idv:"Y", sex:"F", age:37, bmi:32.8, onGlp:"N",
+  { id:"demo-001", queue:"11m", product:"Semaglutide", name:"Avery Morgan", idv:"Y", sex:"F", age:37, bmi:32.8, onGlp:"N",
     term:"3M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"Zofran", med3:"-", med4:"-",
     company:"Northstar Health", allergy:"N", allergyDetail:null, zofran:"Y",
     triage:"Green", video:"Clear", batch:"Eligible", batchReason:null, holds:[],
@@ -373,7 +469,7 @@ const QUEUE = [
                    currentlyOnGlp:"No", additionalMedications:"Zofran for nausea", concerningAllergies:"No",
                    identityVerified:"Yes (storefront verification passed)"} },
 
-  { id:"demo-002", queue:"28m", name:"Jordan Ellis", idv:"Y", sex:"M", age:44, bmi:29.9, onGlp:"Y",
+  { id:"demo-002", queue:"28m", product:"Tirzepatide", name:"Jordan Ellis", idv:"Y", sex:"M", age:44, bmi:29.9, onGlp:"Y",
     term:"4M", dose:"L3 · 7.5 mg", plan:"Hold", med2:"NAD+", med3:"-", med4:"-",
     company:"Northstar Health", allergy:"Y", allergyDetail:"Reports hives after penicillin; documented at intake.", zofran:"N",
     triage:"Yellow", video:"Required", batch:"Review", batchReason:"Yellow triage · video visit incomplete",
@@ -390,7 +486,7 @@ const QUEUE = [
                    currentlyOnGlp:"Yes", additionalMedications:"NAD+", concerningAllergies:"Yes",
                    allergyDetail:"Hives after penicillin", identityVerified:"Yes (storefront verification passed)"} },
 
-  { id:"demo-003", queue:"42m", name:"Riley Chen", idv:"Y", sex:"F", age:31, bmi:34.1, onGlp:"N",
+  { id:"demo-003", queue:"42m", product:"Semaglutide", name:"Riley Chen", idv:"Y", sex:"F", age:31, bmi:34.1, onGlp:"N",
     term:"1M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"-", med3:"-", med4:"-",
     company:"Vitality Direct", allergy:"N", allergyDetail:null, zofran:"N",
     triage:"Green", video:"Clear", batch:"Eligible", batchReason:null, holds:[],
@@ -406,7 +502,7 @@ const QUEUE = [
                    currentlyOnGlp:"No", additionalMedications:"None", concerningAllergies:"No",
                    identityVerified:"Yes (storefront verification passed)"} },
 
-  { id:"demo-004", queue:"1h 07m", name:"Casey Rivera", idv:"N", sex:"F", age:52, bmi:27.4, onGlp:"N",
+  { id:"demo-004", queue:"1h 07m", product:"Tirzepatide", name:"Casey Rivera", idv:"N", sex:"F", age:52, bmi:27.4, onGlp:"N",
     term:"3M", dose:"L2 · 5 mg", plan:"Titration", med2:"-", med3:"-", med4:"-",
     company:"Meridian Wellness", allergy:"N", allergyDetail:null, zofran:"N",
     triage:"Red", video:"Clear", batch:"Blocked", batchReason:"Red hard stop · identity not verified",
@@ -421,7 +517,7 @@ const QUEUE = [
     sourceAnswers:{requestedTerm:"3 months", requestedDoseLevel:"Level 2 (5 mg)", dosePlan:"Standard titration",
                    currentlyOnGlp:"No", concerningAllergies:"No", identityVerified:"No"} },
 
-  { id:"demo-005", queue:"1h 24m", name:"Morgan Blake", idv:"Y", sex:"M", age:39, bmi:31.2, onGlp:"N",
+  { id:"demo-005", queue:"1h 24m", product:"Semaglutide", name:"Morgan Blake", idv:"Y", sex:"M", age:39, bmi:31.2, onGlp:"N",
     term:"3M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"Zofran", med3:"-", med4:"-",
     company:"Vitality Direct", allergy:"N", allergyDetail:null, zofran:"Y",
     triage:"Green", video:"Required", batch:"Blocked", batchReason:"Workflow hold · video visit required",
@@ -439,6 +535,39 @@ const QUEUE = [
 
 const ELIGIBLE_IDS = QUEUE.filter(r => r.batch === "Eligible").map(r => r.id);
 const batchTone = (b) => b === "Eligible" ? "green" : b === "Review" ? "yellow" : "red";
+
+/* ---------------------------------------------------------------------------
+   Approval. The storefront pushes a case that may request MORE THAN ONE
+   medication: the grid's Medication 2/3/4 Req columns are exactly that. So a
+   decision is per medication, not per case, and the case cannot be submitted
+   until every requested medication has one.
+
+   Term is constrained to the three the catalog sells (1M / 3M / 4M) and is
+   prefilled from what was requested; changing it is allowed but called out,
+   because dispensing a different term than the storefront sold is a billing
+   mismatch rather than a clinical one.
+   --------------------------------------------------------------------------- */
+const TERMS = ["1M","3M","4M"];
+const TERM_LABEL = { "1M":"1 month", "3M":"3 months", "4M":"4 months" };
+const DOSAGES = {
+  Semaglutide: ["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg"],
+  Tirzepatide: ["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg","L5 · 12.5 mg"],
+  Zofran: ["4 mg","8 mg"],
+  "NAD+": ["100 mg","200 mg"]
+};
+const FREQUENCIES = ["Weekly","Every 2 weeks","Daily","As needed"];
+const REFILLS = ["0","1","2","3","5","11"];
+
+/* The medications a case actually asked for: the primary product plus whichever
+   of med2/med3/med4 carry a real value. "-" means the slot was not requested. */
+function requestedMeds(row){
+  const meds = [{ key:"primary", name:row.product, term:row.term, dose:row.dose, primary:true }];
+  for(const slot of ["med2","med3","med4"]){
+    const v = row[slot];
+    if(v && v !== "-") meds.push({ key:slot, name:v, term:row.term, dose:"", primary:false });
+  }
+  return meds;
+}
 
 const VIEWS = {
   /* ------------------------------------------------------------- admin */
@@ -586,6 +715,43 @@ const VIEWS = {
       ["Ari Delgado",P("Yellow","pill yellow"),"NAD+","Northstar Health","Yesterday",P("Approved","pill green")]
     ]}
   },
+  "clin.messages":{eyebrow:"Tasks", title:"Messages For Provider", sub:"Storefront and patient messages waiting on a reply from you.",
+    table:{title:"Awaiting reply", cols:["Patient","From","Message","Case","Waiting"], rows:[
+      ["Jordan Ellis","Northstar Health","Patient asking about the video visit slot","demo-002","22 min"],
+      ["Casey Rivera","Meridian Wellness","Storefront query on the identity check","demo-004","1 hr"],
+      ["Avery Morgan","Patient","Question about the nausea medication","demo-001","3 hr"]]}},
+  "clin.escalations":{eyebrow:"Tasks", title:"My Escalations", sub:"Cases escalated to you that need a decision.",
+    table:{title:"Escalated", cols:["Patient","Reason","Raised by","Triage","Waiting"], rows:[
+      ["Casey Rivera","Identity not verified, storefront disputes","Meridian Wellness",P("Red","pill red"),"1 hr"]]}},
+  "clin.sla.breach":{eyebrow:"Priority", title:"SLA breached", sub:"Past the review deadline. These are the ones to clear first.",
+    table:{title:"Breached", cols:["Patient","Triage","In queue","Deadline","Storefront"], rows:[
+      ["Morgan Blake",P("Green","pill green"),"1h 24m",P("Breached","pill red"),"Vitality Direct"],
+      ["Casey Rivera",P("Red","pill red"),"1h 07m",P("Breached","pill red"),"Meridian Wellness"]]}},
+  "clin.sla.due":{eyebrow:"Priority", title:"Approaching deadline", sub:"Inside the warning window before the review deadline.",
+    table:{title:"Due soon", cols:["Patient","Triage","In queue","Time left","Storefront"], rows:[
+      ["Riley Chen",P("Green","pill green"),"42m",P("4 hr","pill yellow"),"Vitality Direct"],
+      ["Jordan Ellis",P("Yellow","pill yellow"),"28m",P("6 hr","pill yellow"),"Northstar Health"]]}},
+  "clin.hold.video":{eyebrow:"Priority", title:"Video visit required", sub:"Blocked on a synchronous video visit, an operational hold rather than a clinical one.",
+    table:{title:"Held", cols:["Patient","Triage","Hold","Scheduled","Storefront"], rows:[
+      ["Jordan Ellis",P("Yellow","pill yellow"),"SYNCHRONOUS_VIDEO_VISIT_REQUIRED",P("Not booked","pill red"),"Northstar Health"],
+      ["Morgan Blake",P("Green","pill green"),"SYNCHRONOUS_VIDEO_VISIT_REQUIRED",P("Tomorrow 2pm","pill green"),"Vitality Direct"]]}},
+  "clin.support.open":{eyebrow:"Priority", title:"Support thread open", sub:"Cases with an open support conversation attached.",
+    table:{title:"Open threads", cols:["Patient","Opened by","Subject","Case","Age"], rows:[
+      ["Jordan Avery","Northstar Health","Dose change requested after submission","demo-001","14 min"]]}},
+  "clin.triage.red":{eyebrow:"Triage", title:"Red", sub:"Hard stops. These cannot be batched and need a provider decision.",
+    table:{title:"Red cases", cols:["Patient","Reason","In queue","Storefront"], rows:[
+      ["Casey Rivera","Identity not verified","1h 07m","Meridian Wellness"],
+      ["Devon Park","Thyroid cancer history","2h 11m","Northstar Health"],
+      ["Sam Okafor","BMI below threshold","3h 40m","Vitality Direct"]]}},
+  "clin.triage.yellow":{eyebrow:"Triage", title:"Yellow", sub:"Needs clinician review before it can move.",
+    table:{title:"Yellow cases", cols:["Patient","Reason","In queue","Storefront"], rows:[
+      ["Jordan Ellis","Dose hold while on active GLP-1","28m","Northstar Health"],
+      ["Noor Haddad","Allergy flag needs review","1h 02m","Vitality Direct"]]}},
+  "clin.triage.green":{eyebrow:"Triage", title:"Green", sub:"Clean intake. Batch-eligible unless an operational hold applies.",
+    table:{title:"Green cases", cols:["Patient","In queue","Batch","Storefront"], rows:[
+      ["Avery Morgan","11m",P("Eligible","pill green"),"Northstar Health"],
+      ["Riley Chen","42m",P("Eligible","pill green"),"Vitality Direct"],
+      ["Morgan Blake","1h 24m",P("Blocked","pill red"),"Vitality Direct"]]}},
   "clin.notifications":{eyebrow:"Clinician", title:"Notifications", sub:"Case assignments, SLA warnings and support requests.",
     table:{title:"Recent", cols:["Type","Message","When"], rows:[
       [P("SLA","pill yellow"),"Case for Jordan Avery approaching the 24h deadline","20 min ago"],
@@ -671,6 +837,7 @@ function navItem(it){
   return '<button class="nav-link'+(it.sub?" sub":"")+(it.id===view?" active":"")+'" data-view="'+it.id+'" title="'+it.label+'">'
        + '<span class="nav-ico">'+it.ico+'</span><span class="lbl">'+it.label+'</span>'
        + (it.badge?'<span class="nav-badge">'+it.badge+'</span>':'')
+       + (it.count !== undefined?'<span class="nav-count'+(it.count?"":" zero")+'">'+it.count+'</span>':'')
        + '</button>';
 }
 
@@ -696,6 +863,37 @@ function cell(c){
 
 const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
+/* ------------------------------------------------------------ approval state */
+let approvalFor = null;   // row id, or null when the modal is shut
+let activeMed = null;     // which medication tab is open
+let decisions = {};       // medKey -> { decision, product, medication, dosage, custom, freq, term, startToday, refills }
+
+function openApproval(rowId){
+  const row = QUEUE.find((r) => r.id === rowId);
+  approvalFor = rowId;
+  decisions = {};
+  for(const m of requestedMeds(row)){
+    decisions[m.key] = {
+      decision:null, product:m.primary ? m.name+"-"+m.term : m.name,
+      medication:m.name, dosage:m.dose || "", custom:false,
+      freq:m.primary ? "Weekly" : "", term:m.term, startToday:true, refills:"0"
+    };
+  }
+  activeMed = requestedMeds(row)[0].key;
+}
+
+/* A medication is only complete when a decision has been made, and an APPROVED
+   one also needs every required field. Deny and None need no prescription. */
+function medComplete(m){
+  const d = decisions[m.key];
+  if(!d || !d.decision) return false;
+  if(d.decision !== "approve") return true;
+  return Boolean(d.medication && d.dosage && d.freq && d.term && d.refills !== "");
+}
+function approvalReady(row){
+  return requestedMeds(row).every(medComplete);
+}
+
 /* ----------------------------------------------------- provider review queue */
 /* Selection state. Only batch-eligible rows may ever enter it: Yellow, Red and
    workflow-held rows are refused here as well as being disabled in the markup,
@@ -704,6 +902,8 @@ let selected = [];
 let drawerId = QUEUE[0].id;
 let showSource = false;
 let showPreflight = false;
+let compact = false;
+let submitted = null;
 const onlyEligible = (ids) => ids.filter((id) => ELIGIBLE_IDS.includes(id));
 
 const QUEUE_COLS = ["Triage","Time in Queue","Full Name","ID Verified","Sex","Age","BMI","On GLP","Req Term",
@@ -724,8 +924,11 @@ function renderQueue(){
     + '</div></div>'
     + '<div class="queue-toolbar"><div class="queue-count"><strong>'+sel.length+'</strong> selected · '
     + '<span>'+ELIGIBLE_IDS.length+' batch-eligible · '+blocked+' rows blocked from selection</span></div>'
-    + '<label class="select-all"><input type="checkbox" id="selectAll"'+(allSel?" checked":"")+' /> Select batch-eligible Green cases</label></div>'
-    + '<div class="review-grid-scroll"><table class="review-grid"><thead><tr>'
+    + '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">'
+    + '<label class="density"><input type="checkbox" id="compact"'+(compact?" checked":"")+' /> Compact columns</label>'
+    + '<label class="select-all"><input type="checkbox" id="selectAll"'+(allSel?" checked":"")+' /> Select batch-eligible Green cases</label>'
+    + '</div></div>'
+    + '<div class="review-grid-scroll"><table class="review-grid'+(compact?" compact":"")+'"><thead><tr>'
     + '<th class="pin pin-select"></th><th class="pin pin-triage">Triage</th>'
     + '<th class="pin pin-time">Time in Queue</th><th class="pin pin-name">Full Name</th>'
     + QUEUE_COLS.slice(3).map((c) => '<th>'+c+'</th>').join("")
@@ -757,6 +960,13 @@ function renderQueue(){
   }
   h += '</tbody></table></div>';
 
+  if(submitted){
+    const s = QUEUE.find((r) => r.id === submitted);
+    h += '<div class="notice queue-notice" id="submitNote">Decision recorded for '+esc(s.name)
+      + ' in this preview only, nothing was submitted. In production this posts one decision per '
+      + 'requested medication, then the approved lines are what seed the order.</div>';
+  }
+
   if(showPreflight){
     h += '<div class="notice queue-notice">Demo only, nothing is submitted. In production this calls '
       + '<code class="audit-verb">POST /v1/cases/batch/preflight</code>: every selected case is revalidated '
@@ -767,7 +977,112 @@ function renderQueue(){
 
   const d = QUEUE.find((r) => r.id === drawerId);
   if(d) h += renderDrawer(d);
+  h += renderApproval();
   return h;
+}
+
+const sel = (name, value, opts, extra) =>
+  '<select data-f="'+name+'"'+(extra||"")+'>'
+  + (value ? "" : '<option value="">Select...</option>')
+  + opts.map((o) => '<option'+(o===value?" selected":"")+'>'+esc(o)+'</option>').join("")
+  + '</select>';
+
+function renderApproval(){
+  if(!approvalFor) return "";
+  const row = QUEUE.find((r) => r.id === approvalFor);
+  const meds = requestedMeds(row);
+  const m = meds.find((x) => x.key === activeMed) || meds[0];
+  const d = decisions[m.key];
+  const done = meds.filter(medComplete).length;
+  const ready = approvalReady(row);
+  const termChanged = d.term !== m.term;
+  const initials = row.name.split(" ").map((p) => p[0]).join("").slice(0,2).toUpperCase();
+  const clean = row.triage === "Green";
+
+  let h = '<div class="modal-back" id="modalBack"><div class="modal" role="dialog" aria-modal="true" aria-label="Case review">'
+    + '<div class="modal-head"><h2>Case Review for</h2>'
+    + '<div class="modal-who"><div class="modal-avatar">'+initials+'</div>'
+    + '<div class="modal-demo">'+row.age+' / '+row.sex+' / '+esc(row.company)
+    + '<span>'+esc(row.name)+' · case '+row.id+'</span></div></div>'
+    + '<dl class="modal-facts">'
+    + '<div><dt>Triage</dt><dd><span class="pill '+row.triage.toLowerCase()+'">'+row.triage+'</span></dd></div>'
+    + '<div><dt>Drug allergies</dt><dd>'+(row.allergy==="Y"?esc(row.allergyDetail||"Yes"):"None reported")+'</dd></div>'
+    + '<div><dt>Video visit</dt><dd>'+row.video+'</dd></div>'
+    + '</dl></div>';
+
+  h += '<div class="modal-body"><div class="modal-left">'
+    + '<dl class="rx-meta">'
+    + '<div><dt>Time in queue</dt><dd>'+row.queue+'</dd></div>'
+    + '<div><dt>Visit type</dt><dd>'+(row.video==="Required"?"Synchronous, video":"Asynchronous")+'</dd></div>'
+    + '<div><dt>Requested term</dt><dd>'+TERM_LABEL[row.term]+'</dd></div>'
+    + '<div><dt>ID verified</dt><dd>'+(row.idv==="Y"?"Yes":"No")+'</dd></div>'
+    + '</dl>'
+    + '<div class="flags-panel'+(clean?" clean":"")+'">'
+    + '<p class="flags-title">'+esc(row.protocolVersion)+': '+row.findings.filter(f=>f[0]!=="green").length
+    + ' flag(s), triage '+row.triage+'</p><div class="flags-grid">'
+    + '<div><dt>Age</dt><dd>'+row.age+'</dd></div>'
+    + '<div><dt>Sex</dt><dd>'+row.sex+'</dd></div>'
+    + '<div><dt>BMI</dt><dd>'+row.bmi+'</dd></div>'
+    + '<div><dt>On GLP-1</dt><dd>'+(row.onGlp==="Y"?"Yes":"No")+'</dd></div>'
+    + '<div><dt>Requested dose</dt><dd>'+esc(row.dose)+'</dd></div>'
+    + '<div><dt>Plan</dt><dd>'+row.plan+'</dd></div>'
+    + '<div><dt>Storefront</dt><dd>'+esc(row.company)+'</dd></div>'
+    + '<div><dt>Batch</dt><dd>'+row.batch+(row.batchReason?", "+esc(row.batchReason):"")+'</dd></div>'
+    + '</div></div></div>';
+
+  // Right: one tab per requested medication, then that medication's decision.
+  h += '<div class="modal-right"><div class="med-tabs">'
+    + meds.map((x) => {
+        const st = decisions[x.key].decision;
+        return '<button class="med-tab'+(x.key===activeMed?" active":"")+'" data-med="'+x.key+'">'
+          + '<span class="dot '+(st||"")+'"></span>'+esc(x.name)+" · "+decisions[x.key].term
+          + (x.primary?"":" (add-on)")+'</button>';
+      }).join("")
+    + '</div>';
+
+  h += '<div class="decision-row">'
+    + ['approve','deny','none'].map((k) =>
+        '<button class="decision-btn '+k+(d.decision===k?" on":"")+'" data-dec="'+k+'">'
+        + (k==="approve"?"Approve":k==="deny"?"Deny":"None")+'</button>').join("")
+    + '</div>';
+
+  const approving = d.decision === "approve";
+  const dis = approving ? "" : " disabled";
+  const bad = (v) => approving && !v ? " bad" : "";
+
+  h += '<div class="field'+bad(d.product)+'"><label>Product selection <span class="req">*</span></label>'
+    + sel("product", d.product, [d.product].filter(Boolean), dis) + '</div>'
+    + '<div class="field'+bad(d.medication)+'"><label>Medication <span class="req">*</span></label>'
+    + sel("medication", d.medication, Object.keys(DOSAGES), dis) + '</div>'
+    + '<div class="field'+bad(d.dosage)+'"><label>Dosage <span class="req">*</span></label>'
+    + sel("dosage", d.dosage, DOSAGES[d.medication] || [], dis) + '</div>'
+    + '<label class="check-line"><input type="checkbox" data-f="custom"'+(d.custom?" checked":"")+dis+' /> Use custom dosage</label>'
+    + '<div class="field-row">'
+    + '<div class="field'+bad(d.freq)+'"><label>Administration frequency <span class="req">*</span></label>'
+    + sel("freq", d.freq, FREQUENCIES, dis) + '</div>'
+    + '<div class="field'+bad(d.term)+'"><label>Duration <span class="req">*</span></label>'
+    + sel("term", TERM_LABEL[d.term] || "", TERMS.map((t) => TERM_LABEL[t]), dis) + '</div>'
+    + '</div>'
+    + (termChanged && approving
+        ? '<p class="term-warn">Duration differs from the '+TERM_LABEL[m.term]+' the storefront sold. This is allowed, but it will not match the order.</p>'
+        : '')
+    + '<label class="check-line"><input type="checkbox" data-f="startToday"'+(d.startToday?" checked":"")+dis+' /> Start date: today</label>'
+    + '<div class="field'+bad(d.refills)+'"><label>Refills <span class="req">*</span></label>'
+    + sel("refills", d.refills, REFILLS, dis) + '</div>';
+
+  if(d.decision === "deny") h += '<p class="action-reason">Denied. No prescription is created for this medication.</p>';
+  if(d.decision === "none") h += '<p class="action-reason">Marked none. This medication is left undecided on the order.</p>';
+
+  h += '</div></div>';
+
+  h += '<div class="modal-foot">'
+    + '<div class="foot-status"><strong>'+done+' of '+meds.length+'</strong> medication'+(meds.length===1?"":"s")+' decided'
+    + (ready?"":", finish the rest to submit")+'</div>'
+    + '<div class="foot-actions"><button class="button-secondary" id="modalCancel">Cancel</button>'
+    + '<button class="button-primary" id="modalSubmit"'+(ready?"":" disabled")+'>Submit decision</button></div>'
+    + '</div>';
+
+  return h + '</div></div>';
 }
 
 function renderDrawer(d){
@@ -812,7 +1127,7 @@ function renderDrawer(d){
 
   // 3. Provider actions
   h += '<div><div class="subheading">Provider actions</div>'
-    + '<button class="button-primary full-width"'+(eligible?"":' disabled title="'+esc(d.batchReason||"Not batch eligible")+'"')+'>Approve and queue order</button>'
+    + '<button class="button-primary full-width" id="openApproval"'+(eligible?"":' disabled title="'+esc(d.batchReason||"Not batch eligible")+'"')+'>Review and approve</button>'
     + '<button class="button-secondary full-width">Request information</button>'
     + '<button class="button-danger full-width">Reject</button>'
     + (eligible?'':'<p class="action-reason">'+esc(d.batchReason||"")+'</p>')
@@ -911,9 +1226,38 @@ document.getElementById("view").addEventListener("click", (e) => {
   }
   if(e.target.id === "preflight"){ showPreflight = true; renderView(); return; }
   if(e.target.id === "srcToggle"){ showSource = !showSource; renderView(); return; }
+  if(e.target.id === "compact"){ compact = !compact; renderView(); return; }
+
+  // Approval modal
+  if(e.target.id === "openApproval"){ openApproval(drawerId); renderView(); return; }
+  if(e.target.id === "modalCancel" || e.target.id === "modalBack"){ approvalFor = null; renderView(); return; }
+  if(e.target.id === "modalSubmit"){ submitted = approvalFor; approvalFor = null; renderView(); return; }
+  const tab = e.target.closest("[data-med]");
+  if(tab){ activeMed = tab.dataset.med; renderView(); return; }
+  const dec = e.target.closest("[data-dec]");
+  if(dec){ decisions[activeMed].decision = dec.dataset.dec; renderView(); return; }
   if(e.target.closest("[data-stop]")) return;           // checkbox + allergy cells never open the drawer
   const row = e.target.closest("[data-row]");
   if(row){ drawerId = row.dataset.row; showSource = false; renderView(); }
+});
+
+/* Field edits inside the approval modal. Changing the medication invalidates a
+   dosage that belonged to the previous one, so it is cleared rather than left
+   pointing at a strength the new drug does not have. */
+document.getElementById("view").addEventListener("change", (e) => {
+  const f = e.target.dataset ? e.target.dataset.f : null;
+  if(!f || !approvalFor) return;
+  const d = decisions[activeMed];
+  if(e.target.type === "checkbox"){ d[f] = e.target.checked; }
+  else if(f === "term"){
+    const hit = TERMS.find((t) => TERM_LABEL[t] === e.target.value);
+    d.term = hit || e.target.value;
+  }
+  else {
+    d[f] = e.target.value;
+    if(f === "medication" && !(DOSAGES[e.target.value] || []).includes(d.dosage)) d.dosage = "";
+  }
+  renderView();
 });
 
 document.getElementById("toggle").addEventListener("click", () => {
