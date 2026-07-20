@@ -10,6 +10,7 @@ use App\Models\PatientFile;
 use App\Services\CaseStateMachine;
 use App\Services\FileUploadService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CaseController extends Controller
 {
@@ -107,6 +108,30 @@ class CaseController extends Controller
         );
 
         return back()->with('success', 'File uploaded successfully.');
+    }
+
+    public function downloadFile(string $uuid, string $fileUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $file = PatientFile::where('uuid', $fileUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        return Storage::disk($file->disk)->download($file->path, $file->original_name);
+    }
+
+    public function previewFile(string $uuid, string $fileUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $file = PatientFile::where('uuid', $fileUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        return Storage::disk($file->disk)->response($file->path, $file->original_name, [
+            'Content-Type' => $file->mime_type,
+        ]);
     }
 
     public function deleteFile(string $uuid, string $fileUuid)

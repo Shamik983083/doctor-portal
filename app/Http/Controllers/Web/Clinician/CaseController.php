@@ -20,6 +20,7 @@ use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 class CaseController extends Controller
@@ -536,6 +537,30 @@ class CaseController extends Controller
             "prescription-{$case->uuid}.pdf",
             ['Content-Type' => 'application/pdf']
         );
+    }
+
+    public function downloadFile(string $uuid, string $fileUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $file = PatientFile::where('uuid', $fileUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        return Storage::disk($file->disk)->download($file->path, $file->original_name);
+    }
+
+    public function previewFile(string $uuid, string $fileUuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $file = PatientFile::where('uuid', $fileUuid)
+            ->where('case_id', $case->id)
+            ->firstOrFail();
+
+        return Storage::disk($file->disk)->response($file->path, $file->original_name, [
+            'Content-Type' => $file->mime_type,
+        ]);
     }
 
     public function deleteFile(string $uuid, string $fileUuid)

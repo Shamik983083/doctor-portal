@@ -72,6 +72,8 @@ Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name(
         Route::post('/{uuid}/messages', [ClinicianCaseController::class, 'sendMessage'])->name('messages.store');
         Route::get('/{uuid}/messages/poll', [ClinicianCaseController::class, 'pollMessages'])->name('messages.poll');
         Route::post('/{uuid}/files', [ClinicianCaseController::class, 'uploadFile'])->name('files.store');
+        Route::get('/{uuid}/files/{fileUuid}/download', [ClinicianCaseController::class, 'downloadFile'])->name('files.download');
+        Route::get('/{uuid}/files/{fileUuid}/preview', [ClinicianCaseController::class, 'previewFile'])->name('files.preview');
         Route::delete('/{uuid}/files/{fileUuid}', [ClinicianCaseController::class, 'deleteFile'])->name('files.destroy');
         Route::get('/{uuid}/prescription-document/{documentUuid}', [ClinicianCaseController::class, 'downloadPrescriptionDocument'])->name('prescription-document.download');
         Route::post('/batch/preflight', [ClinicianCaseController::class, 'batchPreflight'])->name('batch.preflight');
@@ -103,6 +105,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/{uuid}', [AdminCaseController::class, 'show'])->name('show');
         Route::post('/{uuid}/assign', [AdminCaseController::class, 'assign'])->name('assign');
         Route::post('/{uuid}/files', [AdminCaseController::class, 'uploadFile'])->name('files.store');
+        Route::get('/{uuid}/files/{fileUuid}/download', [AdminCaseController::class, 'downloadFile'])->name('files.download');
+        Route::get('/{uuid}/files/{fileUuid}/preview', [AdminCaseController::class, 'previewFile'])->name('files.preview');
         Route::delete('/{uuid}/files/{fileUuid}', [AdminCaseController::class, 'deleteFile'])->name('files.destroy');
         Route::delete('/{uuid}', [AdminCaseController::class, 'destroy'])->name('destroy');
     });

@@ -541,14 +541,19 @@
                     </div>
                     <div class="d-flex gap-2 flex-shrink-0">
                         @if($file->status !== 'failed')
-                        <a href="{{ Storage::url($file->path) }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-2">
+                            @if(in_array($file->mime_type, ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']))
+                            <a href="{{ route('admin.cases.files.preview', [$case->uuid, $file->uuid]) }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2" title="View">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            @endif
+                        <a href="{{ route('admin.cases.files.download', [$case->uuid, $file->uuid]) }}" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Download">
                             <i class="bi bi-download"></i>
                         </a>
                         @endif
                         <form method="POST" action="{{ route('admin.cases.files.destroy', [$case->uuid, $file->uuid]) }}"
                               onsubmit="return confirm('Delete this file?')">
                             @csrf @method('DELETE')
-                            <button class="btn btn-outline-danger btn-sm py-0 px-2">
+                            <button class="btn btn-outline-danger btn-sm py-0 px-2" title="Delete">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>
