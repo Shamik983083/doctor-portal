@@ -126,12 +126,7 @@
     {{-- Right: Tabs --}}
     <div class="col-lg-8">
 
-        {{-- Back link --}}
-        <div class="mb-3">
-            <a href="{{ route('admin.cases.index') }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>Back to Cases
-            </a>
-        </div>
+
 
         <ul class="nav nav-tabs mb-3" id="caseTabs">
             <li class="nav-item">
