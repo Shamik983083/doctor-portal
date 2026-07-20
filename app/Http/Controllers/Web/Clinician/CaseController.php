@@ -417,7 +417,11 @@ class CaseController extends Controller
             'body' => $request->body,
         ]);
 
-        broadcast(new CaseMessageSent($message))->toOthers();
+        try {
+            broadcast(new CaseMessageSent($message))->toOthers();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Reverb broadcast failed for message '.$message->id.': '.$e->getMessage());
+        }
 
         $this->webhooks->dispatch($case->partner_id, 'message_created', [
             'case_id' => $case->uuid,
