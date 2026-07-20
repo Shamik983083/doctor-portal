@@ -10,7 +10,7 @@
             <div class="card-body">
                 <p class="text-muted small mb-4">
                     Use these credentials to obtain access tokens for the Partner REST API.
-                    Keep your Client ID and Client Secret confidential — never expose them in client-side code.
+                    Keep your Client Secret and Webhook Secret confidential — never expose them in client-side code.
                 </p>
 
                 <div class="mb-4">
@@ -38,6 +38,21 @@
                     </div>
                 </div>
 
+                <div class="mb-4">
+                    <label class="form-label fw-medium small text-muted text-uppercase">Webhook Secret</label>
+                    <div class="input-group">
+                        <input type="password" id="webhookSecret" class="form-control font-monospace"
+                               value="{{ $partner->webhook_secret }}" readonly>
+                        <button class="btn btn-outline-secondary" onclick="toggleField('webhookSecret', this)">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="copyField('webhookSecret')">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">Used to verify HMAC-SHA256 signatures on incoming webhook payloads.</div>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label fw-medium small text-muted text-uppercase">Token Endpoint</label>
                     <input type="text" class="form-control font-monospace bg-light"
@@ -46,6 +61,41 @@
             </div>
         </div>
 
+        <div class="card">
+            <div class="card-header bg-white py-3"><h6 class="mb-0 fw-semibold">Webhooks</h6></div>
+            <div class="card-body">
+                @if($webhooks->isEmpty())
+                    <p class="text-muted small mb-0">No webhooks configured yet. Contact your administrator to set up webhooks.</p>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>URL</th>
+                                    <th>Event</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($webhooks as $wh)
+                                <tr>
+                                    <td class="font-monospace">{{ Str::limit($wh->url, 45) }}</td>
+                                    <td>{{ $wh->event_type ?? 'All events' }}</td>
+                                    <td>
+                                        @if($wh->status === 'active')
+                                            <span class="badge bg-success bg-opacity-10 text-success">Active</span>
+                                        @else
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ ucfirst($wh->status) }}</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
     </div>
 
     <div class="col-lg-5">
@@ -109,6 +159,15 @@ Content-Type: application/json
                     Required questionnaire slugs vary by offering — see the full API guides for a complete list.
                 </p>
 
+                <h6 class="small fw-bold mb-2">Step 4 — Verify webhook signature</h6>
+                <pre class="bg-dark text-light rounded p-3 small" style="font-size:.72rem">$header = $request->header('X-Webhook-Signature');
+// format: "sha256={hex_digest}"
+$digest   = str_replace('sha256=', '', $header);
+$expected = hash_hmac('sha256', $rawBody, WEBHOOK_SECRET);
+
+if (!hash_equals($expected, $digest)) {
+    return response('Unauthorized', 401);
+}</pre>
             </div>
         </div>
     </div>
