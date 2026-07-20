@@ -95,7 +95,7 @@
 </div>
 @endsection
 
-@section('scripts')
+@push('scripts')
 <script>
 function markRead(id) {
     fetch('/partner/notifications/' + id + '/read', {
