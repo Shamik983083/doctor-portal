@@ -8,26 +8,38 @@ use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $notifications = Auth::user()
-            ->notifications()
-            ->latest()
-            ->limit(20)
-            ->get()
-            ->map(fn ($n) => [
-                'id'         => $n->id,
-                'type'       => $n->data['type'] ?? 'info',
-                'title'      => $n->data['title'] ?? '',
-                'body'       => $n->data['body'] ?? '',
-                'url'        => $n->data['url'] ?? '#',
-                'is_read'    => !is_null($n->read_at),
-                'time'       => $n->created_at->diffForHumans(),
+        $user = Auth::user();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            $notifications = $user->notifications()
+                ->latest()
+                ->limit(20)
+                ->get()
+                ->map(fn ($n) => [
+                    'id'      => $n->id,
+                    'type'    => $n->data['type'] ?? 'info',
+                    'title'   => $n->data['title'] ?? '',
+                    'body'    => $n->data['body'] ?? '',
+                    'url'     => $n->data['url'] ?? '#',
+                    'is_read' => !is_null($n->read_at),
+                    'time'    => $n->created_at->diffForHumans(),
+                ]);
+
+            return response()->json([
+                'notifications' => $notifications,
+                'unread'        => $user->unreadNotifications()->count(),
             ]);
+        }
 
-        $unread = Auth::user()->unreadNotifications()->count();
+        $notifications = $user->notifications()
+            ->latest()
+            ->paginate(25);
 
-        return response()->json(['notifications' => $notifications, 'unread' => $unread]);
+        $unread = $user->unreadNotifications()->count();
+
+        return view('admin.notifications.index', compact('notifications', 'unread'));
     }
 
     public function markRead(string $id)
