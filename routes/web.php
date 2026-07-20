@@ -119,8 +119,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::delete('/{uuid}', [AdminCaseController::class, 'destroy'])->name('destroy');
     });
 
-    // Partners
-    Route::prefix('partners')->name('partners.')->group(function () {
+    // Partners (Super Admin only). Storefronts carry their own Healthie
+    // credentials, so this is an integration surface, not an operational one.
+    // Devin msg 2117: "All API integrations etc should be a super admin function."
+    Route::prefix('partners')->name('partners.')->middleware('role:super_admin')->group(function () {
         Route::get('/', [AdminPartnerController::class, 'index'])->name('index');
         Route::get('/create', [AdminPartnerController::class, 'create'])->name('create');
         Route::post('/', [AdminPartnerController::class, 'store'])->name('store');
@@ -188,6 +190,19 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::delete('/{id}/questionnaires/{qId}',  [AdminOfferingController::class, 'detachQuestionnaire'])->name('questionnaires.detach');
     });
 
+    /*
+     * INTEGRATION AND PLATFORM CONFIGURATION: SUPER ADMIN ONLY (Devin msg 2117).
+     *
+     * Everything in this group either reaches outside MEDAXIS or changes how the
+     * platform behaves for every doctor: the API guides, webhook deliveries, SLA
+     * settings and the triage rule set. A Doctor Admin runs their doctors; they
+     * do not configure the platform or its outbound connections.
+     *
+     * Grouped rather than annotated route by route so a new integration added
+     * here inherits the restriction instead of relying on someone remembering it.
+     */
+    Route::middleware('role:super_admin')->group(function () {
+
     // Developer Guide
     Route::get('/guide/messaging', fn() => view('admin.guide.messaging'))->name('guide.messaging');
     Route::get('/guide/webhooks', fn() => view('admin.guide.webhooks'))->name('guide.webhooks');
@@ -224,6 +239,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::patch('/{triageRule}/toggle', [AdminTriageRuleController::class, 'toggleActive'])->name('toggle');
     });
 
+    }); // end super-admin-only integration and configuration group
+
     // Admin Users (Super Admin only)
     Route::prefix('admins')->name('admins.')->middleware('role:super_admin')->group(function () {
         Route::get('/',         [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'index'])->name('index');
@@ -233,6 +250,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::patch('/{id}/toggle-active', [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'toggleActive'])->name('toggle-active');
         Route::patch('/{id}/promote',       [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'promote'])->name('promote');
         Route::patch('/{id}/demote',        [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'demote'])->name('demote');
+        // Which doctors this admin is over.
+        Route::put('/{id}/clinicians',      [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'updateClinicians'])->name('clinicians.update');
         Route::delete('/{id}',  [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'destroy'])->name('destroy');
     });
 

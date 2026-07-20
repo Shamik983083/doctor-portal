@@ -13,7 +13,9 @@ class ClinicianController extends Controller
 {
     public function index(Request $request)
     {
-        $clinicians = Clinician::with('user')
+        // Devin msg 2117: an admin is over specific doctors and sees only those.
+        $clinicians = Clinician::visibleTo($request->user())
+            ->with('user')
             ->withCount(['cases'])
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->search, fn($q, $s) => $q->whereHas('user', fn($q) => $q->where('name', 'like', "%{$s}%")))

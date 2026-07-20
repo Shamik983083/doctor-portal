@@ -22,6 +22,28 @@ class Clinician extends Model
         'licensed_states' => 'array',
     ];
 
+    /**
+     * Restrict to the doctors this admin is over (Devin msg 2117).
+     * Super admin sees all; a Doctor Admin assigned nobody sees nobody.
+     * See PatientCase::scopeVisibleTo for why an empty list must stay empty.
+     */
+    public function scopeVisibleTo($query, ?User $user)
+    {
+        $ids = $user?->visibleClinicianIds();
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        return $query->whereIn('id', $ids);
+    }
+
+    /** The admins who are over this doctor. */
+    public function admins()
+    {
+        return $this->belongsToMany(User::class, 'admin_clinician');
+    }
+
     protected static function boot(): void
     {
         parent::boot();

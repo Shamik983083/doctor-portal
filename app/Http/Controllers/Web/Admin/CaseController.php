@@ -21,7 +21,11 @@ class CaseController extends Controller
 
     public function index(Request $request)
     {
-        $cases = PatientCase::with(['patient', 'partner', 'clinician.user', 'caseOfferings.offering'])
+        // A Doctor Admin sees only their own doctors' cases; a super admin sees
+        // all of them (Devin msg 2117). Applied first so no later filter can
+        // widen it, only narrow it.
+        $cases = PatientCase::visibleTo($request->user())
+            ->with(['patient', 'partner', 'clinician.user', 'caseOfferings.offering'])
             ->when($request->input('status'), fn($q, $s) => $q->where('status', $s))
             ->when($request->input('triage'), fn($q, $t) => $q->where('triage', $t))
             ->when($request->input('partner_id'), fn($q, $id) => $q->where('partner_id', $id))
@@ -33,25 +37,37 @@ class CaseController extends Controller
             ->paginate(25)->withQueryString();
 
         $partners   = Partner::orderBy('name')->get(['id', 'name']);
-        $clinicians = Clinician::with('user')->get();
+
+        // The doctor filter offers only doctors this admin is over. Listing all
+        // of them would leak the roster and invite filtering by someone else's.
+        $clinicians = Clinician::visibleTo($request->user())->with('user')->get();
 
         return view('admin.cases.index', compact('cases', 'partners', 'clinicians'));
     }
 
-    public function show(string $uuid)
+    public function show(Request $request, string $uuid)
     {
-        $case = PatientCase::with([
-            'patient', 'partner', 'clinician.user',
-            'diseases',
-            'clinicalNotes.clinician.user',
-            'orders.pharmacy', 'messages', 'files', 'events',
-            'questionnaireResponses.questionnaire',
-            'questionnaireResponses.answers',
-            'casePrescriptions.clinician.user',
-            'casePrescriptions.medications',
-        ])->where('uuid', $uuid)->firstOrFail();
+        /*
+         * Scoped here too, not only on the list. A scoped index with an unscoped
+         * detail view is not access control: the case is one guessed or shared
+         * URL away. Out-of-scope reads 404 rather than 403, so a Doctor Admin
+         * cannot confirm a case exists outside their doctors either.
+         */
+        $case = PatientCase::visibleTo($request->user())
+            ->with([
+                'patient', 'partner', 'clinician.user',
+                'diseases',
+                'clinicalNotes.clinician.user',
+                'orders.pharmacy', 'messages', 'files', 'events',
+                'questionnaireResponses.questionnaire',
+                'questionnaireResponses.answers',
+                'casePrescriptions.clinician.user',
+                'casePrescriptions.medications',
+            ])->where('uuid', $uuid)->firstOrFail();
 
-        $clinicians = Clinician::with('user')->get();
+        // Reassignment targets are scoped as well, so an admin cannot hand a
+        // case to a doctor they are not over.
+        $clinicians = Clinician::visibleTo($request->user())->with('user')->get();
 
         return view('admin.cases.show', compact('case', 'clinicians'));
     }

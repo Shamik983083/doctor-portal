@@ -39,10 +39,15 @@
            href="{{ route('admin.patients.index') }}">
             <i class="bi bi-people"></i> Patients
         </a>
+        {{-- Storefronts carry their own Healthie credentials, so this is an
+             integration surface: super admin only (Devin msg 2117). Hidden rather
+             than shown and 403'd, so a Doctor Admin is never offered a dead link. --}}
+        @role('super_admin')
         <a class="nav-link {{ request()->routeIs('admin.partners.*') ? 'active' : '' }}"
            href="{{ route('admin.partners.index') }}">
             <i class="bi bi-building"></i> Partners
         </a>
+        @endrole
         <a class="nav-link {{ request()->routeIs('admin.clinicians.*') && !request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
            href="{{ route('admin.clinicians.index') }}">
             <i class="bi bi-person-badge"></i> Clinicians
@@ -75,6 +80,10 @@
     </div>
 
     {{-- ── API & Developer ─────────────────────────────────── --}}
+    {{-- Super admin only: "All API integrations etc should be a super admin
+         function" (Devin msg 2117). The routes enforce it; this keeps a Doctor
+         Admin from being shown links they cannot open. --}}
+    @role('super_admin')
     <button class="sidebar-section-toggle {{ $apiActive ? '' : 'collapsed' }}"
             type="button"
             data-bs-toggle="collapse"
@@ -111,8 +120,12 @@
         </a>
 
     </div>
+    @endrole
 
     {{-- ── Configuration ───────────────────────────────────── --}}
+    {{-- Also super admin only: settings and the triage rule set change clinical
+         behaviour for every doctor, not just one admin's group. --}}
+    @role('super_admin')
     <button class="sidebar-section-toggle {{ $cfgActive ? '' : 'collapsed' }}"
             type="button"
             data-bs-toggle="collapse"
@@ -133,6 +146,7 @@
         </a>
 
     </div>
+    @endrole
 
     {{-- ── Super Admin ──────────────────────────────────────── --}}
     @role('super_admin')

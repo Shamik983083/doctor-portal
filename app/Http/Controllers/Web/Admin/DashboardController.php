@@ -11,38 +11,55 @@ use App\Models\PatientCase;
 use App\Models\Setting;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
     private const OPEN_STATUSES = ['waiting', 'assigned', 'support'];
 
-    public function index()
+    public function index(Request $request)
     {
         // ── Core stat cards ──────────────────────────────────────────────
         $slaReviewHours  = (int) Setting::get('sla_review_hours', 24);
         $slaRiskMinutes  = $slaReviewHours * 60 * 0.7; // ≥70% elapsed = at risk or breached
 
+        /*
+         * The dashboard is where an admin lands, so it is the first place scoping
+         * has to hold (Devin msg 2117). A Doctor Admin sees the numbers for their
+         * own doctors; a super admin sees everything.
+         *
+         * `$user` is threaded through every case query below rather than filtered
+         * once at the end, because these are COUNT and GROUP BY queries: they
+         * aggregate in the database, so a post-hoc filter would come too late.
+         */
+        $user      = $request->user();
+        $isSuper   = $user?->isSuperAdmin() ?? true;
+        $caseScope = fn () => PatientCase::visibleTo($user);
+
         $stats = [
-            'partners'        => Partner::count(),
-            'patients'        => Patient::count(),
-            'active_cases'    => PatientCase::whereNotIn('status', ['completed', 'cancelled'])->count(),
-            'clinicians'      => Clinician::where('status', 'active')->count(),
-            'sla_at_risk'     => PatientCase::whereIn('status', ['assigned', 'approved', 'processing'])
+            // Partners and total patients are platform-wide figures and belong to
+            // the super admin. A Doctor Admin gets their own doctors instead of a
+            // number that includes storefronts they have nothing to do with.
+            'partners'        => $isSuper ? Partner::count() : null,
+            'patients'        => $isSuper ? Patient::count() : null,
+            'active_cases'    => $caseScope()->whereNotIn('status', ['completed', 'cancelled'])->count(),
+            'clinicians'      => Clinician::visibleTo($user)->where('status', 'active')->count(),
+            'sla_at_risk'     => $caseScope()->whereIn('status', ['assigned', 'approved', 'processing'])
                                     ->whereRaw(
                                         'TIMESTAMPDIFF(MINUTE, COALESCE(assigned_at, created_at), NOW()) >= ?',
                                         [$slaRiskMinutes]
                                     )->count(),
-            'completed_today' => PatientCase::where('status', 'completed')->count(),
+            'completed_today' => $caseScope()->where('status', 'completed')->count(),
         ];
 
         // ── Cases by status (doughnut) ───────────────────────────────────
-        $casesByStatus = PatientCase::selectRaw('status, COUNT(*) as count')
+        $casesByStatus = PatientCase::visibleTo($user)->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
 
         // ── 30-day trend line ────────────────────────────────────────────
-        $rawTrend = PatientCase::selectRaw('DATE(created_at) as date, COUNT(*) as count')
+        $rawTrend = PatientCase::visibleTo($user)->selectRaw('DATE(created_at) as date, COUNT(*) as count')
             ->where('created_at', '>=', now()->subDays(29)->startOfDay())
             ->groupBy('date')
             ->orderBy('date')
@@ -58,12 +75,12 @@ class DashboardController extends Controller
         }
 
         // ── Recent cases ─────────────────────────────────────────────────
-        $recentCases = PatientCase::with(['patient', 'partner', 'clinician.user'])
+        $recentCases = PatientCase::visibleTo($user)->with(['patient', 'partner', 'clinician.user'])
             ->latest()->take(10)->get();
 
         // ── Storefront workload (partner × triage) ───────────────────────
         $partners = Partner::orderBy('name')->get();
-        $openByPartner = PatientCase::whereIn('status', self::OPEN_STATUSES)
+        $openByPartner = PatientCase::visibleTo($user)->whereIn('status', self::OPEN_STATUSES)
             ->selectRaw('partner_id, triage, COUNT(*) as c')
             ->groupBy('partner_id', 'triage')
             ->get()

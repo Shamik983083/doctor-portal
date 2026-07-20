@@ -1,5 +1,26 @@
 # Doctor Admin: what MA-DOCPORTAL has that MEDAXIS does not
 
+> ## CORRECTION, 2026-07-20, after building against it
+>
+> **Sections B, C, D and the operational report below were WRONG. Those features already
+> exist in MEDAXIS** and have done all along, in `Admin\DashboardController`: storefront
+> workload by partner and triage, weighted provider load as a percentage of
+> `max_daily_cases`, the exception center, the operational report (TTFR, TTD, approval
+> rate, decision throughput), triage volume, and a webhook delivery log.
+>
+> **How the error happened:** the first pass inferred MEDAXIS's capabilities from its
+> routes, nav and controller names. The nav entry is just "Dashboard", so none of it
+> surfaced, and the dashboard controller body was never read. MA's fixture-driven demo was
+> compared against a list of MEDAXIS route names rather than against MEDAXIS's actual code.
+>
+> **What this changes:** those are not gaps and nothing needs building for them. What was
+> genuinely wrong is that every one of those views was UNSCOPED, showing every admin the
+> whole platform. That is fixed (see A), and it makes the scoping work more valuable than
+> this document originally suggested, not less.
+>
+> The corrected gap list is in section 3 below. Sections B, C and D are struck through
+> rather than deleted, so the mistake stays visible instead of being quietly tidied away.
+
 Purpose: decide what a "Doctor Admin" section in MEDAXIS should contain, by comparing MEDAXIS's
 existing admin against MA-DOCPORTAL's, before anything is built.
 
@@ -57,24 +78,28 @@ scoping onto screens built without it is far harder than building them scoped.
 **Needs a decision from Devin:** does MEDAXIS want a two-tier admin (tenant admin vs super admin),
 or do all admins stay global? Everything below inherits the answer.
 
-### B. Storefront workload view
+### ~~B. Storefront workload view~~ — WRONG, ALREADY EXISTS
 
-Per storefront: open cases, triage mix (green/yellow/red), active holds, median decision time, and
-SLA risk. MEDAXIS's Partners index has counts but not the operational picture.
+`DashboardController` already builds `$storefronts`: per partner, open cases and the
+green/yellow/red triage mix. Nothing to build. It was unscoped; that is fixed under A.
 
-All of it is derivable from data MEDAXIS already holds. This is presentation, not new modelling,
-which makes it the cheapest real win on the list.
+### ~~C. Exception center~~ — WRONG, ALREADY EXISTS
 
-### C. Exception center
+`DashboardController` already builds `$exceptions`: workflow holds awaiting clearance, escalated
+to support, missing identity verification, cancelled in the last 7 days. Each bucket already maps
+to a real workflow condition rather than a free-text status, which was the property that mattered.
+Nothing to build. It was unscoped; that is fixed under A.
 
-Buckets of cases needing operational follow-up, where every bucket maps to a real workflow
-condition rather than a free-text status. MEDAXIS models each underlying condition already (triage
-colour, holds, support flag, SLA deadline); what is missing is the single screen that counts them.
+### ~~D. Weighted provider load~~ — WRONG AS WRITTEN, PARTLY ALREADY EXISTS
 
-The clinician-side work-queue sidebar in the preview already does exactly this for one provider.
-This is the admin-wide version.
+`DashboardController` already builds `$providerLoads`: active cases against each clinician's
+`max_daily_cases`, as a percentage, which is the same view MA shows.
 
-### D. Weighted provider load and routing policy
+What remains true is the **routing** half: MEDAXIS ASSIGNS by `Clinician.priority` ordering via
+`CaseAutoAssigner`, not by weighted capacity, and routing policy is code rather than
+configuration. See D-routing below.
+
+### D-routing. Routing policy as configuration
 
 MA shows each provider's load as a percentage of capacity with per-provider caps, and treats
 routing policy as a configurable object.
@@ -117,13 +142,13 @@ Given how much of MEDAXIS's clinical behaviour is now admin-configurable (triage
 and the new AI instruction sets), an unaudited config change can alter clinical outcomes with no
 trace. Recommend high priority, and it is a moderate build.
 
-### G. Integration health
+### G. Integration health — PARTLY EXISTS
 
-A single view of each outbound integration and its status. MEDAXIS has webhooks with delivery
-records, and now pharmacy dispatch, EHR records and AI assist, each with its own state. Nothing
-shows them together.
+The dashboard already shows a webhook delivery log and a failed-delivery count. What it does not
+show is the newer outbound integrations: pharmacy dispatch, EHR records and AI assist, each of
+which now has its own state and flags.
 
-Cheap, and it gets more useful with every integration added.
+So this is extending an existing panel rather than building one. Small.
 
 ### H. Protocol category coverage
 
@@ -142,20 +167,34 @@ Lower priority: MEDAXIS's questionnaire builder already covers most of the pract
 
 ---
 
-## 4. Recommended order
+## 4. Recommended order, corrected
 
-1. **A** (tenant scoping) — decide first, everything else inherits it
-2. **B**, **C**, **G** — presentation over data MEDAXIS already has, cheapest real wins
-3. **F** (config audit) — moderate build, high value given how configurable MEDAXIS now is
-4. **D** load view only; routing change decided separately
-5. **E** (state visit policy) — scoped as its own project
-6. **H**, **I** — after clarification
+1. **A** (two-tier scoping) - everything inherits it, and it is what makes the dashboard panels
+   that already exist actually correct per admin. **BUILT.**
+2. **Integrations under super admin** - Devin msg 2117. **BUILT.**
+3. **G** extend the existing integration panel to pharmacy, EHR and AI. Small.
+4. **F** (config audit) - moderate build, high value given how configurable MEDAXIS now is
+5. **Terminology**: Offering -> Product, plus a Program tier, user-facing language first
+6. **D-routing** as a selectable policy, never a silent cutover
+7. **E** (state visit policy) - its own project
+8. **H**, **I** - after clarification
+
+~~B, C, D-view~~ need no work: they already exist.
 
 ---
 
 ## 5. Status
 
-Gap analysis only. Nothing in this document has been built.
+- **A is built**: `admin_clinician` pivot, `visibleTo()` scopes on cases and clinicians, applied to
+  the admin dashboard, case list, case detail, clinician list and the reassignment picker; the
+  `admin` role no longer holds every permission; a super-admin-only route group; nav gated; and a
+  doctor-assignment UI on the admin detail page.
+- **Integrations under super admin is built**: partners (they carry Healthie credentials), webhook
+  logs, API guides, settings and the triage rule set.
+- Everything else above is unbuilt.
 
-The two open questions that block a clean start are **A** (two-tier admin or not) and **H** (what a
-protocol means here). Everything else can proceed once the order is agreed.
+Open question remaining: **H**, what a "protocol" should mean in MEDAXIS.
+
+**Verification note.** None of the PHP on this branch has been executed or linted: the machine it
+was written on has no PHP, Composer or MySQL. Static checks only. The correction notice at the top
+of this document is the reason to take that limitation seriously.

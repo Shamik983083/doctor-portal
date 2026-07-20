@@ -76,6 +76,36 @@ class PatientCase extends Model
         return $query->where('triage', $level);
     }
 
+    /**
+     * Restrict to what this admin is allowed to see (Devin msg 2117).
+     *
+     * A super admin sees everything. A Doctor Admin sees the cases belonging to
+     * the doctors they are over.
+     *
+     * TWO THINGS THIS DOES ON PURPOSE:
+     *
+     * 1. An admin assigned NO doctors sees NOTHING, not everything. An empty
+     *    list is a real restriction, and `whereIn('clinician_id', [])` correctly
+     *    matches zero rows. The tempting `if (! $ids) return $query;` would open
+     *    the whole system to a half-configured admin, which is the exact
+     *    opposite of what scoping is for.
+     *
+     * 2. UNASSIGNED cases (clinician_id null) are NOT visible to a Doctor Admin.
+     *    A case with no doctor belongs to none of their doctors. If Doctor Admins
+     *    should be able to work the unassigned pool to hand cases out, that is a
+     *    deliberate extension, not something to slip in via a null check.
+     */
+    public function scopeVisibleTo($query, ?User $user)
+    {
+        $ids = $user?->visibleClinicianIds();
+
+        if ($ids === null) {
+            return $query;              // super admin, or no user context
+        }
+
+        return $query->whereIn('clinician_id', $ids);
+    }
+
     protected static function boot(): void
     {
         parent::boot();
