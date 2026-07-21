@@ -383,6 +383,16 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 @media (max-width:1100px){.quick-review-grid{grid-template-columns:1fr}}
 
 /* ------------------------------------------------------------ admin catalog */
+/* Case routing */
+.mode-list{display:grid;gap:9px;padding:0 20px 20px}
+.mode-row{display:flex;gap:11px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:#fff}
+.mode-row.on{border-color:#bcd2f8;background:var(--blue-bg)}
+.mode-row input{margin-top:2px;accent-color:var(--accent);flex:0 0 auto}
+.mode-row strong{font-size:13.5px;display:block}
+.mode-note{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.weight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;padding:0 20px 20px}
+.weight label{display:block;font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.weight input{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line-strong);background:#fff;font-family:inherit;font-size:13px;color:var(--ink)}
 .catalog-list{display:grid;gap:12px;padding:0 20px 20px}
 .catalog-card{border:1px solid var(--line);border-radius:14px;padding:15px;background:#fff}
 .catalog-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
@@ -524,7 +534,8 @@ const PORTALS = {
       {type:"section", label:"Configuration", open:false, items:[
         {id:"admin.catalog",  ico:"\u{1F9EA}", label:"Products & Levels"},
         {id:"admin.settings", ico:"⚙", label:"SLA Settings"},
-        {id:"admin.triage",   ico:"\u{1F6A6}", label:"Triage Rule Set"}
+        {id:"admin.triage",   ico:"\u{1F6A6}", label:"Triage Rule Set"},
+        {id:"admin.routing",  ico:"\u{1F500}", label:"Case Routing"}
       ]},
       {type:"section", label:"Super Admin", open:false, items:[
         {id:"admin.admins", ico:"\u{1F510}", label:"Admin Users"}
@@ -1056,6 +1067,8 @@ const VIEWS = {
     table:{title:"Thresholds", cols:["Setting","Value","Applies to"], rows:[
       ["Review deadline","24 hours","All cases"],["Escalation warning","18 hours","All cases"],
       ["Auto-reassign after","36 hours","Unclaimed cases"]]}},
+  "admin.routing":{eyebrow:"Configuration", title:"Case Routing", sub:"Which doctor a new case is auto-assigned to. Every change is a new version, and the live version is never edited in place.",
+    routing:true},
   "admin.triage":{eyebrow:"Configuration", title:"Triage Rule Set", sub:"Rules that colour a case Green, Yellow or Red before a provider opens it.",
     table:{title:"Active rules", cols:["Rule","Condition","Result","Active"], rows:[
       ["Thyroid cancer history","Answer = Yes",P("Red","pill red"),P("On","pill green")],
@@ -1297,6 +1310,69 @@ function draftReply(t, tone){
 }
 
 /* ------------------------------------------------------------ admin catalog */
+/* ---------------------------------------------------------------- routing
+   Case routing, ported from MA-DOCPORTAL. Five modes, eight tunable
+   coefficients, per-doctor weights, versioned with one live version at a time.
+
+   The two warnings on this screen are not decoration. Switching mode changes
+   which doctor sees which patient, and the licence check does nothing for a
+   doctor with no licensed states recorded, so both are stated where the change
+   is actually made rather than left in a document nobody opens.        */
+const ROUTING_MODES = [
+  ["PRIORITY", "Priority order (current)", "Assigns to the lowest priority rank with capacity. This is how MEDAXIS behaves today.", true],
+  ["ROUND_ROBIN", "Round robin", "Rotates strictly through eligible doctors so everyone gets an even turn.", false],
+  ["WEIGHTED", "Weighted allocation", "Distributes by each doctor's configured share. A weight of 0 takes that doctor out of routing.", false],
+  ["INTELLIGENT", "Intelligent workload score", "Scores each doctor on open cases by triage, unanswered messages, decision speed and volume. Lowest score wins.", false],
+  ["PROVIDER_POOL", "Provider pool", "Nothing is auto-assigned. Cases wait for a doctor to pick them up.", false]
+];
+
+const ROUTING_WEIGHTS = [
+  ["Open green case", "1"], ["Open yellow case", "3"], ["Open red case", "2"],
+  ["Unanswered message", "2"], ["Message older than 12 hours", "25"],
+  ["Per minute of median decision time", "0.02"], ["Per case already assigned today", "0.25"],
+  ["Allocation penalty multiplier", "5"]
+];
+
+function renderRouting(){
+  let h = '<section class="panel"><div class="panel-heading"><div>'
+    + '<div class="eyebrow">Live policy</div><h2>v1 · Priority order</h2>'
+    + '<p>Seeded from the behaviour MEDAXIS already had, so routing is unchanged until another '
+    + 'version is activated. Activated automatically at install.</p></div>'
+    + '<span class="pill green">Live</span></div>';
+
+  h += '<div class="notice">Switching mode changes <strong>which doctor receives which case</strong>. '
+    + 'Drafting a version does nothing on its own; it only takes effect when you activate it.</div>';
+
+  h += '<div class="notice" style="border-color:#f2c9c4;background:#fff5f4">'
+    + '<strong>Licence check.</strong> A doctor with no licensed states recorded currently counts as '
+    + 'licensed everywhere, so the state-licence block does nothing for them. Fill in licensed states, '
+    + 'then switch on <em>Block doctors with no licensed states recorded</em>.</div>';
+
+  h += '<div class="mode-list">' + ROUTING_MODES.map(m =>
+      '<label class="mode-row'+(m[3]?" on":"")+'"><input type="radio" name="rmode"'+(m[3]?" checked":"")+' />'
+      + '<span><strong>'+m[1]+'</strong><span class="mode-note">'+m[2]+'</span></span></label>'
+    ).join("") + '</div></section>';
+
+  h += '<section class="panel"><div class="panel-heading"><div>'
+    + '<div class="eyebrow">Intelligent mode</div><h2>Score weights</h2>'
+    + '<p>Lower total score wins, so a larger number pushes work away from a doctor harder. '
+    + 'These are the defaults carried over from MA.</p></div></div>'
+    + '<div class="weight-grid">' + ROUTING_WEIGHTS.map(w =>
+        '<div class="weight"><label>'+w[0]+'</label><input type="text" value="'+w[1]+'" readonly /></div>'
+      ).join("") + '</div></section>';
+
+  h += '<section class="panel"><div class="panel-heading"><div>'
+    + '<div class="eyebrow">Version history</div><h2>Every change is a version</h2>'
+    + '<p>The live version is never edited. To change routing you draft a new version and activate '
+    + 'it, which leaves the previous rules on the record.</p></div></div>'
+    + '<table class="grid"><thead><tr><th>Version</th><th>Mode</th><th>Status</th><th>Activated</th><th>Why</th></tr></thead><tbody>'
+    + '<tr><td><strong>v1</strong></td><td>Priority order</td><td><span class="pill green">Live</span></td>'
+    + '<td>At install</td><td>Seeded from existing behaviour so nothing changed on deploy.</td></tr>'
+    + '</tbody></table></section>';
+
+  return h;
+}
+
 function renderCatalog(){
   let h = '<div class="panel"><div class="panel-heading"><div><h2>Products</h2>'
     + '<p>Each product carries an ordered ladder of dose levels. Titration walks up that ladder one step per month; hold repeats the requested step.</p></div>'
@@ -1790,6 +1866,7 @@ function renderView(){
 
   if(v.queue){ h += renderQueue(v.queue); }
   if(v.catalog){ h += renderCatalog(); }
+  if(v.routing){ h += renderRouting(); }
   if(v.chat){ h += renderMessages(); }
 
   if(v.doc){

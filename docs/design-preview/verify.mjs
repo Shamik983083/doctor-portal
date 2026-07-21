@@ -626,6 +626,44 @@ section("The approval modal fits, it does not hide fields behind an inner scroll
   await page.click("#modalCancel");
 }
 
+section("Case routing screen shows every mode and both warnings");
+{
+  await page.click('.role-button:text-is("Admin")');
+  await page.locator('.nav-link[title="Case Routing"]').click();
+
+  const modes = await page.locator(".mode-row strong").allTextContents();
+  ok(modes.length === 5, `all five routing modes are offered (got ${modes.length})`);
+  for (const m of ["Priority order", "Round robin", "Weighted allocation", "Intelligent workload score", "Provider pool"])
+    ok(modes.some((t) => t.includes(m)), `mode "${m}" is present`);
+
+  ok((await page.locator(".mode-row.on").count()) === 1, "exactly one mode is live");
+  ok((await page.locator(".mode-row.on strong").textContent()).includes("Priority order"),
+     "and the live one is the behaviour MEDAXIS already had, so nothing changed on deploy");
+
+  ok((await page.locator(".weight-grid .weight").count()) === 8, "all eight intelligent coefficients are shown");
+  const body = await page.locator(".main").textContent();
+  // Read the input VALUES, not textContent: an input's value is not text, so a
+  // textContent check here passed vacuously on the labels and never looked at a
+  // single number.
+  const weightValues = await page.locator(".weight-grid .weight input").evaluateAll(
+    (els) => els.map((e) => e.value));
+  ok(weightValues.join(",") === "1,3,2,2,25,0.02,0.25,5",
+     `carrying MA's own default coefficients (got ${weightValues.join(",")})`);
+  ok(/Open yellow case/.test(body), "and the coefficients are labelled in words");
+
+  // The two warnings are the point of the screen, not decoration: one says the
+  // change moves patients between doctors, the other says the licence check is
+  // currently vacuous for doctors with no licence data.
+  ok(/which doctor receives which case/i.test(body), "warns that switching mode reassigns patients");
+  ok(/no licensed states recorded/i.test(body), "warns that the licence block does nothing without licence data");
+  ok(/never edited/i.test(body), "states that the live version is never edited in place");
+
+  // Hand the portal back as this section found it. Leaving it on Admin makes the
+  // NEXT section fail on a missing clinician nav item, which reads as a bug in
+  // that section rather than as leakage from this one.
+  await page.click('.role-button:text-is("Clinician")');
+}
+
 section("Provider sees questions, never slugs");
 {
   await page.locator('.nav-link[title="Case Queue"]').click();
