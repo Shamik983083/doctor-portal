@@ -98,7 +98,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
         Route::post('/{uuid}/draft-note', [ClinicianCaseController::class, 'draftNote'])->name('draft-note');
         Route::post('/{uuid}/cancel', [ClinicianCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/support', [ClinicianCaseController::class, 'escalateToSupport'])->name('support');
-Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
+        Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
         Route::post('/{uuid}/messages', [ClinicianCaseController::class, 'sendMessage'])->name('messages.store');
         Route::get('/{uuid}/messages/poll', [ClinicianCaseController::class, 'pollMessages'])->name('messages.poll');
         Route::post('/{uuid}/files', [ClinicianCaseController::class, 'uploadFile'])->name('files.store');
