@@ -118,15 +118,22 @@ external API's behaviour, so it should be your call rather than a silent scope e
 
 ### B. Stored XSS in the API guide screens (low severity)
 
-`resources/views/admin/guide/weightloss-api.blade.php` and `antiaging-api.blade.php` build table
-rows in a helper and emit them with `{!! ... !!}`. Inside, `$depQ->key` is escaped with `e()`, but
-`$q->depends_on_operator`, `$q->depends_on_value`, `$q->type` and the joined option values are
-interpolated raw.
+**Correction to my first report of this, which overstated it.** I originally said four values were
+interpolated raw. On a closer read, two of them are not: `$cond` and `$valueCell` are built with
+raw interpolation but then emitted through `e(...)`, so `depends_on_operator`,
+`depends_on_value` and the option values were already escaped at output.
 
-Severity is limited: question content is admin-authored (partners are read-only on questionnaires,
-confirmed in `routes/api.php`), and these pages are now super-admin-only after fix 1. So it is
-admin-to-admin. Still, an option value containing a script tag executes on the guide page. Escape
-the interpolated values.
+The genuine gaps were narrower:
+
+- `$typeBadge` is emitted **unescaped** (`'<td>' . $typeBadge . '</td>'`) and contains `$q->type`
+  interpolated raw in two of its four branches. This is the real one.
+- `$q->step_number` was emitted unescaped. An integer column, so low risk, but free to fix.
+- `$cond` pre-escaped `$depQ->key` and was then escaped again at output, so a key containing `&`
+  rendered as a literal `&amp;` on screen. A display bug rather than a security one.
+
+All three are fixed. Severity was always limited: question content is admin-authored (partners are
+read-only on questionnaires, confirmed in `routes/api.php`) and these pages are super-admin-only
+after fix 1, so the reach was admin to admin.
 
 ### C. `json_encode` without `JSON_HEX_TAG` into a script block (low severity)
 
@@ -162,10 +169,61 @@ does not have to re-derive that.
 
 ---
 
-## Priority
+## All three fixed (Devin msg 2153)
 
-1. **A**, cross-tenant questionnaire read. External API, real tenant isolation, two-line fix.
-2. **C**, `JSON_HEX_TAG` on the public form page.
-3. **B**, escape the guide table values.
+Commit follows the review. Same caveat as everywhere else: **not executed, not linted.**
 
-None is an emergency, and none blocks the merge. The four original defects are closed.
+### A, done, and deliberately wider than the two-line version I first proposed
+
+The obvious fix is `partner_id IS NULL OR partner_id = caller`. That closes the hole and **would
+have broken a legitimate case**: an admin can attach any questionnaire to any offering through
+`offering_questionnaire`, including one owned by a different partner, and that composition is
+intentional. A two-clause scope would cut a partner off from a form their own offering requires.
+
+So the scope has a third clause: **or the questionnaire is attached to an offering the caller
+owns.**
+
+Why that provably does not lose legitimate access: the only way a partner learns a questionnaire
+uuid through this API is `GET /offerings/{id}/questionnaires`, which is already scoped to the
+caller's own offerings. Every uuid that endpoint can hand out is therefore covered by clause 3.
+The only thing the fix removes is access to questionnaires the caller has no link to at all,
+which is exactly the hole.
+
+`linkedQuestionnaire` is deliberately **not** scoped. A linked questionnaire is an
+admin-configured composition of one form into another, so a link crossing partners is the feature
+working. Restricting it would break multi-part intake.
+
+Also qualified the column as `offerings.partner_id`: the `whereHas` subquery joins
+`offering_questionnaire`, and an unqualified `partner_id` there is asking to become ambiguous the
+day someone adds that column to the pivot.
+
+### B, done
+Escaped `$q->type` inside `$typeBadge` (the real gap), escaped `step_number`, and removed the
+double-escape on `$depQ->key`. See the correction above: this was narrower than I first reported.
+
+### C, done
+`JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT` on the payload. `JSON_HEX_*` escapes
+to `\u00XX`, which JavaScript parses back to the identical string, so the receiving window sees a
+byte-for-byte unchanged payload. No consumer changes.
+
+## What "make sure it doesn't break anything" could and could not cover
+
+**Could, and did:**
+- Traced every caller of the one signature that changed (`QuestionnaireController::show` now takes
+  `Request $request` first). One route references it; Laravel resolves `Request` by type-hint and
+  `{uuid}` by name, so the route needs no change.
+- Confirmed `Questionnaire::offerings()` exists (`belongsToMany` via `offering_questionnaire`)
+  before relying on it in `whereHas`. A missing relation would have thrown at runtime.
+- Reasoned through the access paths above to show clause 3 preserves everything discoverable.
+- Bracket-balance checked every edited file. The two Blade files are unbalanced, but they were
+  **already** unbalanced at HEAD (they mix HTML and CSS braces), and the signature is byte-identical
+  before and after, so the edits are structurally inert.
+- Read the final diff line by line: 4 files, escaping and scoping only.
+
+**Could not:** run the app, run the test suite, or execute a single line of PHP. There is no PHP,
+Composer or MySQL here. Nothing above is a substitute for someone running this.
+
+**The one thing to check first when it does run:** log in as a partner whose offering uses a
+questionnaire owned by a *different* partner, and confirm
+`GET /api/partner/questionnaires/{uuid}` still returns it. That is the exact case clause 3 exists
+for, and the one a two-clause fix would have silently broken.

@@ -355,18 +355,18 @@ function renderAAQRows($rows, $allRows) {
     foreach ($rows as $q) {
         $depQ = $allRows->firstWhere('id', $q->depends_on_question_id);
         $cond = $depQ
-            ? 'Show if ' . e($depQ->key) . ' ' . $q->depends_on_operator . ' "' . $q->depends_on_value . '"'
+            ? 'Show if ' . $depQ->key . ' ' . $q->depends_on_operator . ' "' . $q->depends_on_value . '"'
             : '—';
         $optVals = collect($q->options ?? [])->pluck('value')->implode(', ');
         if (strlen($optVals) > 60) $optVals = substr($optVals, 0, 58) . '…';
         if (in_array($q->type, ['multi', 'checkbox', 'multiselect'])) {
-            $typeBadge = '<span class="badge bg-info text-dark">' . $q->type . '</span>';
+            $typeBadge = '<span class="badge bg-info text-dark">' . e($q->type) . '</span>';
         } elseif ($q->type === 'file') {
             $typeBadge = '<span class="badge bg-warning text-dark">file</span>';
         } elseif ($q->type === 'hidden') {
             $typeBadge = '<span class="badge bg-secondary">hidden</span>';
         } else {
-            $typeBadge = '<span class="badge bg-light text-dark border">' . $q->type . '</span>';
+            $typeBadge = '<span class="badge bg-light text-dark border">' . e($q->type) . '</span>';
         }
         $valueCell = in_array($q->type, ['multi', 'checkbox'])
             ? 'array of: ' . $optVals
@@ -379,7 +379,7 @@ function renderAAQRows($rows, $allRows) {
             . '<td><code style="font-size:.75rem">' . e($q->key) . '</code></td>'
             . '<td>' . $slugCell . '</td>'
             . '<td>' . $typeBadge . '</td>'
-            . '<td>' . $q->step_number . '</td>'
+            . '<td>' . e($q->step_number) . '</td>'
             . '<td class="small text-muted" style="font-size:.78rem">' . e($cond) . '</td>'
             . '<td class="small text-muted" style="font-size:.78rem">' . e($valueCell) . '</td>'
             . '</tr>';
