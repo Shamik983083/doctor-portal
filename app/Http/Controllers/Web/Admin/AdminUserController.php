@@ -133,9 +133,31 @@ class AdminUserController extends Controller
             return back()->with('error', 'You cannot deactivate your own account.');
         }
 
-        $admin->update(['is_active' => !($admin->is_active ?? true)]);
+        /*
+         * Deactivating the last super admin would lock everyone out of the
+         * screens only a super admin can reach, including this one. Self-toggle
+         * is already blocked above, but that does not cover A deactivating B
+         * when B is the only other one left.
+         */
+        $wasActive = $admin->is_active ?? true;
 
-        return back()->with('success', 'Admin account status updated.');
+        if ($wasActive && $admin->hasRole('super_admin')) {
+            $remaining = User::role('super_admin')
+                ->where('id', '!=', $admin->id)
+                ->where(fn ($q) => $q->where('is_active', true)->orWhereNull('is_active'))
+                ->count();
+
+            if ($remaining === 0) {
+                return back()->with('error',
+                    'This is the last active super admin. Promote another one before deactivating this account.');
+            }
+        }
+
+        $admin->update(['is_active' => ! $wasActive]);
+
+        return back()->with('success', $wasActive
+            ? "\"{$admin->name}\" deactivated and can no longer sign in."
+            : "\"{$admin->name}\" reactivated.");
     }
 
     public function promote(int $id, Request $request)

@@ -14,8 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'partner.auth'    => \App\Http\Middleware\PartnerAuthenticate::class,
-            'partner.portal'  => \App\Http\Middleware\PartnerPortalAccess::class,
+            'partner.auth'      => \App\Http\Middleware\PartnerAuthenticate::class,
+            'partner.portal'    => \App\Http\Middleware\PartnerPortalAccess::class,
+            'clinician.portal'  => \App\Http\Middleware\ClinicianPortalAccess::class,
             'role'            => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission'      => \Spatie\Permission\Middleware\PermissionMiddleware::class,
         ]);

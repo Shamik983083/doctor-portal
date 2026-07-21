@@ -24,8 +24,30 @@ class LoginController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            $request->session()->regenerate();
-            return redirect()->intended($this->redirectAfterLogin());
+            /*
+             * A deactivated account must not get a session. Adding the
+             * is_active column alone would have made the admin toggle persist
+             * something nobody reads, which is the same lie in a tidier form.
+             *
+             * Checked AFTER a successful attempt, deliberately. Refusing before
+             * the password is verified would tell an anonymous visitor which
+             * addresses exist and which are switched off. The message stays the
+             * generic credential error for the same reason.
+             *
+             * `?? true` keeps every pre-existing row usable: the column is new
+             * and defaults to true, but a row loaded from a cache or a partial
+             * select should not read as deactivated because the value is absent.
+             */
+            if (Auth::user()->is_active ?? true) {
+                $request->session()->regenerate();
+                return redirect()->intended($this->redirectAfterLogin());
+            }
+
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors(['email' => 'Invalid credentials.'])->withInput();
         }
 
         return back()->withErrors(['email' => 'Invalid credentials.'])->withInput();

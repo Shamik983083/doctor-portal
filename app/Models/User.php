@@ -19,6 +19,10 @@ class User extends Authenticatable
         'email',
         'password',
         'partner_id',
+        // Without this, AdminUserController::toggleActive()'s update() is
+        // silently dropped by the mass-assignment guard, and the deactivate
+        // button reports success while changing nothing.
+        'is_active',
     ];
 
     protected $hidden = [
@@ -31,6 +35,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

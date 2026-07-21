@@ -48,16 +48,42 @@ Route::prefix('forms')->name('forms.')->group(function () {
     Route::post('/{uuid}', [QuestionnaireFormController::class, 'submit'])->name('submit');
 });
 
-// MA-Portal role-view preview · read-only showcase, any authenticated user
+/*
+ * MA-Portal role-view showcase.
+ *
+ * WAS `auth` ONLY, WITH NO ROLE GATE. Defensible when these were static
+ * mockups, but MaPortalController reads real records: practitioner() loads open
+ * cases with patient demographics, recorded intake answers, clinical notes and
+ * messages; superAdmin() lists every user in the install with email and roles.
+ * Behind `auth` alone, a PARTNER login (an external storefront operator) could
+ * read all of it by typing the URL.
+ *
+ * Each route is now gated to the tier whose surface it previews, mirroring the
+ * real portals below. The bare /ma-portal redirect stays on `auth` only because
+ * it just forwards; the destination enforces its own gate.
+ */
 Route::prefix('ma-portal')->middleware(['auth'])->name('ma-portal.')->group(function () {
     Route::get('/', fn () => redirect()->route('ma-portal.practitioner'));
-    Route::get('/practitioner', [MaPortalController::class, 'practitioner'])->name('practitioner');
-    Route::get('/admin', [MaPortalController::class, 'admin'])->name('admin');
-    Route::get('/super-admin', [MaPortalController::class, 'superAdmin'])->name('super-admin');
+
+    Route::get('/practitioner', [MaPortalController::class, 'practitioner'])
+        ->middleware('role:clinician|admin|super_admin')->name('practitioner');
+
+    Route::get('/admin', [MaPortalController::class, 'admin'])
+        ->middleware('role:admin|super_admin')->name('admin');
+
+    // Global user roster and cross-tenant view. Super admin only, matching the
+    // real admin.admins screens.
+    Route::get('/super-admin', [MaPortalController::class, 'superAdmin'])
+        ->middleware('role:super_admin')->name('super-admin');
 });
 
 // Clinician Portal
-Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin'])->name('clinician.')->group(function () {
+/*
+ * `clinician.portal` guarantees a Clinician record exists behind the user, so
+ * the controllers' `Auth::user()->clinician` cannot be null. The role gate still
+ * says who may knock; this says who has a queue to show.
+ */
+Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinician.portal'])->name('clinician.')->group(function () {
     Route::get('/dashboard', [ClinicianDashboard::class, 'index'])->name('dashboard');
 
     Route::prefix('cases')->name('cases.')->group(function () {
@@ -176,18 +202,40 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     });
 
     // Offerings
+    /*
+     * The catalog. READ is open to both admin tiers, WRITE is super admin only.
+     *
+     * This mirrors RolesAndPermissionsSeeder exactly, which grants `admin` the
+     * single permission `view offerings` and withholds create, update and
+     * delete. Before this, every write here was reachable by any admin, so the
+     * seeder described a restriction that no route enforced.
+     *
+     * A Doctor Admin still needs to SEE what is prescribable to run their
+     * doctors, which is why index and show stay open rather than gating the
+     * whole prefix.
+     */
     Route::prefix('offerings')->name('offerings.')->group(function () {
         Route::get('/', [AdminOfferingController::class, 'index'])->name('index');
-        Route::get('/create', [AdminOfferingController::class, 'create'])->name('create');
-        Route::post('/', [AdminOfferingController::class, 'store'])->name('store');
+
+        /* ORDER MATTERS. GET /create must be registered BEFORE GET /{id} or the
+           literal "create" is captured as an id and the create page renders as a
+           lookup for an offering that does not exist. The other write routes use
+           distinct verbs, so only this one has to sit up here. */
+        Route::get('/create', [AdminOfferingController::class, 'create'])
+            ->middleware('role:super_admin')->name('create');
+
         Route::get('/{id}', [AdminOfferingController::class, 'show'])->name('show');
-        Route::put('/{id}', [AdminOfferingController::class, 'update'])->name('update');
-        Route::delete('/{id}', [AdminOfferingController::class, 'destroy'])->name('destroy');
-        Route::patch('/{id}/toggle-status', [AdminOfferingController::class, 'toggleStatus'])->name('toggle-status');
-        Route::post('/{id}/approve', [AdminOfferingController::class, 'approve'])->name('approve');
-        Route::post('/{id}/reject',  [AdminOfferingController::class, 'reject'])->name('reject');
-        Route::post('/{id}/questionnaires',          [AdminOfferingController::class, 'attachQuestionnaire'])->name('questionnaires.attach');
-        Route::delete('/{id}/questionnaires/{qId}',  [AdminOfferingController::class, 'detachQuestionnaire'])->name('questionnaires.detach');
+
+        Route::middleware('role:super_admin')->group(function () {
+            Route::post('/', [AdminOfferingController::class, 'store'])->name('store');
+            Route::put('/{id}', [AdminOfferingController::class, 'update'])->name('update');
+            Route::delete('/{id}', [AdminOfferingController::class, 'destroy'])->name('destroy');
+            Route::patch('/{id}/toggle-status', [AdminOfferingController::class, 'toggleStatus'])->name('toggle-status');
+            Route::post('/{id}/approve', [AdminOfferingController::class, 'approve'])->name('approve');
+            Route::post('/{id}/reject',  [AdminOfferingController::class, 'reject'])->name('reject');
+            Route::post('/{id}/questionnaires',          [AdminOfferingController::class, 'attachQuestionnaire'])->name('questionnaires.attach');
+            Route::delete('/{id}/questionnaires/{qId}',  [AdminOfferingController::class, 'detachQuestionnaire'])->name('questionnaires.detach');
+        });
     });
 
     /*
