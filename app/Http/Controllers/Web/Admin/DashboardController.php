@@ -155,7 +155,7 @@ class DashboardController extends Controller
             ->where(fn($q) => $q->whereNotNull('approved_at')->orWhere('status', 'cancelled'))
             ->count();
 
-        $fmt = fn ($min) => $min === null ? '—' : (function ($m) {
+        $fmt = fn ($min) => $min === null ? ' · ' : (function ($m) {
             $m = (int) round($m);
             $h = intdiv($m, 60);
             $r = $m % 60;
@@ -165,7 +165,7 @@ class DashboardController extends Controller
         $report = [
             ['value' => $fmt($ttfr),                                         'label' => 'TTFR · time to first review'],
             ['value' => $fmt($ttd),                                          'label' => 'TTD · time to decision'],
-            ['value' => $approvalRate === null ? '—' : $approvalRate . '%',  'label' => 'Approval rate'],
+            ['value' => $approvalRate === null ? ' · ' : $approvalRate . '%',  'label' => 'Approval rate'],
             ['value' => round($recentDecisions / 7, 1) . '/day',             'label' => 'Decision throughput (7d)'],
         ];
 

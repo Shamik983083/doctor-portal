@@ -11,14 +11,14 @@ use RuntimeException;
  *
  * Talks to the Responses API. Two modes, decided by config:
  *
- *  1. STORED PROMPT (`ai.openai.prompt_id` set) — the "GPT agent / skill set we
+ *  1. STORED PROMPT (`ai.openai.prompt_id` set) · the "GPT agent / skill set we
  *     set up" case. The prompt, its tools and its style live on the OpenAI side
  *     and are versioned there; this app just references the id and sends the
  *     case material as input. Instruction sets in this app are then a fallback
  *     rather than the source of truth, and the response records which prompt
  *     version answered so a note can be traced back to the exact instructions.
  *
- *  2. INLINE INSTRUCTIONS (no prompt id) — the instruction set stored in this
+ *  2. INLINE INSTRUCTIONS (no prompt id) · the instruction set stored in this
  *     app is sent as `instructions`. This is the mode the admin screen drives,
  *     and it is the one that lets the product be re-taught without a deploy.
  *

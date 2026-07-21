@@ -46,7 +46,7 @@ class PatientCase extends Model
     const STATUS_COMPLETED  = 'completed';
     const STATUS_CANCELLED  = 'cancelled';
 
-    // Triage constants — review-priority band, separate from status
+    // Triage constants · review-priority band, separate from status
     const TRIAGE_GREEN  = 'green';
     const TRIAGE_YELLOW = 'yellow';
     const TRIAGE_RED    = 'red';
@@ -64,9 +64,9 @@ class PatientCase extends Model
     public function triageMeaning(): string
     {
         return match ($this->triage) {
-            self::TRIAGE_GREEN  => 'Routine — no elevated-risk signals detected.',
-            self::TRIAGE_YELLOW => 'Elevated — closer clinician review advised.',
-            self::TRIAGE_RED    => 'High-attention — do not fast-track; review carefully.',
+            self::TRIAGE_GREEN  => 'Routine · no elevated-risk signals detected.',
+            self::TRIAGE_YELLOW => 'Elevated · closer clinician review advised.',
+            self::TRIAGE_RED    => 'High-attention · do not fast-track; review carefully.',
             default             => 'Not yet classified.',
         };
     }

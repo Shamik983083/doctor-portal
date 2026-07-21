@@ -166,7 +166,7 @@
                             @endif
                         </td>
                         <td class="small text-muted">
-                            {{ $policy->activated_at?->format('M j, Y H:i') ?? '—' }}
+                            {{ $policy->activated_at?->format('M j, Y H:i') ?? ' · ' }}
                             {{ $policy->activatedBy ? ' · ' . $policy->activatedBy->name : '' }}
                         </td>
                         <td class="small">{{ $policy->note }}</td>

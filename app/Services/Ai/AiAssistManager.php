@@ -29,7 +29,7 @@ class AiAssistManager
                 throw new RuntimeException(
                     "AI adapter [{$key}] requires ai.enabled AND ai.baa_confirmed. Drafting sends PHI to "
                     . 'the provider, so it stays off until the BAA is executed on the account owning the '
-                    . 'API key. Falling back is not automatic — set both flags deliberately or use the mock adapter.'
+                    . 'API key. Falling back is not automatic · set both flags deliberately or use the mock adapter.'
                 );
             }
         }

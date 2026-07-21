@@ -252,7 +252,7 @@ class PartnerController extends Controller
         ]);
 
         return redirect()->route('admin.partners.show', $partner->id)
-            ->with('success', 'API credentials regenerated. Share the new secret with the partner immediately — it cannot be retrieved again.');
+            ->with('success', 'API credentials regenerated. Share the new secret with the partner immediately · it cannot be retrieved again.');
     }
 
     public function storeWebhook(Request $request, int $id)

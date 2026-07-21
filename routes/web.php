@@ -42,13 +42,13 @@ Route::post('/reset-password', [ResetPasswordController::class, 'reset'])->name(
 
 Route::get('/', fn() => redirect('/login'));
 
-// Public questionnaire form renderer — no auth required
+// Public questionnaire form renderer · no auth required
 Route::prefix('forms')->name('forms.')->group(function () {
     Route::get('/{uuid}',  [QuestionnaireFormController::class, 'show'])->name('show');
     Route::post('/{uuid}', [QuestionnaireFormController::class, 'submit'])->name('submit');
 });
 
-// MA-Portal role-view preview — read-only showcase, any authenticated user
+// MA-Portal role-view preview · read-only showcase, any authenticated user
 Route::prefix('ma-portal')->middleware(['auth'])->name('ma-portal.')->group(function () {
     Route::get('/', fn () => redirect()->route('ma-portal.practitioner'));
     Route::get('/practitioner', [MaPortalController::class, 'practitioner'])->name('practitioner');
@@ -143,7 +143,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/', [AdminClinicianController::class, 'index'])->name('index');
         Route::get('/create', [AdminClinicianController::class, 'create'])->name('create');
         Route::post('/', [AdminClinicianController::class, 'store'])->name('store');
-        // Priority management — must be before /{id} wildcard
+        // Priority management · must be before /{id} wildcard
         Route::get('/priority', [AdminClinicianController::class, 'priorityIndex'])->name('priority');
         Route::patch('/reorder', [AdminClinicianController::class, 'reorder'])->name('reorder');
         Route::patch('/{id}/case-load', [AdminClinicianController::class, 'updateCaseLoad'])->name('case-load');
@@ -209,7 +209,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     Route::get('/guide/weightloss-api', function () {
         $questionnaire = \App\Models\Questionnaire::with([
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
-        ])->where('name', 'MWL – Weight Loss')->first();
+        ])->where('name', 'MWL · Weight Loss')->first();
         return view('admin.guide.weightloss-api', compact('questionnaire'));
     })->name('guide.weightloss-api');
 

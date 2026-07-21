@@ -44,6 +44,36 @@ class Clinician extends Model
         return $this->belongsToMany(User::class, 'admin_clinician');
     }
 
+    /**
+     * May this clinician practise on a patient in this state?
+     *
+     * LAW 4: licensure is a hard gate, not a filter. A case for a patient in
+     * state X can only ever be assigned to, viewed by, or approved by a
+     * prescriber with an active licence in state X.
+     *
+     * Two deliberate positions:
+     *
+     *  - An UNKNOWN patient state returns false. We cannot show a licence covers
+     *     a state we do not know, and this is an authorization surface.
+     *  - Blank licensure on the clinician currently returns TRUE, because
+     *     `isLicensedInState()` treats an empty list as licensed everywhere. That
+     *     is fail-open and it is a KNOWN, LOGGED GAP, not an accident: changing
+     *     that helper today would lock out every clinician whose licence data was
+     *     never populated. It is tracked in docs/COMPLIANCE-LEDGER.md as the
+     *     blocking item for full Law 4 conformance, and closed by populating
+     *     licensed_states and then enabling requireRecordedLicensure.
+     */
+    public function canPracticeIn(?string $state): bool
+    {
+        $state = strtoupper(trim((string) $state));
+
+        if ($state === '') {
+            return false;
+        }
+
+        return $this->isLicensedInState($state);
+    }
+
     protected static function boot(): void
     {
         parent::boot();

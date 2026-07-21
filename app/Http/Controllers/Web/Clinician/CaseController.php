@@ -75,7 +75,7 @@ class CaseController extends Controller
             'green'  => (int) $triageCounts->get(PatientCase::TRIAGE_GREEN, 0),
         ];
 
-        // Quick-review panel — top case drives summary, intake, and triage findings
+        // Quick-review panel · top case drives summary, intake, and triage findings
         $topCase = $cases->first();
         if ($topCase) {
             $topCase->load(['caseQuestions', 'questionnaireResponses.answers', 'clinician.user']);
@@ -95,7 +95,7 @@ class CaseController extends Controller
 
         $aiSummary = [];
         if ($topCase) {
-            $bullets = ['Triage classification: ' . $topCase->triageLabel() . ' — ' . $topCase->triageMeaning()];
+            $bullets = ['Triage classification: ' . $topCase->triageLabel() . ' · ' . $topCase->triageMeaning()];
             $p = $topCase->patient;
             if ($p) {
                 $demo = array_filter([
@@ -178,6 +178,49 @@ class CaseController extends Controller
         return view('clinician.cases.my-cases', compact('cases', 'clinician', 'counts', 'tab'));
     }
 
+    /**
+     * LAW 4: licensure is a hard gate, not a filter.
+     *
+     * A case for a patient in state X may only ever be viewed, assigned,
+     * approved or prescribed by a clinician holding a licence in state X. Before
+     * this, licensure was checked ONLY during auto-routing, which meant a doctor
+     * could still open, self-assign, approve and prescribe a case for a state
+     * they are not licensed in by going at it directly. Routing is a filter;
+     * this is the gate.
+     *
+     * Admins are exempt on purpose: the clinician routes are shared with the
+     * admin role, and an admin is not the prescriber. The gate exists to stop a
+     * PRESCRIBER acting outside their licence.
+     *
+     * Throws 403 rather than 404: unlike cross-tenant access, the case legitimately
+     * exists and the clinician needs to know why they are being stopped, otherwise
+     * this reads as a broken link and generates a support ticket.
+     */
+    private function assertLicensedForCase(PatientCase $case): void
+    {
+        $user = Auth::user();
+        $clinician = $user?->clinician;
+
+        if (! $clinician) {
+            return;   // admin or support acting on the shared routes, not a prescriber
+        }
+
+        $state = $case->patient_state ?: $case->patient?->state;
+
+        if ($clinician->canPracticeIn($state)) {
+            return;
+        }
+
+        // LAW 2: no PHI in logs. The case id and clinician id are internal
+        // identifiers; the patient, their name and their state are not recorded.
+        Log::warning('Licensure gate blocked a case action', [
+            'case_id'      => $case->id,
+            'clinician_id' => $clinician->id,
+        ]);
+
+        abort(403, 'You are not licensed in this patient\'s state, so this case cannot be opened or actioned by you.');
+    }
+
     public function show(string $uuid)
     {
         $case = PatientCase::with([
@@ -190,6 +233,9 @@ class CaseController extends Controller
             'casePrescriptions.clinician.user',
             'casePrescriptions.medications',
         ])->where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates viewing, not only assignment.
+        $this->assertLicensedForCase($case);
 
         // Count unread patient messages before marking them read
         $unreadMessageCount = $case->messages
@@ -210,6 +256,9 @@ class CaseController extends Controller
     public function assign(Request $request, string $uuid)
     {
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
         if ($case->status !== PatientCase::STATUS_WAITING) {
@@ -264,6 +313,9 @@ class CaseController extends Controller
         ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
         $prescription = null;
@@ -294,11 +346,11 @@ class CaseController extends Controller
             $this->stateMachine->approve($case, $clinician->id);
         });
 
-        // Complete immediately — no manual pharmacy step required.
+        // Complete immediately · no manual pharmacy step required.
         $this->stateMachine->complete($case);
 
         // Generate the signed prescription PDF and queue it for pharmacy dispatch.
-        // Best-effort and fully feature-flagged — a failure here must never break case completion.
+        // Best-effort and fully feature-flagged · a failure here must never break case completion.
         try {
             $document = $this->prescriptionDocuments->generate($case, $prescription);
             $this->pharmacyDispatch->queue($document);
@@ -329,7 +381,7 @@ class CaseController extends Controller
         ]);
 
         return redirect()->route('clinician.cases.show', $uuid)
-            ->with('success', 'Prescription submitted — case completed.');
+            ->with('success', 'Prescription submitted · case completed.');
     }
 
     public function approve(Request $request, string $uuid)
@@ -347,6 +399,9 @@ class CaseController extends Controller
         ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
         $decisions = $request->input('decisions', []);
 
@@ -424,6 +479,9 @@ class CaseController extends Controller
         $request->validate(['reason' => 'required|string']);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
         $this->stateMachine->cancel($case, $request->reason, $clinician->id, 'clinician');
@@ -447,6 +505,9 @@ class CaseController extends Controller
         ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
         ClinicalNote::create([
@@ -470,6 +531,9 @@ class CaseController extends Controller
         $request->validate(['support_note' => 'required|string|max:1000']);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
         $this->stateMachine->escalateToSupport($case, $request->input('support_note'));
@@ -487,6 +551,9 @@ class CaseController extends Controller
     public function pollMessages(Request $request, string $uuid)
     {
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $afterId = (int) $request->query('after', 0);
 
         $messages = $case->messages()
@@ -514,6 +581,9 @@ class CaseController extends Controller
         $request->validate(['body' => 'required|string']);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
         $message = Message::create([
@@ -572,6 +642,9 @@ class CaseController extends Controller
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
 
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
+
         $this->fileUploader->store(
             $request->file('file'),
             $request->input('type', 'other'),
@@ -587,6 +660,9 @@ class CaseController extends Controller
     public function downloadPrescriptionDocument(string $uuid, string $documentUuid)
     {
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
 
         $document = \App\Models\PrescriptionDocument::where('uuid', $documentUuid)
             ->where('case_id', $case->id)
@@ -611,6 +687,9 @@ class CaseController extends Controller
     {
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
 
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
+
         $file = PatientFile::where('uuid', $fileUuid)
             ->where('case_id', $case->id)
             ->firstOrFail();
@@ -621,6 +700,9 @@ class CaseController extends Controller
     public function previewFile(string $uuid, string $fileUuid)
     {
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
 
         $file = PatientFile::where('uuid', $fileUuid)
             ->where('case_id', $case->id)
@@ -634,6 +716,9 @@ class CaseController extends Controller
     public function deleteFile(string $uuid, string $fileUuid)
     {
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
 
         $file = PatientFile::where('uuid', $fileUuid)
             ->where('case_id', $case->id)
@@ -695,6 +780,17 @@ class CaseController extends Controller
                 continue;
             }
 
+            /*
+             * LAW 4 in the batch surface. Batch is batch UI, not batch judgment,
+             * so the licensure gate applies to every case in the batch exactly as
+             * it does to a single case. Failing here rather than at submit means
+             * the clinician sees WHY before they attest to anything.
+             */
+            if (! $clinician->canPracticeIn($case->patient_state ?: $case->patient?->state)) {
+                $results[$uuid] = ['pass' => false, 'reason' => 'You are not licensed in this patient\'s state.'];
+                continue;
+            }
+
             $state = strtoupper($case->patient_state ?? $case->patient?->state ?? '');
             if ($state) {
                 foreach ($case->caseOfferings as $co) {
@@ -710,7 +806,7 @@ class CaseController extends Controller
                 'patient'   => $case->patient?->full_name ?? 'Patient',
                 'triage'    => $case->triage,
                 'status'    => $case->status,
-                'state'     => $state ?: '—',
+                'state'     => $state ?: ' · ',
                 'offerings' => $case->caseOfferings->map(fn($co) => $co->offering ? [
                     'id'                  => $co->offering->id,
                     'name'                => $co->offering->name,
@@ -769,9 +865,24 @@ class CaseController extends Controller
                 continue;
             }
 
-            // Re-run preflight guards — never trust client-side pass list
+            // Re-run preflight guards · never trust client-side pass list
             if ($case->triage !== PatientCase::TRIAGE_GREEN || $case->hold_status) {
                 $results[$uuid] = ['success' => false, 'error' => 'Failed re-validation (triage/hold changed).'];
+                continue;
+            }
+
+            /*
+             * LAW 4, re-checked at submit and not only at preflight. Preflight is
+             * advisory and its result reaches the client, so trusting it here
+             * would make the gate bypassable by replaying a submit with a uuid
+             * that never passed. This is the enforcing check.
+             */
+            if (! $clinician->canPracticeIn($case->patient_state ?: $case->patient?->state)) {
+                Log::warning('Licensure gate blocked a batch approval', [
+                    'case_id'      => $case->id,
+                    'clinician_id' => $clinician->id,
+                ]);
+                $results[$uuid] = ['success' => false, 'error' => 'Not licensed in this patient\'s state.'];
                 continue;
             }
 

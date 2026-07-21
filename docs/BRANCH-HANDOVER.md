@@ -164,12 +164,12 @@ for the same human, and a fallback match is how two charts silently become one.
 
 ## 7. Suggested review order
 
-1. `database/migrations/` — four additive migrations, plus the seeded routing v1
-2. `RolesAndPermissionsSeeder` — the permission change in §3
-3. `app/Models/User.php` + `PatientCase::scopeVisibleTo` — the scoping primitive
-4. `app/Services/Routing/RoutingStrategy.php` — pure, no I/O, fully unit-tested
-5. `app/Services/Routing/EligibilityEvaluator.php` — §4.3 lives here
-6. `app/Services/EhrRecordService.php` — payload construction and the segregation guards
+1. `database/migrations/` · four additive migrations, plus the seeded routing v1
+2. `RolesAndPermissionsSeeder` · the permission change in §3
+3. `app/Models/User.php` + `PatientCase::scopeVisibleTo` · the scoping primitive
+4. `app/Services/Routing/RoutingStrategy.php` · pure, no I/O, fully unit-tested
+5. `app/Services/Routing/EligibilityEvaluator.php` · §4.3 lives here
+6. `app/Services/EhrRecordService.php` · payload construction and the segregation guards
 7. Everything else
 
 ## 8. Suggested merge order

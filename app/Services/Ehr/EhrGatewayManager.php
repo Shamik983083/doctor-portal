@@ -31,7 +31,7 @@ class EhrGatewayManager
         if (! config('ehr.enabled') || ! config('ehr.sandbox_validated')) {
             throw new RuntimeException(
                 "EHR adapter [{$key}] requires ehr.enabled AND ehr.sandbox_validated. "
-                . 'Falling back is not automatic — set both flags deliberately or use the mock adapter.'
+                . 'Falling back is not automatic · set both flags deliberately or use the mock adapter.'
             );
         }
 

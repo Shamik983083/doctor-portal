@@ -64,7 +64,7 @@ priority), and `video_required_states` (an array of two-letter states on an Offe
 
 ## 3. The gaps, ranked by what they are actually worth
 
-### A. Tenant-scoped admin access — HIGHEST VALUE
+### A. Tenant-scoped admin access · HIGHEST VALUE
 
 MA states it explicitly in its own UI: *"Admins see only storefronts explicitly assigned to them,
 never cross-storefront metrics."* Cross-storefront reporting is reserved to a Super Admin role.
@@ -78,19 +78,19 @@ scoping onto screens built without it is far harder than building them scoped.
 **Needs a decision from Devin:** does MEDAXIS want a two-tier admin (tenant admin vs super admin),
 or do all admins stay global? Everything below inherits the answer.
 
-### ~~B. Storefront workload view~~ — WRONG, ALREADY EXISTS
+### ~~B. Storefront workload view~~ · WRONG, ALREADY EXISTS
 
 `DashboardController` already builds `$storefronts`: per partner, open cases and the
 green/yellow/red triage mix. Nothing to build. It was unscoped; that is fixed under A.
 
-### ~~C. Exception center~~ — WRONG, ALREADY EXISTS
+### ~~C. Exception center~~ · WRONG, ALREADY EXISTS
 
 `DashboardController` already builds `$exceptions`: workflow holds awaiting clearance, escalated
 to support, missing identity verification, cancelled in the last 7 days. Each bucket already maps
 to a real workflow condition rather than a free-text status, which was the property that mattered.
 Nothing to build. It was unscoped; that is fixed under A.
 
-### ~~D. Weighted provider load~~ — WRONG AS WRITTEN, PARTLY ALREADY EXISTS
+### ~~D. Weighted provider load~~ · WRONG AS WRITTEN, PARTLY ALREADY EXISTS
 
 `DashboardController` already builds `$providerLoads`: active cases against each clinician's
 `max_daily_cases`, as a percentage, which is the same view MA shows.
@@ -142,7 +142,7 @@ Given how much of MEDAXIS's clinical behaviour is now admin-configurable (triage
 and the new AI instruction sets), an unaudited config change can alter clinical outcomes with no
 trace. Recommend high priority, and it is a moderate build.
 
-### G. Integration health — PARTLY EXISTS
+### G. Integration health · PARTLY EXISTS
 
 The dashboard already shows a webhook delivery log and a failed-delivery count. What it does not
 show is the newer outbound integrations: pharmacy dispatch, EHR records and AI assist, each of
