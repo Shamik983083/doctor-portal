@@ -858,6 +858,135 @@ section("Typography is one system across the portal");
   ok(/tabular-nums/.test(nums), "figures are tabular so columns of numbers line up");
 }
 
+/* ---------------------------------------------------------------------------
+   Two-tier admin (Devin msg 2117).
+
+   The rule this section exists to defend reads backwards, so it is the one most
+   likely to be "fixed" into a bug later: an admin over NO doctors must see
+   NOTHING. The plausible-looking `if (! ids) return rows;` turns an empty scope
+   into an unrestricted one and hands a half-configured admin the whole platform.
+   Asserting "the scoped admin sees fewer rows" would NOT catch that, because a
+   scoped admin with doctors still filters correctly. Only the empty case does.
+   --------------------------------------------------------------------------- */
+section("Two-tier admin: super admin vs scoped Doctor Admin");
+{
+  const gotoAdmin = async (scope, viewLabel) => {
+    await page.click('.role-button:text-is("Admin")');
+    await page.click(`.scope-button[data-scope="${scope}"]`);
+    if (viewLabel) {
+      for (let g = 0; g < 12; g++) {
+        const c = await page.locator(".nav-section.closed").count();
+        if (!c) break;
+        await page.locator(".nav-section.closed").first().click();
+      }
+      await page.click(`.nav-link:has(.lbl:text-is("${viewLabel}"))`);
+    }
+  };
+  const navLabels = () => page.$$eval(".nav-link .lbl", (n) => n.map((x) => x.textContent.trim()));
+  const bodyRows  = () => page.locator(".tbl tbody tr").count();
+  const rowText   = () => page.$$eval(".tbl tbody tr", (n) => n.map((x) => x.textContent));
+
+  // The switcher belongs to the admin portal only.
+  await page.click('.role-button:text-is("Admin")');
+  ok((await page.locator(".scope-button").count()) === 3, "admin portal offers three tiers to view as");
+  await page.click('.role-button:text-is("Clinician")');
+  ok(await page.locator("#scopes").isHidden(), "no tier switcher in the clinician portal, the tiers do not exist there");
+  await page.click('.role-button:text-is("Partner")');
+  ok(await page.locator("#scopes").isHidden(), "nor in the partner portal");
+
+  // --- super admin sees the configuration and integration surfaces ---
+  await gotoAdmin("super");
+  for (let g = 0; g < 12; g++) {
+    const c = await page.locator(".nav-section.closed").count();
+    if (!c) break;
+    await page.locator(".nav-section.closed").first().click();
+  }
+  const superNav = await navLabels();
+  const SUPER_ONLY = ["Partners","Messaging API","Weight Loss API","Anti-Aging API","Webhook Guide",
+                      "Webhook Logs","Products & Levels","SLA Settings","Triage Rule Set","Case Routing",
+                      "Admin Users","Roles & Permissions"];
+  ok(SUPER_ONLY.every((l) => superNav.includes(l)), "super admin sees every gated screen");
+  ok((await page.locator("#whoRole").textContent()).trim() === "Super Admin",
+     "and the footer identity says so");
+
+  // --- the same nav, one tier down ---
+  await gotoAdmin("scoped");
+  const scopedNav = await navLabels();
+  const leaked = SUPER_ONLY.filter((l) => scopedNav.includes(l));
+  ok(leaked.length === 0, "a Doctor Admin sees none of them" + (leaked.length ? " (leaked: " + leaked.join(", ") + ")" : ""));
+  ok(scopedNav.includes("Cases") && scopedNav.includes("Patients") && scopedNav.includes("Clinicians"),
+     "but keeps the operational screens they run their doctors from");
+  ok(/over 2 doctors/.test(await page.locator("#whoRole").textContent()),
+     "and the footer identity follows the tier, not just the portal");
+
+  // --- scoping filters real rows, and says that it did ---
+  await gotoAdmin("super", "Cases");
+  const allCases = await bodyRows();
+  ok(allCases === 5, `super admin sees every case (${allCases})`);
+
+  await gotoAdmin("scoped", "Cases");
+  const mineCases = await rowText();
+  ok(mineCases.length === 2, `Doctor Admin sees only their doctors' cases (${mineCases.length} of 5)`);
+  ok(mineCases.every((t) => /Alex Hart/.test(t)), "every visible row belongs to one of their doctors");
+  ok(!mineCases.some((t) => /Priya Raman/.test(t)), "another admin's doctor is not visible");
+  ok(!mineCases.some((t) => /Unassigned/.test(t)),
+     "and neither are unassigned cases: whereIn(clinician_id, ids) does not match a null");
+  ok(/filtered to your doctors/.test(await page.locator(".toolbar").first().textContent()),
+     "the row counter says the list was filtered, so a short list does not read as missing data");
+
+  // PHI reached only through a case belonging to one of my doctors.
+  await gotoAdmin("scoped", "Patients");
+  const pts = await rowText();
+  ok(pts.length === 2 && !pts.some((t) => /Riley Chen/.test(t)),
+     "patients are reachable only through a case with one of their doctors");
+
+  // Platform-wide figures are withheld rather than quietly shrunk.
+  await gotoAdmin("scoped", "Dashboard");
+  const metrics = await page.$$eval(".metric", (n) => n.map((x) => x.textContent));
+  ok(metrics.some((m) => /Storefronts.*Super admin only/s.test(m)),
+     "a platform-wide count is withheld from a Doctor Admin, not shown as a smaller number");
+
+  // --- THE IMPORTANT ONE ---
+  await gotoAdmin("empty", "Cases");
+  const emptyRows = await rowText();
+  ok(emptyRows.length === 1 && /not over any doctors/.test(emptyRows[0]),
+     "an admin over NO doctors sees NOTHING, not everything");
+  ok(await page.locator(".scope-note.blocked").isVisible(),
+     "and the screen says why, rather than looking like an empty database");
+  ok(/not over any doctors/.test(await page.locator(".toolbar").first().textContent()),
+     "the counter says they are over nobody, not that a filter matched nothing");
+  ok(/0 = 1/.test(await page.locator(".scope-note.blocked").textContent()),
+     "naming the empty whereIn that produces it server-side");
+
+  await gotoAdmin("empty", "Patients");
+  ok((await bodyRows()) === 1 && /not over any doctors/.test((await rowText())[0]),
+     "the same holds for patients, which are PHI");
+
+  // --- switching tiers must not strand you on a screen you cannot open ---
+  await gotoAdmin("super", "Case Routing");
+  await page.click('.scope-button[data-scope="scoped"]');
+  ok((await page.locator(".stub").count()) === 0,
+     "dropping a tier while on a gated screen moves you to one you can open, not a dead stub");
+  ok(!/Case Routing/.test(await page.locator(".page-head h1").textContent()),
+     "and does not keep rendering the gated screen after the tier lost access to it");
+
+  // --- the permission matrix matches the seeder ---
+  await gotoAdmin("super", "Roles & Permissions");
+  const matrix = await page.$$eval(".perm-tbl tbody tr", (rows) =>
+    rows.map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent.trim())));
+  ok(matrix.length === 11, `every seeder permission is on the matrix (${matrix.length})`);
+  ok(matrix.every((r) => r[1] === "Yes"), "super_admin holds all of them (Permission::all())");
+  const withheld = matrix.filter((r) => r[2] === "No").map((r) => r[0]);
+  ok(withheld.length === 4, `four are withheld from a Doctor Admin (${withheld.length})`);
+  ok(["manage partners","manage webhooks","manage system","manage admins"]
+      .every((p) => withheld.some((w) => w.startsWith(p))),
+     "and they are the four the seeder actually withholds");
+  ok(/syncPermissions REPLACES/.test(await page.locator(".perm-note").textContent()),
+     "the screen warns that re-running the seeder is a live permission change");
+  ok(/no route in/.test(await page.locator(".perm-note").textContent()),
+     "and admits Products & Levels is gated here without middleware behind it");
+}
+
 section("Palette is MA-DOCPORTAL's, not invented");
 const tok = await page.evaluate(() => {
   const s = getComputedStyle(document.documentElement);
