@@ -987,6 +987,90 @@ section("Two-tier admin: super admin vs scoped Doctor Admin");
      "and admits Products & Levels is gated here without middleware behind it");
 }
 
+/* ---------------------------------------------------------------------------
+   Medications: terminology, category sections, one drug across many partners.
+   Devin msgs 2144 and 2145.
+   --------------------------------------------------------------------------- */
+section("Offerings are Medications, grouped by category, one drug across partners");
+{
+  await page.click('.role-button:text-is("Admin")');
+  await page.click('.scope-button[data-scope="super"]');
+  for (let g = 0; g < 12; g++) {
+    const c = await page.locator(".nav-section.closed").count();
+    if (!c) break;
+    await page.locator(".nav-section.closed").first().click();
+  }
+
+  const navLabels = await page.$$eval(".nav-link .lbl", (n) => n.map((x) => x.textContent.trim()));
+  ok(navLabels.includes("Medications") && !navLabels.includes("Offerings"),
+     "the admin sidebar says Medications, not Offerings");
+
+  await page.click('.nav-link:has(.lbl:text-is("Medications"))');
+  ok((await page.locator(".page-head h1").textContent()).trim() === "Medications", "and so does the page");
+
+  // Category sections, including the ones that are awkward to show.
+  const cats = await page.$$eval(".cat-panel", (n) => n.map((x) => x.dataset.category));
+  ok(cats.includes("Weight Loss") && cats.includes("Anti-Aging"), "drugs are grouped into category sections");
+  ok(cats.includes("Sexual Health"), "an EMPTY category is still shown, not hidden");
+  ok(await page.locator('.cat-panel[data-category="Sexual Health"] .empty-scope').isVisible(),
+     "and says it is empty rather than looking broken");
+  ok(cats.includes("Uncategorised"),
+     "and a drug with no category gets its own section instead of vanishing from the catalog");
+
+  // ONE drug, MANY partners. This is the replication Devin wants gone, so the
+  // test asserts the drug appears ONCE and carries several partners, not that
+  // several rows happen to mention it.
+  const semaCards = await page.locator('.drug[data-drug="Semaglutide"]').count();
+  ok(semaCards === 1, `Semaglutide appears once, not once per partner (${semaCards})`);
+  const semaPartners = await page.$$eval('.drug[data-drug="Semaglutide"] .partner-chip:not(.add)',
+    (n) => n.map((x) => x.textContent));
+  ok(semaPartners.length === 3, `and is assigned to 3 partners from that single card (${semaPartners.length})`);
+  ok(semaPartners.some((t) => /Northstar/.test(t)) && semaPartners.some((t) => /Meridian/.test(t)),
+     "naming each storefront that sells it");
+  ok(semaPartners.some((t) => /Approved/.test(t)) && semaPartners.some((t) => /Pending/.test(t)),
+     "with approval per partner, so one storefront can be live while another is mid-approval");
+
+  // Variants come from CATALOG, the same ladder titration walks. If this screen
+  // defined its own list, the two could disagree about what is prescribable.
+  const rungs = await page.$$eval('.drug[data-drug="Semaglutide"] .rung', (n) => n.map((x) => x.textContent));
+  ok(rungs.length === 4, `the drug carries its ordered variant ladder (${rungs.length} levels)`);
+  ok(/2\.5 mg/.test(rungs[0]) && /10 mg/.test(rungs[3]), "in dose order, lowest first");
+  const catalogLevels = await page.evaluate(() => CATALOG.Semaglutide.levels);
+  ok(JSON.stringify(catalogLevels) === JSON.stringify(rungs.map((r) => r.replace(/^\d+/, ""))),
+     "and they ARE CATALOG's levels, the ones the approval screen titrates along, not a second list");
+
+  ok(/partner_id/.test(await page.locator(".perm-note").last().textContent()),
+     "the screen states this shape is a proposal and names the schema blocker");
+  ok(/api\/partner\/offerings/.test(await page.locator(".perm-note").last().textContent()),
+     "and that the partner endpoint does not get renamed with the label");
+}
+
+section("Clinician dashboard shows the real review queue, in the compact grid");
+{
+  await page.click('.role-button:text-is("Clinician")');
+  await page.click('.nav-link:has(.lbl:text-is("Dashboard"))');
+  ok((await page.locator(".metric").count()) === 4, "the dashboard keeps its metric cards");
+  ok((await page.locator("table.review-grid").count()) === 1,
+     "and renders the review grid itself, not a flat summary table");
+  ok((await page.locator(".tbl").count()) === 0,
+     "the old five-column 'Next in your queue' table is gone");
+
+  const dashCols = await page.$$eval("table.review-grid thead th", (n) => n.map((x) => x.textContent.trim()));
+  const dashRows = await page.locator("table.review-grid tbody tr").count();
+  ok(await page.locator("table.review-grid th.pin-triage").isVisible(),
+     "with triage pinned, so the first thing a provider sees is what to pick up first");
+
+  await page.click('.nav-link:has(.lbl:text-is("Case Queue"))');
+  const queueCols = await page.$$eval("table.review-grid thead th", (n) => n.map((x) => x.textContent.trim()));
+  const queueRows = await page.locator("table.review-grid tbody tr").count();
+
+  ok(dashCols.length > 15, `the dashboard shows the full compact column set (${dashCols.length} columns)`);
+  ok(JSON.stringify(dashCols) === JSON.stringify(queueCols),
+     "identical to the Case Queue's columns, because it is the same renderer and cannot drift from it");
+  ok(dashRows === queueRows && dashRows > 0,
+     `and the same cases (${dashRows}), not a truncated teaser that disagrees with the queue`);
+}
+
 section("Palette is MA-DOCPORTAL's, not invented");
 const tok = await page.evaluate(() => {
   const s = getComputedStyle(document.documentElement);

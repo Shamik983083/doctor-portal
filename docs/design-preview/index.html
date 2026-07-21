@@ -166,6 +166,27 @@ button{cursor:pointer}
 
 .empty-scope{text-align:center;color:var(--muted);padding:26px 14px;font-size:13px}
 
+/* Medications: drug > variants > partners */
+.cat-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;
+  padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:13px;color:var(--muted)}
+.cat-summary strong{color:var(--ink);font-weight:780}
+.cat-summary .button-primary{margin-left:auto}
+.cat-panel{margin-bottom:16px}
+.cat-count{display:inline-grid;place-items:center;min-width:21px;height:21px;padding:0 6px;margin-left:7px;
+  border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted);
+  font-size:11px;font-weight:780;vertical-align:middle}
+.drug{padding:16px 18px;border-top:1px solid var(--line)}
+.drug-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.drug-head strong{font-size:15px;margin-right:8px}
+.drug-head .pill{margin-right:5px}
+.drug-row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding:9px 0}
+.drug-row .subheading{flex:0 0 118px;padding-top:5px}
+.partner-chips{display:flex;gap:7px;flex-wrap:wrap;flex:1;min-width:0}
+.partner-chip{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:9px;
+  border:1px solid var(--line);background:#fff;font-size:12px;font-weight:650;color:var(--ink);white-space:nowrap}
+.partner-chip.add{border-style:dashed;color:var(--muted);font-weight:600}
+.partner-chip.add:hover{color:var(--accent);border-color:var(--accent)}
+
 /* Permission matrix */
 .perm-tbl td.yes{color:#1d7a4d;font-weight:750}
 .perm-tbl td.no{color:#b03a2e;font-weight:750}
@@ -579,7 +600,7 @@ const PORTALS = {
         {id:"admin.partners",    ico:"\u{1F3E2}", label:"Partners", su:true},
         {id:"admin.clinicians",  ico:"\u{1F9D1}", label:"Clinicians"},
         {id:"admin.priority",    ico:"⇅", label:"Assignment Priority", sub:true},
-        {id:"admin.offerings",   ico:"\u{1F48A}", label:"Offerings", badge:"3"},
+        {id:"admin.offerings",   ico:"\u{1F48A}", label:"Medications", badge:"3"},
         {id:"admin.categories",  ico:"\u{1F3F7}", label:"Categories", sub:true},
         {id:"admin.questionnaires", ico:"☑", label:"Questionnaires"},
         {id:"admin.questions",   ico:"❓", label:"Question Bank", sub:true}
@@ -636,7 +657,7 @@ const PORTALS = {
     label: "Partner", who: ["MW","Marcus Webb","Storefront Admin"],
     nav: [
       {type:"link", id:"prt.dashboard",  ico:"◴", label:"Dashboard"},
-      {type:"link", id:"prt.offerings",  ico:"\u{1F48A}", label:"Offerings"},
+      {type:"link", id:"prt.offerings",  ico:"\u{1F48A}", label:"Medications"},
       {type:"link", id:"prt.patients",   ico:"\u{1F465}", label:"Patients"},
       {type:"link", id:"prt.cases",      ico:"\u{1F5C2}", label:"Cases"},
       {type:"link", id:"prt.credentials",ico:"\u{1F511}", label:"API Credentials"},
@@ -1115,7 +1136,7 @@ const VIEWS = {
   "admin.cases": {
     eyebrow:"Management", title:"Cases", sub:"Every case across all storefronts, with triage and assignment state.",
     scoped:true,
-    table:{title:"All cases", cols:["Triage","Patient","Partner","Clinician","Offerings","Status","Support","Created"],
+    table:{title:"All cases", cols:["Triage","Patient","Partner","Clinician","Medications","Status","Support","Created"],
       owners:["Dr. Alex Hart","Dr. Priya Raman",null,"Dr. Alex Hart",null],
       rows:[
       [P("Red","pill red"),"Jordan Avery","Northstar Health","Dr. Alex Hart","Semaglutide",P("In review","pill yellow"),P("Open","pill red"),"14 min ago"],
@@ -1171,19 +1192,16 @@ const VIEWS = {
     ]}
   },
   "admin.offerings": {
-    eyebrow:"Management", title:"Offerings", sub:"Products a storefront can sell, and their approval state.",
-    table:{title:"Catalog", cols:["Name","Partner","Type","Category","Approval","Active"], rows:[
-      ["Semaglutide 0.25mg","Northstar Health","Injectable","Weight Loss",P("Approved","pill green"),P("Yes","pill green")],
-      ["Tirzepatide 2.5mg","Vitality Direct","Injectable","Weight Loss",P("Approved","pill green"),P("Yes","pill green")],
-      ["NAD+ 100mg","Northstar Health","Injectable","Anti-Aging",P("Pending","pill yellow"),P("No","pill neutral")],
-      ["Peptide Therapy","Meridian Wellness","Injectable","Anti-Aging",P("Pending","pill yellow"),P("No","pill neutral")]
-    ]}
+    eyebrow:"Management", title:"Medications",
+    sub:"Everything a storefront can prescribe, grouped by category, with each one's approval state.",
+    medications:true
   },
-  "admin.categories":{eyebrow:"Management", title:"Categories", sub:"Grouping used to organise the offering catalog.",
-    table:{title:"Categories", cols:["Name","Offerings","Status"], rows:[
-      ["Weight Loss","12",P("Active","pill green")],["Anti-Aging","7",P("Active","pill green")],["Hormone Therapy","4",P("Active","pill green")]]}},
-  "admin.questionnaires":{eyebrow:"Management", title:"Questionnaires", sub:"Intake forms attached to offerings, built in the questionnaire builder.",
-    table:{title:"Questionnaires", cols:["Name","Offerings","Questions","Status","Updated"], rows:[
+  "admin.categories":{eyebrow:"Management", title:"Categories", sub:"The grouping the medication catalog is organised by. A category with nothing in it still shows, because an empty category is usually a setup step someone did not finish.",
+    table:{title:"Categories", cols:["Name","Medications","Status"], rows:[
+      ["Weight Loss","12",P("Active","pill green")],["Anti-Aging","7",P("Active","pill green")],
+      ["Hormone Therapy","4",P("Active","pill green")],["Sexual Health","0",P("Needs review","pill yellow")]]}},
+  "admin.questionnaires":{eyebrow:"Management", title:"Questionnaires", sub:"Intake forms attached to medications, built in the questionnaire builder.",
+    table:{title:"Questionnaires", cols:["Name","Medications","Questions","Status","Updated"], rows:[
       ["Weight Loss Intake v4","6","38",P("Published","pill green"),"2 days ago"],
       ["Anti-Aging Intake v2","3","24",P("Published","pill green"),"1 week ago"],
       ["Hormone Screen v1","1","19",P("Draft","pill neutral"),"3 weeks ago"]]}},
@@ -1240,15 +1258,19 @@ const VIEWS = {
     permissions:true},
 
   /* --------------------------------------------------------- clinician */
+  /* Devin msg 2146: the dashboard used to show "Next in your queue" as a flat
+     five-column table, which was a different, thinner rendering of the same
+     cases the Case Queue screen shows properly. Two renderings of one queue
+     means the dashboard can imply something the queue does not, and a provider
+     landing here saw none of the triage, holds or batch eligibility that decide
+     what to pick up first. It now renders THE review queue through the same
+     renderQueue() as the Case Queue screen, with the same filter, so there is
+     one compact-column view of the queue and it cannot drift. */
   "clin.dashboard": {
     eyebrow:"Clinician", title:"Dashboard", sub:"Your queue, your workload and your SLA position.",
     metrics:[["Waiting Queue","12","cases available to claim"],["My Active Cases","8","assigned and approved"],
              ["Completed This Month","64","July 2026"],["SLA Status","All clear","24h review deadline"]],
-    table:{title:"Next in your queue", cols:["Triage","Patient","Offerings","Company","Submitted"], rows:[
-      [P("Red","pill red"),"Jordan Avery","Semaglutide","Northstar Health","14 min ago"],
-      [P("Yellow","pill yellow"),"Casey Morgan","NAD+","Northstar Health","1 hr ago"],
-      [P("Green","pill green"),"Devon Ellis","Peptide Therapy","Vitality Direct","3 hr ago"]
-    ]}
+    queue:(r) => !ROUTING[r.id].mine
   },
   "clin.queue": {
     eyebrow:"Clinician", title:"Case Queue", sub:"Unclaimed cases you are licensed to review. Claim one to start.",
@@ -1292,7 +1314,7 @@ const VIEWS = {
     eyebrow:"Partner", title:"Dashboard", sub:"Your storefront's cases, patients and integration health.",
     metrics:[["Open cases","34","awaiting provider review"],["Patients","412","registered via your API"],
              ["Approved this month","118","July 2026"],["Webhook health","OK","last failure 6 days ago"]],
-    table:{title:"Recent cases", cols:["UUID","Patient","Offerings","Clinician","Status","Created"], rows:[
+    table:{title:"Recent cases", cols:["UUID","Patient","Medications","Clinician","Status","Created"], rows:[
       ["c_8f21a4","Jordan Avery","Semaglutide","Dr. Alex Hart",P("In review","pill yellow"),"14 min ago"],
       ["c_7b90d3","Casey Morgan","NAD+",P("Unassigned","pill neutral"),P("Queued","pill"),"1 hr ago"],
       ["c_6a45f8","Ari Delgado","NAD+","Dr. Alex Hart",P("Approved","pill green"),"Yesterday"]
@@ -1300,7 +1322,7 @@ const VIEWS = {
   },
   "prt.cases": {
     eyebrow:"Partner", title:"Cases", sub:"Every case your storefront has submitted.",
-    table:{title:"Your cases", cols:["UUID","Patient","Offerings","Clinician","Status","Created"], rows:[
+    table:{title:"Your cases", cols:["UUID","Patient","Medications","Clinician","Status","Created"], rows:[
       ["c_8f21a4","Jordan Avery","Semaglutide","Dr. Alex Hart",P("In review","pill yellow"),"14 min ago"],
       ["c_7b90d3","Casey Morgan","NAD+",P("Unassigned","pill neutral"),P("Queued","pill"),"1 hr ago"],
       ["c_6a45f8","Ari Delgado","NAD+","Dr. Alex Hart",P("Approved","pill green"),"Yesterday"],
@@ -1316,7 +1338,7 @@ const VIEWS = {
     ]}
   },
   "prt.offerings": {
-    eyebrow:"Partner", title:"Offerings", sub:"Products you sell, and where each one stands in approval.",
+    eyebrow:"Partner", title:"Medications", sub:"What you are approved to sell, and where each one stands in approval.",
     table:{title:"Your catalog", cols:["Name","Internal Name","Type","Category","States","Approval","Status"], rows:[
       ["Semaglutide 0.25mg","sema_025","Injectable","Weight Loss","TN, KY",P("Approved","pill green"),P("Active","pill green")],
       ["NAD+ 100mg","nad_100","Injectable","Anti-Aging","TN",P("Pending","pill yellow"),P("Inactive","pill neutral")]
@@ -2078,6 +2100,151 @@ function renderScopeNote(){
     + '</div></div>';
 }
 
+/* ---------------------------------------------------------------------------
+   Medications, grouped into category sections (Devin msg 2144).
+
+   TERMINOLOGY ONLY. The model is still Offering, the table is still offerings,
+   and the partner endpoint is still /api/partner/offerings. What changed is
+   every word a human reads. Renaming the code and the API would break the
+   storefront integrations that call that endpoint today, and it is a separate
+   decision from what this screen is called.
+
+   The last group is the one that earns its place: `category_id` was added to
+   offerings in a LATER migration (2026_06_29_000006), so it is nullable and
+   rows predating it have no category. If uncategorised medications were simply
+   dropped from a grouped view, they would vanish from the catalog screen while
+   still being prescribable. They get their own section instead.
+   --------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   ONE DRUG, MANY VARIANTS, MANY PARTNERS (Devin msg 2145).
+
+   "Should be a drug, variants, and you should be able to add to multiple
+   partners to not have to replicate items."
+
+   THE PROBLEM IS REAL AND IT IS IN THE SCHEMA. offerings.partner_id is a
+   non-nullable foreign key and Offering::partner() is a belongsTo, so an
+   offering belongs to exactly ONE storefront. Selling Semaglutide through three
+   partners today means three rows, each carrying its own available_states,
+   is_controlled_substance and dosespot_medication_id. Those are clinical facts
+   about the DRUG, not about the storefront, and duplicating them means they can
+   drift: the same drug controlled under one partner and not another.
+
+   The variants already exist here and are already load-bearing: CATALOG holds
+   the ordered dose ladder, and prefillMonths() walks it one step per month for
+   titration. This screen therefore READS CATALOG rather than defining a second
+   list, so there is one catalog in this preview and not two that can disagree.
+
+   WHAT SPLITS WHERE is the decision this screen puts in front of you, and it is
+   the whole design:
+     per DRUG    name, category, form, the variant ladder, controlled-substance
+                 flag, pharmacy ids, clinical rules. One source of truth.
+     per PARTNER price, active, approval state. A storefront can be mid-approval
+                 on a drug another storefront is already selling.
+   --------------------------------------------------------------------------- */
+const PARTNERS_ALL = ["Northstar Health","Vitality Direct","Meridian Wellness"];
+
+/* Category, form and per-partner state for each drug already in CATALOG. Kept
+   deliberately small: Devin is sending the real list (msg 2145), and inventing a
+   catalog now would only have to be thrown away. */
+const DRUG_META = {
+  Semaglutide: { category:"Weight Loss", form:"Injectable", controlled:false,
+    partners:{ "Northstar Health":"Approved", "Vitality Direct":"Approved", "Meridian Wellness":"Pending" } },
+  Tirzepatide: { category:"Weight Loss", form:"Injectable", controlled:false,
+    partners:{ "Vitality Direct":"Approved", "Northstar Health":"Pending" } },
+  "NAD+":      { category:"Anti-Aging", form:"Injectable", controlled:false,
+    partners:{ "Northstar Health":"Pending" } },
+  Zofran:      { category:null, form:"Oral", controlled:false,
+    partners:{ "Northstar Health":"Approved", "Vitality Direct":"Approved" } }
+};
+
+const CATEGORY_ORDER = ["Weight Loss","Anti-Aging","Hormone Therapy","Sexual Health"];
+
+function approvalTone(s){ return s === "Approved" ? "green" : s === "Pending" ? "yellow" : "neutral"; }
+
+function renderMedications(){
+  const drugs = Object.keys(CATALOG);
+  const byCategory = {};
+  for(const c of CATEGORY_ORDER) byCategory[c] = [];
+  const uncategorised = [];
+
+  for(const name of drugs){
+    const meta = DRUG_META[name];
+    if(!meta) continue;
+    (meta.category ? byCategory[meta.category] : uncategorised).push(name);
+  }
+
+  const variantTotal = drugs.reduce((n,d) => n + CATALOG[d].levels.length, 0);
+  let h = '<div class="cat-summary">'
+    + '<div><strong>'+drugs.length+'</strong> drugs · <strong>'+variantTotal+'</strong> variants across '
+    + CATEGORY_ORDER.length+' categories</div>'
+    + (uncategorised.length ? '<span class="pill red">'+uncategorised.length+' uncategorised</span>'
+                            : '<span class="pill green">all categorised</span>')
+    + '<button class="button-primary">Add drug</button></div>';
+
+  const drugCard = (name) => {
+    const meta = DRUG_META[name];
+    const p = CATALOG[name];
+    const assigned = Object.entries(meta.partners);
+    return '<div class="drug" data-drug="'+esc(name)+'">'
+      + '<div class="drug-head"><div><strong>'+esc(name)+'</strong>'
+      + '<span class="pill neutral">'+esc(p.kind)+'</span>'
+      + '<span class="pill neutral">'+esc(meta.form)+'</span></div>'
+      + '<button class="button-secondary">Edit drug</button></div>'
+
+      /* The variant ladder. Same data the approval screen titrates along, so a
+         level added here is a level a provider can prescribe. */
+      + '<div class="drug-row"><span class="subheading">Variants</span>'
+      + '<div class="ladder">'
+      + p.levels.map((l,i) => '<div class="rung"><span class="rung-n">'+(i+1)+'</span>'+esc(l)+'</div>')
+          .join('<span class="rung-arrow">&rarr;</span>')
+      + '</div></div>'
+
+      /* Assignment, not duplication: the same drug listed against each partner
+         that sells it, with approval per partner. */
+      + '<div class="drug-row"><span class="subheading">Sold by <span class="cat-count">'+assigned.length+'</span></span>'
+      + '<div class="partner-chips">'
+      + assigned.map(([pt,st]) => '<span class="partner-chip">'+esc(pt)
+          + '<span class="pill '+approvalTone(st)+'">'+esc(st)+'</span></span>').join("")
+      + PARTNERS_ALL.filter((pt) => !meta.partners[pt])
+          .map((pt) => '<button class="partner-chip add">+ '+esc(pt)+'</button>').join("")
+      + '</div></div></div>';
+  };
+
+  for(const cat of CATEGORY_ORDER){
+    const list = byCategory[cat];
+    h += '<div class="panel cat-panel" data-category="'+esc(cat)+'">'
+      + '<div class="panel-heading"><div><h2>'+esc(cat)+' <span class="cat-count">'+list.length+'</span></h2>'
+      + '<p>'+(list.length ? 'Drugs in this category and the storefronts selling them.'
+                           : 'Category exists with nothing mapped to it yet.')+'</p></div>'
+      + '<span class="pill '+(list.length ? "green" : "yellow")+'">'+(list.length ? "Active" : "Empty")+'</span></div>'
+      + (list.length ? list.map(drugCard).join("")
+        /* An empty category is shown, never hidden. Hiding it makes a
+           half-finished setup look like a finished one. */
+        : '<div class="empty-scope">No drugs in this category yet.</div>')
+      + '</div>';
+  }
+
+  if(uncategorised.length){
+    h += '<div class="panel cat-panel" data-category="Uncategorised">'
+      + '<div class="panel-heading"><div><h2>Uncategorised <span class="cat-count">'+uncategorised.length+'</span></h2>'
+      + '<p>category_id is nullable and was added to offerings in a later migration, so a drug can be '
+      + 'prescribable while belonging to no category. Shown here rather than dropped from the screen.</p></div>'
+      + '<span class="pill red">Needs a category</span></div>'
+      + uncategorised.map(drugCard).join("") + '</div>';
+  }
+
+  h += '<div class="perm-note"><b>This shape is a proposal, not what the schema does today.</b> '
+     + 'Right now <b>offerings.partner_id</b> is a non-nullable foreign key, so one offering belongs to one '
+     + 'storefront and selling a drug through three partners means three rows. Each copy carries its own '
+     + 'available_states, is_controlled_substance and pharmacy ids, which are facts about the drug rather '
+     + 'than the storefront, so they can drift apart. Getting to the screen above needs a drug table, a '
+     + 'variant table and a drug/partner pivot, with price, active and approval living on the pivot.'
+     + '<br><br><b>Terminology is only the label.</b> These stay Offering records and the partner endpoint '
+     + 'stays <b>/api/partner/offerings</b>. Renaming the route would break every storefront integration '
+     + 'calling it today, and that is a separate decision from what the screen is called.</div>';
+  return h;
+}
+
 /* The permission matrix, read straight out of RolesAndPermissionsSeeder. */
 const PERMISSION_MATRIX = [
   ["Cases · view, create, update, delete", true, true],
@@ -2142,6 +2309,7 @@ function renderView(){
   if(v.routing){ h += renderRouting(); }
   if(v.chat){ h += renderMessages(); }
   if(v.permissions){ h += renderPermissions(); }
+  if(v.medications){ h += renderMedications(); }
 
   if(v.doc){
     h += '<div class="panel"><div class="panel-heading"><div><h2>Endpoints</h2>'
