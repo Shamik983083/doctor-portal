@@ -774,12 +774,20 @@ section("Admin can see products, levels and combinations");
     const c = await page.locator(".nav-section.closed").count(); if(!c) break;
     await page.locator(".nav-section.closed").first().click(); } };
   await openAll();
-  await page.locator('.nav-link[title="Products & Levels"]').click();
-  ok((await page.locator(".catalog-card").count()) === 4, "every catalog product is listed");
-  const rungs = await page.locator(".catalog-card").first().locator(".rung").count();
+  /* Products & Levels is gone, merged into Medications (Devin msg 2149). The
+     catalog it held has to still be reachable, and reachable in ONE place: two
+     screens describing one catalog is how they end up disagreeing about what is
+     prescribable. */
+  ok((await page.locator('.nav-link[title="Products & Levels"]').count()) === 0,
+     "Products & Levels is gone from the sidebar, not left alongside Medications");
+  await page.locator('.nav-link[title="Medications"]').click();
+  ok((await page.locator(".drug").count()) === 4, "every catalog drug is listed on Medications");
+  const rungs = await page.locator('.drug[data-drug="Semaglutide"] .rung').count();
   ok(rungs === 4, `Semaglutide shows its four ordered levels (got ${rungs})`);
-  const combos = await page.locator(".catalog-card").first().locator(".combos .pill").allTextContents();
-  ok(combos.includes("Zofran"), "and the add-ons it may be combined with");
+  const combos = await page.locator('.drug[data-drug="Semaglutide"]').getByText("Zofran").count();
+  ok(combos > 0, "and the add-ons it may be combined with came across with it");
+  ok((await page.locator('.drug[data-drug="NAD+"]').getByText("add-on itself").count()) > 0,
+     "including the case with no combinations, which says so rather than rendering blank");
 
   // The catalog is the same source the approval screen reads.
   const same = await page.evaluate(() =>
@@ -903,7 +911,7 @@ section("Two-tier admin: super admin vs scoped Doctor Admin");
   }
   const superNav = await navLabels();
   const SUPER_ONLY = ["Partners","Messaging API","Weight Loss API","Anti-Aging API","Webhook Guide",
-                      "Webhook Logs","Products & Levels","SLA Settings","Triage Rule Set","Case Routing",
+                      "Webhook Logs","SLA Settings","Triage Rule Set","Case Routing",
                       "Admin Users","Roles & Permissions"];
   ok(SUPER_ONLY.every((l) => superNav.includes(l)), "super admin sees every gated screen");
   ok((await page.locator("#whoRole").textContent()).trim() === "Super Admin",
@@ -983,8 +991,8 @@ section("Two-tier admin: super admin vs scoped Doctor Admin");
      "and they are the four the seeder actually withholds");
   ok(/syncPermissions REPLACES/.test(await page.locator(".perm-note").textContent()),
      "the screen warns that re-running the seeder is a live permission change");
-  ok(/no route in/.test(await page.locator(".perm-note").textContent()),
-     "and admits Products & Levels is gated here without middleware behind it");
+  ok(/still has to be written/.test(await page.locator(".perm-note").textContent()),
+     "and admits the server side of the catalog read-only split is not written yet");
 }
 
 /* ---------------------------------------------------------------------------
@@ -1038,6 +1046,22 @@ section("Offerings are Medications, grouped by category, one drug across partner
   const catalogLevels = await page.evaluate(() => CATALOG.Semaglutide.levels);
   ok(JSON.stringify(catalogLevels) === JSON.stringify(rungs.map((r) => r.replace(/^\d+/, ""))),
      "and they ARE CATALOG's levels, the ones the approval screen titrates along, not a second list");
+
+  /* Merging Products & Levels in moved the catalog onto a screen a Doctor Admin
+     can open. That must NOT have widened who can change it. */
+  ok((await page.locator(".drug .button-secondary").count()) > 0, "a super admin can edit a drug");
+  ok((await page.locator(".partner-chip.add").count()) > 0, "and assign it to another partner");
+  await page.click('.scope-button[data-scope="scoped"]');
+  await page.click('.nav-link:has(.lbl:text-is("Medications"))');
+  ok((await page.locator(".drug").count()) === 4,
+     "a Doctor Admin still SEES the catalog, they need to know what is prescribable");
+  ok((await page.locator(".drug .button-secondary").count()) === 0,
+     "but cannot edit a drug: they hold view offerings, not update offerings");
+  ok((await page.locator(".partner-chip.add").count()) === 0, "and cannot assign it to a partner");
+  ok((await page.locator(".read-only-tag").count()) === 1,
+     "and the screen says it is view-only rather than just missing its buttons");
+  await page.click('.scope-button[data-scope="super"]');
+  await page.click('.nav-link:has(.lbl:text-is("Medications"))');
 
   ok(/partner_id/.test(await page.locator(".perm-note").last().textContent()),
      "the screen states this shape is a proposal and names the schema blocker");

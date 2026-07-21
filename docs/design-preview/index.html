@@ -453,16 +453,10 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .weight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;padding:0 20px 20px}
 .weight label{display:block;font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 .weight input{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line-strong);background:#fff;font-family:inherit;font-size:13px;color:var(--ink)}
-.catalog-list{display:grid;gap:12px;padding:0 20px 20px}
-.catalog-card{border:1px solid var(--line);border-radius:14px;padding:15px;background:#fff}
-.catalog-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
-.catalog-head > div{display:flex;align-items:center;gap:9px}
-.catalog-head strong{font-size:14px}
 .ladder{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:13px}
 .rung{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);border-radius:10px;padding:7px 11px;font-size:12.5px;background:#fbfcfe}
 .rung-n{display:grid;place-items:center;width:18px;height:18px;border-radius:99px;background:var(--blue-bg);color:var(--accent-ink);font-size:10px;font-weight:790}
 .rung-arrow{color:var(--soft-muted);font-size:13px}
-.combos{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .combos .subheading{margin:0}
 
 /* ------------------------------------------------- messages, iPhone styling */
@@ -612,8 +606,11 @@ const PORTALS = {
         {id:"admin.guide.webhooks",   ico:"\u{1F4C4}", label:"Webhook Guide"},
         {id:"admin.webhooks",         ico:"\u{1F4E1}", label:"Webhook Logs"}
       ]},
+      /* Products & Levels is GONE (Devin msg 2149, "merge to variant"). It held
+         the drug ladder and allowed combinations, which are now on the drug card
+         under Medications. Two screens describing one catalog is how they end up
+         disagreeing about what is prescribable. */
       {type:"section", label:"Configuration", open:false, su:true, items:[
-        {id:"admin.catalog",  ico:"\u{1F9EA}", label:"Products & Levels"},
         {id:"admin.settings", ico:"⚙", label:"SLA Settings"},
         {id:"admin.triage",   ico:"\u{1F6A6}", label:"Triage Rule Set"},
         {id:"admin.routing",  ico:"\u{1F500}", label:"Case Routing"}
@@ -1234,8 +1231,9 @@ const VIEWS = {
       ["case.cancelled","Vitality Direct","/api/webhook",P("200 OK","pill green"),"1","22 min ago"],
       ["case.completed","Meridian Wellness","/inbound",P("500 Error","pill red"),"4","1 hr ago"],
       ["order.updated","Northstar Health","/hooks/medaxis",P("200 OK","pill green"),"1","2 hr ago"]]}},
-  "admin.catalog":{eyebrow:"Configuration", title:"Products & Levels", sub:"The catalog the approval screen reads. Levels are ordered, and that order is what titration steps through.",
-    catalog:true},
+  /* "admin.catalog" (Products & Levels) removed, merged into Medications.
+     renderCatalog() goes with it: the ladder and the allowed combinations now
+     render on the drug card, from the same CATALOG object as before. */
   "admin.settings":{eyebrow:"Configuration", title:"SLA Settings", sub:"Review deadlines and escalation thresholds.",
     table:{title:"Thresholds", cols:["Setting","Value","Applies to"], rows:[
       ["Review deadline","24 hours","All cases"],["Escalation warning","18 hours","All cases"],
@@ -1597,29 +1595,6 @@ function renderRouting(){
   return h;
 }
 
-function renderCatalog(){
-  let h = '<div class="panel"><div class="panel-heading"><div><h2>Products</h2>'
-    + '<p>Each product carries an ordered ladder of dose levels. Titration walks up that ladder one step per month; hold repeats the requested step.</p></div>'
-    + '<button class="button-primary">Add product</button></div>'
-    + '<div class="catalog-list">';
-
-  for(const [name, p] of Object.entries(CATALOG)){
-    h += '<div class="catalog-card"><div class="catalog-head">'
-      + '<div><strong>'+esc(name)+'</strong><span class="pill neutral">'+p.kind+'</span></div>'
-      + '<button class="button-secondary">Edit</button></div>'
-      + '<div class="ladder">'
-      + p.levels.map((l, i) => '<div class="rung"><span class="rung-n">'+(i+1)+'</span>'+esc(l)+'</div>').join('<span class="rung-arrow">&rarr;</span>')
-      + '</div>'
-      + '<div class="combos"><span class="subheading">Allowed combinations</span>'
-      + (p.combos.length
-          ? p.combos.map((c) => '<span class="pill">'+esc(c)+'</span>').join(" ")
-          : '<span class="no-holds">None. This product is an add-on itself.</span>')
-      + '</div></div>';
-  }
-  return h + '</div></div>'
-    + '<div class="note">Editing is not wired in this preview. The point is that the approval screen '
-    + 'reads this catalog: adding a level here adds it to the provider dropdowns and extends what titration can reach.</div>';
-}
 
 /* ------------------------------------------------------- messages, iPhone style */
 const THREADS = [
@@ -2161,7 +2136,24 @@ const CATEGORY_ORDER = ["Weight Loss","Anti-Aging","Hormone Therapy","Sexual Hea
 
 function approvalTone(s){ return s === "Approved" ? "green" : s === "Pending" ? "yellow" : "neutral"; }
 
+/* ---------------------------------------------------------------------------
+   READ-ONLY FOR A DOCTOR ADMIN, and this is not a style choice.
+
+   Merging Products & Levels into Medications moved the drug ladder and the
+   combination rules out of a super-admin-only Configuration section onto a
+   screen in Management, which a Doctor Admin can open. Left alone, that merge
+   would have quietly widened who can change the catalog.
+
+   The seeder already answers it: admin holds `view offerings` and does NOT hold
+   create, update or delete. So a Doctor Admin sees the catalog and cannot act on
+   it, and every editing affordance is gated rather than the whole screen. Hiding
+   the screen would be wrong the other way: they need to know what is
+   prescribable to run their doctors.
+   --------------------------------------------------------------------------- */
+function canEditCatalog(){ return portal !== "admin" || isSuperAdmin(); }
+
 function renderMedications(){
+  const editable = canEditCatalog();
   const drugs = Object.keys(CATALOG);
   const byCategory = {};
   for(const c of CATEGORY_ORDER) byCategory[c] = [];
@@ -2179,7 +2171,9 @@ function renderMedications(){
     + CATEGORY_ORDER.length+' categories</div>'
     + (uncategorised.length ? '<span class="pill red">'+uncategorised.length+' uncategorised</span>'
                             : '<span class="pill green">all categorised</span>')
-    + '<button class="button-primary">Add drug</button></div>';
+    + (editable ? '<button class="button-primary">Add drug</button>'
+                : '<span class="pill neutral read-only-tag">View only · you hold view offerings, not update</span>')
+    + '</div>';
 
   const drugCard = (name) => {
     const meta = DRUG_META[name];
@@ -2189,7 +2183,8 @@ function renderMedications(){
       + '<div class="drug-head"><div><strong>'+esc(name)+'</strong>'
       + '<span class="pill neutral">'+esc(p.kind)+'</span>'
       + '<span class="pill neutral">'+esc(meta.form)+'</span></div>'
-      + '<button class="button-secondary">Edit drug</button></div>'
+      + (editable ? '<button class="button-secondary">Edit drug</button>' : '')
+      + '</div>'
 
       /* The variant ladder. Same data the approval screen titrates along, so a
          level added here is a level a provider can prescribe. */
@@ -2199,14 +2194,27 @@ function renderMedications(){
           .join('<span class="rung-arrow">&rarr;</span>')
       + '</div></div>'
 
+      /* Allowed combinations, folded in from the old Products & Levels screen
+         (Devin msg 2149, "merge to variant"). It belongs on the drug: it is a
+         clinical rule about what may be prescribed alongside it, and it was the
+         only thing that screen held which this one did not. */
+      + '<div class="drug-row"><span class="subheading">Combines with</span>'
+      + '<div class="partner-chips">'
+      + (p.combos.length
+          ? p.combos.map((c) => '<span class="pill">'+esc(c)+'</span>').join("")
+          : '<span class="no-holds">None. This drug is an add-on itself.</span>')
+      + '</div></div>'
+
       /* Assignment, not duplication: the same drug listed against each partner
          that sells it, with approval per partner. */
       + '<div class="drug-row"><span class="subheading">Sold by <span class="cat-count">'+assigned.length+'</span></span>'
       + '<div class="partner-chips">'
       + assigned.map(([pt,st]) => '<span class="partner-chip">'+esc(pt)
           + '<span class="pill '+approvalTone(st)+'">'+esc(st)+'</span></span>').join("")
-      + PARTNERS_ALL.filter((pt) => !meta.partners[pt])
-          .map((pt) => '<button class="partner-chip add">+ '+esc(pt)+'</button>').join("")
+      + (editable
+          ? PARTNERS_ALL.filter((pt) => !meta.partners[pt])
+              .map((pt) => '<button class="partner-chip add">+ '+esc(pt)+'</button>').join("")
+          : "")
       + '</div></div></div>';
   };
 
@@ -2277,10 +2285,13 @@ function renderPermissions(){
     + '<br><br><b>Re-running the seeder is a live permission change.</b> syncPermissions REPLACES a role’s '
     + 'permissions, so it demotes every existing admin from full access to scoped access. That is the intended '
     + 'change, but it should be run knowingly rather than incidentally.'
-    + '<br><br><b>One gap worth naming:</b> Products &amp; Levels is hidden from a Doctor Admin in this preview '
-    + 'because it is platform configuration and admin does not hold <b>manage system</b>. But it has no route in '
-    + 'routes/web.php at all, so unlike every other gated item here there is currently no middleware enforcing '
-    + 'that. This preview is taking a position the app does not yet hold.</div>'
+    + '<br><br><b>Where the catalog sits now:</b> Products &amp; Levels was merged into Medications, so the drug '
+    + 'ladder and combination rules moved from a super-admin-only Configuration screen onto one a Doctor Admin '
+    + 'can open. Rather than widen who can change the catalog, Medications is <b>read-only</b> for a Doctor '
+    + 'Admin: they hold <b>view offerings</b> and not create, update or delete, so they see what is prescribable '
+    + 'and every editing control is withheld. Note this is enforced in the preview by role, whereas the app has '
+    + 'no offering routes under <b>role:super_admin</b> today, so the server side of that split still has to be '
+    + 'written.</div>'
     + '</div>';
 }
 
@@ -2305,7 +2316,6 @@ function renderView(){
   }
 
   if(v.queue){ h += renderQueue(v.queue); }
-  if(v.catalog){ h += renderCatalog(); }
   if(v.routing){ h += renderRouting(); }
   if(v.chat){ h += renderMessages(); }
   if(v.permissions){ h += renderPermissions(); }
