@@ -38,6 +38,29 @@ class Patient extends Model
     public function partner() { return $this->belongsTo(Partner::class); }
     public function user() { return $this->belongsTo(User::class); }
     public function cases() { return $this->hasMany(PatientCase::class); }
+
+    /**
+     * Restrict to patients this admin may see (Devin msg 2117).
+     *
+     * A Doctor Admin sees a patient only if that patient has at least one case
+     * belonging to one of their doctors. Patient records are PHI, so an admin
+     * over nobody sees nobody, and a patient whose cases all sit with other
+     * doctors is invisible.
+     *
+     * See PatientCase::scopeVisibleTo for why an empty id list must stay empty
+     * rather than being read as "no restriction".
+     */
+    public function scopeVisibleTo($query, ?User $user)
+    {
+        $ids = $user?->visibleClinicianIds();
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        return $query->whereHas('cases', fn ($q) => $q->whereIn('clinician_id', $ids));
+    }
+
     public function subscriptions() { return $this->hasMany(PatientSubscription::class); }
     public function vouchers() { return $this->hasMany(Voucher::class); }
     public function messages() { return $this->hasMany(Message::class); }

@@ -78,6 +78,31 @@ class DoctorAdminScopingTest extends TestCase
         $this->assertStringContainsString('0 = 1', $this->sqlFor(Clinician::visibleTo($this->userSeeing([]))));
     }
 
+    /**
+     * Patients are PHI. A Doctor Admin sees a patient only through a case that
+     * belongs to one of their doctors.
+     */
+    public function test_patients_are_reachable_only_through_a_case_with_one_of_my_doctors(): void
+    {
+        $unrestricted = \App\Models\Patient::visibleTo($this->userSeeing(null));
+        $this->assertStringNotContainsString('exists', strtolower($this->sqlFor($unrestricted)),
+            'a super admin sees every patient with no subquery restriction');
+
+        $scoped = \App\Models\Patient::visibleTo($this->userSeeing([4, 7]));
+        $sql = strtolower($this->sqlFor($scoped));
+        $this->assertStringContainsString('exists', $sql, 'scoping is applied through the case relation');
+        $this->assertStringContainsString('clinician_id', $sql);
+        $this->assertSame([4, 7], $scoped->getBindings());
+    }
+
+    public function test_an_admin_over_no_doctors_sees_no_patients(): void
+    {
+        $sql = $this->sqlFor(\App\Models\Patient::visibleTo($this->userSeeing([])));
+
+        $this->assertStringContainsString('0 = 1', $sql,
+            'an admin assigned nobody must see no patients, not every patient');
+    }
+
     /** A null user (no request context) must not silently mean "see everything" by accident. */
     public function test_a_null_user_is_treated_as_unrestricted_deliberately(): void
     {

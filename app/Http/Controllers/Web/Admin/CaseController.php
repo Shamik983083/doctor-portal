@@ -76,8 +76,12 @@ class CaseController extends Controller
     {
         $request->validate(['clinician_id' => 'required|exists:clinicians,id']);
 
-        $case      = PatientCase::where('uuid', $uuid)->firstOrFail();
-        $clinician = Clinician::findOrFail($request->input('clinician_id'));
+        $case = PatientCase::visibleTo(auth()->user())->where('uuid', $uuid)->firstOrFail();
+
+        // The TARGET is scoped too, not just the case. Scoping only the case
+        // would let a Doctor Admin push work onto a doctor they are not over,
+        // which crosses the same boundary from the other direction.
+        $clinician = Clinician::visibleTo(auth()->user())->findOrFail($request->input('clinician_id'));
 
         // Reassign an already-assigned case without a status change
         if ($case->status === PatientCase::STATUS_ASSIGNED) {
@@ -112,7 +116,7 @@ class CaseController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::visibleTo(auth()->user())->where('uuid', $uuid)->firstOrFail();
 
         $this->fileUploader->store(
             $request->file('file'),
@@ -128,7 +132,7 @@ class CaseController extends Controller
 
     public function downloadFile(string $uuid, string $fileUuid)
     {
-        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::visibleTo(auth()->user())->where('uuid', $uuid)->firstOrFail();
 
         $file = PatientFile::where('uuid', $fileUuid)
             ->where('case_id', $case->id)
@@ -139,7 +143,7 @@ class CaseController extends Controller
 
     public function previewFile(string $uuid, string $fileUuid)
     {
-        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::visibleTo(auth()->user())->where('uuid', $uuid)->firstOrFail();
 
         $file = PatientFile::where('uuid', $fileUuid)
             ->where('case_id', $case->id)
@@ -152,7 +156,7 @@ class CaseController extends Controller
 
     public function deleteFile(string $uuid, string $fileUuid)
     {
-        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::visibleTo(auth()->user())->where('uuid', $uuid)->firstOrFail();
 
         $file = PatientFile::where('uuid', $fileUuid)
             ->where('case_id', $case->id)
@@ -165,7 +169,7 @@ class CaseController extends Controller
 
     public function destroy(string $uuid)
     {
-        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::visibleTo(auth()->user())->where('uuid', $uuid)->firstOrFail();
         $case->delete();
 
         return redirect()->route('admin.cases.index')

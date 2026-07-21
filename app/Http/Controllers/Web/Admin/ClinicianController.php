@@ -60,7 +60,7 @@ class ClinicianController extends Controller
             ];
         }
 
-        Clinician::create([
+        $clinician = Clinician::create([
             'user_id'         => $user->id,
             'npi'             => $data['npi'] ?? null,
             'specialty'       => $data['specialty'] ?? null,
@@ -68,24 +68,35 @@ class ClinicianController extends Controller
             'licensed_states' => $licensedStates,
         ]);
 
+        /*
+         * A Doctor Admin who creates a doctor is put over them immediately.
+         * Without this the doctor they just created would vanish from their own
+         * list, which reads as a bug rather than as scoping. A super admin needs
+         * no row: they see everyone regardless.
+         */
+        $actor = $request->user();
+        if ($actor && ! $actor->isSuperAdmin()) {
+            $actor->managedClinicians()->syncWithoutDetaching([$clinician->id]);
+        }
+
         return redirect()->route('admin.clinicians.index')->with('success', 'Clinician created.');
     }
 
     public function show(int $id)
     {
-        $clinician = Clinician::with(['user', 'cases.patient'])->withCount('cases')->findOrFail($id);
+        $clinician = Clinician::visibleTo(auth()->user())->with(['user', 'cases.patient'])->withCount('cases')->findOrFail($id);
         return view('admin.clinicians.show', compact('clinician'));
     }
 
     public function edit(int $id)
     {
-        $clinician = Clinician::with('user')->findOrFail($id);
+        $clinician = Clinician::visibleTo(auth()->user())->with('user')->findOrFail($id);
         return view('admin.clinicians.edit', compact('clinician'));
     }
 
     public function update(Request $request, int $id)
     {
-        $clinician = Clinician::with('user')->findOrFail($id);
+        $clinician = Clinician::visibleTo(auth()->user())->with('user')->findOrFail($id);
 
         $data = $request->validate([
             'name'                 => 'required|string',
@@ -134,7 +145,11 @@ class ClinicianController extends Controller
 
     public function priorityIndex()
     {
-        $clinicians = Clinician::with('user')
+        // The priority screen ranks doctors against each other, so it must show
+        // only the ones this admin is over. Listing everyone would leak the full
+        // roster and let an admin re-rank doctors outside their group.
+        $clinicians = Clinician::visibleTo(auth()->user())
+            ->with('user')
             ->withCount([
                 'cases as active_cases_count' => fn($q) => $q->whereIn('status', [
                     PatientCase::STATUS_ASSIGNED,
@@ -153,7 +168,7 @@ class ClinicianController extends Controller
         $request->validate(['ids' => 'required|array', 'ids.*' => 'integer|exists:clinicians,id']);
 
         foreach ($request->ids as $rank => $id) {
-            Clinician::where('id', $id)->update(['priority' => $rank]);
+            Clinician::visibleTo(auth()->user())->where('id', $id)->update(['priority' => $rank]);
         }
 
         return response()->json(['success' => true]);
@@ -163,14 +178,14 @@ class ClinicianController extends Controller
     {
         $request->validate(['max_daily_cases' => 'required|integer|min:1|max:999']);
 
-        Clinician::findOrFail($id)->update(['max_daily_cases' => $request->max_daily_cases]);
+        Clinician::visibleTo(auth()->user())->findOrFail($id)->update(['max_daily_cases' => $request->max_daily_cases]);
 
         return response()->json(['success' => true]);
     }
 
     public function destroy(int $id)
     {
-        $clinician = Clinician::with('user')->findOrFail($id);
+        $clinician = Clinician::visibleTo(auth()->user())->with('user')->findOrFail($id);
         $name = $clinician->full_name;
         $clinician->delete();
 

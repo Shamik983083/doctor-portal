@@ -99,8 +99,8 @@ class DashboardController extends Controller
         });
 
         // ── Weighted provider load ───────────────────────────────────────
-        $providerLoads = Clinician::with('user')->get()->map(function ($c) {
-            $active = PatientCase::where('clinician_id', $c->id)
+        $providerLoads = Clinician::visibleTo($user)->with('user')->get()->map(function ($c) {
+            $active = PatientCase::visibleTo($user)->where('clinician_id', $c->id)
                 ->whereIn('status', ['assigned', 'support', 'processing'])
                 ->count();
             $cap = (int) ($c->max_daily_cases ?: 0);
@@ -115,17 +115,17 @@ class DashboardController extends Controller
         // ── Exception center ─────────────────────────────────────────────
         $exceptions = [
             [
-                'count' => PatientCase::where('hold_status', true)->whereIn('status', self::OPEN_STATUSES)->count(),
+                'count' => PatientCase::visibleTo($user)->where('hold_status', true)->whereIn('status', self::OPEN_STATUSES)->count(),
                 'label' => 'Workflow hold awaiting clearance',
                 'tone'  => 'yellow',
             ],
             [
-                'count' => PatientCase::where('status', 'support')->count(),
+                'count' => PatientCase::visibleTo($user)->where('status', 'support')->count(),
                 'label' => 'Escalated to support',
                 'tone'  => 'red',
             ],
             [
-                'count' => PatientCase::whereIn('status', self::OPEN_STATUSES)
+                'count' => PatientCase::visibleTo($user)->whereIn('status', self::OPEN_STATUSES)
                     ->whereHas('patient', fn($q) =>
                         $q->where(fn($w) =>
                             $w->where('id_verified_status', '!=', 'verified')->orWhereNull('id_verified_status')
@@ -135,7 +135,7 @@ class DashboardController extends Controller
                 'tone'  => 'yellow',
             ],
             [
-                'count' => PatientCase::where('status', 'cancelled')
+                'count' => PatientCase::visibleTo($user)->where('status', 'cancelled')
                     ->where('cancelled_at', '>=', now()->subDays(7))->count(),
                 'label' => 'Cancelled in last 7 days',
                 'tone'  => 'neutral',
@@ -143,15 +143,15 @@ class DashboardController extends Controller
         ];
 
         // ── Operational report ───────────────────────────────────────────
-        $ttfr = PatientCase::whereNotNull('assigned_at')
+        $ttfr = PatientCase::visibleTo($user)->whereNotNull('assigned_at')
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, assigned_at)) a')->value('a');
-        $ttd = PatientCase::whereNotNull('approved_at')
+        $ttd = PatientCase::visibleTo($user)->whereNotNull('approved_at')
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, approved_at)) a')->value('a');
-        $approvedCount  = PatientCase::whereNotNull('approved_at')->count();
-        $cancelledCount = PatientCase::where('status', 'cancelled')->count();
+        $approvedCount  = PatientCase::visibleTo($user)->whereNotNull('approved_at')->count();
+        $cancelledCount = PatientCase::visibleTo($user)->where('status', 'cancelled')->count();
         $decisions      = $approvedCount + $cancelledCount;
         $approvalRate   = $decisions > 0 ? round($approvedCount / $decisions * 100) : null;
-        $recentDecisions = PatientCase::where('updated_at', '>=', now()->subDays(7))
+        $recentDecisions = PatientCase::visibleTo($user)->where('updated_at', '>=', now()->subDays(7))
             ->where(fn($q) => $q->whereNotNull('approved_at')->orWhere('status', 'cancelled'))
             ->count();
 
@@ -170,7 +170,7 @@ class DashboardController extends Controller
         ];
 
         // ── Triage volume bar chart ──────────────────────────────────────
-        $triageCounts = PatientCase::whereIn('status', self::OPEN_STATUSES)
+        $triageCounts = PatientCase::visibleTo($user)->whereIn('status', self::OPEN_STATUSES)
             ->selectRaw('triage, COUNT(*) as total')
             ->groupBy('triage')
             ->pluck('total', 'triage');
