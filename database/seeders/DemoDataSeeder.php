@@ -60,6 +60,15 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
+        // Static API credentials for demo partner
+        if (! $partner->client_id) {
+            $partner->update([
+                'oauth_client_id' => '019f898d-7db6-7097-9429-eb3738e8001e',
+                'client_id'       => 'jG1i928eYkzNFwWuwwnJoQEWZp3tL1IiuyqUAQ8l',
+                'client_secret'   => 'YNdxm2ustsa8UqRndqsVk7yCOivI8Ov1',
+            ]);
+        }
+
         // Pharmacies
         $pharmacy = Pharmacy::firstOrCreate(
             ['name' => 'Boothwyn Pharmacy'],
@@ -93,20 +102,20 @@ class DemoDataSeeder extends Seeder
                 'dea' => 'no',
                 'product_category' => 'WeightLoss',
                 'variants' => [
-                    ['name' => 'Semaglutide Monthly',  'sku' => 'SEMA_M2M',  'price' => 249, 'quantity' => 30,  'unit' => 'mg', 'days_supply' => 30,  'refills' => 1],
-                    ['name' => 'Semaglutide 3-Month',  'sku' => 'SEMA_3M',   'price' => 596, 'quantity' => 90,  'unit' => 'mg', 'days_supply' => 90,  'refills' => 1],
-                    ['name' => 'Semaglutide 6-Month',  'sku' => 'SEMA_6M',   'price' => 1050, 'quantity' => 180, 'unit' => 'mg', 'days_supply' => 180, 'refills' => 1],
-                    ['name' => 'Semaglutide 12-Month', 'sku' => 'SEMA_12M',  'price' => 1800, 'quantity' => 360, 'unit' => 'mg', 'days_supply' => 365, 'refills' => 1],
+                    ['name' => 'Semaglutide Monthly',  'uuid' => 'e7ea33b9-46ea-46b6-8544-e91bba16f550', 'sku' => 'SEMA_M2M',  'price' => 249, 'quantity' => 30,  'unit' => 'mg', 'days_supply' => 30,  'refills' => 1],
+                    ['name' => 'Semaglutide 3-Month',  'uuid' => '24167a5a-f10b-4913-ae03-cba5792f2b2c', 'sku' => 'SEMA_3M',   'price' => 596, 'quantity' => 90,  'unit' => 'mg', 'days_supply' => 90,  'refills' => 1],
+                    ['name' => 'Semaglutide 6-Month',  'uuid' => '0d2716a9-e214-4dee-8e74-f06cefd95c0d', 'sku' => 'SEMA_6M',   'price' => 1050, 'quantity' => 180, 'unit' => 'mg', 'days_supply' => 180, 'refills' => 1],
+                    ['name' => 'Semaglutide 12-Month', 'uuid' => 'd579597c-aadc-4b12-a9d8-7b91ceac024b', 'sku' => 'SEMA_12M',  'price' => 1800, 'quantity' => 360, 'unit' => 'mg', 'days_supply' => 365, 'refills' => 1],
                 ],
             ],
             [
                 'dea' => 'no',
                 'product_category' => 'WeightLoss',
                 'variants' => [
-                    ['name' => 'Tirzepatide Monthly',  'sku' => 'TIRZ_M2M',  'price' => 359, 'quantity' => 15,  'unit' => 'mg', 'days_supply' => 30,  'refills' => 1],
-                    ['name' => 'Tirzepatide 3-Month',  'sku' => 'TIRZ_3M',   'price' => 896, 'quantity' => 45,  'unit' => 'mg', 'days_supply' => 90,  'refills' => 1],
-                    ['name' => 'Tirzepatide 6-Month',  'sku' => 'TIRZ_6M',   'price' => 1650, 'quantity' => 90,  'unit' => 'mg', 'days_supply' => 180, 'refills' => 1],
-                    ['name' => 'Tirzepatide 12-Month', 'sku' => 'TIRZ_12M',  'price' => 2880, 'quantity' => 180, 'unit' => 'mg', 'days_supply' => 365, 'refills' => 1],
+                    ['name' => 'Tirzepatide Monthly',  'uuid' => 'fbcd7604-fd4e-47ae-846a-bc2907fd17a2', 'sku' => 'TIRZ_M2M',  'price' => 359, 'quantity' => 15,  'unit' => 'mg', 'days_supply' => 30,  'refills' => 1],
+                    ['name' => 'Tirzepatide 3-Month',  'uuid' => 'ba673659-48ba-4322-8f4c-c75018bfdef0', 'sku' => 'TIRZ_3M',   'price' => 896, 'quantity' => 45,  'unit' => 'mg', 'days_supply' => 90,  'refills' => 1],
+                    ['name' => 'Tirzepatide 6-Month',  'uuid' => '6524da26-de62-42e9-9ba9-109e517e39ad', 'sku' => 'TIRZ_6M',   'price' => 1650, 'quantity' => 90,  'unit' => 'mg', 'days_supply' => 180, 'refills' => 1],
+                    ['name' => 'Tirzepatide 12-Month', 'uuid' => 'de698464-9947-4ea8-b9d6-e4352136f2e4', 'sku' => 'TIRZ_12M',  'price' => 2880, 'quantity' => 180, 'unit' => 'mg', 'days_supply' => 365, 'refills' => 1],
                 ],
             ],
 
@@ -115,30 +124,30 @@ class DemoDataSeeder extends Seeder
                 'dea' => 'no',
                 'product_category' => 'WeightLoss',
                 'variants' => [
-                    ['name' => 'LipoC 1-Month', 'sku' => 'LIPOC_1M', 'price' => 149, 'refills' => 0],
-                    ['name' => 'LipoC 3-Month', 'sku' => 'LIPOC_3M', 'price' => 99,  'refills' => 0],
+                    ['name' => 'LipoC 1-Month', 'uuid' => '4a1da53c-ab4a-4387-abb6-2b1f0503a8e0', 'sku' => 'LIPOC_1M', 'price' => 149, 'refills' => 0],
+                    ['name' => 'LipoC 3-Month', 'uuid' => '3bdc1d45-623a-44ab-bf60-037742388b92', 'sku' => 'LIPOC_3M', 'price' => 99,  'refills' => 0],
                 ],
             ],
             [
                 'dea' => 'no',
                 'product_category' => 'AntiAging',
                 'variants' => [
-                    ['name' => 'Tesamorelin 3-Month', 'sku' => 'TESA_3M', 'price' => 149, 'refills' => 0],
+                    ['name' => 'Tesamorelin 3-Month', 'uuid' => '8a58ca3b-38ab-478a-bec5-e93cc28509db', 'sku' => 'TESA_3M', 'price' => 149, 'refills' => 0],
                 ],
             ],
             [
                 'dea' => 'no',
                 'product_category' => 'AntiAging',
                 'variants' => [
-                    ['name' => 'NAD+ (1000mg) 1-Month', 'sku' => 'NAD_1M', 'price' => 209, 'refills' => 0],
-                    ['name' => 'NAD+ (1000mg) 3-Month', 'sku' => 'NAD_3M', 'price' => 149, 'refills' => 0],
+                    ['name' => 'NAD+ (1000mg) 1-Month', 'uuid' => 'b09dd040-82f8-4a38-88c9-c7010ff43507', 'sku' => 'NAD_1M', 'price' => 209, 'refills' => 0],
+                    ['name' => 'NAD+ (1000mg) 3-Month', 'uuid' => '97b2c85e-fbb3-43f8-b452-4535a122c787', 'sku' => 'NAD_3M', 'price' => 149, 'refills' => 0],
                 ],
             ],
             [
                 'dea' => 'no',
                 'product_category' => 'WeightLoss',
                 'variants' => [
-                    ['name' => 'Zofran 30ct', 'sku' => 'ZOFRAN_30', 'price' => 49, 'refills' => 0],
+                    ['name' => 'Zofran 30ct', 'uuid' => '09c6c7c8-7062-4eaf-826b-2ae519da34dd', 'sku' => 'ZOFRAN_30', 'price' => 49, 'refills' => 0],
                 ],
             ],
 
@@ -147,14 +156,14 @@ class DemoDataSeeder extends Seeder
                 'dea' => 'no',
                 'product_category' => 'WeightLoss',
                 'variants' => [
-                    ['name' => 'Nutrition & Training App (Semaglutide M2M)',   'sku' => 'NTA_SEMA_M2M',  'price' => 0, 'refills' => 0],
-                    ['name' => 'Nutrition & Training App (Semaglutide 3M)',    'sku' => 'NTA_SEMA_3M',   'price' => 0, 'refills' => 0],
-                    ['name' => 'Nutrition & Training App (Semaglutide 6M)',    'sku' => 'NTA_SEMA_6M',   'price' => 0, 'refills' => 0],
-                    ['name' => 'Nutrition & Training App (Semaglutide 12M)',   'sku' => 'NTA_SEMA_12M',  'price' => 0, 'refills' => 0],
-                    ['name' => 'Nutrition & Training App (Tirzepatide M2M)',   'sku' => 'NTA_TIRZ_M2M',  'price' => 0, 'refills' => 0],
-                    ['name' => 'Nutrition & Training App (Tirzepatide 3M)',    'sku' => 'NTA_TIRZ_3M',   'price' => 0, 'refills' => 0],
-                    ['name' => 'Nutrition & Training App (Tirzepatide 6M)',    'sku' => 'NTA_TIRZ_6M',   'price' => 0, 'refills' => 0],
-                    ['name' => 'Nutrition & Training App (Tirzepatide 12M)',   'sku' => 'NTA_TIRZ_12M',  'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Semaglutide M2M)',   'uuid' => '613a2b1b-2b68-43e1-97b3-f9238783d03f', 'sku' => 'NTA_SEMA_M2M',  'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Semaglutide 3M)',    'uuid' => 'c9df1a9b-663a-4e68-ba2a-a55afa53f333', 'sku' => 'NTA_SEMA_3M',   'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Semaglutide 6M)',    'uuid' => '3e6f4a4f-dc92-41b6-b0cd-1d51831db859', 'sku' => 'NTA_SEMA_6M',   'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Semaglutide 12M)',   'uuid' => 'eb325970-6a28-44ca-84f2-6c480cd6bd60', 'sku' => 'NTA_SEMA_12M',  'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Tirzepatide M2M)',   'uuid' => '369deccf-21c0-44c6-aa8b-d1ddafe270e9', 'sku' => 'NTA_TIRZ_M2M',  'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Tirzepatide 3M)',    'uuid' => 'b04fbaa1-4335-449d-a225-6f1b2fcb27a5', 'sku' => 'NTA_TIRZ_3M',   'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Tirzepatide 6M)',    'uuid' => 'a36205d1-703d-43fc-8f0b-a4dcdaf5582a', 'sku' => 'NTA_TIRZ_6M',   'price' => 0, 'refills' => 0],
+                    ['name' => 'Nutrition & Training App (Tirzepatide 12M)',   'uuid' => '2816f4af-1bcd-4ef7-872b-1fd373affd85', 'sku' => 'NTA_TIRZ_12M',  'price' => 0, 'refills' => 0],
                 ],
             ],
         ];
@@ -164,6 +173,7 @@ class DemoDataSeeder extends Seeder
                 Offering::firstOrCreate(
                     ['name' => $variant['name'], 'partner_id' => $partner->id],
                     [
+                        'uuid'                    => $variant['uuid'],
                         'partner_id'              => $partner->id,
                         'category_id'             => $categoryMap[$item['product_category']],
                         'type'                    => 'compound',
@@ -175,6 +185,7 @@ class DemoDataSeeder extends Seeder
                         'quantity'                => $variant['quantity'] ?? null,
                         'dispense_unit'           => $variant['unit'] ?? null,
                         'days_supply'             => $variant['days_supply'] ?? null,
+                        'approval_status'         => 'approved',
                     ]
                 );
             }
