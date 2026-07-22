@@ -49,6 +49,12 @@ class Patient extends Model
      *
      * See PatientCase::scopeVisibleTo for why an empty id list must stay empty
      * rather than being read as "no restriction".
+     *
+     * TRACKS THE CASE SCOPE, DELIBERATELY. Since a Doctor Admin can now see
+     * unassigned cases, they must also be able to see the PATIENT behind one,
+     * otherwise the intake queue lists a case whose patient record 404s and the
+     * admin cannot act on what they were just shown. Same three outcomes, same
+     * load-bearing grouping, same empty-list-sees-nothing guarantee.
      */
     public function scopeVisibleTo($query, ?User $user)
     {
@@ -58,7 +64,14 @@ class Patient extends Model
             return $query;
         }
 
-        return $query->whereHas('cases', fn ($q) => $q->whereIn('clinician_id', $ids));
+        if ($ids === []) {
+            return $query->whereHas('cases', fn ($q) => $q->whereIn('clinician_id', $ids));
+        }
+
+        return $query->whereHas('cases', fn ($q) => $q->where(function ($w) use ($ids) {
+            $w->whereIn('clinician_id', $ids)
+              ->orWhereNull('clinician_id');
+        }));
     }
 
     public function subscriptions() { return $this->hasMany(PatientSubscription::class); }

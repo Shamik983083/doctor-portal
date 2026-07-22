@@ -67,6 +67,71 @@ class DoctorAdminScopingTest extends TestCase
             'whereIn with an empty list must resolve to a false condition, matching no rows');
     }
 
+    /**
+     * THE BUG THIS SUITE MISSED (Devin msg 2234).
+     *
+     * A waiting case has clinician_id NULL, and `whereIn` never matches NULL, so
+     * a Doctor Admin saw an empty intake queue: they could see work already
+     * handed to their doctors but not the work waiting to be handed out. The
+     * earlier tests all asserted on SQL SHAPE, so every one of them still passed
+     * while the screen a Doctor Admin uses most showed nothing.
+     */
+    public function test_a_doctor_admin_can_see_unassigned_cases(): void
+    {
+        $sql = strtolower($this->sqlFor(PatientCase::visibleTo($this->userSeeing([4, 7]))));
+
+        $this->assertStringContainsString('clinician_id" is null', $sql,
+            'unassigned cases must be reachable, or the intake queue is empty for a Doctor Admin');
+        $this->assertStringContainsString('or', $sql,
+            'the unassigned clause is an alternative to the id list, not an additional filter');
+    }
+
+    /**
+     * THE GROUPING, which is the part that silently leaks if it is dropped.
+     *
+     * Callers chain conditions onto this scope. Ungrouped, `in (...) or is null`
+     * followed by `and status = ?` binds as `in (...) OR (is null AND status = ?)`,
+     * and the first branch then matches every case in the system regardless of
+     * status. Asserting the parenthesis is asserting the difference between
+     * scoped and not scoped.
+     */
+    public function test_the_unassigned_clause_is_grouped_so_later_conditions_cannot_leak(): void
+    {
+        $sql = strtolower($this->sqlFor(
+            PatientCase::visibleTo($this->userSeeing([4, 7]))->where('status', 'support')
+        ));
+
+        $this->assertMatchesRegularExpression('/\(.*clinician_id.*or.*is null.*\)/s', $sql,
+            'the id list and the null check must sit inside one group');
+        $this->assertStringContainsString('and "status" = ?', $sql,
+            'the chained condition must apply to the whole group, not to one branch of it');
+    }
+
+    /**
+     * The exemption must not become a hole. An admin over nobody sees nothing,
+     * and "nothing" includes the unassigned pool.
+     */
+    public function test_an_admin_over_no_doctors_still_sees_no_unassigned_cases(): void
+    {
+        $sql = strtolower($this->sqlFor(PatientCase::visibleTo($this->userSeeing([]))));
+
+        $this->assertStringContainsString('0 = 1', $sql);
+        $this->assertStringNotContainsString('is null', $sql,
+            'an empty assignment must not be handed the intake queue as a consolation prize');
+    }
+
+    /**
+     * A case the admin can see must have a patient the admin can open, or the
+     * queue lists rows that 404 when clicked.
+     */
+    public function test_patients_behind_unassigned_cases_are_reachable(): void
+    {
+        $sql = strtolower($this->sqlFor(\App\Models\Patient::visibleTo($this->userSeeing([4, 7]))));
+
+        $this->assertStringContainsString('clinician_id" is null', $sql,
+            'the patient scope must track the case scope, or an unassigned case has an unopenable patient');
+    }
+
     public function test_the_same_rules_apply_to_the_clinician_list(): void
     {
         $this->assertStringNotContainsString('"id" in', $this->sqlFor(Clinician::visibleTo($this->userSeeing(null))));
