@@ -32,12 +32,16 @@ $totalCases = array_sum($donutData);
 
     {{-- Metric row --}}
     <div class="ma-metric-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); margin-bottom:1rem;">
+        @if($stats['partners'] !== null)
         <a href="{{ route('admin.partners.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Partners</div><div class="ma-metric-value">{{ $stats['partners'] }}</div></div>
         </a>
+        @endif
+        @if($stats['patients'] !== null)
         <a href="{{ route('admin.patients.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Patients</div><div class="ma-metric-value">{{ $stats['patients'] }}</div></div>
         </a>
+        @endif
         <a href="{{ route('admin.clinicians.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Clinicians</div><div class="ma-metric-value">{{ $stats['clinicians'] }}</div></div>
         </a>
