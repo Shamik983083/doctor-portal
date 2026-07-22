@@ -99,7 +99,7 @@ class DashboardController extends Controller
         });
 
         // ── Weighted provider load ───────────────────────────────────────
-        $providerLoads = Clinician::visibleTo($user)->with('user')->get()->map(function ($c) {
+        $providerLoads = Clinician::visibleTo($user)->with('user')->get()->map(function ($c) use ($user) {
             $active = PatientCase::visibleTo($user)->where('clinician_id', $c->id)
                 ->whereIn('status', ['assigned', 'support', 'processing'])
                 ->count();
