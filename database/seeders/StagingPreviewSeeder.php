@@ -58,10 +58,12 @@ class StagingPreviewSeeder extends Seeder
             return;
         }
 
-        $partner    = $this->partner();
-        $mine       = $this->doctor('dr.alvarez@staging.axismd.io', 'Dr. Rosa Alvarez', '1780000001', ['TN', 'CA', 'NY']);
-        $notMine    = $this->doctor('dr.okafor@staging.axismd.io',  'Dr. Daniel Okafor', '1780000002', ['TN', 'TX', 'FL']);
+        $partner     = $this->partner();
+        $superAdmin  = $this->superAdmin();
+        $mine        = $this->doctor('dr.alvarez@staging.axismd.io', 'Dr. Rosa Alvarez', '1780000001', ['TN', 'CA', 'NY']);
+        $notMine     = $this->doctor('dr.okafor@staging.axismd.io',  'Dr. Daniel Okafor', '1780000002', ['TN', 'TX', 'FL']);
         $doctorAdmin = $this->doctorAdmin();
+        $this->partnerUser($partner);
 
         /*
          * The scoping demo. The Doctor Admin is over Alvarez and NOT over Okafor.
@@ -71,12 +73,79 @@ class StagingPreviewSeeder extends Seeder
         $doctorAdmin->managedClinicians()->syncWithoutDetaching([$mine->id]);
 
         $this->cases($partner, $mine, $notMine);
-        $this->routingPolicy($doctorAdmin);
+        $this->routingPolicy($superAdmin);
 
-        $this->command->info('Staging preview data seeded.');
-        $this->command->info("  Doctor Admin : doctor.admin@staging.axismd.io / " . self::PASSWORD);
-        $this->command->info('  Over         : Dr. Rosa Alvarez only (NOT Dr. Daniel Okafor)');
-        $this->command->info('  Expect       : their own doctor\'s cases + ALL waiting cases, and nothing of Okafor\'s');
+        $this->command->info('Staging preview data seeded. Password for all: ' . self::PASSWORD);
+        $this->command->info('  Super Admin  : super.admin@staging.axismd.io');
+        $this->command->info('  Doctor Admin : doctor.admin@staging.axismd.io  (over Dr. Alvarez only)');
+        $this->command->info('  Clinician    : dr.alvarez@staging.axismd.io / dr.okafor@staging.axismd.io');
+        $this->command->info('  Partner      : partner@staging.axismd.io');
+        $this->command->info('  Expect (Doctor Admin): their doctor\'s cases + ALL waiting cases, nothing of Okafor\'s');
+    }
+
+    /**
+     * THE ACCOUNT NOBODY HAD (Devin msg 2238, then 2241 "Fix 1 and 2").
+     *
+     * RolesAndPermissionsSeeder creates the `super_admin` ROLE and grants it
+     * every permission, but no seeder has ever assigned that role to a user. So
+     * the role existed and nobody held it.
+     *
+     * That was survivable while `admin` and `super_admin` were effectively the
+     * same thing. It stopped being survivable when Partners, SLA Settings,
+     * Triage Rule Set, Case Routing, Admin Users, the API guides and every
+     * offering WRITE moved behind `role:super_admin`: those screens became
+     * unreachable by anyone at all, and /ma-portal/super-admin 403'd for
+     * everybody.
+     */
+    private function superAdmin(): User
+    {
+        $user = User::firstOrCreate(
+            ['email' => 'super.admin@staging.axismd.io'],
+            ['name' => 'Staging Super Admin', 'password' => Hash::make(self::PASSWORD)]
+        );
+
+        $user->assignRole('super_admin');
+
+        return $user;
+    }
+
+    /**
+     * A partner (storefront operator) login, which no seeder created either.
+     *
+     * DemoDataSeeder made the Partner ORGANISATION but never a user attached to
+     * one, and the only other way to create one is through
+     * /admin/partners/{id}/users/create, which is itself super-admin-only. So
+     * this gap was locked behind the previous one.
+     *
+     * Without this account the most important line of the smoke test cannot be
+     * run at all: confirming that a PARTNER login is refused by /ma-portal/*.
+     * That route was gated on `auth` alone and exposed patient demographics,
+     * intake answers, clinical notes and the full user roster to any logged-in
+     * user. Being able to prove it is closed matters more than the convenience.
+     *
+     * `partner_id` is what PartnerPortalAccess checks, so it is set here
+     * directly, matching PartnerController::storeUser().
+     */
+    private function partnerUser(Partner $partner): User
+    {
+        $user = User::firstOrCreate(
+            ['email' => 'partner@staging.axismd.io'],
+            [
+                'name'       => 'Staging Storefront Operator',
+                'password'   => Hash::make(self::PASSWORD),
+                'partner_id' => $partner->id,
+            ]
+        );
+
+        // firstOrCreate skips the attribute block when the row already exists,
+        // so a re-run against a user made by hand still gets linked.
+        if ($user->partner_id !== $partner->id) {
+            $user->update(['partner_id' => $partner->id]);
+        }
+
+        $user->assignRole('partner');
+
+        return $user;
     }
 
     private function partner(): Partner

@@ -1,0 +1,53 @@
+name: Staging - seed preview data
+
+# Manual only. Never fires on push.
+#
+# WHY THIS EXISTS. The deploy workflow runs `migrate --force` but never seeders,
+# deliberately: the same migration set runs on production, so fixtures must not
+# ride along with a deploy. That leaves the staging fixtures needing a person
+# with SSH access, and there is not always one to hand. This gives the same
+# result through a button, using the SSH secrets that are already configured,
+# without anyone needing shell access or seeing a credential.
+#
+# It is scoped to staging on purpose. There is no production equivalent and
+# there should not be: StagingPreviewSeeder itself refuses to run when
+# APP_ENV=production, and this workflow only ever targets the staging path.
+on:
+  workflow_dispatch:
+    inputs:
+      restart_queue:
+        description: 'Also run queue:restart (deploy-staging.yml does not)'
+        type: boolean
+        default: true
+
+jobs:
+  seed:
+    name: Seed staging preview data
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run seeder over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /home/axismd/public_html/staging_doctor_portal
+
+            PHP=/opt/cpanel/ea-php82/root/usr/bin/php
+
+            echo "--- Roles and permissions (idempotent, required by the preview seeder) ---"
+            $PHP artisan db:seed --class=Database\\Seeders\\RolesAndPermissionsSeeder --force
+
+            echo "--- Staging preview data ---"
+            $PHP artisan db:seed --class=Database\\Seeders\\StagingPreviewSeeder --force
+
+            if [ "${{ inputs.restart_queue }}" = "true" ]; then
+              echo "--- Restarting queue workers ---"
+              $PHP artisan queue:restart
+            fi
+
+            echo "--- Done ---"
