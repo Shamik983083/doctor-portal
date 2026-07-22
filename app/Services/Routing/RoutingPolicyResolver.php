@@ -27,10 +27,17 @@ final class RoutingPolicyResolver
     /** Statuses that count as an open, non-terminal case. */
     private const OPEN_STATUSES = ['waiting', 'assigned', 'support', 'approved', 'processing'];
 
+    private ContinuityResolver $continuity;
+
+    public function __construct(?ContinuityResolver $continuity = null)
+    {
+        $this->continuity = $continuity ?? new ContinuityResolver();
+    }
+
     /**
      * Decide where a case goes.
      *
-     * @return array{kind:string, providerId?:int} ASSIGN / POOL / NONE
+     * @return array{kind:string, providerId?:int, reason?:string} ASSIGN / POOL / NONE
      */
     public function resolve(PatientCase $case, ?RoutingPolicy $policy = null): array
     {
@@ -40,6 +47,34 @@ final class RoutingPolicyResolver
         // built-in fallback would route under rules nobody chose.
         if (! $policy) {
             return ['kind' => RoutingStrategy::NONE];
+        }
+
+        /*
+         * CONTINUITY OF CARE RUNS FIRST (Devin msg 2244).
+         *
+         * A check-in goes back to the doctor who treated this patient, when they
+         * can still take it. It sits ahead of the strategy because all five
+         * modes answer "who is least loaded right now", and for a returning
+         * patient that is the wrong question.
+         *
+         * PROVIDER_POOL is honoured OVER continuity on purpose: that mode means
+         * "push nothing, every case is claimed", and quietly pushing check-ins
+         * would make the pool not a pool. Continuity still happens there, as the
+         * doctor recognising their own patient in the queue.
+         *
+         * Returns null for anything that is not a check-in, so first visits
+         * route exactly as they did before this existed.
+         */
+        if ($policy->mode !== RoutingMode::PROVIDER_POOL) {
+            $continuous = $this->continuity->resolve($case, $policy->requireRecordedLicensure());
+
+            if ($continuous) {
+                return [
+                    'kind'       => RoutingStrategy::ASSIGN,
+                    'providerId' => $continuous->id,
+                    'reason'     => 'CONTINUITY_OF_CARE',
+                ];
+            }
         }
 
         $candidates = $this->candidates($case, $policy);

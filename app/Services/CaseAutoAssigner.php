@@ -52,6 +52,20 @@ class CaseAutoAssigner
         $outcome = $this->resolver->resolve($case);
 
         if (($outcome['kind'] ?? null) === RoutingStrategy::ASSIGN) {
+            /*
+             * Continuity assignments are logged and ordinary ones are not,
+             * because this is the one that looks wrong from outside: the
+             * rotation appears to have been skipped, and a doctor may be over
+             * their cap. Ids only, no PHI.
+             */
+            if (($outcome['reason'] ?? null) === 'CONTINUITY_OF_CARE') {
+                Log::info('CaseAutoAssigner: continuity of care', [
+                    'case_uuid'    => $case->uuid,
+                    'clinician_id' => $outcome['providerId'],
+                    'reason'       => 'Check-in returned to the doctor who treated this patient before.',
+                ]);
+            }
+
             return Clinician::find($outcome['providerId']);
         }
 

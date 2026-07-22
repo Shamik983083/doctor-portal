@@ -57,6 +57,20 @@ class CaseController extends Controller
             'patient.id_verified_at'                          => 'nullable|date',
             'external_id'                                     => 'nullable|string|max:255',
             'visit_type'                                      => 'nullable|string|max:100',
+            /*
+             * Re-bill / check-in, NOT a pharmacy refill (Devin msg 2246). Set it
+             * and the case routes back to the doctor who treated this patient
+             * before, and counts as a check-in rather than a first visit in
+             * reporting.
+             *
+             * Optional, and false is the safe default: a check-in arriving
+             * unflagged just routes normally, whereas a first visit wrongly
+             * flagged would be handed to a doctor on the strength of a history
+             * that does not apply. Partners not sending it yet may still be
+             * picked up by the visit_type fallback, see
+             * PatientCase::isRefillRequest().
+             */
+            'is_refill'                                       => 'nullable|boolean',
             'hold_status'                                     => 'boolean',
             'is_chargeable'                                   => 'boolean',
             'patient_state'                                   => 'nullable|string|size:2',
@@ -188,6 +202,7 @@ class CaseController extends Controller
                 'patient_id'    => $patient->id,
                 'external_id'   => $data['external_id'] ?? null,
                 'visit_type'    => $data['visit_type'] ?? null,
+                'is_refill'     => $data['is_refill'] ?? false,
                 'hold_status'   => $data['hold_status'] ?? false,
                 'is_chargeable' => $data['is_chargeable'] ?? true,
                 'patient_state' => $data['patient_state'] ?? $patient->state,

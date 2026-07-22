@@ -57,6 +57,14 @@ $totalCases = array_sum($donutData);
         <a href="{{ route('admin.cases.index') }}?status=completed" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Completed</div><div class="ma-metric-value">{{ $stats['completed_today'] }}</div></div>
         </a>
+        {{-- First visits vs check-ins. These two sum to the case total, because
+             both read the is_refill column rather than the visit_type fallback. --}}
+        <a href="{{ route('admin.cases.index') }}?case_type=new" class="text-decoration-none">
+            <div class="ma-metric"><div class="ma-metric-label">First Visits</div><div class="ma-metric-value">{{ $stats['first_visits'] }}</div></div>
+        </a>
+        <a href="{{ route('admin.cases.index') }}?case_type=refill" class="text-decoration-none">
+            <div class="ma-metric"><div class="ma-metric-label">Check-ins</div><div class="ma-metric-value">{{ $stats['refills'] }}</div></div>
+        </a>
     </div>
 
     {{-- Storefront workload --}}

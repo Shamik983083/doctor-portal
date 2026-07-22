@@ -30,6 +30,13 @@ class CaseController extends Controller
             ->when($request->input('triage'), fn($q, $t) => $q->where('triage', $t))
             ->when($request->input('partner_id'), fn($q, $id) => $q->where('partner_id', $id))
             ->when($request->input('clinician_id'), fn($q, $id) => $q->where('clinician_id', $id))
+            /*
+             * First visit vs check-in. Matches the two dashboard metrics, so the
+             * cards link somewhere that shows the cases they counted. Reads the
+             * column, like the metrics do, not the visit_type fallback.
+             */
+            ->when($request->input('case_type') === 'refill', fn($q) => $q->refills())
+            ->when($request->input('case_type') === 'new', fn($q) => $q->firstVisits())
             ->when($request->input('search'), fn($q, $s) =>
                 $q->whereHas('patient', fn($q) => $q->where('first_name', 'like', "%{$s}%")->orWhere('last_name', 'like', "%{$s}%"))
             )

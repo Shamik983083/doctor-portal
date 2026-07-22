@@ -50,6 +50,15 @@ class DashboardController extends Controller
                                         [$slaRiskMinutes]
                                     )->count(),
             'completed_today' => $caseScope()->where('status', 'completed')->count(),
+            /*
+             * First visits vs check-ins (Devin msg 2246: "to be able to project
+             * on our reporting"). Both read the `is_refill` COLUMN and never the
+             * visit_type fallback, so the two always sum to the case total. A
+             * substring match over free text would not add up, and a reporting
+             * figure that does not add up is worse than no figure.
+             */
+            'first_visits'    => $caseScope()->firstVisits()->count(),
+            'refills'         => $caseScope()->refills()->count(),
         ];
 
         // ── Cases by status (doughnut) ───────────────────────────────────

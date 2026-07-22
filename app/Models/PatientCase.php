@@ -17,6 +17,7 @@ class PatientCase extends Model
         'uuid', 'partner_id', 'patient_id', 'clinician_id', 'external_id',
         'status', 'hold_status', 'is_chargeable', 'charge_amount',
         'support_note', 'support_at', 'cancellation_reason', 'patient_state', 'visit_type',
+        'is_refill',
         'assigned_at', 'approved_at', 'processing_at', 'completed_at', 'cancelled_at',
         'metadata',
         'triage', 'triage_reasons', 'triage_ruleset', 'triaged_at',
@@ -25,6 +26,7 @@ class PatientCase extends Model
     protected $casts = [
         'hold_status' => 'boolean',
         'is_chargeable' => 'boolean',
+        'is_refill' => 'boolean',
         'support_at' => 'datetime',
         'assigned_at' => 'datetime',
         'approved_at' => 'datetime',
@@ -50,6 +52,81 @@ class PatientCase extends Model
     const TRIAGE_GREEN  = 'green';
     const TRIAGE_YELLOW = 'yellow';
     const TRIAGE_RED    = 'red';
+
+    /*
+     * ── Re-bill / check-in cases ──────────────────────────────────────────
+     *
+     * NOT a pharmacy refill. The `refills` integer elsewhere in this codebase
+     * means "how many times may this script be dispensed again" and is a
+     * different thing entirely. THIS means the patient submitted a check-in on
+     * an existing course of treatment and a doctor prescribes again
+     * (Devin msg 2246).
+     *
+     * Two consumers: routing sends these back to the doctor who treated the
+     * patient before, and reporting splits first visits from check-ins.
+     */
+
+    /**
+     * `visit_type` values accepted as a check-in when the explicit flag is absent.
+     *
+     * THE FALLBACK, AND ITS LIMIT (Devin msg 2246: "b should be what we build,
+     * with a as a fallback"). `is_refill` on the API is the real signal. This
+     * exists so a partner already sending a sensible `visit_type` gets the
+     * behaviour without changing their integration first.
+     *
+     * Matching is substring, case-insensitive, so "Refill", "refill request"
+     * and "Monthly check-in" all land. It is deliberately a SHORT list of
+     * unambiguous words: `visit_type` is free text (nullable, max 100, set by
+     * the partner), and a loose matcher would start classifying first visits as
+     * check-ins, which is the failure that hands a new patient to a doctor on
+     * the strength of a history they do not have.
+     */
+    public const REFILL_VISIT_TYPE_HINTS = ['refill', 'rebill', 're-bill', 'check-in', 'checkin', 'check in'];
+
+    /**
+     * Is this case a check-in / re-bill?
+     *
+     * Explicit flag first, `visit_type` hint second. Never infers from patient
+     * history: a returning patient with a genuinely new complaint is a first
+     * visit for that complaint, and guessing otherwise routes on a history that
+     * does not apply.
+     */
+    public function isRefillRequest(): bool
+    {
+        if ($this->is_refill) {
+            return true;
+        }
+
+        $visitType = strtolower(trim((string) $this->visit_type));
+
+        if ($visitType === '') {
+            return false;
+        }
+
+        foreach (self::REFILL_VISIT_TYPE_HINTS as $hint) {
+            if (str_contains($visitType, $hint)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reporting scopes. These read the COLUMN only, never the visit_type
+     * fallback, because a report has to be one SQL query and a substring match
+     * over free text is not a number anyone should plan against. Partners who
+     * want to appear in these send `is_refill`.
+     */
+    public function scopeRefills($query)
+    {
+        return $query->where('is_refill', true);
+    }
+
+    public function scopeFirstVisits($query)
+    {
+        return $query->where('is_refill', false);
+    }
 
     public function triageLabel(): string
     {
