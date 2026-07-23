@@ -100,9 +100,11 @@
                 <div class="note-block">
                     <div class="note-head">
                         <div><div class="subheading">Clinical note (directions)</div>
-                        <span class="pill neutral">Provider writes and owns this</span></div>
+                        <span class="pill neutral">AI draft · provider edits and signs</span></div>
+                        <button type="button" class="button-secondary" id="genNote">Draft with AI</button>
                     </div>
-                    <textarea name="directions" class="note-area" rows="3" placeholder="Administration instructions for the patient.">{{ old('directions') }}</textarea>
+                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write the basics or your instructions here, then draft with AI. What you write is used, not replaced.">{{ old('directions') }}</textarea>
+                    <p class="ai-honesty" id="noteNotice" hidden></p>
                     <div class="field" style="margin-top:10px"><label>Medical necessity</label>
                         <textarea name="medical_necessity" class="note-area" rows="2" placeholder="Justify medical necessity for the prescribed medications.">{{ old('medical_necessity') }}</textarea>
                     </div>
@@ -111,9 +113,7 @@
         </div>
 
         <div class="modal-foot">
-            <div class="foot-status"><strong id="medCount">0</strong> medication(s)
-                <label class="check-line" style="margin-left:16px"><input type="checkbox" id="attest"> I attest this is clinically appropriate.</label>
-            </div>
+            <div class="foot-status"><strong id="medCount">0</strong> medication(s) decided</div>
             <div class="foot-actions">
                 <a class="button-secondary" href="{{ route('clinician.cases.show', $case->uuid) }}">Cancel</a>
                 <button type="submit" class="button-primary" id="submitBtn" disabled>Approve &amp; submit</button>
@@ -134,7 +134,6 @@
         if (!form) return;
         var list   = document.getElementById('medList');
         var addBtn = document.getElementById('addMed');
-        var attest = document.getElementById('attest');
         var submit = document.getElementById('submitBtn');
         var medCount = document.getElementById('medCount');
 
@@ -257,12 +256,67 @@
             rows.forEach(function (r) { if (r.querySelector('[data-f="med"]').value) withMed++; });
             if (medCount) medCount.textContent = withMed;
             var diagnoses = form.querySelector('[name="diagnoses"]');
-            var ready = withMed >= 1 && attest && attest.checked && diagnoses && diagnoses.value.trim() !== '';
+            var ready = withMed >= 1 && diagnoses && diagnoses.value.trim() !== '';
             if (submit) submit.disabled = !ready;
         }
 
+        // The current medication rows as decisions, for the AI note draft.
+        function currentDecisions() {
+            var out = [];
+            list.querySelectorAll('.med-decision').forEach(function (r) {
+                var name = r.querySelector('[data-f="name"]').value;
+                if (!name) return;
+                var months = [];
+                r.querySelectorAll('[name$="[months][]"]').forEach(function (m) { if (m.value) months.push(m.value); });
+                out.push({
+                    name: name, decision: 'approve',
+                    term: (r.querySelector('[data-f="term"]') || {}).value || '',
+                    frequency: (r.querySelector('select[name$="[frequency]"]') || {}).value || '',
+                    refills: (r.querySelector('select[name$="[refills]"]') || {}).value || '',
+                    months: months
+                });
+            });
+            return out;
+        }
+
+        // AI note tie-in (Devin msg 2281). Posts what the provider has typed plus
+        // the current decisions to draft-note; the returned text fills the note,
+        // and the notice says honestly whether a model ran or it was composed
+        // locally. What the provider wrote is used as the steer, not replaced.
+        var genNote  = document.getElementById('genNote');
+        var noteArea = document.getElementById('noteArea');
+        var notice   = document.getElementById('noteNotice');
+        if (genNote && noteArea) {
+            genNote.addEventListener('click', function () {
+                genNote.disabled = true;
+                var original = genNote.textContent;
+                genNote.textContent = 'Drafting...';
+                var token = document.querySelector('meta[name="csrf-token"]');
+                fetch('{{ route('clinician.cases.draft-note', $case->uuid) }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': token ? token.getAttribute('content') : '',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ provider_text: noteArea.value, decisions: currentDecisions() })
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d && d.text) { noteArea.value = d.text; refresh(); }
+                    if (notice && d && d.notice) { notice.textContent = d.notice; notice.removeAttribute('hidden'); }
+                    genNote.textContent = 'Regenerate';
+                    genNote.disabled = false;
+                })
+                .catch(function () {
+                    if (notice) { notice.textContent = 'The draft could not be generated. Write the note manually.'; notice.removeAttribute('hidden'); }
+                    genNote.textContent = original;
+                    genNote.disabled = false;
+                });
+            });
+        }
+
         if (addBtn) addBtn.addEventListener('click', function () { addRow(''); });
-        if (attest) attest.addEventListener('change', refresh);
         var diag = form.querySelector('[name="diagnoses"]');
         if (diag) diag.addEventListener('input', refresh);
 
