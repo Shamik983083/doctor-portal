@@ -166,7 +166,7 @@
                 </div>
                 <div class="qa-sheet" style="padding:0 8px 12px;margin:0">
                     @forelse($response->answers as $answer)
-                        @php($decoded = json_decode($answer->answer, true))
+                        @php $decoded = json_decode($answer->answer, true); @endphp
                         <div class="qa {{ $answer->is_disqualified ? 'consent' : '' }}">
                             <dt>{{ $answer->question_text }}</dt>
                             <dd>@if(is_array($decoded)){{ implode(', ', $decoded) }}@elseif(filled($answer->answer)){{ $answer->answer }}@else <span style="color:var(--muted)">-</span>@endif</dd>
@@ -302,7 +302,7 @@
                 $actorLabel = fn($e) => match($e->actor_type) { 'admin'=>'Admin','clinician'=>'Clinician','partner'=>'Partner', default=>'System' };
             @endphp
             @forelse($case->events->sortByDesc('created_at') as $event)
-                @php([$label, $tone] = $eventLabel($event))
+                @php [$label, $tone] = $eventLabel($event); @endphp
                 <div style="display:flex;gap:14px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)">
                     <div style="color:var(--muted);font-size:12px;min-width:110px">{{ $event->created_at->format('M d, H:i') }}</div>
                     <div>
