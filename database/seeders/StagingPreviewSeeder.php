@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Clinician;
+use App\Models\OfferingCategory;
 use App\Models\Partner;
 use App\Models\Patient;
 use App\Models\PatientCase;
@@ -71,6 +72,24 @@ class StagingPreviewSeeder extends Seeder
          * hand while testing.
          */
         $doctorAdmin->managedClinicians()->syncWithoutDetaching([$mine->id]);
+
+        /*
+         * THE v2 ELIGIBILITY GATE NEEDS THE DOCTORS OPTED IN, AND THIS IS NOT
+         * OPTIONAL FIXTURE POLISH. Routing v2 made accepted categories a hard
+         * fail-closed block: a doctor with none accepts NOTHING.
+         *
+         * The migration backfills every clinician that existed WHEN IT RAN, which
+         * covers the upgrade. It cannot cover a category created afterwards, and
+         * on staging that is exactly what happened: the GLP offerings seeder
+         * landed after the routing v2 migration, so both demo doctors were left
+         * accepting nothing and no case could route to anyone. Verified on
+         * staging 2026-07-23: "Categories you accept: None ticked".
+         *
+         * Doing it here rather than in the migration is deliberate. A fixture
+         * that re-runs on every deploy is the only thing that keeps up with a
+         * taxonomy people keep adding to.
+         */
+        $this->acceptEveryCategory($mine, $notMine);
 
         $this->cases($partner, $mine, $notMine);
         $this->messages($partner, $mine);
@@ -159,6 +178,48 @@ class StagingPreviewSeeder extends Seeder
                 'status' => 'active',
             ]
         );
+    }
+
+    /**
+     * Make sure the demo categories exist, and tick every doctor into all of them.
+     *
+     * THE CATEGORY LIST. Devin msg 2313: "Currently we have GLP, NAD, Anti-Aging,
+     * Peptides, ED. We want to be able to add and remove as we go." Staging had
+     * only GLP, so the rest are created here as fixtures. firstOrCreate on name,
+     * so a category an admin already added by hand is left exactly as it is,
+     * including one they deliberately deactivated.
+     *
+     * THEN EVERY ACTIVE CATEGORY IS ATTACHED TO BOTH DEMO DOCTORS, including any
+     * an admin added themselves. On a demo box the useful default is a doctor who
+     * can take anything; narrowing one is the thing you then demonstrate, by
+     * unticking a box and watching a case land in the exceptions queue with
+     * CATEGORY_NOT_ACCEPTED.
+     *
+     * syncWithoutDetaching, so unticking a category by hand to try that out is not
+     * silently undone by the next deploy.
+     */
+    private function acceptEveryCategory(Clinician ...$clinicians): void
+    {
+        foreach (['GLP', 'NAD', 'Anti-Aging', 'Peptides', 'ED'] as $name) {
+            OfferingCategory::firstOrCreate(
+                ['name' => $name],
+                ['description' => 'Staging preview category.', 'is_active' => true],
+            );
+        }
+
+        $categoryIds = OfferingCategory::where('is_active', true)->pluck('id')->all();
+
+        if ($categoryIds === []) {
+            $this->command->warn('No active product categories: demo doctors will accept nothing and no case will route.');
+
+            return;
+        }
+
+        foreach ($clinicians as $clinician) {
+            $clinician->acceptedCategories()->syncWithoutDetaching($categoryIds);
+        }
+
+        $this->command->info('  Categories   : ' . count($categoryIds) . ' active, all accepted by both demo doctors');
     }
 
     /** A clinician plus the user behind them. */
@@ -373,9 +434,14 @@ class StagingPreviewSeeder extends Seeder
      * returns null and nothing is auto-assigned when it does. Without one the
      * routing screen is empty and reads as broken rather than unconfigured.
      *
-     * requireRecordedLicensure is left FALSE here, matching the shipped default.
-     * Flipping it is a real operational decision that belongs in the runbook
-     * after `licensure:audit` passes, not something a fixture decides.
+     * requireRecordedLicensure is TRUE now. It used to be false here to match the
+     * old shipped default; routing v2 flipped that default on Devin's instruction
+     * (msg 2313, "empty should not show licensed everywhere it needs to reject"),
+     * so leaving an explicit false would have made the staging fixture the one
+     * place still running the old fail-open behaviour, which is the worst
+     * possible place for it: the box people test the new behaviour on.
+     *
+     * Safe here because both demo doctors are seeded with real licensed_states.
      */
     private function routingPolicy(User $createdBy): void
     {
@@ -388,7 +454,7 @@ class StagingPreviewSeeder extends Seeder
                 ['version' => 1],
                 [
                     'mode'         => 'PRIORITY',
-                    'config'       => ['requireRecordedLicensure' => false],
+                    'config'       => ['requireRecordedLicensure' => true],
                     'status'       => RoutingPolicy::STATUS_ACTIVE,
                     'activated_at' => now(),
                     'created_by'   => $createdBy->id,

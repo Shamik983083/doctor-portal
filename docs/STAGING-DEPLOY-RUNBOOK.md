@@ -180,13 +180,35 @@ It requires `RolesAndPermissionsSeeder` to have run first, since it assigns role
 
 | Account | Password | Role |
 |---|---|---|
+| `super.admin@staging.axismd.io` | `staging-preview-2026` | `super_admin`, the only holder of the role |
 | `doctor.admin@staging.axismd.io` | `staging-preview-2026` | `admin`, over Dr. Alvarez only |
 | `dr.alvarez@staging.axismd.io` | `staging-preview-2026` | `clinician`, licensed TN/CA/NY |
 | `dr.okafor@staging.axismd.io` | `staging-preview-2026` | `clinician`, licensed TN/TX/FL |
+| `partner@staging.axismd.io` | `staging-preview-2026` | partner portal |
+
+All five were verified logging in against `staging.axismd.io` on 2026-07-23, each
+landing on a dashboard that renders, with a deliberately wrong password bouncing
+back to `/login` as the control. The super admin and partner accounts were
+missing from this table before then, though the seeder has always created them.
 
 It creates 3 waiting (unassigned) cases, 2 assigned to Alvarez, 2 assigned to
 Okafor, and an ACTIVE v1 routing policy. Logged in as the Doctor Admin you should
 see the 3 waiting plus Alvarez's 2, and none of Okafor's.
+
+**Routing v2 (2026-07-23) added a step this seeder now has to do.** Accepted
+product categories are a hard fail-closed block: a doctor accepting none accepts
+nothing. The migration backfills clinicians that existed when it ran, but cannot
+cover a category created afterwards, and on staging that is exactly what
+happened. The GLP offerings seeder landed after the routing v2 migration, leaving
+both demo doctors accepting nothing, so no case could route to anybody. The
+seeder now creates the five demo categories (GLP, NAD, Anti-Aging, Peptides, ED)
+and ticks both doctors into every active one on each run.
+
+**To check this by hand in ten seconds**: log in as Dr. Alvarez and open
+`/clinician/pool`. The "What you will be given" panel names her states, her
+categories and her visit types. "None ticked, so nothing can be assigned to you"
+under categories means routing is dead for her and the seeder has not run since
+the last category was added.
 
 Weak passwords are deliberate: `axismd.io` staging is demo mode with no real
 patients. **If that ever stops being true, delete this seeder rather than

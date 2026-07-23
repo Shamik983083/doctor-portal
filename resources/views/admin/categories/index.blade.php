@@ -5,6 +5,21 @@
 
 @section('content')
 
+{{-- Routing v2 made accepted categories a hard block on which doctor can take a
+     case, so a category is only half-created here: until doctors are ticked into
+     it, nobody accepts it and cases in it will not route. They land visibly in
+     the exceptions queue rather than disappearing, but the fix is on the doctor's
+     screen, and this is where somebody will be standing when they need to know. --}}
+<div class="alert alert-secondary small d-flex align-items-start gap-2">
+    <i class="bi bi-info-circle mt-1"></i>
+    <div>
+        <strong>A new category is accepted by no doctor until you tick them in.</strong>
+        Cases in a category nobody accepts cannot be routed, and appear in
+        <a href="{{ route('admin.routing.exceptions') }}">Routing Exceptions</a> as
+        "Doctor does not accept this product category". Set who takes what on each
+        <a href="{{ route('admin.clinicians.index') }}">doctor's profile</a>.
+    </div>
+</div>
 
 <div class="row g-4">
 
