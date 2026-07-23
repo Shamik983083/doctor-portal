@@ -59,10 +59,11 @@
 
             <div class="nav-section"><span>Tasks</span></div>
             <div class="nav-group">
-                <a class="nav-link {{ request()->routeIs('clinician.queue') || request()->routeIs('clinician.cases.queue') ? 'active' : '' }}" href="{{ route('clinician.queue') }}">
+                {{-- Case Queue hidden: clinicians only see cases assigned to them (My Cases) --}}
+                {{-- <a class="nav-link {{ request()->routeIs('clinician.queue') || request()->routeIs('clinician.cases.queue') ? 'active' : '' }}" href="{{ route('clinician.queue') }}">
                     <span class="nav-ico">&#128451;</span><span class="lbl">Case Queue</span>
                     <span class="nav-count {{ $nav['queue'] ? '' : 'zero' }}">{{ $nav['queue'] }}</span>
-                </a>
+                </a> --}}
                 <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases') }}">
                     <span class="nav-ico">&#128203;</span><span class="lbl">My Cases</span>
                     <span class="nav-count {{ $nav['myCases'] ? '' : 'zero' }}">{{ $nav['myCases'] }}</span>
