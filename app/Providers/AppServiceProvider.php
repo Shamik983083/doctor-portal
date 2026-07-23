@@ -66,6 +66,12 @@ class AppServiceProvider extends ServiceProvider
             $myEscalations = PatientCase::where('clinician_id', $clinician->id)
                 ->where('status', 'support')->count();
 
+            // "Support thread open": support cases with at least one unread inbound message.
+            $supportThreadOpen = PatientCase::where('clinician_id', $clinician->id)
+                ->where('status', 'support')
+                ->whereHas('messages', fn ($q) => $q->where('direction', 'inbound')->where('is_read', false))
+                ->count();
+
             // Refills badge (Devin msg 2285): check-ins for patients this
             // clinician has seen. Same shape as the Refills screen query.
             $seenPatientIds = PatientCase::where('clinician_id', $clinician->id)
@@ -96,7 +102,7 @@ class AppServiceProvider extends ServiceProvider
                 'refills'     => $refills,
                 'messages'    => $messages,
                 'escalations' => $myEscalations,
-                'support'     => $myEscalations,
+                'support'     => $supportThreadOpen,
                 'red'         => (int) $triage->get('red', 0),
                 'yellow'      => (int) $triage->get('yellow', 0),
                 'green'       => (int) $triage->get('green', 0),

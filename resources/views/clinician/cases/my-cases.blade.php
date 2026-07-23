@@ -18,7 +18,7 @@
 
 {{-- Status tabs --}}
 <div class="mc-tabs">
-    @foreach(['active' => 'Active', 'escalations' => 'My Escalations', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'all' => 'All cases'] as $key => $label)
+    @foreach(['active' => 'Active', 'escalations' => 'My Escalations', 'support' => 'Support thread open', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'all' => 'All cases'] as $key => $label)
         <a href="{{ route('clinician.cases.my-cases', array_merge(request()->except('tab','page'), ['tab' => $key])) }}"
            class="mc-tab {{ $tab === $key ? 'active' : '' }}">
             {{ $label }} <span class="mc-tab-count">{{ number_format($counts[$key]) }}</span>
@@ -30,12 +30,14 @@
 $tabTitle = match($tab) {
     'active'      => 'Active cases',
     'escalations' => 'My Escalations',
+    'support'     => 'Support thread open',
     'completed'   => 'Completed cases',
     'cancelled'   => 'Cancelled cases',
     default       => 'All cases',
 };
 $tabSub = match($tab) {
     'escalations' => number_format($counts['escalations']) . ' ' . ($counts['escalations'] === 1 ? 'case' : 'cases') . ' escalated to support.',
+    'support'     => number_format($counts['support']) . ' ' . ($counts['support'] === 1 ? 'case' : 'cases') . ' with unread messages in the support thread.',
     default       => number_format($counts[$tab]) . ' ' . ($counts[$tab] === 1 ? 'case' : 'cases') . ' assigned to you.',
 };
 @endphp

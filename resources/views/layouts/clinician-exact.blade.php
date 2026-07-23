@@ -133,7 +133,7 @@
 
             <div class="nav-section"><span>Priority</span></div>
             <div class="nav-group">
-                <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') && request()->get('tab') === 'escalations' ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases', ['tab' => 'escalations']) }}">
+                <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') && request()->get('tab') === 'support' ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases', ['tab' => 'support']) }}">
                     <span class="nav-ico">&#128736;</span><span class="lbl">Support thread open</span>
                     <span class="nav-count {{ $nav['support'] ? '' : 'zero' }}">{{ $nav['support'] }}</span>
                 </a>
