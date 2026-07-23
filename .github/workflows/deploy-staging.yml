@@ -35,9 +35,23 @@ jobs:
             echo "--- Running migrations ---"
             /opt/cpanel/ea-php82/root/usr/bin/php artisan migrate --force
 
+            echo "--- Seeding staging preview data (Devin msg 2261: re-seed) ---"
+            # Staging ONLY. This workflow never runs against production, and the
+            # seeders are idempotent (firstOrCreate / updateOrCreate) and refuse
+            # APP_ENV=production, so re-running on every staging deploy just keeps
+            # the demo data present and current. RolesAndPermissionsSeeder first,
+            # because the preview seeder assigns roles.
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan db:seed --class="Database\\Seeders\\RolesAndPermissionsSeeder" --force
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan db:seed --class="Database\\Seeders\\StagingPreviewSeeder" --force
+
             echo "--- Clearing and rebuilding caches ---"
             /opt/cpanel/ea-php82/root/usr/bin/php artisan config:cache
             /opt/cpanel/ea-php82/root/usr/bin/php artisan route:cache
             /opt/cpanel/ea-php82/root/usr/bin/php artisan view:cache
+
+            echo "--- Restarting queue workers ---"
+            # Production had this; staging did not, so staging workers ran stale
+            # code against new schema after every deploy. Fixed here.
+            /opt/cpanel/ea-php82/root/usr/bin/php artisan queue:restart
 
             echo "--- Deployment complete ---"
