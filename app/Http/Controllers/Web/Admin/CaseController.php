@@ -7,6 +7,7 @@ use App\Models\Clinician;
 use App\Models\Partner;
 use App\Models\PatientCase;
 use App\Models\PatientFile;
+use App\Models\Setting;
 use App\Services\CaseStateMachine;
 use App\Services\FileUploadService;
 use Illuminate\Http\Request;
@@ -24,6 +25,8 @@ class CaseController extends Controller
         // A Doctor Admin sees only their own doctors' cases; a super admin sees
         // all of them (Devin msg 2117). Applied first so no later filter can
         // widen it, only narrow it.
+        $slaRiskMinutes = (int) Setting::get('sla_review_hours', 24) * 60 * 0.7;
+
         $cases = PatientCase::visibleTo($request->user())
             ->with(['patient', 'partner', 'clinician.user', 'caseOfferings.offering'])
             ->when($request->input('status'), fn($q, $s) => $q->where('status', $s))
@@ -37,6 +40,25 @@ class CaseController extends Controller
              */
             ->when($request->input('case_type') === 'refill', fn($q) => $q->refills())
             ->when($request->input('case_type') === 'new', fn($q) => $q->firstVisits())
+            ->when($request->boolean('sla_risk'), fn($q) => $q
+                ->whereIn('status', ['assigned', 'approved', 'processing'])
+                ->whereRaw('
+                    TIMESTAMPDIFF(MINUTE, COALESCE(assigned_at, created_at), NOW()) >=
+                    LEAST(
+                        ?,
+                        COALESCE(
+                            (SELECT MIN(sp.overdue_after_hours * 60 * 0.7)
+                             FROM admin_clinician ac
+                             JOIN sla_policies sp
+                               ON sp.owner_user_id = ac.user_id
+                              AND sp.is_active = 1
+                              AND sp.overdue_after_hours IS NOT NULL
+                             WHERE ac.clinician_id = cases.clinician_id),
+                            ?
+                        )
+                    )
+                ', [$slaRiskMinutes, $slaRiskMinutes])
+            )
             ->when($request->input('search'), fn($q, $s) =>
                 $q->whereHas('patient', fn($q) => $q->where('first_name', 'like', "%{$s}%")->orWhere('last_name', 'like', "%{$s}%"))
             )

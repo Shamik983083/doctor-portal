@@ -48,7 +48,7 @@ $totalCases = array_sum($donutData);
         <a href="{{ route('admin.cases.index') }}" class="text-decoration-none">
             <div class="ma-metric accent"><div class="ma-metric-label">Active Cases</div><div class="ma-metric-value">{{ $stats['active_cases'] }}</div></div>
         </a>
-        <a href="{{ route('admin.cases.index') }}?status=assigned" class="text-decoration-none">
+        <a href="{{ route('admin.cases.index') }}?sla_risk=1" class="text-decoration-none">
             <div class="ma-metric {{ $stats['sla_at_risk'] > 0 ? 'warn' : '' }}">
                 <div class="ma-metric-label">At SLA Risk</div>
                 <div class="ma-metric-value">{{ $stats['sla_at_risk'] }}</div>
