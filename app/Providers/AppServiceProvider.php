@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Message;
+use App\Models\PatientCase;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;
 
@@ -25,5 +29,75 @@ class AppServiceProvider extends ServiceProvider
         Broadcast::routes(['middleware' => ['web', 'auth']]);
 
         require base_path('routes/channels.php');
+
+        $this->composeClinicianSidebar();
+    }
+
+    /**
+     * Feed the clinician sidebar its live badge counts (Devin msg 2253: match
+     * the design preview, which shows a count on every nav item).
+     *
+     * Bound to the clinician layout so every clinician page gets the same
+     * numbers without each controller recomputing them. Real data only, so an
+     * empty queue reads zero rather than a mocked figure.
+     */
+    private function composeClinicianSidebar(): void
+    {
+        View::composer('layouts.clinician', function ($view) {
+            $clinician = Auth::user()?->clinician;
+
+            // No clinician record (an admin on the shared clinician routes):
+            // render the nav with zeros rather than 500 on a null.
+            if (! $clinician) {
+                $view->with('clinicianNav', $this->emptyClinicianNav());
+                return;
+            }
+
+            $open = ['waiting', 'assigned', 'support'];
+
+            // The unclaimed queue: waiting cases the provider could pick up.
+            $queueCount = PatientCase::where('status', 'waiting')->count();
+
+            // Mine: everything currently on my plate.
+            $mineBase = PatientCase::where('clinician_id', $clinician->id)
+                ->whereIn('status', ['assigned', 'support', 'processing']);
+
+            $myCases      = (clone $mineBase)->count();
+            $myEscalations = PatientCase::where('clinician_id', $clinician->id)
+                ->where('status', 'support')->count();
+
+            // Messages waiting on me: unread inbound on cases assigned to me.
+            $messages = Message::query()
+                ->join('cases', 'cases.id', '=', 'messages.case_id')
+                ->where('cases.clinician_id', $clinician->id)
+                ->where('messages.direction', 'inbound')
+                ->where('messages.is_read', false)
+                ->count();
+
+            // Triage bands across the open queue (matches the queue screen).
+            $triage = PatientCase::whereIn('status', $open)
+                ->selectRaw('triage, COUNT(*) as c')
+                ->groupBy('triage')
+                ->pluck('c', 'triage');
+
+            $view->with('clinicianNav', [
+                'queue'       => $queueCount,
+                'myCases'     => $myCases,
+                'messages'    => $messages,
+                'escalations' => $myEscalations,
+                'support'     => $myEscalations,
+                'red'         => (int) $triage->get('red', 0),
+                'yellow'      => (int) $triage->get('yellow', 0),
+                'green'       => (int) $triage->get('green', 0),
+            ]);
+        });
+    }
+
+    private function emptyClinicianNav(): array
+    {
+        return [
+            'queue' => 0, 'myCases' => 0, 'messages' => 0, 'escalations' => 0,
+            'support' => 0, 'red' => 0, 'yellow' => 0, 'green' => 0,
+        ];
     }
 }
