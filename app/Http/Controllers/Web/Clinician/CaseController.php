@@ -356,6 +356,13 @@ class CaseController extends Controller
             'medications.*.days_supply' => 'nullable|integer|min:0',
             'medications.*.dispense_unit' => 'nullable|string|max:100',
             'medications.*.days_until_dispense' => 'nullable|integer|min:0',
+            // Rich dosing from the full review model (Devin msg 2279): frequency,
+            // term, and a dose per month of the term. Optional, stored alongside
+            // the flat columns in the `dosing` json.
+            'medications.*.frequency' => 'nullable|string|max:60',
+            'medications.*.term' => 'nullable|string|max:20',
+            'medications.*.months' => 'nullable|array',
+            'medications.*.months.*' => 'nullable|string|max:60',
         ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
@@ -377,10 +384,24 @@ class CaseController extends Controller
             ]);
 
             foreach ($request->input('medications', []) as $med) {
+                // Keep only the real month doses, so a 3M ladder with a blank
+                // month is not stored as an empty step.
+                $months = array_values(array_filter($med['months'] ?? [], fn ($m) => filled($m)));
+                $dosing = null;
+                if (filled($med['frequency'] ?? null) || filled($med['term'] ?? null) || $months !== []) {
+                    $dosing = [
+                        'medication' => $med['name'],
+                        'frequency'  => $med['frequency'] ?? null,
+                        'term'       => $med['term'] ?? null,
+                        'months'     => $months,
+                    ];
+                }
+
                 $prescription->medications()->create([
                     'offering_id' => $med['offering_id'] ?? null,
                     'name' => $med['name'],
                     'compound_formula' => $med['compound_formula'] ?? null,
+                    'dosing' => $dosing,
                     'refills' => $med['refills'] ?? null,
                     'quantity' => $med['quantity'] ?? null,
                     'days_supply' => $med['days_supply'] ?? null,

@@ -4,23 +4,32 @@
 @section('page-title', 'Case Review')
 
 {{--
-    Review and approve, rebuilt to the design preview's modal look with its
-    options (Devin msg 2277: "keep the functionality and what passes in there now
-    but make it look and have all the options from the preview"). Per requested
-    medication: Approve / Deny / None, and the prescribing fields. The FORM still
-    posts to clinician.cases.prescribe with the exact fields that endpoint already
-    expects (diagnoses + medications[]), so approving still creates the
+    Review and approve, the full model from MA-DOCPORTAL / the design preview
+    (Devin msg 2279: dropdowns, and the ability to add multiple months or
+    multiple medications). Each medication has a medication / duration /
+    frequency / refills dropdown and a dose-per-month ladder driven by the
+    duration; medications can be added and removed.
+
+    Still posts to clinician.cases.prescribe, which now also stores the rich
+    dosing alongside the flat medication columns. Approving creates the
     prescription, approves and completes the case, generates the PDF, dispatches
-    and fires the webhook. Only the presentation changed.
+    and fires the webhook, exactly as before.
 --}}
 
 @php
     $clin = $case->queueClinical();
     $ci   = $case->clinical_intake ?? [];
     $idv  = strtolower($case->patient?->id_verified_status ?? '') === 'verified';
-    $meds = $case->caseOfferings->pluck('offering')->filter()->values();
-    if ($meds->isEmpty()) { $meds = $offerings; }
     $findingFlags = collect($ci['findings'] ?? [])->filter(fn($f) => is_array($f) && ($f[0] ?? '') !== 'green')->count();
+
+    $offeringData = $offerings->map(fn($o) => [
+        'id' => $o->id, 'name' => $o->name,
+        'refills' => $o->refills, 'quantity' => $o->quantity,
+        'days_supply' => $o->days_supply, 'dispense_unit' => $o->dispense_unit,
+        'compound_formula' => $o->compound_formula,
+    ])->values();
+
+    $requestedIds = $case->caseOfferings->pluck('offering.id')->filter()->values();
 @endphp
 
 @section('view')
@@ -70,49 +79,23 @@
                 </div>
             </div>
 
-            {{-- Right: diagnosis, per-medication decisions, clinical note --}}
+            {{-- Right: diagnosis, medications, note --}}
             <div class="modal-right">
                 <div class="field">
                     <label>Diagnoses <span class="req">*</span></label>
                     <textarea name="diagnoses" class="note-area" rows="2" required placeholder="e.g. E66.01 obesity due to excess calories">{{ old('diagnoses') }}</textarea>
                 </div>
 
-                <div class="subheading" style="margin:16px 0 8px">Requested medications</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px">
+                    <div class="subheading" style="margin:0">Medications</div>
+                    <button type="button" class="button-secondary" id="addMed">+ Add medication</button>
+                </div>
 
-                @forelse($meds as $i => $offering)
-                    <div class="med-decision" data-med="{{ $i }}" style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px">
-                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
-                            <strong>{{ $offering->name }}</strong>
-                            <div class="decision-row">
-                                <button type="button" class="decision-btn approve" data-dec="approve" data-med="{{ $i }}">Approve</button>
-                                <button type="button" class="decision-btn deny" data-dec="deny" data-med="{{ $i }}">Deny</button>
-                                <button type="button" class="decision-btn none" data-dec="none" data-med="{{ $i }}">None</button>
-                            </div>
-                        </div>
+                @if($offerings->isEmpty())
+                    <p class="ai-honesty">No approved offerings are available to prescribe for this case's category.</p>
+                @endif
 
-                        <input type="hidden" name="medications[{{ $i }}][offering_id]" value="{{ $offering->id }}" disabled data-input="{{ $i }}">
-                        <input type="hidden" name="medications[{{ $i }}][name]" value="{{ $offering->name }}" disabled data-input="{{ $i }}">
-                        <input type="hidden" name="medications[{{ $i }}][compound_formula]" value="{{ $offering->compound_formula }}" disabled data-input="{{ $i }}">
-
-                        <div class="med-fields" data-fields="{{ $i }}" hidden>
-                            <div class="field-row">
-                                <div class="field"><label>Refills</label>
-                                    <input type="number" min="0" name="medications[{{ $i }}][refills]" value="{{ $offering->refills }}" disabled data-input="{{ $i }}"></div>
-                                <div class="field"><label>Quantity</label>
-                                    <input type="number" min="0" step="0.01" name="medications[{{ $i }}][quantity]" value="{{ $offering->quantity }}" disabled data-input="{{ $i }}"></div>
-                            </div>
-                            <div class="field-row">
-                                <div class="field"><label>Days supply</label>
-                                    <input type="number" min="0" name="medications[{{ $i }}][days_supply]" value="{{ $offering->days_supply }}" disabled data-input="{{ $i }}"></div>
-                                <div class="field"><label>Dispense unit</label>
-                                    <input type="text" name="medications[{{ $i }}][dispense_unit]" value="{{ $offering->dispense_unit }}" disabled data-input="{{ $i }}"></div>
-                            </div>
-                        </div>
-                        <p class="action-reason" data-reason="{{ $i }}" hidden></p>
-                    </div>
-                @empty
-                    <p class="ai-honesty">No medications are attached to this case.</p>
-                @endforelse
+                <div id="medList"></div>
 
                 <div class="note-block">
                     <div class="note-head">
@@ -128,12 +111,12 @@
         </div>
 
         <div class="modal-foot">
-            <div class="foot-status"><strong id="decidedCount">0</strong> of {{ $meds->count() }} medication{{ $meds->count() === 1 ? '' : 's' }} decided
+            <div class="foot-status"><strong id="medCount">0</strong> medication(s)
                 <label class="check-line" style="margin-left:16px"><input type="checkbox" id="attest"> I attest this is clinically appropriate.</label>
             </div>
             <div class="foot-actions">
                 <a class="button-secondary" href="{{ route('clinician.cases.show', $case->uuid) }}">Cancel</a>
-                <button type="submit" class="button-primary" id="submitBtn" disabled>Submit decision</button>
+                <button type="submit" class="button-primary" id="submitBtn" disabled>Approve &amp; submit</button>
             </div>
         </div>
     </section>
@@ -142,55 +125,151 @@
 
 @section('scripts')
 <script>
+    var OFFERINGS = @json($offeringData);
+    var REQUESTED = @json($requestedIds);
+</script>
+<script>
     (function () {
-        var form = document.getElementById('reviewForm');
+        var form   = document.getElementById('reviewForm');
         if (!form) return;
+        var list   = document.getElementById('medList');
+        var addBtn = document.getElementById('addMed');
         var attest = document.getElementById('attest');
         var submit = document.getElementById('submitBtn');
-        var count  = document.getElementById('decidedCount');
-        var total  = {{ $meds->count() }};
-        var state  = {}; // med index -> 'approve' | 'deny' | 'none'
+        var medCount = document.getElementById('medCount');
 
-        function inputs(i) { return form.querySelectorAll('[data-input="' + i + '"]'); }
+        // Dose ladders by drug family (from the MA / preview catalog). A medication
+        // matched to a family gets a dropdown per month; anything else gets a free
+        // text dose per month, so nothing is un-prescribable.
+        var CATALOG = {
+            semaglutide: ['L1 · 2.5 mg', 'L2 · 5 mg', 'L3 · 7.5 mg', 'L4 · 10 mg'],
+            tirzepatide: ['L1 · 2.5 mg', 'L2 · 5 mg', 'L3 · 7.5 mg', 'L4 · 10 mg', 'L5 · 12.5 mg'],
+            zofran:      ['4 mg', '8 mg'],
+            nad:         ['100 mg', '200 mg']
+        };
+        var TERMS = [{ v: '1M', label: '1 month', n: 1 }, { v: '3M', label: '3 months', n: 3 }, { v: '4M', label: '4 months', n: 4 }];
+        var FREQUENCIES = ['Weekly', 'Every 2 weeks', 'Daily', 'As needed'];
+        var REFILLS = ['0', '1', '2', '3', '5', '11'];
 
-        function apply(i, dec) {
-            state[i] = dec;
-            form.querySelectorAll('.decision-btn[data-med="' + i + '"]').forEach(function (b) {
-                b.classList.toggle('on', b.getAttribute('data-dec') === dec);
+        var idx = 0;
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
             });
-            var fields = form.querySelector('[data-fields="' + i + '"]');
-            var reason = form.querySelector('[data-reason="' + i + '"]');
-            var approved = dec === 'approve';
+        }
+        function family(name) {
+            var n = (name || '').toLowerCase();
+            if (n.indexOf('semaglutide') > -1) return 'semaglutide';
+            if (n.indexOf('tirzepatide') > -1) return 'tirzepatide';
+            if (n.indexOf('zofran') > -1 || n.indexOf('ondansetron') > -1) return 'zofran';
+            if (n.indexOf('nad') > -1) return 'nad';
+            return null;
+        }
+        function monthsIn(term) { var t = TERMS.filter(function (x) { return x.v === term; })[0]; return t ? t.n : 1; }
 
-            // Only an approved medication submits its inputs. Disabled inputs are
-            // not posted, so denied / none meds contribute nothing, exactly like
-            // the preview leaves them off the order.
-            inputs(i).forEach(function (el) { el.disabled = !approved; });
-            if (fields) { if (approved) { fields.removeAttribute('hidden'); } else { fields.setAttribute('hidden', ''); } }
-            if (reason) {
-                if (dec === 'deny') { reason.textContent = 'Denied. No prescription is created for this medication.'; reason.removeAttribute('hidden'); }
-                else if (dec === 'none') { reason.textContent = 'Marked none. Left undecided on the order.'; reason.removeAttribute('hidden'); }
-                else { reason.setAttribute('hidden', ''); }
+        function offeringOptions(selId) {
+            return '<option value="">Select medication</option>' + OFFERINGS.map(function (o) {
+                return '<option value="' + o.id + '"' + (String(o.id) === String(selId) ? ' selected' : '') + '>' + esc(o.name) + '</option>';
+            }).join('');
+        }
+        function optionList(arr, sel) {
+            return arr.map(function (v) {
+                var val = v.v !== undefined ? v.v : v;
+                var label = v.label !== undefined ? v.label : v;
+                return '<option value="' + esc(val) + '"' + (String(val) === String(sel) ? ' selected' : '') + '>' + esc(label) + '</option>';
+            }).join('');
+        }
+
+        function renderMonths(row) {
+            var i    = row.getAttribute('data-idx');
+            var name = row.querySelector('[data-f="name"]').value;
+            var term = row.querySelector('[data-f="term"]').value;
+            var n    = monthsIn(term);
+            var fam  = family(name);
+            var wrap = row.querySelector('[data-f="months"]');
+
+            var head = '<div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
+                + '<span class="months-note">' + n + ' month term, one dose per month</span></div>';
+            var cells = '';
+            for (var m = 0; m < n; m++) {
+                var control = fam
+                    ? '<select name="medications[' + i + '][months][]"><option value="">Dose</option>' + optionList(CATALOG[fam], '') + '</select>'
+                    : '<input type="text" name="medications[' + i + '][months][]" placeholder="Dose">';
+                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + '</div>';
             }
-            refresh();
+            wrap.innerHTML = '<div class="months">' + head + '<div class="months-grid">' + cells + '</div></div>';
+        }
+
+        function addRow(offeringId) {
+            var i = idx++;
+            var row = document.createElement('div');
+            row.className = 'med-decision';
+            row.setAttribute('data-idx', i);
+            row.style.cssText = 'border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px';
+            row.innerHTML =
+                '<div style="display:flex;justify-content:flex-end;margin-bottom:6px">'
+                + '<button type="button" class="button-secondary" data-f="remove" style="padding:4px 10px">Remove</button></div>'
+                + '<div class="field-row">'
+                + '<div class="field"><label>Medication <span class="req">*</span></label>'
+                + '<select data-f="med" name="medications[' + i + '][offering_id]">' + offeringOptions(offeringId) + '</select></div>'
+                + '<div class="field"><label>Duration <span class="req">*</span></label>'
+                + '<select data-f="term" name="medications[' + i + '][term]">' + optionList(TERMS, '3M') + '</select></div>'
+                + '</div>'
+                + '<div class="field-row">'
+                + '<div class="field"><label>Administration frequency <span class="req">*</span></label>'
+                + '<select name="medications[' + i + '][frequency]">' + optionList(FREQUENCIES, 'Weekly') + '</select></div>'
+                + '<div class="field"><label>Refills <span class="req">*</span></label>'
+                + '<select name="medications[' + i + '][refills]">' + optionList(REFILLS, '0') + '</select></div>'
+                + '</div>'
+                + '<div data-f="months"></div>'
+                + '<input type="hidden" data-f="name" name="medications[' + i + '][name]" value="">'
+                + '<input type="hidden" data-f="quantity" name="medications[' + i + '][quantity]" value="">'
+                + '<input type="hidden" data-f="days_supply" name="medications[' + i + '][days_supply]" value="">'
+                + '<input type="hidden" data-f="dispense_unit" name="medications[' + i + '][dispense_unit]" value="">'
+                + '<input type="hidden" data-f="compound" name="medications[' + i + '][compound_formula]" value="">';
+            list.appendChild(row);
+
+            var med = row.querySelector('[data-f="med"]');
+            var termSel = row.querySelector('[data-f="term"]');
+
+            function syncMed() {
+                var o = OFFERINGS.filter(function (x) { return String(x.id) === String(med.value); })[0];
+                row.querySelector('[data-f="name"]').value = o ? o.name : '';
+                row.querySelector('[data-f="quantity"]').value = o && o.quantity != null ? o.quantity : '';
+                row.querySelector('[data-f="days_supply"]').value = o && o.days_supply != null ? o.days_supply : '';
+                row.querySelector('[data-f="dispense_unit"]').value = o && o.dispense_unit != null ? o.dispense_unit : '';
+                row.querySelector('[data-f="compound"]').value = o && o.compound_formula != null ? o.compound_formula : '';
+                renderMonths(row);
+                refresh();
+            }
+
+            med.addEventListener('change', syncMed);
+            termSel.addEventListener('change', function () { renderMonths(row); });
+            row.querySelector('[data-f="remove"]').addEventListener('click', function () { row.remove(); refresh(); });
+
+            syncMed();
         }
 
         function refresh() {
-            var decided = Object.keys(state).length;
-            var approvedCount = Object.keys(state).filter(function (k) { return state[k] === 'approve'; }).length;
-            if (count) count.textContent = decided;
+            var rows = list.querySelectorAll('.med-decision');
+            var withMed = 0;
+            rows.forEach(function (r) { if (r.querySelector('[data-f="med"]').value) withMed++; });
+            if (medCount) medCount.textContent = withMed;
             var diagnoses = form.querySelector('[name="diagnoses"]');
-            var ready = decided === total && total > 0 && approvedCount >= 1
-                && attest && attest.checked && diagnoses && diagnoses.value.trim() !== '';
+            var ready = withMed >= 1 && attest && attest.checked && diagnoses && diagnoses.value.trim() !== '';
             if (submit) submit.disabled = !ready;
         }
 
-        form.querySelectorAll('.decision-btn').forEach(function (b) {
-            b.addEventListener('click', function () { apply(b.getAttribute('data-med'), b.getAttribute('data-dec')); });
-        });
+        if (addBtn) addBtn.addEventListener('click', function () { addRow(''); });
         if (attest) attest.addEventListener('change', refresh);
         var diag = form.querySelector('[name="diagnoses"]');
         if (diag) diag.addEventListener('input', refresh);
+
+        // Pre-load a row for each medication the case actually requested; if none,
+        // start with one empty row so there is always something to fill.
+        if (REQUESTED && REQUESTED.length) { REQUESTED.forEach(function (id) { addRow(id); }); }
+        else { addRow(''); }
 
         refresh();
     })();
