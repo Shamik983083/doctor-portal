@@ -29,6 +29,7 @@
         'refills' => $o->refills, 'quantity' => $o->quantity,
         'days_supply' => $o->days_supply, 'dispense_unit' => $o->dispense_unit,
         'compound_formula' => $o->compound_formula,
+        'levels' => $o->levels ?? [],
     ])->values();
 
     $requestedIds = $case->caseOfferings->pluck('offering.id')->filter()->values();
@@ -187,20 +188,35 @@
         }
 
         function renderMonths(row) {
-            var i    = row.getAttribute('data-idx');
-            var name = row.querySelector('[data-f="name"]').value;
-            var term = row.querySelector('[data-f="term"]').value;
-            var n    = monthsIn(term);
-            var fam  = family(name);
-            var wrap = row.querySelector('[data-f="months"]');
+            var i      = row.getAttribute('data-idx');
+            var medSel = row.querySelector('[data-f="med"]');
+            var term   = row.querySelector('[data-f="term"]').value;
+            var n      = monthsIn(term);
+            var wrap   = row.querySelector('[data-f="months"]');
+
+            // Prefer offering-specific levels; fall back to family CATALOG; then free text.
+            var offering = OFFERINGS.filter(function (x) { return String(x.id) === String(medSel.value); })[0];
+            var levels   = (offering && offering.levels && offering.levels.length) ? offering.levels : null;
+            var fam      = levels ? null : family(offering ? offering.name : '');
 
             var head = '<div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
                 + '<span class="months-note">' + n + ' month term, one dose per month</span></div>';
             var cells = '';
             for (var m = 0; m < n; m++) {
-                var control = fam
-                    ? '<select name="medications[' + i + '][months][]"><option value="">Dose</option>' + optionList(CATALOG[fam], '') + '</select>'
-                    : '<input type="text" name="medications[' + i + '][months][]" placeholder="Dose">';
+                var control;
+                if (levels) {
+                    var opts = '<option value="">Select level</option>'
+                        + levels.map(function (lvl) {
+                            return '<option value="' + esc(lvl.label) + '">'
+                                + esc(lvl.label) + ' · ' + esc(lvl.formula) + '</option>';
+                        }).join('');
+                    control = '<select name="medications[' + i + '][months][]">' + opts + '</select>';
+                } else if (fam) {
+                    control = '<select name="medications[' + i + '][months][]"><option value="">Dose</option>'
+                        + optionList(CATALOG[fam], '') + '</select>';
+                } else {
+                    control = '<input type="text" name="medications[' + i + '][months][]" placeholder="Dose">';
+                }
                 cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + '</div>';
             }
             wrap.innerHTML = '<div class="months">' + head + '<div class="months-grid">' + cells + '</div></div>';
