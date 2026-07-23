@@ -104,7 +104,9 @@
                         <td class="pin pin-triage"><span class="pill {{ $case->triage }}">{{ ucfirst($case->triage ?? 'unclassified') }}</span></td>
                         <td class="pin pin-time">{{ $case->created_at->diffForHumans(null, true) }}</td>
                         <td class="pin pin-name">
-                            <a class="patient-link" href="{{ route('clinician.cases.show', $case->uuid) }}">{{ $case->patient?->full_name ?? 'Unknown' }}</a>
+                            {{-- Button, not a link: clicking the row updates the quick review below.
+                                 The case page is reached from the panel's Review action. --}}
+                            <button type="button" class="patient-link">{{ $case->patient?->full_name ?? 'Unknown' }}</button>
                         </td>
                         <td><span class="pill {{ $idv ? 'green' : 'red' }}">{{ $idv ? 'Y' : 'N' }}</span></td>
                         <td>{{ strtoupper(substr($case->patient?->gender ?? '-', 0, 1)) }}</td>
@@ -144,93 +146,54 @@
     </div>
 </section>
 
-{{-- Quick review below the grid, the preview's renderDrawer (Devin msg 2267:
-     "the case queue should have a quick review below with the relevant data like
-     the reference"). Shows the top case in the current view; its summary,
-     findings and source answers come from the storefront clinical_intake. --}}
-@php($top = $cases->first())
-@if($top)
-    @php
-        $tclin  = $top->queueClinical();
-        $tci    = $top->clinical_intake ?? [];
-        $tSummary = $tci['summary'] ?? [];
-        $tFindings = $tci['findings'] ?? [];
-        $tSource = $tci['sourceAnswers'] ?? [];
-        $tProtocol = $tci['protocolVersion'] ?? null;
+{{-- Quick review below the grid, the preview's renderDrawer (Devin msgs 2267/
+     2269: "quick review below ... make it update on a row click"). Each visible
+     case's data is built once below and embedded as JSON; the panel renders the
+     top case server-side and JS re-renders it when a row is clicked. All data is
+     real, from the storefront clinical_intake. --}}
+@php
+    $buildCard = function ($case) {
+        $clin = $case->queueClinical();
+        $ci   = $case->clinical_intake ?? [];
 
-        $topEligible = $top->triage === 'green' && in_array($top->status, ['waiting','assigned']) && !$top->hold_status;
-        if ($top->triage === 'red') { $tTone='red'; $tLabel='Blocked'; }
-        elseif ($top->hold_status || $top->status === 'support') { $tTone='red'; $tLabel='Blocked'; }
-        elseif ($top->triage === 'yellow') { $tTone='yellow'; $tLabel='Review'; }
-        elseif (!in_array($top->status, ['waiting','assigned'])) { $tTone='red'; $tLabel='Blocked'; }
-        else { $tTone='green'; $tLabel='Eligible'; }
-    @endphp
-    <section class="panel quick-review">
-        <div class="panel-heading">
-            <div>
-                <div class="eyebrow">Quick review · {{ $top->external_id ?? \Illuminate\Support\Str::limit($top->uuid, 8, '') }}</div>
-                <h2>{{ $top->patient?->full_name ?? 'Unknown' }}</h2>
-                <p>{{ $top->partner?->name ?? '-' }} · Request {{ $tclin['term'] }} · {{ $tclin['dose'] }}</p>
-            </div>
-            <div class="quick-pills">
-                <span class="pill {{ $top->triage }}">{{ ucfirst($top->triage ?? 'unclassified') }}</span>
-                <span class="pill {{ $tTone }}">{{ $tLabel }}</span>
-            </div>
-        </div>
+        if ($case->triage === 'red') { $tone='red'; $label='Blocked'; }
+        elseif ($case->hold_status || $case->status === 'support') { $tone='red'; $label='Blocked'; }
+        elseif ($case->triage === 'yellow') { $tone='yellow'; $label='Review'; }
+        elseif (!in_array($case->status, ['waiting','assigned'])) { $tone='red'; $label='Blocked'; }
+        else { $tone='green'; $label='Eligible'; }
 
-        <div class="quick-review-grid">
-            {{-- 1. AI draft summary --}}
-            <div>
-                <div class="subheading">AI draft summary</div>
-                <div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>
-                <ul class="summary-list">
-                    @forelse($tSummary as $line)
-                        <li>{{ is_array($line) ? ($line[0] ?? '') : $line }}</li>
-                    @empty
-                        <li>No AI draft yet. It is composed from the storefront intake once that is sent for this case.</li>
-                    @endforelse
-                </ul>
-                <p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.</p>
+        $source = [];
+        foreach (($ci['sourceAnswers'] ?? []) as $k => $v) {
+            $source[] = ['q' => \Illuminate\Support\Str::headline($k), 'a' => ($v === null || $v === '') ? 'Not answered' : $v];
+        }
 
-                @if(!empty($tSource))
-                    <div class="source-answers">
-                        @foreach($tSource as $k => $v)
-                            <div><dt>{{ \Illuminate\Support\Str::headline($k) }}</dt><dd>{{ ($v === null || $v === '') ? 'Not answered' : $v }}</dd></div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
+        return [
+            'id'       => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
+            'name'     => $case->patient?->full_name ?? 'Unknown',
+            'company'  => $case->partner?->name ?? '-',
+            'term'     => $clin['term'],
+            'dose'     => $clin['dose'],
+            'triage'   => $case->triage ?? 'unclassified',
+            'tone'     => $tone,
+            'label'    => $label,
+            'summary'  => collect($ci['summary'] ?? [])->map(fn($l) => is_array($l) ? ($l[0] ?? '') : $l)->filter()->values(),
+            'findings' => collect($ci['findings'] ?? [])->map(fn($f) => is_array($f) ? ['tone' => $f[0] ?? 'neutral', 'text' => $f[1] ?? ''] : ['tone' => 'neutral', 'text' => $f])->values(),
+            'protocol' => $ci['protocolVersion'] ?? null,
+            'source'   => $source,
+            'hold'     => (bool) $case->hold_status,
+            'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
+            'showUrl'    => route('clinician.cases.show', $case->uuid),
+        ];
+    };
 
-            {{-- 2. Triage and findings --}}
-            <div>
-                <div class="subheading">Triage and findings</div>
-                <p class="protocol-version">{{ $tProtocol ? $tProtocol . ' · ' : '' }}classification {{ ucfirst($top->triage ?? 'unclassified') }}</p>
-                <ul class="finding-list">
-                    @forelse($tFindings as $f)
-                        <li><span class="finding-dot {{ is_array($f) ? ($f[0] ?? 'neutral') : 'neutral' }}"></span> {{ is_array($f) ? ($f[1] ?? '') : $f }}</li>
-                    @empty
-                        <li><span class="finding-dot neutral"></span> No findings recorded from intake yet.</li>
-                    @endforelse
-                </ul>
-                <div class="subheading holds-heading">Active workflow holds</div>
-                @if($top->hold_status)
-                    <ul class="holds-list"><li><code class="audit-verb">WORKFLOW_HOLD_ACTIVE</code></li></ul>
-                @else
-                    <p class="no-holds">No active workflow holds.</p>
-                @endif
-            </div>
+    $caseData = [];
+    foreach ($cases as $case) { $caseData[$case->uuid] = $buildCard($case); }
+    $topCard = $cases->first() ? $caseData[$cases->first()->uuid] : null;
+@endphp
 
-            {{-- 3. Provider actions (link to the real case flows) --}}
-            <div>
-                <div class="subheading">Provider actions</div>
-                <a class="button-primary full-width" href="{{ route('clinician.cases.prescribe.form', $top->uuid) }}">Review and approve</a>
-                <a class="button-secondary full-width" href="{{ route('clinician.cases.show', $top->uuid) }}">Request information</a>
-                <a class="button-danger full-width" href="{{ route('clinician.cases.show', $top->uuid) }}">Reject</a>
-                @unless($topEligible)
-                    <p class="action-reason">{{ $tLabel === 'Eligible' ? '' : 'This case is not batch-eligible; review it individually.' }}</p>
-                @endunless
-            </div>
-        </div>
+@if($topCard)
+    <section class="panel quick-review" id="quickReview">
+        @include('clinician.cases._quick-review', ['d' => $topCard])
     </section>
 @endif
 
@@ -240,6 +203,85 @@
 @endsection
 
 @section('scripts')
+<script>
+    // Per-case quick-review data, so a row click can re-render the panel without
+    // a round trip (Devin msg 2269). Same fields the server-side partial uses.
+    var CASE_DATA = @json($caseData ?? []);
+</script>
+<script>
+    // Row click swaps the quick-review panel to the clicked case, rebuilding the
+    // same markup the server partial produces so the two never diverge.
+    (function () {
+        var panel = document.getElementById('quickReview');
+        var grid  = document.getElementById('reviewGrid');
+        if (!panel || !grid) return;
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+            });
+        }
+
+        function render(d) {
+            if (!d) return;
+            var summary = (d.summary && d.summary.length)
+                ? d.summary.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('')
+                : '<li>No AI draft yet. It is composed from the storefront intake once that is sent for this case.</li>';
+
+            var findings = (d.findings && d.findings.length)
+                ? d.findings.map(function (f) { return '<li><span class="finding-dot ' + esc(f.tone) + '"></span> ' + esc(f.text) + '</li>'; }).join('')
+                : '<li><span class="finding-dot neutral"></span> No findings recorded from intake yet.</li>';
+
+            var source = (d.source && d.source.length)
+                ? '<div class="source-answers">' + d.source.map(function (r) {
+                    return '<div><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
+                  }).join('') + '</div>'
+                : '';
+
+            var holds = d.hold
+                ? '<ul class="holds-list"><li><code class="audit-verb">WORKFLOW_HOLD_ACTIVE</code></li></ul>'
+                : '<p class="no-holds">No active workflow holds.</p>';
+
+            var triageLabel = d.triage ? d.triage.charAt(0).toUpperCase() + d.triage.slice(1) : '';
+            var protocol = (d.protocol ? esc(d.protocol) + ' · ' : '') + 'classification ' + esc(triageLabel);
+
+            panel.innerHTML =
+                '<div class="panel-heading"><div>'
+                + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
+                + '<h2>' + esc(d.name) + '</h2>'
+                + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + '</p></div>'
+                + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
+                + '<span class="pill ' + esc(d.tone) + '">' + esc(d.label) + '</span></div></div>'
+                + '<div class="quick-review-grid">'
+                + '<div><div class="subheading">AI draft summary</div>'
+                + '<div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>'
+                + '<ul class="summary-list">' + summary + '</ul>'
+                + '<p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.</p>'
+                + source + '</div>'
+                + '<div><div class="subheading">Triage and findings</div>'
+                + '<p class="protocol-version">' + protocol + '</p>'
+                + '<ul class="finding-list">' + findings + '</ul>'
+                + '<div class="subheading holds-heading">Active workflow holds</div>' + holds + '</div>'
+                + '<div><div class="subheading">Provider actions</div>'
+                + '<a class="button-primary full-width" href="' + esc(d.approveUrl) + '">Review and approve</a>'
+                + '<a class="button-secondary full-width" href="' + esc(d.showUrl) + '">Request information</a>'
+                + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a></div>'
+                + '</div>';
+        }
+
+        grid.querySelectorAll('tbody tr[data-row]').forEach(function (tr) {
+            tr.style.cursor = 'pointer';
+            tr.addEventListener('click', function (e) {
+                // Not when the click is on the checkbox or the allergy tooltip.
+                if (e.target.closest('[data-stop]')) return;
+                grid.querySelectorAll('tr.selected-row').forEach(function (r) { r.classList.remove('selected-row'); });
+                tr.classList.add('selected-row');
+                render(CASE_DATA[tr.getAttribute('data-row')]);
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        });
+    })();
+</script>
 <script>
     // Batch selection, mirroring the preview's interactivity: the count and the
     // preflight button react to the eligible checkboxes; select-all toggles the
