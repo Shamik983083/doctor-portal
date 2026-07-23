@@ -123,7 +123,7 @@
                 </a>
                 <a class="nav-link {{ request()->routeIs('clinician.messages.*') ? 'active' : '' }}" href="{{ route('clinician.messages.index') }}">
                     <span class="nav-ico">&#128172;</span><span class="lbl">Messages For Provider</span>
-                    <span class="nav-count {{ $nav['messages'] ? '' : 'zero' }}">{{ $nav['messages'] }}</span>
+                    <span class="nav-count {{ $nav['messages'] ? '' : 'zero' }}" id="msgBadge">{{ $nav['messages'] }}</span>
                 </a>
                 <a class="nav-link" href="{{ route('clinician.queue') }}?status=support">
                     <span class="nav-ico">&#9888;</span><span class="lbl">My Escalations</span>
@@ -239,6 +239,43 @@
     </div>
 
 </div>
+
+{{-- Reverb / Pusher — loaded once in the layout so every page shares one connection --}}
+<script src="https://js.pusher.com/8.0/pusher.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/2.2.4/echo.iife.min.js"></script>
+<script>
+(function () {
+    var csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var EchoCtor = (typeof Echo === 'object' && typeof Echo.default === 'function') ? Echo.default
+                 : (typeof Echo === 'function' ? Echo : null);
+
+    if (!EchoCtor) return;
+
+    window.Pusher = Pusher;
+    window.Echo = new EchoCtor({
+        broadcaster:       'pusher',
+        key:               "{{ config('reverb.apps.apps.0.key') }}",
+        wsHost:            "{{ config('reverb.apps.apps.0.options.host') }}",
+        wsPort:            {{ config('reverb.apps.apps.0.options.port') }},
+        wssPort:           {{ config('reverb.apps.apps.0.options.port') }},
+        disableStats:      true,
+        forceTLS:          {{ config('reverb.apps.apps.0.options.useTLS') ? 'true' : 'false' }},
+        cluster:           'mt1',
+        enabledTransports: ['ws', 'wss'],
+        authEndpoint:      '/broadcasting/auth',
+        auth: { headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' } },
+    });
+
+    // Sidebar badge: increment live when a new patient message arrives on any page.
+    var msgBadge = document.getElementById('msgBadge');
+    window.Echo.private('provider-inbox').listen('.NewPatientMessage', function () {
+        if (!msgBadge) return;
+        var n = (parseInt(msgBadge.textContent, 10) || 0) + 1;
+        msgBadge.textContent = n;
+        msgBadge.classList.remove('zero');
+    });
+})();
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
 <script>

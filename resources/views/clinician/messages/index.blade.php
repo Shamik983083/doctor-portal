@@ -92,8 +92,6 @@
 @endsection
 
 @section('scripts')
-<script src="https://js.pusher.com/8.0/pusher.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/2.2.4/echo.iife.min.js"></script>
 <script>
 (function () {
     // Scroll thread to bottom on load
@@ -184,27 +182,8 @@
         }
     }
 
-    // ── Reverb / Echo setup (mirrors case show page) ─────────────────
-    var EchoConstructor = null;
-    if (typeof Echo === 'object' && typeof Echo.default === 'function') EchoConstructor = Echo.default;
-    else if (typeof Echo === 'function') EchoConstructor = Echo;
-
-    if (EchoConstructor) {
-        window.Pusher = Pusher;
-        window.Echo = new EchoConstructor({
-            broadcaster:       'pusher',
-            key:               "{{ config('reverb.apps.apps.0.key') }}",
-            wsHost:            "{{ config('reverb.apps.apps.0.options.host') }}",
-            wsPort:            {{ config('reverb.apps.apps.0.options.port') }},
-            wssPort:           {{ config('reverb.apps.apps.0.options.port') }},
-            disableStats:      true,
-            forceTLS:          {{ config('reverb.apps.apps.0.options.useTLS') ? 'true' : 'false' }},
-            cluster:           'mt1',
-            enabledTransports: ['ws', 'wss'],
-            authEndpoint:      '/broadcasting/auth',
-            auth: { headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' } }
-        });
-
+    // Echo is initialised globally by the layout; subscribe to page-specific events here.
+    if (window.Echo) {
         window.Echo.private('provider-inbox').listen('.NewPatientMessage', function (e) {
             handleNewMessage({
                 caseUuid:    e.caseUuid,
@@ -213,7 +192,6 @@
             });
         });
     } else {
-        // Fallback: reload on page visibility regain if tab was hidden
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'visible') window.location.reload();
         });
