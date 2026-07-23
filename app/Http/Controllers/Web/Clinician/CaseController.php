@@ -150,8 +150,8 @@ class CaseController extends Controller
         $clinician   = Auth::user()->clinician;
         $tab         = $request->get('tab', 'active');
 
-        $activeStatuses    = ['waiting', 'assigned', 'support', 'approved', 'processing'];
-        $completedStatuses = ['completed'];
+        $activeStatuses    = ['assigned', 'support', 'processing'];
+        $completedStatuses = ['approved'];
         $cancelledStatuses = ['cancelled'];
 
         // Same eager loads as the queue, so My Cases can render the identical
@@ -160,6 +160,7 @@ class CaseController extends Controller
                 'patient', 'partner', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
             ])
+            ->where('clinician_id', $clinician->id)
             ->withCount(['messages as unread_messages_count' => fn ($q) =>
                 $q->where('direction', 'inbound')->where('is_read', false)
             ])
