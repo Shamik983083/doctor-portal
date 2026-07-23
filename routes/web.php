@@ -89,6 +89,10 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
     Route::prefix('cases')->name('cases.')->group(function () {
         Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
         Route::get('/my-cases', [ClinicianCaseController::class, 'myCases'])->name('my-cases');
+        // Refills (Devin msg 2285): the same grid, filtered to check-ins from
+        // patients this clinician has seen before. Must sit before /{uuid} so
+        // "refills" is not read as a case uuid.
+        Route::get('/refills', [ClinicianCaseController::class, 'refills'])->name('refills');
         Route::get('/{uuid}', [ClinicianCaseController::class, 'show'])->name('show');
         Route::post('/{uuid}/assign', [ClinicianCaseController::class, 'assign'])->name('assign');
         Route::get('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribeForm'])->name('prescribe.form');

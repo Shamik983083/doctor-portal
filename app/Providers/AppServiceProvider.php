@@ -66,6 +66,16 @@ class AppServiceProvider extends ServiceProvider
             $myEscalations = PatientCase::where('clinician_id', $clinician->id)
                 ->where('status', 'support')->count();
 
+            // Refills badge (Devin msg 2285): check-ins for patients this
+            // clinician has seen. Same shape as the Refills screen query.
+            $seenPatientIds = PatientCase::where('clinician_id', $clinician->id)
+                ->where('status', 'completed')->pluck('patient_id')->filter()->unique();
+            $refills = PatientCase::where('is_refill', true)
+                ->where(function ($q) use ($clinician, $seenPatientIds) {
+                    $q->where('clinician_id', $clinician->id);
+                    if ($seenPatientIds->isNotEmpty()) { $q->orWhereIn('patient_id', $seenPatientIds); }
+                })->count();
+
             // Messages waiting on me: unread inbound on cases assigned to me.
             $messages = Message::query()
                 ->join('cases', 'cases.id', '=', 'messages.case_id')
@@ -83,6 +93,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with('clinicianNav', [
                 'queue'       => $queueCount,
                 'myCases'     => $myCases,
+                'refills'     => $refills,
                 'messages'    => $messages,
                 'escalations' => $myEscalations,
                 'support'     => $myEscalations,
@@ -96,7 +107,7 @@ class AppServiceProvider extends ServiceProvider
     private function emptyClinicianNav(): array
     {
         return [
-            'queue' => 0, 'myCases' => 0, 'messages' => 0, 'escalations' => 0,
+            'queue' => 0, 'myCases' => 0, 'refills' => 0, 'messages' => 0, 'escalations' => 0,
             'support' => 0, 'red' => 0, 'yellow' => 0, 'green' => 0,
         ];
     }

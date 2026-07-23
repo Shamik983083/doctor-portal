@@ -135,6 +135,12 @@
         <span class="cn-count">{{ $nav['myCases'] }}</span>
     </a>
 
+    <a class="nav-link {{ request()->routeIs('clinician.cases.refills') ? 'active' : '' }}"
+       href="{{ route('clinician.cases.refills') }}">
+        <i class="bi bi-arrow-repeat me-2"></i> Refills
+        <span class="cn-count">{{ $nav['refills'] ?? 0 }}</span>
+    </a>
+
     {{-- Messages now has its own screen (Devin msg 2256). Escalations still
          links to the queue filtered to support until it gets a dedicated view. --}}
     <a class="nav-link {{ request()->routeIs('clinician.messages.*') ? 'active' : '' }}"

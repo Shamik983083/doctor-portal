@@ -190,6 +190,50 @@ class CaseController extends Controller
     }
 
     /**
+     * Refills (Devin msg 2285): the same review grid as the queue, filtered to
+     * check-ins from patients this clinician has already seen. A refill is a
+     * re-bill / check-in (is_refill), and continuity routes it back to the doctor
+     * who treated the patient before, so this is that doctor's returning book.
+     *
+     * A case shows here when it is a refill AND either it is already assigned to
+     * this clinician (continuity did its job) or its patient has a prior
+     * completed case with this clinician (their last visit was with me).
+     */
+    public function refills(Request $request)
+    {
+        $clinician = Auth::user()->clinician;
+
+        $seenPatientIds = PatientCase::where('clinician_id', $clinician->id)
+            ->where('status', 'completed')
+            ->pluck('patient_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $cases = PatientCase::with([
+                'patient', 'partner', 'caseOfferings.offering',
+                'caseQuestions', 'questionnaireResponses.answers',
+            ])
+            ->withCount(['messages as unread_messages_count' => fn ($q) =>
+                $q->where('direction', 'inbound')->where('is_read', false)
+            ])
+            ->where('is_refill', true)
+            ->where(function ($q) use ($clinician, $seenPatientIds) {
+                $q->where('clinician_id', $clinician->id);
+                if ($seenPatientIds->isNotEmpty()) {
+                    $q->orWhereIn('patient_id', $seenPatientIds);
+                }
+            })
+            ->when($request->filled('triage'), fn ($q) => $q->where('triage', $request->triage))
+            ->orderByRaw("FIELD(triage, 'red', 'yellow', 'green') DESC")
+            ->orderBy('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('clinician.cases.refills', compact('cases', 'clinician'));
+    }
+
+    /**
      * Messages For Provider (Devin msg 2256), the inbox screen from the design
      * preview. Lists this clinician's cases that have a conversation, most
      * recent message first, with the unread count and the last message preview.

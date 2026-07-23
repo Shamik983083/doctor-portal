@@ -63,6 +63,10 @@
                     <span class="nav-ico">&#128203;</span><span class="lbl">My Cases</span>
                     <span class="nav-count {{ $nav['myCases'] ? '' : 'zero' }}">{{ $nav['myCases'] }}</span>
                 </a>
+                <a class="nav-link {{ request()->routeIs('clinician.cases.refills') ? 'active' : '' }}" href="{{ route('clinician.cases.refills') }}">
+                    <span class="nav-ico">&#128260;</span><span class="lbl">Refills</span>
+                    <span class="nav-count {{ ($nav['refills'] ?? 0) ? '' : 'zero' }}">{{ $nav['refills'] ?? 0 }}</span>
+                </a>
                 <a class="nav-link {{ request()->routeIs('clinician.messages.*') ? 'active' : '' }}" href="{{ route('clinician.messages.index') }}">
                     <span class="nav-ico">&#128172;</span><span class="lbl">Messages For Provider</span>
                     <span class="nav-count {{ $nav['messages'] ? '' : 'zero' }}">{{ $nav['messages'] }}</span>
