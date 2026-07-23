@@ -43,7 +43,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function composeClinicianSidebar(): void
     {
-        View::composer('layouts.clinician', function ($view) {
+        View::composer(['layouts.clinician', 'layouts.clinician-exact'], function ($view) {
             $clinician = Auth::user()?->clinician;
 
             // No clinician record (an admin on the shared clinician routes):
