@@ -1,6 +1,10 @@
-@extends('layouts.clinician')
+{{-- layouts.clinician-exact, matching every other clinician screen after the
+     2026-07-23 unification (commit 7910e55). layouts.clinician is no longer used
+     by any clinician view. --}}
+@extends('layouts.clinician-exact')
 
 @section('title', 'Request Cases')
+@section('page-title', 'Request Cases')
 
 @section('content')
 {{--

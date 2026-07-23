@@ -114,6 +114,13 @@
                     <span class="nav-ico">&#128260;</span><span class="lbl">Refills</span>
                     <span class="nav-count {{ ($nav['refills'] ?? 0) ? '' : 'zero' }}">{{ $nav['refills'] ?? 0 }}</span>
                 </a>
+                {{-- The provider pool (Devin msg 2308). A doctor asks for a
+                     number of cases and the pool grants the oldest ones they are
+                     eligible for. No count: they never see what is in the queue,
+                     so there is no number to show them. --}}
+                <a class="nav-link {{ request()->routeIs('clinician.pool.*') ? 'active' : '' }}" href="{{ route('clinician.pool.index') }}">
+                    <span class="nav-ico">&#128229;</span><span class="lbl">Request Cases</span>
+                </a>
                 <a class="nav-link {{ request()->routeIs('clinician.messages.*') ? 'active' : '' }}" href="{{ route('clinician.messages.index') }}">
                     <span class="nav-ico">&#128172;</span><span class="lbl">Messages For Provider</span>
                     <span class="nav-count {{ $nav['messages'] ? '' : 'zero' }}">{{ $nav['messages'] }}</span>
@@ -203,6 +210,16 @@
             @if(session('success'))
                 <div style="margin:1rem 1.5rem 0;padding:.75rem 1rem;background:#eaf8ef;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:.875rem;display:flex;align-items:center;gap:.5rem;">
                     <i class="bi bi-check-circle-fill"></i> {{ session('success') }}
+                </div>
+            @endif
+            {{-- 'warning' had no block here. The pool refusal path depends on it
+                 reaching the doctor: "you asked for 20 and got nothing, here is
+                 why" is flashed as a warning, and without this it was rendered
+                 nowhere, which is the exact silent failure the pool was built to
+                 avoid. --}}
+            @if(session('warning'))
+                <div style="margin:1rem 1.5rem 0;padding:.75rem 1rem;background:#fff7df;border:1px solid #fde68a;border-radius:10px;color:#92400e;font-size:.875rem;display:flex;align-items:center;gap:.5rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i> {{ session('warning') }}
                 </div>
             @endif
             @if(session('error'))
