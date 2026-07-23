@@ -123,11 +123,12 @@
     {{-- Tasks --}}
     <div class="cn-group-label">Tasks</div>
 
-    <a class="nav-link {{ request()->routeIs('clinician.queue') || (request()->routeIs('clinician.cases.*') && !request()->routeIs('clinician.cases.my-cases')) ? 'active' : '' }}"
+    {{-- Case Queue hidden: clinicians only see cases assigned to them (My Cases) --}}
+    {{-- <a class="nav-link {{ request()->routeIs('clinician.queue') || (request()->routeIs('clinician.cases.*') && !request()->routeIs('clinician.cases.my-cases')) ? 'active' : '' }}"
        href="{{ route('clinician.queue') }}">
         <i class="bi bi-inbox me-2"></i> Case Queue
         <span class="cn-count">{{ $nav['queue'] }}</span>
-    </a>
+    </a> --}}
 
     <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') ? 'active' : '' }}"
        href="{{ route('clinician.cases.my-cases') }}">
