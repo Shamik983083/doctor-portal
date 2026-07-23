@@ -38,6 +38,9 @@ Route::prefix('partner')->middleware('partner.auth')->group(function () {
         Route::get('/{id}', [CaseController::class, 'show']);
         Route::post('/{id}/cancel', [CaseController::class, 'cancel']);
         Route::post('/{id}/hold', [CaseController::class, 'setHold']);
+        // Clinical intake push (Devin msg 2258): the storefront sends the
+        // medication detail that feeds the provider review queue columns.
+        Route::post('/{id}/clinical', [CaseController::class, 'updateClinical']);
         Route::post('/{id}/support', [CaseController::class, 'support']);
         Route::get('/{id}/events', [CaseController::class, 'events']);
         Route::get('/{id}/messages', [MessageController::class, 'index']);

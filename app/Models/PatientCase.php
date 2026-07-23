@@ -19,7 +19,7 @@ class PatientCase extends Model
         'support_note', 'support_at', 'cancellation_reason', 'patient_state', 'visit_type',
         'is_refill',
         'assigned_at', 'approved_at', 'processing_at', 'completed_at', 'cancelled_at',
-        'metadata',
+        'metadata', 'clinical_intake',
         'triage', 'triage_reasons', 'triage_ruleset', 'triaged_at',
     ];
 
@@ -27,6 +27,7 @@ class PatientCase extends Model
         'hold_status' => 'boolean',
         'is_chargeable' => 'boolean',
         'is_refill' => 'boolean',
+        'clinical_intake' => 'array',
         'support_at' => 'datetime',
         'assigned_at' => 'datetime',
         'approved_at' => 'datetime',
@@ -118,6 +119,52 @@ class PatientCase extends Model
      * over free text is not a number anyone should plan against. Partners who
      * want to appear in these send `is_refill`.
      */
+    /**
+     * The clinical-intake columns for the provider review queue, in the exact
+     * shape the design preview renders (Devin msg 2258).
+     *
+     * Storefront data first, real case data as the fallback, and a dash when
+     * neither has it. The requested MEDICATION falls back to the case's offering,
+     * which the app always has; ID / sex / age / BMI fall back to the patient.
+     * Nothing is invented: an absent value is a dash, never a guess.
+     *
+     * @return array<string,mixed>
+     */
+    public function queueClinical(): array
+    {
+        $ci = $this->clinical_intake ?? [];
+        $dash = '-';
+
+        $offeringName = optional($this->caseOfferings->first()?->offering)->name;
+
+        $val = fn ($k, $fallback = null) => (isset($ci[$k]) && $ci[$k] !== '' && $ci[$k] !== null)
+            ? $ci[$k]
+            : $fallback;
+
+        return [
+            'product'       => $val('product', $offeringName ?? $dash),
+            'dose'          => $val('dose', $dash),
+            'term'          => $val('term', $dash),
+            'plan'          => $val('plan', $dash),
+            'med2'          => $val('med2', $dash),
+            'med3'          => $val('med3', $dash),
+            'med4'          => $val('med4', $dash),
+            'onGlp'         => $val('onGlp', $dash),
+            'zofran'        => $val('zofran', $dash),
+            'allergy'       => $val('allergy', $dash),
+            'allergyDetail' => $val('allergyDetail'),
+            'video'         => $val('video', $this->offeringRequiresVideoLabel($dash)),
+        ];
+    }
+
+    /** Video-visit label fallback from the case offerings when intake is silent. */
+    private function offeringRequiresVideoLabel(string $dash): string
+    {
+        // Without storefront intake we cannot assert a video requirement, so this
+        // stays a dash rather than guessing "Clear".
+        return $dash;
+    }
+
     public function scopeRefills($query)
     {
         return $query->where('is_refill', true);

@@ -73,20 +73,34 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
+                    {{-- Columns match the design preview's provider review queue
+                         (Devin msg 2258, "everything from the preview in that
+                         exact format"). The medication columns read from the
+                         storefront's clinical_intake block via
+                         PatientCase::queueClinical(); a missing value is a dash. --}}
                     <thead>
                         <tr>
                             <th style="width:2rem"></th>
                             <th>Triage</th>
-                            <th>Time</th>
-                            <th>Patient</th>
-                            <th>IDV</th>
+                            <th>Queue time</th>
+                            <th>Full name</th>
+                            <th>ID ver</th>
                             <th>Sex</th>
                             <th>Age</th>
                             <th>BMI</th>
-                            <th>Offerings</th>
-                            <th>Video visit</th>
+                            <th>On GLP</th>
+                            <th>Med 1 req</th>
+                            <th>Med 1 dose</th>
+                            <th>Med 1 term</th>
+                            <th>Titrate?</th>
+                            <th>Med 2</th>
+                            <th>Med 3</th>
+                            <th>Med 4</th>
                             <th>Company</th>
-                            <th>Batch Eligibility</th>
+                            <th>Allergies</th>
+                            <th>Std Zof</th>
+                            <th>Video visit</th>
+                            <th>Batch eligibility</th>
                             <th>Status</th>
                             <th></th>
                         </tr>
@@ -97,6 +111,7 @@
                             $st       = strtoupper($case->patient_state ?? optional($case->patient)->state ?? '');
                             $videoReq = $st && $case->caseOfferings->some(fn($co) => optional($co->offering)->isVideoRequiredInState($st));
                             $idv      = strtolower($case->patient?->id_verified_status ?? '');
+                            $clin     = $case->queueClinical();
                         @endphp
                         @php
                             $batchEligible = $case->triage === 'green'
@@ -156,19 +171,32 @@
                             <td>{{ strtoupper(substr($case->patient?->gender ?? '—', 0, 1)) }}</td>
                             <td>{{ $case->patient?->age ?? '—' }}</td>
                             <td>{{ !is_null($case->patient?->bmi) ? number_format($case->patient->bmi, 1) : '—' }}</td>
+                            <td>{{ $clin['onGlp'] }}</td>
+                            <td>{{ $clin['product'] }}</td>
+                            <td class="text-nowrap">{{ $clin['dose'] }}</td>
+                            <td>{{ $clin['term'] }}</td>
+                            <td>{{ $clin['plan'] }}</td>
+                            <td>{{ $clin['med2'] }}</td>
+                            <td>{{ $clin['med3'] }}</td>
+                            <td>{{ $clin['med4'] }}</td>
+                            <td>{{ $case->partner?->name ?? '—' }}</td>
                             <td>
-                                @foreach($case->caseOfferings->take(2) as $co)
-                                    <span class="ma-pill neutral">{{ $co->offering->name ?? '?' }}</span>
-                                @endforeach
+                                @if($clin['allergy'] === 'Y')
+                                    <span class="ma-pill yellow" title="{{ $clin['allergyDetail'] ?? 'Allergy flagged at intake' }}">Y</span>
+                                @else
+                                    {{ $clin['allergy'] }}
+                                @endif
                             </td>
+                            <td>{{ $clin['zofran'] }}</td>
                             <td>
-                                @if($videoReq)
+                                @if($clin['video'] !== '-')
+                                    <span class="ma-pill {{ strtolower($clin['video']) === 'required' ? 'yellow' : 'green' }}">{{ $clin['video'] }}</span>
+                                @elseif($videoReq)
                                     <span class="ma-pill yellow">Required</span>
                                 @else
                                     <span class="ma-pill green">Not required</span>
                                 @endif
                             </td>
-                            <td>{{ $case->partner?->name ?? '—' }}</td>
                             <td>
                                 <span class="ma-pill {{ $batchBand }}">{{ $batchLabel }}</span>
                                 @if($batchReason)<div class="batch-reason">{{ $batchReason }}</div>@endif
@@ -179,7 +207,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="15" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
+                        <tr><td colspan="23" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases in queue.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

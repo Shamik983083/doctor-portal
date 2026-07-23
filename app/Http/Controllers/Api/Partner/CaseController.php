@@ -75,6 +75,31 @@ class CaseController extends Controller
             'is_chargeable'                                   => 'boolean',
             'patient_state'                                   => 'nullable|string|size:2',
             'metadata'                                        => 'nullable|array',
+            /*
+             * Clinical intake block (Devin msg 2258, "they send to us", "exact
+             * format" from the design preview). Populates the provider review
+             * queue's medication columns. Every field optional: a storefront can
+             * send all of it, some, or none, and the queue shows a dash for
+             * anything missing rather than a fabricated value. See
+             * PatientCase::queueClinical() and docs/integrations/STOREFRONT-INTAKE.md.
+             */
+            'clinical_intake'                                 => 'nullable|array',
+            'clinical_intake.product'                         => 'nullable|string|max:120',
+            'clinical_intake.dose'                            => 'nullable|string|max:60',
+            'clinical_intake.term'                            => 'nullable|string|max:30',
+            'clinical_intake.plan'                            => 'nullable|string|max:40',
+            'clinical_intake.med2'                            => 'nullable|string|max:120',
+            'clinical_intake.med3'                            => 'nullable|string|max:120',
+            'clinical_intake.med4'                            => 'nullable|string|max:120',
+            'clinical_intake.onGlp'                           => 'nullable|string|max:8',
+            'clinical_intake.zofran'                          => 'nullable|string|max:8',
+            'clinical_intake.allergy'                         => 'nullable|string|max:8',
+            'clinical_intake.allergyDetail'                   => 'nullable|string|max:500',
+            'clinical_intake.video'                           => 'nullable|string|max:20',
+            'clinical_intake.protocolVersion'                 => 'nullable|string|max:60',
+            'clinical_intake.findings'                        => 'nullable|array',
+            'clinical_intake.summary'                         => 'nullable|array',
+            'clinical_intake.sourceAnswers'                   => 'nullable|array',
             'offerings'                                       => 'nullable|array',
             'offerings.*.offering_id'                         => 'string',
             'offerings.*.quantity'                            => 'integer|min:1',
@@ -203,6 +228,7 @@ class CaseController extends Controller
                 'external_id'   => $data['external_id'] ?? null,
                 'visit_type'    => $data['visit_type'] ?? null,
                 'is_refill'     => $data['is_refill'] ?? false,
+                'clinical_intake' => $data['clinical_intake'] ?? null,
                 'hold_status'   => $data['hold_status'] ?? false,
                 'is_chargeable' => $data['is_chargeable'] ?? true,
                 'patient_state' => $data['patient_state'] ?? $patient->state,
@@ -362,6 +388,50 @@ class CaseController extends Controller
             ->where('uuid', $id)->firstOrFail();
 
         return response()->json($case);
+    }
+
+    /**
+     * Push (or replace) the clinical intake block for a case (Devin msg 2258).
+     *
+     * POST /api/partner/cases/{id}/clinical. For storefronts that learn the
+     * medication detail after the case is already created, or want to update it,
+     * rather than only at create time. Partner-scoped through $this->partner(),
+     * so a storefront can only write to its own cases.
+     *
+     * REPLACES the block wholesale rather than merging: the storefront owns this
+     * data and the queue should reflect exactly what they last sent, not a merge
+     * of two intake snapshots. Same field set and same optionality as create.
+     */
+    public function updateClinical(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'clinical_intake'                 => 'required|array',
+            'clinical_intake.product'         => 'nullable|string|max:120',
+            'clinical_intake.dose'            => 'nullable|string|max:60',
+            'clinical_intake.term'            => 'nullable|string|max:30',
+            'clinical_intake.plan'            => 'nullable|string|max:40',
+            'clinical_intake.med2'            => 'nullable|string|max:120',
+            'clinical_intake.med3'            => 'nullable|string|max:120',
+            'clinical_intake.med4'            => 'nullable|string|max:120',
+            'clinical_intake.onGlp'           => 'nullable|string|max:8',
+            'clinical_intake.zofran'          => 'nullable|string|max:8',
+            'clinical_intake.allergy'         => 'nullable|string|max:8',
+            'clinical_intake.allergyDetail'   => 'nullable|string|max:500',
+            'clinical_intake.video'           => 'nullable|string|max:20',
+            'clinical_intake.protocolVersion' => 'nullable|string|max:60',
+            'clinical_intake.findings'        => 'nullable|array',
+            'clinical_intake.summary'         => 'nullable|array',
+            'clinical_intake.sourceAnswers'   => 'nullable|array',
+        ]);
+
+        $case = $this->partner($request)->cases()->where('uuid', $id)->firstOrFail();
+
+        $case->update(['clinical_intake' => $data['clinical_intake']]);
+
+        return response()->json([
+            'message' => 'Clinical intake updated.',
+            'case'    => $case->fresh(['patient', 'caseOfferings.offering']),
+        ]);
     }
 
     public function showByExternalId(Request $request, string $externalId)
