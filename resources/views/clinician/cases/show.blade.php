@@ -5,6 +5,53 @@
 
 @section('content')
 <x-ma-styles />
+<style>
+    /*
+        Case detail restyled to the MEDAXIS design system (Devin msg 2296: this
+        screen had overlap and did not match the new formatting). Bootstrap keeps
+        driving the tabs, modals, grid and the live message polling, so no
+        functionality changes; only the look is brought in line with the queue,
+        my-cases and messages screens.
+    */
+    :root {
+        --pv-ink:#172033; --pv-muted:#647188; --pv-line:#e5e9f0; --pv-accent:#2563eb;
+        --pv-shadow:0 10px 34px rgba(26,40,73,.07);
+    }
+    /* Contain the layout so nothing overlaps the sidebar or bleeds sideways. */
+    .page-content { overflow-x: hidden; }
+    .page-content .row.ma-surface { margin-left: 0; margin-right: 0; max-width: 100%; }
+
+    /* Cards read as the preview's panels. */
+    .page-content .card {
+        background:#fff; border:1px solid var(--pv-line); border-radius:16px;
+        box-shadow:var(--pv-shadow);
+    }
+    .page-content .card-header {
+        background:#fff; border-bottom:1px solid var(--pv-line); padding:13px 18px; font-weight:700;
+    }
+    .page-content .card-header h6 { font-weight:700; letter-spacing:-.01em; }
+
+    /* Tabs: quiet underline like the preview. */
+    .page-content .nav-tabs { border-bottom:1px solid var(--pv-line); gap:2px; }
+    .page-content .nav-tabs .nav-link {
+        border:0; border-bottom:2px solid transparent; color:var(--pv-muted);
+        font-weight:680; font-size:13px; padding:9px 14px; background:none;
+    }
+    .page-content .nav-tabs .nav-link:hover { color:var(--pv-ink); }
+    .page-content .nav-tabs .nav-link.active { color:var(--pv-accent); border-bottom-color:var(--pv-accent); background:none; }
+
+    /* Buttons and badges rounded to match. */
+    .page-content .btn { border-radius:10px; font-weight:680; }
+    .page-content .btn-primary { background:var(--pv-accent); border-color:var(--pv-accent); }
+    .page-content .badge { border-radius:999px; font-weight:700; letter-spacing:.01em; }
+
+    /* Tables: preview type and dividers. */
+    .page-content table.table th { color:var(--pv-muted); font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; }
+    .page-content table.table td, .page-content table.table th { border-color:var(--pv-line); }
+
+    /* Modals as panels. */
+    .modal-content { border:1px solid var(--pv-line); border-radius:16px; box-shadow:var(--pv-shadow); }
+</style>
 <div class="row g-4 ma-surface">
 
     {{-- Triage banner --}}
