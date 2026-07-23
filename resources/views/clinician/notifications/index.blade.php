@@ -1,4 +1,4 @@
-@extends('layouts.clinician')
+@extends('layouts.clinician-exact')
 
 @section('title', 'Notifications')
 @section('page-title', 'Notifications')
