@@ -154,7 +154,12 @@ class CaseController extends Controller
         $completedStatuses = ['completed'];
         $cancelledStatuses = ['cancelled'];
 
-        $base = PatientCase::with(['patient', 'partner', 'caseOfferings.offering'])
+        // Same eager loads as the queue, so My Cases can render the identical
+        // review grid + quick review (Devin msg 2283).
+        $base = PatientCase::with([
+                'patient', 'partner', 'caseOfferings.offering',
+                'caseQuestions', 'questionnaireResponses.answers',
+            ])
             ->withCount(['messages as unread_messages_count' => fn ($q) =>
                 $q->where('direction', 'inbound')->where('is_read', false)
             ])

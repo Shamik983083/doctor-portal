@@ -1,0 +1,357 @@
+{{--
+    The provider review grid + quick review, shared by Case Queue and My Cases so
+    they are literally the same surface (Devin msg 2283: My Cases should mimic the
+    Case Queue in look, feel and functionality; the preview calls My Cases "the
+    same grid, filtered to yours"). Params:
+      $cases   (required) the paginator
+      $eyebrow $title $sub  the panel heading text
+    Both views include this inside @section('view'); the <script> blocks run in
+    the body, so no separate scripts section is needed.
+--}}
+@php($eyebrow = $eyebrow ?? 'Provider review queue')
+@php($title = $title ?? 'Fast review, full context one click away')
+@php($sub = $sub ?? 'Highest-attention cases surface first. Triage is a review-priority signal, not a clinical decision.')
+
+<section class="panel queue-panel">
+    <div class="panel-heading">
+        <div>
+            <div class="eyebrow">{{ $eyebrow }}</div>
+            <h2>{{ $title }}</h2>
+            <p>{{ $sub }}</p>
+        </div>
+        <div class="queue-actions">
+            <button type="button" class="button-secondary">Filters</button>
+            <button type="button" class="button-primary" id="preflight" disabled>Run batch preflight (<span id="pfCount">0</span>)</button>
+        </div>
+    </div>
+
+    <div class="queue-toolbar">
+        <div class="queue-count">
+            <strong id="selCount">0</strong> selected ·
+            <span><span id="eligCount">0</span> batch-eligible · <span id="blkCount">0</span> rows blocked from selection</span>
+        </div>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <label class="density"><input type="checkbox" id="compact" /> Compact columns</label>
+            <label class="select-all"><input type="checkbox" id="selectAll" /> Select batch-eligible Green cases</label>
+        </div>
+    </div>
+
+    <div class="review-grid-scroll">
+        <table class="review-grid" id="reviewGrid">
+            <thead>
+                <tr>
+                    <th class="pin pin-select"></th>
+                    <th class="pin pin-triage">Triage</th>
+                    <th class="pin pin-time">Queue Time</th>
+                    <th class="pin pin-name">Full Name</th>
+                    <th>ID VER</th>
+                    <th>Sex</th>
+                    <th>Age</th>
+                    <th>BMI</th>
+                    <th>On GLP</th>
+                    <th>Med 1 Req</th>
+                    <th>Med 1 Dose</th>
+                    <th>Med 1 Term</th>
+                    <th>Titrate?</th>
+                    <th>Med 2 Req</th>
+                    <th>Med 3 Req</th>
+                    <th>Med 4 Req</th>
+                    <th>Company</th>
+                    <th>Allergies</th>
+                    <th>STD ZOF</th>
+                    <th>Video Visit</th>
+                    <th>Batch Eligibility</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($cases as $case)
+                    @php
+                        $clin = $case->queueClinical();
+                        $idv  = strtolower($case->patient?->id_verified_status ?? '') === 'verified';
+                        $planLabel = ['Titration' => 'Titrate', 'Hold' => 'Hold'][$clin['plan']] ?? $clin['plan'];
+
+                        $eligible = $case->triage === 'green'
+                            && in_array($case->status, ['waiting', 'assigned'])
+                            && !$case->hold_status;
+
+                        if ($case->triage === 'red') {
+                            $batchTone = 'red'; $batchLabel = 'Blocked'; $batchReason = 'Red hard stop';
+                        } elseif ($case->hold_status) {
+                            $batchTone = 'red'; $batchLabel = 'Blocked'; $batchReason = 'Workflow hold active';
+                        } elseif ($case->status === 'support') {
+                            $batchTone = 'red'; $batchLabel = 'Blocked'; $batchReason = 'Escalated to support';
+                        } elseif ($case->triage === 'yellow') {
+                            $batchTone = 'yellow'; $batchLabel = 'Review'; $batchReason = 'Yellow triage · review required';
+                        } elseif (!in_array($case->status, ['waiting', 'assigned'])) {
+                            $batchTone = 'red'; $batchLabel = 'Blocked'; $batchReason = 'Status: ' . ucfirst($case->status);
+                        } else {
+                            $batchTone = 'green'; $batchLabel = 'Eligible'; $batchReason = null;
+                        }
+                    @endphp
+                    <tr data-row="{{ $case->uuid }}">
+                        <td class="pin pin-select" data-stop="1">
+                            <input type="checkbox" class="row-check" data-check="{{ $case->uuid }}"
+                                   {{ $eligible ? '' : 'disabled' }}
+                                   title="{{ $eligible ? 'Select ' . $case->patient?->full_name : $batchReason }}">
+                        </td>
+                        <td class="pin pin-triage"><span class="pill {{ $case->triage }}">{{ ucfirst($case->triage ?? 'unclassified') }}</span></td>
+                        <td class="pin pin-time">{{ $case->created_at->diffForHumans(null, true) }}</td>
+                        <td class="pin pin-name">
+                            {{-- Button, not a link: clicking the row updates the quick review below. --}}
+                            <button type="button" class="patient-link">{{ $case->patient?->full_name ?? 'Unknown' }}</button>
+                        </td>
+                        <td><span class="pill {{ $idv ? 'green' : 'red' }}">{{ $idv ? 'Y' : 'N' }}</span></td>
+                        <td>{{ strtoupper(substr($case->patient?->gender ?? '-', 0, 1)) }}</td>
+                        <td>{{ $case->patient?->age ?? '-' }}</td>
+                        <td>{{ !is_null($case->patient?->bmi) ? number_format($case->patient->bmi, 1) : '-' }}</td>
+                        <td>{{ $clin['onGlp'] }}</td>
+                        <td>{{ $clin['product'] }}</td>
+                        <td>{{ $clin['dose'] }}</td>
+                        <td>{{ $clin['term'] }}</td>
+                        <td>{{ $planLabel }}</td>
+                        <td>{{ $clin['med2'] }}</td>
+                        <td>{{ $clin['med3'] }}</td>
+                        <td>{{ $clin['med4'] }}</td>
+                        <td>{{ $case->partner?->name ?? '-' }}</td>
+                        <td>
+                            @if($clin['allergy'] === 'Y')
+                                <span class="allergy-detail-wrap" data-stop="1">
+                                    <button type="button" class="allergy-flag">Y &#9432;</button>
+                                    <span role="tooltip" class="allergy-tooltip">{{ $clin['allergyDetail'] ?? 'Allergy flagged at intake' }}</span>
+                                </span>
+                            @else
+                                {{ $clin['allergy'] }}
+                            @endif
+                        </td>
+                        <td>{{ $clin['zofran'] }}</td>
+                        <td><span class="pill {{ strtolower($clin['video']) === 'clear' ? 'green' : ($clin['video'] === '-' ? 'neutral' : 'yellow') }}">{{ $clin['video'] }}</span></td>
+                        <td class="batch-cell">
+                            <span class="pill {{ $batchTone }}">{{ $batchLabel }}</span>
+                            @if($batchReason)<div class="batch-reason">{{ $batchReason }}</div>@endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="21"><div class="stub"><strong>Nothing in this queue</strong>No case currently matches this filter.</div></td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{{-- Quick review below the grid, the preview's renderDrawer. Each visible case's
+     data is built once below and embedded as JSON; the panel renders the top
+     case server-side and JS re-renders it when a row is clicked. --}}
+@php
+    $buildCard = function ($case) {
+        $clin = $case->queueClinical();
+        $ci   = $case->clinical_intake ?? [];
+
+        if ($case->triage === 'red') { $tone='red'; $label='Blocked'; }
+        elseif ($case->hold_status || $case->status === 'support') { $tone='red'; $label='Blocked'; }
+        elseif ($case->triage === 'yellow') { $tone='yellow'; $label='Review'; }
+        elseif (!in_array($case->status, ['waiting','assigned'])) { $tone='red'; $label='Blocked'; }
+        else { $tone='green'; $label='Eligible'; }
+
+        $srcRow = function ($question, $answer, $type = null) {
+            $q = trim((string) $question);
+            $a = filled($answer) ? (string) $answer : 'Not answered';
+            $isConsent = ($type === 'consent')
+                || preg_match('/\b(consent|i agree|i acknowledge|i authorize|telehealth|hipaa|terms of|privacy policy)\b/i', $q);
+            $agreed = (bool) preg_match('/^(agreed|yes|i agree|accept|accepted|true|1)$/i', trim($a));
+
+            $name = null;
+            if ($isConsent) {
+                if (preg_match('/telehealth/i', $q))                 { $name = 'Telehealth consent'; }
+                elseif (preg_match('/hipaa|privacy/i', $q))          { $name = 'Privacy / HIPAA consent'; }
+                elseif (preg_match('/terms/i', $q))                  { $name = 'Terms of use'; }
+                elseif (preg_match('/sms|text|message/i', $q))       { $name = 'SMS / messaging consent'; }
+                else { $name = \Illuminate\Support\Str::limit($q, 42); }
+            }
+
+            return ['q' => $q, 'a' => $a, 'consent' => $isConsent, 'name' => $name, 'agreed' => $agreed];
+        };
+
+        $source = [];
+        if ($case->relationLoaded('caseQuestions') && $case->caseQuestions->isNotEmpty()) {
+            foreach ($case->caseQuestions as $cq) {
+                if (filled($cq->question)) { $source[] = $srcRow($cq->question, $cq->answer, $cq->type); }
+            }
+        } elseif ($case->relationLoaded('questionnaireResponses') && $case->questionnaireResponses->isNotEmpty()) {
+            foreach ($case->questionnaireResponses as $resp) {
+                foreach ($resp->answers as $ans) {
+                    if (filled($ans->question_text)) { $source[] = $srcRow($ans->question_text, $ans->answer); }
+                }
+            }
+        }
+        if (empty($source)) {
+            foreach (($ci['sourceAnswers'] ?? []) as $k => $v) {
+                $source[] = $srcRow(\Illuminate\Support\Str::headline($k), $v);
+            }
+        }
+
+        return [
+            'id'       => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
+            'name'     => $case->patient?->full_name ?? 'Unknown',
+            'company'  => $case->partner?->name ?? '-',
+            'term'     => $clin['term'],
+            'dose'     => $clin['dose'],
+            'triage'   => $case->triage ?? 'unclassified',
+            'tone'     => $tone,
+            'label'    => $label,
+            'summary'  => collect($ci['summary'] ?? [])->map(fn($l) => is_array($l) ? ($l[0] ?? '') : $l)->filter()->values(),
+            'findings' => collect($ci['findings'] ?? [])->map(fn($f) => is_array($f) ? ['tone' => $f[0] ?? 'neutral', 'text' => $f[1] ?? ''] : ['tone' => 'neutral', 'text' => $f])->values(),
+            'protocol' => $ci['protocolVersion'] ?? null,
+            'source'   => $source,
+            'hold'     => (bool) $case->hold_status,
+            'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
+            'showUrl'    => route('clinician.cases.show', $case->uuid),
+        ];
+    };
+
+    $caseData = [];
+    foreach ($cases as $case) { $caseData[$case->uuid] = $buildCard($case); }
+    $topCard = $cases->first() ? $caseData[$cases->first()->uuid] : null;
+@endphp
+
+@if($topCard)
+    <section class="panel quick-review" id="quickReview">
+        @include('clinician.cases._quick-review', ['d' => $topCard])
+    </section>
+@endif
+
+@if($cases->hasPages())
+    <div style="margin-top:16px">{{ $cases->withQueryString()->links() }}</div>
+@endif
+
+<script>
+    var CASE_DATA = @json($caseData ?? []);
+</script>
+<script>
+    // Row click swaps the quick-review panel to the clicked case, rebuilding the
+    // same markup the server partial produces so the two never diverge.
+    (function () {
+        var panel = document.getElementById('quickReview');
+        var grid  = document.getElementById('reviewGrid');
+        if (!panel || !grid) return;
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+            });
+        }
+
+        function render(d) {
+            if (!d) return;
+            var summary = (d.summary && d.summary.length)
+                ? d.summary.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('')
+                : '<li>No AI draft yet. It is composed from the storefront intake once that is sent for this case.</li>';
+
+            var findings = (d.findings && d.findings.length)
+                ? d.findings.map(function (f) { return '<li><span class="finding-dot ' + esc(f.tone) + '"></span> ' + esc(f.text) + '</li>'; }).join('')
+                : '<li><span class="finding-dot neutral"></span> No findings recorded from intake yet.</li>';
+
+            var source = (d.source && d.source.length)
+                ? '<button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers (' + d.source.length + ')</button>'
+                  + '<div class="qa-sheet" id="sourceAnswers" hidden>' + d.source.map(function (r) {
+                    if (r.consent) {
+                        return '<div class="qa consent"><dt><details><summary>' + esc(r.name)
+                            + '</summary><div class="consent-full">' + esc(r.q) + '</div></details></dt>'
+                            + '<dd><span class="pill ' + (r.agreed ? 'green' : 'red') + '">' + esc(r.agreed ? 'Agreed' : r.a) + '</span></dd></div>';
+                    }
+                    return '<div class="qa"><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
+                  }).join('') + '</div>'
+                : '<p class="ai-honesty">No intake answers were passed for this case yet.</p>';
+
+            var holds = d.hold
+                ? '<ul class="holds-list"><li><code class="audit-verb">WORKFLOW_HOLD_ACTIVE</code></li></ul>'
+                : '<p class="no-holds">No active workflow holds.</p>';
+
+            var triageLabel = d.triage ? d.triage.charAt(0).toUpperCase() + d.triage.slice(1) : '';
+            var protocol = (d.protocol ? esc(d.protocol) + ' · ' : '') + 'classification ' + esc(triageLabel);
+
+            panel.innerHTML =
+                '<div class="panel-heading"><div>'
+                + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
+                + '<h2>' + esc(d.name) + '</h2>'
+                + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + '</p></div>'
+                + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
+                + '<span class="pill ' + esc(d.tone) + '">' + esc(d.label) + '</span></div></div>'
+                + '<div class="quick-review-grid">'
+                + '<div><div class="subheading">AI draft summary</div>'
+                + '<div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>'
+                + '<ul class="summary-list">' + summary + '</ul>'
+                + '<p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.</p>'
+                + source + '</div>'
+                + '<div><div class="subheading">Triage and findings</div>'
+                + '<p class="protocol-version">' + protocol + '</p>'
+                + '<ul class="finding-list">' + findings + '</ul>'
+                + '<div class="subheading holds-heading">Active workflow holds</div>' + holds + '</div>'
+                + '<div><div class="subheading">Provider actions</div>'
+                + '<a class="button-primary full-width" href="' + esc(d.approveUrl) + '">Review and approve</a>'
+                + '<a class="button-secondary full-width" href="' + esc(d.showUrl) + '">Request information</a>'
+                + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a></div>'
+                + '</div>';
+        }
+
+        grid.querySelectorAll('tbody tr[data-row]').forEach(function (tr) {
+            tr.style.cursor = 'pointer';
+            tr.addEventListener('click', function (e) {
+                if (e.target.closest('[data-stop]')) return;
+                grid.querySelectorAll('tr.selected-row').forEach(function (r) { r.classList.remove('selected-row'); });
+                tr.classList.add('selected-row');
+                render(CASE_DATA[tr.getAttribute('data-row')]);
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        });
+
+        panel.addEventListener('click', function (e) {
+            var btn = e.target.closest('#srcToggle');
+            if (!btn) return;
+            var box = document.getElementById('sourceAnswers');
+            if (!box) return;
+            var open = box.hasAttribute('hidden');
+            if (open) { box.removeAttribute('hidden'); } else { box.setAttribute('hidden', ''); }
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.textContent = (open ? 'Hide source answers' : 'View source answers') + ' (' + box.children.length + ')';
+        });
+    })();
+</script>
+<script>
+    // Batch selection: count and preflight react to the eligible checkboxes;
+    // select-all toggles the eligible Green rows; compact toggles dense columns.
+    (function () {
+        var grid = document.getElementById('reviewGrid');
+        if (!grid) return;
+
+        var checks    = Array.prototype.slice.call(grid.querySelectorAll('.row-check'));
+        var eligible  = checks.filter(function (c) { return !c.disabled; });
+        var selCount  = document.getElementById('selCount');
+        var pfCount   = document.getElementById('pfCount');
+        var eligCount = document.getElementById('eligCount');
+        var blkCount  = document.getElementById('blkCount');
+        var preflight = document.getElementById('preflight');
+        var selectAll = document.getElementById('selectAll');
+        var compact   = document.getElementById('compact');
+
+        if (eligCount) eligCount.textContent = eligible.length;
+        if (blkCount)  blkCount.textContent  = checks.length - eligible.length;
+
+        function refresh() {
+            var n = eligible.filter(function (c) { return c.checked; }).length;
+            if (selCount) selCount.textContent = n;
+            if (pfCount)  pfCount.textContent  = n;
+            if (preflight) preflight.disabled = n === 0;
+            if (selectAll) selectAll.checked = eligible.length > 0 && n === eligible.length;
+        }
+
+        eligible.forEach(function (c) { c.addEventListener('change', refresh); });
+        if (selectAll) selectAll.addEventListener('change', function () {
+            eligible.forEach(function (c) { c.checked = selectAll.checked; });
+            refresh();
+        });
+        if (compact) compact.addEventListener('change', function () {
+            grid.classList.toggle('compact', compact.checked);
+        });
+        refresh();
+    })();
+</script>
