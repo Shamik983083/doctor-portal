@@ -634,11 +634,21 @@ class CaseController extends Controller
 
     public function addNote(Request $request, string $uuid)
     {
-        $request->validate([
-            'note' => 'required|string',
-            'type' => 'nullable|in:general,soap,progress',
-            'is_private' => 'boolean',
-        ]);
+        $type = $request->input('type', 'general');
+
+        $rules = ['type' => 'nullable|in:general,soap,progress', 'is_private' => 'boolean'];
+
+        if ($type === 'soap') {
+            $rules += ['soap_s' => 'required|string', 'soap_o' => 'required|string',
+                       'soap_a' => 'required|string', 'soap_p' => 'required|string'];
+        } elseif ($type === 'progress') {
+            $rules += ['prog_status'   => 'required|string', 'prog_changes'  => 'required|string',
+                       'prog_response' => 'required|string', 'prog_next'     => 'required|string'];
+        } else {
+            $rules['note'] = 'required|string';
+        }
+
+        $request->validate($rules);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
 
@@ -646,12 +656,30 @@ class CaseController extends Controller
         $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
+        if ($type === 'soap') {
+            $noteContent = json_encode([
+                's' => $request->input('soap_s'),
+                'o' => $request->input('soap_o'),
+                'a' => $request->input('soap_a'),
+                'p' => $request->input('soap_p'),
+            ]);
+        } elseif ($type === 'progress') {
+            $noteContent = json_encode([
+                'status'   => $request->input('prog_status'),
+                'changes'  => $request->input('prog_changes'),
+                'response' => $request->input('prog_response'),
+                'next'     => $request->input('prog_next'),
+            ]);
+        } else {
+            $noteContent = $request->input('note');
+        }
+
         ClinicalNote::create([
-            'case_id' => $case->id,
+            'case_id'      => $case->id,
             'clinician_id' => $clinician->id,
-            'type' => $request->type ?? 'general',
-            'note' => $request->note,
-            'is_private' => $request->boolean('is_private'),
+            'type'         => $type,
+            'note'         => $noteContent,
+            'is_private'   => $request->boolean('is_private'),
         ]);
 
         $this->webhooks->dispatch($case->partner_id, 'clinical_note_added', [

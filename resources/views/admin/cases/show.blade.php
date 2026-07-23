@@ -323,7 +323,30 @@
                             </small>
                             <small class="text-muted">{{ $note->created_at->diffForHumans() }}</small>
                         </div>
+                        @php
+                            $nd = null;
+                            if (in_array($note->type, ['soap','progress'])) {
+                                $dec = json_decode($note->note, true);
+                                if (is_array($dec)) $nd = $dec;
+                            }
+                        @endphp
+                        @if($nd && $note->type === 'soap')
+                        <div class="small" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Subjective</span><p class="mb-0">{{ $nd['s'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Objective</span><p class="mb-0">{{ $nd['o'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Assessment</span><p class="mb-0">{{ $nd['a'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Plan</span><p class="mb-0">{{ $nd['p'] ?? '' }}</p></div>
+                        </div>
+                        @elseif($nd && $note->type === 'progress')
+                        <div class="small" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Current Status</span><p class="mb-0">{{ $nd['status'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Changes Since Last Visit</span><p class="mb-0">{{ $nd['changes'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Treatment Response</span><p class="mb-0">{{ $nd['response'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Next Steps</span><p class="mb-0">{{ $nd['next'] ?? '' }}</p></div>
+                        </div>
+                        @else
                         <p class="mb-0 small">{{ $note->note }}</p>
+                        @endif
                     </div>
                 </div>
                 @empty

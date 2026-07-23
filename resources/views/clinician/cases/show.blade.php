@@ -187,13 +187,58 @@
                 <form method="POST" action="{{ route('clinician.cases.notes.store', $case->uuid) }}">@csrf
                     <div class="field-row">
                         <div class="field"><label>Type</label>
-                            <select name="type"><option value="general">General</option><option value="soap">SOAP</option><option value="progress">Progress</option></select>
+                            <select name="type" id="noteType">
+                                <option value="general">General</option>
+                                <option value="soap">SOAP</option>
+                                <option value="progress">Progress</option>
+                            </select>
                         </div>
                         <div class="field"><label>&nbsp;</label>
                             <label class="check-line"><input type="checkbox" name="is_private" value="1"> Private note</label>
                         </div>
                     </div>
-                    <textarea name="note" class="note-area" rows="3" placeholder="Add a clinical note." required></textarea>
+                    {{-- General (default) --}}
+                    <div id="note-fields-general">
+                        <textarea name="note" class="note-area" rows="3" placeholder="Add a clinical note." required></textarea>
+                    </div>
+                    {{-- SOAP: Subjective / Objective / Assessment / Plan --}}
+                    <div id="note-fields-soap" hidden>
+                        <div class="field-row" style="margin-bottom:8px">
+                            <div class="field"><label style="font-size:12px">Subjective <span style="font-weight:400;color:var(--muted)">(patient-reported symptoms)</span></label>
+                                <textarea name="soap_s" class="note-area" rows="2" placeholder="What the patient reports — pain, complaints, history…"></textarea>
+                            </div>
+                            <div class="field"><label style="font-size:12px">Objective <span style="font-weight:400;color:var(--muted)">(measurable findings)</span></label>
+                                <textarea name="soap_o" class="note-area" rows="2" placeholder="Vitals, exam findings, lab results…"></textarea>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field"><label style="font-size:12px">Assessment <span style="font-weight:400;color:var(--muted)">(clinical diagnosis)</span></label>
+                                <textarea name="soap_a" class="note-area" rows="2" placeholder="Diagnosis or differential…"></textarea>
+                            </div>
+                            <div class="field"><label style="font-size:12px">Plan <span style="font-weight:400;color:var(--muted)">(treatment)</span></label>
+                                <textarea name="soap_p" class="note-area" rows="2" placeholder="Medications, referrals, follow-up…"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    {{-- Progress: Status / Changes / Response / Next Steps --}}
+                    <div id="note-fields-progress" hidden>
+                        <div class="field-row" style="margin-bottom:8px">
+                            <div class="field"><label style="font-size:12px">Current Status</label>
+                                <textarea name="prog_status" class="note-area" rows="2" placeholder="Patient's current clinical status…"></textarea>
+                            </div>
+                            <div class="field"><label style="font-size:12px">Changes Since Last Visit</label>
+                                <textarea name="prog_changes" class="note-area" rows="2" placeholder="Improvements, regressions, new symptoms…"></textarea>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field"><label style="font-size:12px">Treatment Response</label>
+                                <textarea name="prog_response" class="note-area" rows="2" placeholder="How the patient is responding to treatment…"></textarea>
+                            </div>
+                            <div class="field"><label style="font-size:12px">Next Steps</label>
+                                <textarea name="prog_next" class="note-area" rows="2" placeholder="Upcoming interventions, referrals, goals…"></textarea>
+                            </div>
+                        </div>
+                    </div>
                     <div style="margin-top:10px"><button class="button-primary">Add note</button></div>
                 </form>
             </div></section>
@@ -204,7 +249,30 @@
                     <strong>{{ $note->clinician->full_name ?? 'Unknown' }} <span style="color:var(--muted)">· {{ ucfirst($note->type) }}</span></strong>
                     <span style="color:var(--muted)">{{ $note->created_at->diffForHumans() }} {{ $note->is_private ? '· private' : '' }}</span>
                 </div>
+                @php
+                    $nd = null;
+                    if (in_array($note->type, ['soap','progress'])) {
+                        $dec = json_decode($note->note, true);
+                        if (is_array($dec)) $nd = $dec;
+                    }
+                @endphp
+                @if($nd && $note->type === 'soap')
+                <div style="font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px">
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Subjective</span><p style="margin:2px 0 0">{{ $nd['s'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Objective</span><p style="margin:2px 0 0">{{ $nd['o'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Assessment</span><p style="margin:2px 0 0">{{ $nd['a'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Plan</span><p style="margin:2px 0 0">{{ $nd['p'] ?? '' }}</p></div>
+                </div>
+                @elseif($nd && $note->type === 'progress')
+                <div style="font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px">
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Current Status</span><p style="margin:2px 0 0">{{ $nd['status'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Changes Since Last Visit</span><p style="margin:2px 0 0">{{ $nd['changes'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Treatment Response</span><p style="margin:2px 0 0">{{ $nd['response'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Next Steps</span><p style="margin:2px 0 0">{{ $nd['next'] ?? '' }}</p></div>
+                </div>
+                @else
                 <div style="font-size:13px">{{ $note->note }}</div>
+                @endif
             </div></section>
             @empty
             <p class="ai-honesty">No notes yet.</p>
@@ -362,8 +430,27 @@
     .case-pane[hidden] { display:none; }
     .modal-back[hidden] { display:none; }
     .chat .chat-scroll { border-radius:0; }
+    #note-fields-general[hidden], #note-fields-soap[hidden], #note-fields-progress[hidden] { display:none; }
 </style>
 <script>
+    // Note type switcher — shows the matching field group and toggles required.
+    (function () {
+        var sel = document.getElementById('noteType');
+        if (!sel) return;
+        var groups = { general: 'note-fields-general', soap: 'note-fields-soap', progress: 'note-fields-progress' };
+        function switchType(type) {
+            Object.keys(groups).forEach(function (k) {
+                var el = document.getElementById(groups[k]);
+                if (!el) return;
+                var active = k === type;
+                el.hidden = !active;
+                el.querySelectorAll('textarea').forEach(function (t) { t.required = active; });
+            });
+        }
+        sel.addEventListener('change', function () { switchType(this.value); });
+        switchType(sel.value);
+    })();
+
     // Vanilla tabs. Fires a custom event so the chat can start/stop polling.
     (function () {
         var tabs  = document.querySelectorAll('.case-tab');
