@@ -141,15 +141,15 @@
 
             <div class="nav-section"><span>Triage</span></div>
             <div class="nav-group">
-                <a class="nav-link" href="{{ route('clinician.queue') }}?triage=red">
+                <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') && request()->get('triage') === 'red' ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases', ['triage' => 'red']) }}">
                     <span class="nav-ico">&#128308;</span><span class="lbl">Red</span>
                     <span class="nav-count {{ $nav['red'] ? '' : 'zero' }}">{{ $nav['red'] }}</span>
                 </a>
-                <a class="nav-link" href="{{ route('clinician.queue') }}?triage=yellow">
+                <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') && request()->get('triage') === 'yellow' ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases', ['triage' => 'yellow']) }}">
                     <span class="nav-ico">&#128993;</span><span class="lbl">Yellow</span>
                     <span class="nav-count {{ $nav['yellow'] ? '' : 'zero' }}">{{ $nav['yellow'] }}</span>
                 </a>
-                <a class="nav-link" href="{{ route('clinician.queue') }}?triage=green">
+                <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') && request()->get('triage') === 'green' ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases', ['triage' => 'green']) }}">
                     <span class="nav-ico">&#128994;</span><span class="lbl">Green</span>
                     <span class="nav-count {{ $nav['green'] ? '' : 'zero' }}">{{ $nav['green'] }}</span>
                 </a>
