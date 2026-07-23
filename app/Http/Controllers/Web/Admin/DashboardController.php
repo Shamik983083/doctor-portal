@@ -44,11 +44,27 @@ class DashboardController extends Controller
             'patients'        => $isSuper ? Patient::count() : null,
             'active_cases'    => $caseScope()->whereNotIn('status', ['completed', 'cancelled'])->count(),
             'clinicians'      => Clinician::visibleTo($user)->where('status', 'active')->count(),
+            // A case is at risk when elapsed time >= LEAST(global 70% threshold,
+            // the assigned clinician's Doctor SLA 70% threshold). The subquery
+            // finds the strictest active Doctor SLA policy for each clinician
+            // and falls back to the global threshold when none is set.
             'sla_at_risk'     => $caseScope()->whereIn('status', ['assigned', 'approved', 'processing'])
-                                    ->whereRaw(
-                                        'TIMESTAMPDIFF(MINUTE, COALESCE(assigned_at, created_at), NOW()) >= ?',
-                                        [$slaRiskMinutes]
-                                    )->count(),
+                                    ->whereRaw('
+                                        TIMESTAMPDIFF(MINUTE, COALESCE(assigned_at, created_at), NOW()) >=
+                                        LEAST(
+                                            ?,
+                                            COALESCE(
+                                                (SELECT MIN(sp.overdue_after_hours * 60 * 0.7)
+                                                 FROM admin_clinician ac
+                                                 JOIN sla_policies sp
+                                                   ON sp.owner_user_id = ac.user_id
+                                                  AND sp.is_active = 1
+                                                  AND sp.overdue_after_hours IS NOT NULL
+                                                 WHERE ac.clinician_id = cases.clinician_id),
+                                                ?
+                                            )
+                                        )
+                                    ', [$slaRiskMinutes, $slaRiskMinutes])->count(),
             'completed_today' => $caseScope()->where('status', 'completed')->count(),
             /*
              * First visits vs check-ins (Devin msg 2246: "to be able to project

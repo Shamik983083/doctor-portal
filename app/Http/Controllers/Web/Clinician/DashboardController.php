@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Clinician;
 use App\Http\Controllers\Controller;
 use App\Models\PatientCase;
 use App\Models\Setting;
+use App\Models\SlaPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -84,8 +85,16 @@ class DashboardController extends Controller
         );
         $visitTypeCounts = array_values($visitTypeRaw);
 
-        // ── SLA configuration (from admin settings) ───────────────────────
+        // ── SLA configuration ─────────────────────────────────────────────
         $slaReviewHours = (int) Setting::get('sla_review_hours', 24);
+
+        // If this clinician has a Doctor SLA with overdue_after_hours set,
+        // use whichever threshold is stricter (lower) for risk calculations.
+        $doctorSlaPolicy  = $clinician ? SlaPolicy::forClinician($clinician) : null;
+        $doctorSlaHours   = $doctorSlaPolicy?->overdue_after_hours;
+        $effectiveSlaHours = $doctorSlaHours
+            ? min($slaReviewHours, (float) $doctorSlaHours)
+            : $slaReviewHours;
 
         // ── Active cases table with SLA computation ───────────────────────
         $recentCases = PatientCase::where($myCase)
@@ -98,14 +107,14 @@ class DashboardController extends Controller
             ->latest()
             ->take(10)
             ->get()
-            ->map(function ($case) use ($slaReviewHours) {
+            ->map(function ($case) use ($effectiveSlaHours) {
                 $clock        = $case->assigned_at ?? $case->created_at;
                 $hoursElapsed = $clock->diffInMinutes(now()) / 60;
-                $pct          = round(($hoursElapsed / $slaReviewHours) * 100);
-                $remaining    = max(0, round($slaReviewHours - $hoursElapsed, 1));
+                $pct          = round(($hoursElapsed / $effectiveSlaHours) * 100);
+                $remaining    = max(0, round($effectiveSlaHours - $hoursElapsed, 1));
 
                 $case->sla_pct       = min($pct, 999);
-                $case->sla_breached  = $hoursElapsed >= $slaReviewHours;
+                $case->sla_breached  = $hoursElapsed >= $effectiveSlaHours;
                 $case->sla_at_risk   = !$case->sla_breached && $pct >= 70;
                 $case->sla_remaining = $remaining;
                 $case->sla_elapsed_h = round($hoursElapsed, 1);
@@ -113,8 +122,9 @@ class DashboardController extends Controller
                 return $case;
             });
 
-        $slaBreached = $recentCases->where('sla_breached', true)->count();
-        $slaAtRisk   = $recentCases->where('sla_at_risk', true)->count();
+        $slaBreached   = $recentCases->where('sla_breached', true)->count();
+        $slaAtRisk     = $recentCases->where('sla_at_risk', true)->count();
+        $slaReviewHours = $effectiveSlaHours; // view uses this name for the deadline label
 
         return view('clinician.dashboard', compact(
             'stats', 'clinician',
