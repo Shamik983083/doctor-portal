@@ -36,6 +36,17 @@ final class EligibilityEvaluator
     public const OPEN_CASES_CAP_REACHED            = 'OPEN_CASES_CAP_REACHED';
     public const MESSAGE_AGING_BLOCK               = 'MESSAGE_AGING_BLOCK';
 
+    /*
+     * NEW-CASE-ONLY BLOCKS (Devin msgs 2248/2250). These fire for a first visit
+     * and NEVER for a check-in: a returning patient still reaches their own
+     * doctor even when that doctor has stopped taking new patients. They are
+     * gated on $isNewCase below and are absent from every refill path.
+     */
+    public const NOT_ACCEPTING_NEW_CASES           = 'NOT_ACCEPTING_NEW_CASES';
+    public const DAILY_NEW_CASE_CAP_REACHED        = 'DAILY_NEW_CASE_CAP_REACHED';
+    public const DELAYED_CASES_THRESHOLD           = 'DELAYED_CASES_THRESHOLD';
+    public const AWAITING_REPLY_THRESHOLD          = 'AWAITING_REPLY_THRESHOLD';
+
     public const REASON_LABELS = [
         self::PROVIDER_NOT_ACTIVE             => 'Doctor is not active',
         self::PROVIDER_UNAVAILABLE            => 'Doctor is marked unavailable',
@@ -44,10 +55,21 @@ final class EligibilityEvaluator
         self::DAILY_VOLUME_CAP_REACHED        => 'Daily case cap reached',
         self::OPEN_CASES_CAP_REACHED          => 'Open case cap reached',
         self::MESSAGE_AGING_BLOCK             => 'Has a message older than the configured limit',
+        self::NOT_ACCEPTING_NEW_CASES         => 'Not accepting new cases (books full)',
+        self::DAILY_NEW_CASE_CAP_REACHED      => 'Daily new-case cap reached',
+        self::DELAYED_CASES_THRESHOLD         => 'Too many delayed cases to take new work',
+        self::AWAITING_REPLY_THRESHOLD        => 'Too many cases awaiting a reply to take new work',
     ];
 
     /**
-     * @param  array{currentDailyVolume:int,currentOpenCases:int,maxDailyVolume:?int,maxOpenCases:?int,oldestUnansweredMessageAgeHours:?float} $workload
+     * @param  array{
+     *     currentDailyVolume:int, currentOpenCases:int, maxDailyVolume:?int, maxOpenCases:?int,
+     *     oldestUnansweredMessageAgeHours:?float,
+     *     isNewCase?:bool, acceptingNewCases?:bool,
+     *     maxDailyNewCases?:?int, currentDailyNewCases?:int,
+     *     maxDelayedCases?:?int, currentDelayedCases?:int,
+     *     maxAwaitingReply?:?int, currentAwaitingReply?:int
+     *  } $workload
      * @return string[] every reason that fired, in a fixed order
      */
     public static function evaluate(
@@ -121,6 +143,37 @@ final class EligibilityEvaluator
 
         if ($messageAgingThresholdHours !== null && $oldest !== null && $oldest >= $messageAgingThresholdHours) {
             $reasons[] = self::MESSAGE_AGING_BLOCK;
+        }
+
+        /*
+         * NEW-CASE-ONLY BLOCKS (Devin msgs 2248/2250).
+         *
+         * A check-in must still reach the doctor who treated the patient, so
+         * none of these may fire for a refill. The gate is a single flag: for a
+         * check-in the caller passes isNewCase=false and this whole block is
+         * skipped. A refill therefore never carries a "books full" or
+         * "too delayed" reason, and continuity is never blocked by capacity.
+         *
+         * "Books full" is a per-doctor switch; the delayed and awaiting-reply
+         * thresholds are admin-set on the routing policy. All are opt-in: a null
+         * threshold or an unset flag does nothing.
+         */
+        if (($workload['isNewCase'] ?? true) === true) {
+            if (($workload['acceptingNewCases'] ?? true) === false) {
+                $reasons[] = self::NOT_ACCEPTING_NEW_CASES;
+            }
+
+            if (self::capReached($workload['maxDailyNewCases'] ?? null, $workload['currentDailyNewCases'] ?? null)) {
+                $reasons[] = self::DAILY_NEW_CASE_CAP_REACHED;
+            }
+
+            if (self::capReached($workload['maxDelayedCases'] ?? null, $workload['currentDelayedCases'] ?? null)) {
+                $reasons[] = self::DELAYED_CASES_THRESHOLD;
+            }
+
+            if (self::capReached($workload['maxAwaitingReply'] ?? null, $workload['currentAwaitingReply'] ?? null)) {
+                $reasons[] = self::AWAITING_REPLY_THRESHOLD;
+            }
         }
 
         return $reasons;

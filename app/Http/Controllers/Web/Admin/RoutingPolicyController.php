@@ -43,11 +43,31 @@ class RoutingPolicyController extends Controller
             'note' => 'nullable|string|max:1000',
             'message_aging_hours' => 'nullable|numeric|min:0|max:720',
             'require_recorded_licensure' => 'nullable|boolean',
+            // Admin-set criteria that stop NEW cases (Devin msg 2248). Optional;
+            // blank leaves the criterion off. Delayed needs BOTH the count and
+            // the hours to do anything, enforced below.
+            'new_case_max_delayed_cases'   => 'nullable|integer|min:0|max:9999',
+            'new_case_delayed_after_hours' => 'nullable|numeric|min:1|max:720',
+            'new_case_max_awaiting_reply'  => 'nullable|integer|min:0|max:9999',
             'weights'   => 'nullable|array',
             'weights.*' => 'nullable|numeric',
             'provider_weights'   => 'nullable|array',
             'provider_weights.*' => 'nullable|numeric|min:0',
         ]);
+
+        /*
+         * The delayed-cases criterion is two fields that only work as a pair: a
+         * count with no "delayed after" window cannot be evaluated, and a window
+         * with no count blocks nobody. Persist both or neither, so a
+         * half-filled form does not store a criterion that silently does
+         * nothing (or, worse, one the resolver reads as zero).
+         */
+        $delayedCount = $data['new_case_max_delayed_cases'] ?? null;
+        $delayedHours = $data['new_case_delayed_after_hours'] ?? null;
+        if ($delayedCount === null || $delayedHours === null) {
+            $delayedCount = null;
+            $delayedHours = null;
+        }
 
         // Only keep coefficients that are actually part of the score, so a stray
         // field cannot end up persisted as configuration nothing reads.
@@ -73,6 +93,9 @@ class RoutingPolicyController extends Controller
                 'providerWeights'            => $providerWeights,
                 'messageAgingThresholdHours' => $data['message_aging_hours'] ?? null,
                 'requireRecordedLicensure'   => $request->boolean('require_recorded_licensure'),
+                'newCaseMaxDelayedCases'     => $delayedCount,
+                'newCaseDelayedAfterHours'   => $delayedHours,
+                'newCaseMaxAwaitingReply'    => $data['new_case_max_awaiting_reply'] ?? null,
             ],
             'status'     => RoutingPolicy::STATUS_DRAFT,
             'created_by' => $request->user()?->id,

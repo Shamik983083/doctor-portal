@@ -108,10 +108,34 @@ final class RoutingPolicyResolver
         $ids             = $clinicians->pluck('id')->all();
         $openByTriage    = $this->openCaseCounts($ids);
         $dailyVolume     = $this->dailyVolumeCounts($ids);
+        $newCaseVolume   = $this->dailyNewCaseVolumeCounts($ids);
         $messageFacts    = $this->messageFacts($ids);
         $medianDecisions = $this->medianDecisionMinutes($ids);
         $providerWeights = $policy->providerWeights();
         $agingThreshold  = $policy->messageAgingThresholdHours();
+
+        // Is the case being routed a first visit? A check-in must never be held
+        // back by a new-case control, so this flag switches all of them off for
+        // a refill. See EligibilityEvaluator's new-case block.
+        $isNewCase = ! $case->isRefillRequest();
+
+        /*
+         * The two admin-set new-case criteria are computed ONLY when the policy
+         * configures them and the case is a new one. Both are joins over the
+         * whole case and message tables, so gathering them for a check-in, or
+         * when nobody set a threshold, would be work with no consumer.
+         */
+        $delayedAfterHours = $policy->delayedAfterHours();
+        $maxDelayedCases   = $policy->maxDelayedCases();
+        $maxAwaitingReply  = $policy->maxAwaitingReply();
+
+        $delayedCounts = ($isNewCase && $maxDelayedCases !== null && $delayedAfterHours !== null)
+            ? $this->delayedCaseCounts($ids, $delayedAfterHours)
+            : [];
+
+        $awaitingReplyCounts = ($isNewCase && $maxAwaitingReply !== null)
+            ? $this->awaitingReplyCounts($ids)
+            : [];
 
         $state = $case->patient_state ?: $case->patient?->state;
 
@@ -126,12 +150,30 @@ final class RoutingPolicyResolver
             // the distinction between "no cap" and "cap of zero" is preserved.
             $maxDaily = ((int) $clinician->max_daily_cases) > 0 ? (int) $clinician->max_daily_cases : null;
 
+            // FINDING 1 FIX (Devin msg 2250). The open-case ceiling is now its
+            // OWN column, not max_daily_cases reused. Before this, a doctor with
+            // a full open list was permanently blocked from new work even after
+            // taking nothing that day, because one number gated both a counter
+            // that resets daily and one that does not.
+            $maxOpen = $clinician->maxOpenCasesOrNull();
+
             $workload = [
                 'maxDailyVolume'                  => $maxDaily,
                 'currentDailyVolume'              => $dailyVolume[$clinician->id] ?? 0,
-                'maxOpenCases'                    => $maxDaily,
+                'maxOpenCases'                    => $maxOpen,
                 'currentOpenCases'                => $open['total'],
                 'oldestUnansweredMessageAgeHours' => $msgs['oldestHours'],
+
+                // New-case-only facts. Ignored by EligibilityEvaluator for a
+                // check-in, since isNewCase gates the whole block.
+                'isNewCase'            => $isNewCase,
+                'acceptingNewCases'    => (bool) $clinician->accepting_new_cases,
+                'maxDailyNewCases'     => $clinician->maxDailyNewCasesOrNull(),
+                'currentDailyNewCases' => $newCaseVolume[$clinician->id] ?? 0,
+                'maxDelayedCases'      => $maxDelayedCases,
+                'currentDelayedCases'  => $delayedCounts[$clinician->id] ?? 0,
+                'maxAwaitingReply'     => $maxAwaitingReply,
+                'currentAwaitingReply' => $awaitingReplyCounts[$clinician->id] ?? 0,
             ];
 
             $reasons = EligibilityEvaluator::evaluate(
@@ -158,7 +200,7 @@ final class RoutingPolicyResolver
                 medianDecisionMinutes: $medianDecisions[$clinician->id] ?? 0.0,
                 currentDailyVolume:    $dailyVolume[$clinician->id] ?? 0,
                 maxDailyVolume:        $maxDaily,
-                maxOpenCases:          $maxDaily,
+                maxOpenCases:          $maxOpen,
                 openCases:             $open['total'],
                 weightAllocation:      is_numeric($weight) ? (float) $weight : 1.0,
                 priority:              (int) $clinician->priority,
@@ -211,6 +253,77 @@ final class RoutingPolicyResolver
             ->pluck('c', 'clinician_id')
             ->map(fn ($c) => (int) $c)
             ->all();
+    }
+
+    /**
+     * NEW cases (not check-ins) assigned to each doctor today.
+     *
+     * Same shape as dailyVolumeCounts but filtered to `is_refill = false`, so the
+     * per-doctor new-case cap counts first visits only. A doctor's own returning
+     * patients never eat into their new-case allowance.
+     */
+    private function dailyNewCaseVolumeCounts(array $ids): array
+    {
+        return PatientCase::selectRaw('clinician_id, COUNT(*) as c')
+            ->whereIn('clinician_id', $ids)
+            ->where('is_refill', false)
+            ->whereNotNull('assigned_at')
+            ->where('assigned_at', '>=', now()->startOfDay())
+            ->groupBy('clinician_id')
+            ->pluck('c', 'clinician_id')
+            ->map(fn ($c) => (int) $c)
+            ->all();
+    }
+
+    /**
+     * Cases per doctor that have sat too long without reaching a terminal state.
+     *
+     * "Delayed" is measured on how long the case has been in the queue, from
+     * assigned_at (falling back to created_at), NOT on a message flag. That makes
+     * it un-gameable: a doctor cannot clear a delayed case by opening it, only by
+     * moving it forward. This is the robust half of Devin's "delayed or pending"
+     * (msg 2248); the message half is awaitingReplyCounts below.
+     */
+    private function delayedCaseCounts(array $ids, float $delayedAfterHours): array
+    {
+        $cutoff = now()->subMinutes((int) round($delayedAfterHours * 60));
+
+        return PatientCase::selectRaw('clinician_id, COUNT(*) as c')
+            ->whereIn('clinician_id', $ids)
+            ->whereIn('status', self::OPEN_STATUSES)
+            ->whereRaw('COALESCE(assigned_at, created_at) <= ?', [$cutoff])
+            ->groupBy('clinician_id')
+            ->pluck('c', 'clinician_id')
+            ->map(fn ($c) => (int) $c)
+            ->all();
+    }
+
+    /**
+     * Open cases per doctor where the patient is waiting on a REPLY.
+     *
+     * A case counts when its newest INBOUND message is newer than its newest
+     * OUTBOUND one (or there is an inbound and no outbound at all). This is the
+     * deliberate answer to the is_read problem: opening a case marks its messages
+     * read but does NOT add an outbound message, so an opened-but-unanswered case
+     * still shows here. It measures whether the patient got a reply, which is what
+     * "pending messages" should mean.
+     */
+    private function awaitingReplyCounts(array $ids): array
+    {
+        $rows = PatientCase::selectRaw('cases.clinician_id as cid, COUNT(*) as c')
+            ->whereIn('cases.clinician_id', $ids)
+            ->whereIn('cases.status', self::OPEN_STATUSES)
+            ->whereRaw(
+                '(SELECT MAX(m.created_at) FROM messages m
+                    WHERE m.case_id = cases.id AND m.direction = ?)
+                 > COALESCE((SELECT MAX(m2.created_at) FROM messages m2
+                    WHERE m2.case_id = cases.id AND m2.direction = ?), ?)',
+                ['inbound', 'outbound', '1970-01-01 00:00:00']
+            )
+            ->groupBy('cases.clinician_id')
+            ->pluck('c', 'cid');
+
+        return $rows->map(fn ($c) => (int) $c)->all();
     }
 
     /**

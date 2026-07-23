@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Clinician;
 use App\Models\PatientCase;
 use App\Models\RoutingPolicy;
+use App\Models\User;
+use App\Notifications\RefillLoadAlert;
 use App\Services\Routing\RoutingPolicyResolver;
 use App\Services\Routing\RoutingStrategy;
 use Illuminate\Support\Facades\Log;
@@ -52,6 +54,8 @@ class CaseAutoAssigner
         $outcome = $this->resolver->resolve($case);
 
         if (($outcome['kind'] ?? null) === RoutingStrategy::ASSIGN) {
+            $clinician = Clinician::find($outcome['providerId']);
+
             /*
              * Continuity assignments are logged and ordinary ones are not,
              * because this is the one that looks wrong from outside: the
@@ -64,9 +68,13 @@ class CaseAutoAssigner
                     'clinician_id' => $outcome['providerId'],
                     'reason'       => 'Check-in returned to the doctor who treated this patient before.',
                 ]);
+
+                if ($clinician) {
+                    $this->maybeAlertRefillLoad($clinician, $case);
+                }
             }
 
-            return Clinician::find($outcome['providerId']);
+            return $clinician;
         }
 
         // Logged rather than silent: "why did nothing get assigned" is the first
@@ -81,6 +89,56 @@ class CaseAutoAssigner
         ]);
 
         return null;
+    }
+
+    /**
+     * Alert the doctor's admins when a continuity check-in pushes them past their
+     * refill alert threshold (Devin msg 2250 A).
+     *
+     * SOFT, BY DESIGN. The case is already assigned to this doctor and stays with
+     * them. This only notifies. It counts check-ins assigned to the doctor
+     * earlier today; the current one is the one crossing the line, so `>=` on the
+     * prior count is "this assignment takes them over".
+     *
+     * Wrapped so a notification failure can never break assignment: routing a
+     * patient matters, telling an admin about load does not.
+     */
+    private function maybeAlertRefillLoad(Clinician $clinician, PatientCase $case): void
+    {
+        $threshold = (int) ($clinician->daily_refill_alert_threshold ?? 0);
+
+        if ($threshold <= 0) {
+            return;
+        }
+
+        try {
+            $priorRefillsToday = PatientCase::where('clinician_id', $clinician->id)
+                ->where('is_refill', true)
+                ->whereNotNull('assigned_at')
+                ->where('assigned_at', '>=', now()->startOfDay())
+                ->where('id', '!=', $case->id)
+                ->count();
+
+            if ($priorRefillsToday < $threshold) {
+                return;
+            }
+
+            $admins = $clinician->admins()->get();
+
+            // No Doctor Admin assigned: fall back to the general admin pool so the
+            // alert is not silently dropped for an unmanaged doctor.
+            if ($admins->isEmpty()) {
+                $admins = User::role(['admin', 'super_admin'])->get();
+            }
+
+            $notification = new RefillLoadAlert($clinician, $case, $priorRefillsToday + 1, $threshold);
+            $admins->each(fn ($admin) => $admin->notify($notification));
+        } catch (\Throwable $e) {
+            Log::warning('Refill load alert failed: ' . $e->getMessage(), [
+                'clinician_id' => $clinician->id,
+                'case_uuid'    => $case->uuid,
+            ]);
+        }
     }
 
     /**

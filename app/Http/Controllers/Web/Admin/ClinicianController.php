@@ -108,6 +108,12 @@ class ClinicianController extends Controller
             'status'               => 'required|in:active,inactive,suspended',
             'is_available'         => 'nullable|boolean',
             'max_daily_cases'      => 'nullable|integer|min:1',
+            // Capacity controls (Devin msgs 2248/2250). Empty means uncapped, so
+            // min:0 is not used; a blank field clears the cap rather than setting 0.
+            'accepting_new_cases'          => 'nullable|boolean',
+            'max_daily_new_cases'          => 'nullable|integer|min:1',
+            'max_open_cases'               => 'nullable|integer|min:1',
+            'daily_refill_alert_threshold' => 'nullable|integer|min:1',
             'license_info'         => 'required|array|min:1',
             'license_info.*.state' => 'required|string|size:2',
             'license_info.*.number'=> 'required|string|max:100',
@@ -136,6 +142,12 @@ class ClinicianController extends Controller
             'status'          => $data['status'],
             'is_available'    => $request->boolean('is_available'),
             'max_daily_cases' => $data['max_daily_cases'] ?? $clinician->max_daily_cases,
+            // A blank number field clears the cap (null = uncapped). The checkbox
+            // is read with boolean() so an unchecked box means "books full".
+            'accepting_new_cases'          => $request->boolean('accepting_new_cases'),
+            'max_daily_new_cases'          => $data['max_daily_new_cases'] ?? null,
+            'max_open_cases'               => $data['max_open_cases'] ?? null,
+            'daily_refill_alert_threshold' => $data['daily_refill_alert_threshold'] ?? null,
             'licensed_states' => $licensedStates,
         ]);
 

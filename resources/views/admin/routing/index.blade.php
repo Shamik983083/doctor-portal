@@ -92,6 +92,46 @@
                 <div class="form-text">Leave blank to switch this rule off.</div>
             </div>
 
+            {{-- New-case criteria (Devin msg 2248). All stop NEW cases only; a
+                 returning patient still reaches their own doctor. --}}
+            <div class="border rounded p-3 mb-3 bg-light">
+                <div class="fw-semibold small mb-2">Stop giving a doctor NEW cases when</div>
+                <div class="form-text mb-3">
+                    These pause first visits only. A doctor's own check-ins still come through.
+                    Leave any field blank to switch that rule off.
+                </div>
+
+                <div class="row g-2 align-items-end mb-2">
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">They have this many delayed cases</label>
+                        <input type="number" min="0" class="form-control form-control-sm" style="max-width:160px"
+                               name="new_case_max_delayed_cases"
+                               value="{{ old('new_case_max_delayed_cases', $active->config['newCaseMaxDelayedCases'] ?? '') }}">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">counting a case delayed after (hours)</label>
+                        <input type="number" step="any" min="1" class="form-control form-control-sm" style="max-width:160px"
+                               name="new_case_delayed_after_hours"
+                               value="{{ old('new_case_delayed_after_hours', $active->config['newCaseDelayedAfterHours'] ?? '') }}">
+                    </div>
+                </div>
+                <div class="form-text mb-3">
+                    Delayed is measured on how long a case has sat in the queue, not on unread
+                    messages. Both fields are needed for this rule to apply.
+                </div>
+
+                <div>
+                    <label class="form-label small mb-1">They have this many cases awaiting a reply</label>
+                    <input type="number" min="0" class="form-control form-control-sm" style="max-width:160px"
+                           name="new_case_max_awaiting_reply"
+                           value="{{ old('new_case_max_awaiting_reply', $active->config['newCaseMaxAwaitingReply'] ?? '') }}">
+                    <div class="form-text">
+                        Awaiting a reply means the newest patient message is newer than the doctor's
+                        newest reply. Opening a case does not clear it, only replying does.
+                    </div>
+                </div>
+            </div>
+
             <div class="mb-3">
                 <div class="form-check">
                     <input type="hidden" name="require_recorded_licensure" value="0">

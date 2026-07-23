@@ -87,6 +87,47 @@ class RoutingPolicy extends Model
         return (bool) ($this->config['requireRecordedLicensure'] ?? false);
     }
 
+    /*
+     * ── Admin-set criteria that stop a doctor getting NEW cases ─────────────
+     *   (Devin msg 2248: "criteria to not issue new cases ie delayed or pending
+     *   cases/messages".)
+     *
+     * All optional. Null means the criterion is off, which is the shipped
+     * default, so activating a policy does not suddenly hold cases back. They
+     * gate NEW cases only; a check-in still reaches its own doctor.
+     */
+
+    /** How long a non-terminal case may sit before it counts as "delayed". */
+    public function delayedAfterHours(): ?float
+    {
+        $value = $this->config['newCaseDelayedAfterHours'] ?? null;
+
+        return is_numeric($value) && $value > 0 ? (float) $value : null;
+    }
+
+    /** How many delayed cases a doctor may carry before new work stops. */
+    public function maxDelayedCases(): ?int
+    {
+        $value = $this->config['newCaseMaxDelayedCases'] ?? null;
+
+        return is_numeric($value) && $value >= 0 ? (int) $value : null;
+    }
+
+    /**
+     * How many cases awaiting a REPLY a doctor may carry before new work stops.
+     *
+     * Awaiting a reply, not "unread": a case where the newest inbound patient
+     * message is newer than the newest outbound one. Deliberately not the
+     * is_read flag, which a doctor clears just by opening the case without
+     * replying (that gap is why this criterion measures reply, not attention).
+     */
+    public function maxAwaitingReply(): ?int
+    {
+        $value = $this->config['newCaseMaxAwaitingReply'] ?? null;
+
+        return is_numeric($value) && $value >= 0 ? (int) $value : null;
+    }
+
     public function modeLabel(): string
     {
         return RoutingMode::LABELS[$this->mode] ?? $this->mode;

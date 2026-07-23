@@ -127,6 +127,43 @@ $hasLicenses = count($licenseInfo) > 0;
                     <label class="form-label fw-semibold">Max Daily Cases</label>
                     <input type="number" name="max_daily_cases" class="form-control" min="1" max="999"
                            value="{{ old('max_daily_cases', $clinician->max_daily_cases) }}">
+                    <small class="text-muted">Overall daily ceiling. Blank means no limit.</small>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            {{-- Capacity controls (Devin msgs 2248/2250) --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3">Capacity</h6>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Accepting New Cases</label>
+                    <div class="form-check form-switch mt-2">
+                        <input type="hidden" name="accepting_new_cases" value="0">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="acceptingNew" name="accepting_new_cases" value="1"
+                               {{ old('accepting_new_cases', $clinician->accepting_new_cases ? '1' : '0') === '1' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="acceptingNew">Books open</label>
+                    </div>
+                    <small class="text-muted">Off = books full. Stops NEW patients. Their own check-ins still come through.</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Max Daily New Cases</label>
+                    <input type="number" name="max_daily_new_cases" class="form-control" min="1" max="999"
+                           value="{{ old('max_daily_new_cases', $clinician->max_daily_new_cases) }}">
+                    <small class="text-muted">First visits per day. Blank means no limit. Check-ins do not count.</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Max Open Cases</label>
+                    <input type="number" name="max_open_cases" class="form-control" min="1" max="999"
+                           value="{{ old('max_open_cases', $clinician->max_open_cases) }}">
+                    <small class="text-muted">Total open, non-terminal cases. Blank means no limit.</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Refill Alert Threshold</label>
+                    <input type="number" name="daily_refill_alert_threshold" class="form-control" min="1" max="999"
+                           value="{{ old('daily_refill_alert_threshold', $clinician->daily_refill_alert_threshold) }}">
+                    <small class="text-muted">Alerts the doctor admin past this many check-ins in a day. Never blocks.</small>
                 </div>
             </div>
 

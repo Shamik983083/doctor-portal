@@ -267,3 +267,89 @@ and access gates never, new reason codes default to blocking).
 
 > **Never executed.** Same standing caveat as section 6: written on a machine with no PHP. Static
 > checks only. Run the suite before trusting it.
+
+---
+
+## 8. Capacity controls: caps, "books full", and criteria to hold new cases
+
+Added 2026-07-23 (Devin msgs 2248, 2250).
+
+### 8.1 A bug this fixed on the way in
+
+`max_daily_cases` used to drive TWO caps in the resolver: the daily-volume cap
+(cases assigned since midnight, resets daily) and the open-cases cap (all
+non-terminal cases, never resets). One number, two counters. A doctor capped at
+20 who accumulated 20 open cases over two weeks was permanently blocked from new
+work, having taken zero that day. `max_open_cases` is now its own column, so the
+two ceilings are set independently. If doctors have quietly dropped out of
+rotation, this was why.
+
+### 8.2 Per-doctor controls (on the clinician edit screen)
+
+| Control | Effect | New cases | Check-ins |
+|---|---|---|---|
+| `max_daily_cases` | Overall daily ceiling. Existing. | counts | counts (but continuity overrides it) |
+| `max_open_cases` | Total open non-terminal cases. New. | blocks at cap | continuity overrides |
+| Accepting new cases (switch) | "Books full". Off = no new patients. | **blocks** | **exempt** |
+| `max_daily_new_cases` | First visits per day. | **blocks at cap** | **exempt** (and check-ins do not count toward it) |
+| Refill alert threshold | Soft. Alerts the Doctor Admin. | n/a | **never blocks**, only alerts |
+
+The "new cases only" column is the whole point (Devin msg 2250 B: "some may only
+want to get no new cases because their books are full"). A doctor with their
+books full stops receiving first visits but still receives their own returning
+patients, because those route by continuity and are exempt from every new-case
+control (section 7). The exemption is one flag, `isNewCase`, checked once in
+`EligibilityEvaluator`; a check-in never carries a "books full" or "too delayed"
+reason.
+
+### 8.3 Refills are never withheld, only alerted (msg 2250 A)
+
+"Let it run and alert the doctor admin but don't withhold." So there is no hard
+refill cap. `daily_refill_alert_threshold` is a soft line: when a continuity
+check-in pushes a doctor past it, the admins over that doctor get a
+`RefillLoadAlert` notification, and the case still goes to that doctor. If the
+doctor has no Doctor Admin assigned, the alert falls back to the general admin
+pool rather than being dropped. The alert is best-effort and can never block or
+break the assignment.
+
+### 8.4 Admin-set criteria that hold new cases (on the routing policy)
+
+Two policy-level criteria, both optional, both new-cases-only:
+
+- **Delayed cases.** Stop giving a doctor new cases once they carry N cases that
+  have sat in the queue longer than H hours. Measured on case age from
+  `assigned_at` (falling back to `created_at`), NOT on any message flag, so a
+  doctor cannot clear a delayed case by opening it, only by moving it forward.
+  Needs BOTH the count and the hours; the controller stores neither if only one
+  is filled, so a half-set criterion cannot silently read as zero.
+- **Awaiting reply.** Stop giving a doctor new cases once they carry N cases
+  where the newest inbound patient message is newer than their newest reply.
+  This is deliberately NOT the `is_read` flag: opening a case marks its messages
+  read without sending a reply, so an `is_read` criterion would measure whether
+  the doctor looked, not whether the patient got an answer. This measures the
+  answer.
+
+Both are gathered only when the active policy actually sets them and the case
+being routed is a new one, since each is a join across the case or message
+tables.
+
+### 8.5 What is deliberately NOT done
+
+- **The message-aging hard block still keys off `is_read`** (it predates this
+  work). The new awaiting-reply criterion is the un-gameable version; the older
+  aging block was left as-is rather than changed underneath whoever configured
+  it. Worth reconciling later.
+- **The refill alert can repeat.** It fires each time a check-in lands while the
+  doctor is over threshold, with no daily de-dupe. Cheap to add a once-per-day
+  guard if the volume is noisy; left simple for a first cut.
+
+### 8.6 Tests
+
+`tests/Unit/CapacityControlsTest.php`: the open/daily cap split (finding 1),
+each new-case block firing, and the central guarantee that a check-in is exempt
+from all of them while still being blocked on licence.
+
+> **Never executed.** Same standing caveat as sections 6 and 7: no PHP on the
+> machine this was written on. Static checks only. Run the suite before trusting
+> it, and confirm the two SQL count helpers (`delayedCaseCounts`,
+> `awaitingReplyCounts`) against real data in staging.

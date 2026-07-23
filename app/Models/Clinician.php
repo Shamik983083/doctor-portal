@@ -15,12 +15,30 @@ class Clinician extends Model
         'uuid', 'user_id', 'npi', 'license_number', 'license_state',
         'specialty', 'credentials', 'status', 'is_available',
         'max_daily_cases', 'priority', 'licensed_states',
+        // Capacity controls (Devin msgs 2248/2250). accepting_new_cases and
+        // max_daily_new_cases block NEW cases only; daily_refill_alert_threshold
+        // is a soft alert that never blocks. See the migration.
+        'accepting_new_cases', 'max_daily_new_cases', 'max_open_cases',
+        'daily_refill_alert_threshold',
     ];
 
     protected $casts = [
         'is_available' => 'boolean',
+        'accepting_new_cases' => 'boolean',
         'licensed_states' => 'array',
     ];
+
+    /** A daily new-case cap of null means uncapped, matching max_daily_cases. */
+    public function maxDailyNewCasesOrNull(): ?int
+    {
+        return $this->max_daily_new_cases > 0 ? (int) $this->max_daily_new_cases : null;
+    }
+
+    /** A null open-case cap means uncapped. */
+    public function maxOpenCasesOrNull(): ?int
+    {
+        return $this->max_open_cases > 0 ? (int) $this->max_open_cases : null;
+    }
 
     /**
      * Restrict to the doctors this admin is over (Devin msg 2117).
