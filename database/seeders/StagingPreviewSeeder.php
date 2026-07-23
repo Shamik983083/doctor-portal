@@ -73,6 +73,7 @@ class StagingPreviewSeeder extends Seeder
         $doctorAdmin->managedClinicians()->syncWithoutDetaching([$mine->id]);
 
         $this->cases($partner, $mine, $notMine);
+        $this->messages($partner, $mine);
         $this->routingPolicy($superAdmin);
 
         $this->command->info('Staging preview data seeded. Password for all: ' . self::PASSWORD);
@@ -313,6 +314,57 @@ class StagingPreviewSeeder extends Seeder
                     'clinical_intake' => $clinicalIntake,
                 ]
             );
+        }
+    }
+
+    /**
+     * A short conversation on two of Dr. Alvarez's cases so the Messages screen
+     * shows real threads instead of an empty state (Devin msg 2294). Idempotent:
+     * skips a case that already has messages, so re-running does not pile them up.
+     */
+    private function messages(Partner $partner, Clinician $mine): void
+    {
+        $threads = [
+            'staging-preview-4' => [   // Joel Berhane
+                ['inbound',  'Hi doctor, I have a quick question about my dose this month.'],
+                ['outbound', 'Of course, happy to help. What is your question?'],
+                ['inbound',  'Should I stay at 5 mg or step up? I have had some nausea.'],
+            ],
+            'staging-preview-5' => [   // Nina Kowalski
+                ['inbound',  'Thank you for approving my refill so quickly.'],
+                ['outbound', 'You are welcome. Keep an eye on any side effects and message me anytime.'],
+            ],
+        ];
+
+        foreach ($threads as $externalId => $msgs) {
+            $case = PatientCase::where('partner_id', $partner->id)
+                ->where('external_id', $externalId)->first();
+
+            if (! $case || $case->messages()->exists()) {
+                continue;
+            }
+
+            $when = now()->subHours(3);
+            foreach ($msgs as [$direction, $body]) {
+                // forceCreate so the custom created_at is kept (it is not in the
+                // Message model's fillable, and distinct times keep the thread
+                // in order and the time headers realistic).
+                \App\Models\Message::forceCreate([
+                    'uuid'        => (string) \Illuminate\Support\Str::uuid(),
+                    'case_id'     => $case->id,
+                    'patient_id'  => $case->patient_id,
+                    'clinician_id'=> $direction === 'outbound' ? $mine->id : null,
+                    'partner_id'  => $partner->id,
+                    'direction'   => $direction,
+                    'channel'     => 'portal',
+                    'sender_type' => $direction === 'outbound' ? 'clinician' : 'patient',
+                    'body'        => $body,
+                    'is_read'     => $direction === 'outbound',
+                    'created_at'  => $when,
+                    'updated_at'  => $when,
+                ]);
+                $when = $when->copy()->addMinutes(12);
+            }
         }
     }
 
