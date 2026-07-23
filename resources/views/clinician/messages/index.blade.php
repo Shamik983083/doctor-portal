@@ -34,6 +34,7 @@
         @foreach($cases as $c)
             @php($msg = $latest->get($c->id))
             <a class="msg-row {{ $selected && $selected->id === $c->id ? 'active' : '' }}"
+               data-uuid="{{ $c->uuid }}"
                href="{{ route('clinician.messages.index', array_merge(request()->except('page'), ['case' => $c->uuid])) }}">
                 <span class="msg-avatar">{{ $initials($c->patient?->full_name) }}</span>
                 <span class="msg-row-body">
@@ -52,7 +53,7 @@
     </div>
 
     {{-- Right: the thread --}}
-    <div class="panel chat">
+    <div class="panel chat" data-selected-uuid="{{ $selected?->uuid }}" id="chatPanel">
         <div class="chat-head">
             <span class="msg-avatar big">{{ $initials($selected->patient?->full_name) }}</span>
             <div>
@@ -91,11 +92,132 @@
 @endsection
 
 @section('scripts')
+<script src="https://js.pusher.com/8.0/pusher.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/2.2.4/echo.iife.min.js"></script>
 <script>
-    // Keep the thread scrolled to the newest message.
-    (function () {
-        var s = document.getElementById('chatScroll');
-        if (s) s.scrollTop = s.scrollHeight;
-    })();
+(function () {
+    // Scroll thread to bottom on load
+    var scroll = document.getElementById('chatScroll');
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+
+    var msgList    = document.querySelector('.msg-list');
+    var chatPanel  = document.getElementById('chatPanel');
+    var selectedUuid = chatPanel ? chatPanel.dataset.selectedUuid : null;
+    var csrf       = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    function esc(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s||'')); return d.innerHTML; }
+
+    // ── Toast for new messages in other conversations ────────────────
+    function showToast(patientName, snippet, caseUuid) {
+        var existing = document.getElementById('msgToast');
+        if (existing) existing.remove();
+        var url = '{{ route("clinician.messages.index") }}?case=' + caseUuid;
+        var t = document.createElement('div');
+        t.id = 'msgToast';
+        t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;background:#172033;color:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:320px;display:flex;flex-direction:column;gap:6px;animation:slideUp .25s ease';
+        t.innerHTML = '<strong style="font-size:.85rem;">New message from ' + esc(patientName) + '</strong>'
+            + '<span style="font-size:.78rem;color:#94a3b8;">' + esc(snippet) + '</span>'
+            + '<a href="' + url + '" style="font-size:.78rem;color:#60a5fa;margin-top:2px;">Open conversation &rarr;</a>';
+        document.body.appendChild(t);
+        setTimeout(function () { if (t.parentNode) t.remove(); }, 6000);
+    }
+
+    // ── Update or prepend a conversation row in the left panel ───────
+    function upsertConversationRow(data) {
+        if (!msgList) return;
+        var url    = '{{ route("clinician.messages.index") }}?case=' + data.caseUuid;
+        var existing = msgList.querySelector('.msg-row[data-uuid="' + data.caseUuid + '"]');
+
+        if (existing) {
+            // Update snippet and time
+            var snippetEl = existing.querySelector('.msg-row-body span');
+            var timeEl    = existing.querySelector('.msg-row-meta');
+            var badgeEl   = existing.querySelector('.msg-unread');
+            if (snippetEl) snippetEl.textContent = data.snippet;
+            if (timeEl) {
+                // Update time text (keep badge if present)
+                var badge = badgeEl ? badgeEl.outerHTML : '';
+                timeEl.innerHTML = 'just now ' + (existing.classList.contains('active') ? '' : badge || '<span class="msg-unread">1</span>');
+            }
+            if (!existing.classList.contains('active')) {
+                var initials = data.patientName.split(' ').map(function(p){return p[0]||'';}).slice(0,2).join('').toUpperCase();
+                // Move to top of list (after the heading)
+                var heading = msgList.querySelector('.panel-heading');
+                msgList.insertBefore(existing, heading ? heading.nextSibling : msgList.firstChild);
+                existing.style.background = '#eff6ff';
+                setTimeout(function(){ existing.style.background = ''; }, 3000);
+            }
+        } else {
+            // New conversation not in list — prepend a row
+            var initials = data.patientName.split(' ').map(function(p){return p[0]||'';}).slice(0,2).join('').toUpperCase();
+            var row = document.createElement('a');
+            row.className = 'msg-row';
+            row.setAttribute('data-uuid', data.caseUuid);
+            row.href = url;
+            row.style.background = '#eff6ff';
+            row.innerHTML = '<span class="msg-avatar">' + esc(initials) + '</span>'
+                + '<span class="msg-row-body"><strong>' + esc(data.patientName) + '</strong><span>' + esc(data.snippet) + '</span></span>'
+                + '<span class="msg-row-meta">just now <span class="msg-unread">1</span></span>';
+            var heading = msgList.querySelector('.panel-heading');
+            msgList.insertBefore(row, heading ? heading.nextSibling : msgList.firstChild);
+            setTimeout(function(){ row.style.background = ''; }, 3000);
+        }
+    }
+
+    // ── Append an inbound bubble to the open thread ──────────────────
+    function appendInboundBubble(snippet) {
+        if (!scroll) return;
+        var bubble = document.createElement('div');
+        bubble.className = 'bubble-row them';
+        bubble.innerHTML = '<div class="bubble them">' + esc(snippet) + '</div>';
+        scroll.appendChild(bubble);
+        scroll.scrollTop = scroll.scrollHeight;
+    }
+
+    // ── Handle an incoming NewPatientMessage event ────────────────────
+    function handleNewMessage(data) {
+        upsertConversationRow(data);
+        if (selectedUuid && selectedUuid === data.caseUuid) {
+            appendInboundBubble(data.snippet);
+        } else {
+            showToast(data.patientName, data.snippet, data.caseUuid);
+        }
+    }
+
+    // ── Reverb / Echo setup (mirrors case show page) ─────────────────
+    var EchoConstructor = null;
+    if (typeof Echo === 'object' && typeof Echo.default === 'function') EchoConstructor = Echo.default;
+    else if (typeof Echo === 'function') EchoConstructor = Echo;
+
+    if (EchoConstructor) {
+        window.Pusher = Pusher;
+        window.Echo = new EchoConstructor({
+            broadcaster:       'pusher',
+            key:               "{{ config('reverb.apps.apps.0.key') }}",
+            wsHost:            "{{ config('reverb.apps.apps.0.options.host') }}",
+            wsPort:            {{ config('reverb.apps.apps.0.options.port') }},
+            wssPort:           {{ config('reverb.apps.apps.0.options.port') }},
+            disableStats:      true,
+            forceTLS:          {{ config('reverb.apps.apps.0.options.useTLS') ? 'true' : 'false' }},
+            cluster:           'mt1',
+            enabledTransports: ['ws', 'wss'],
+            authEndpoint:      '/broadcasting/auth',
+            auth: { headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' } }
+        });
+
+        window.Echo.private('provider-inbox').listen('.NewPatientMessage', function (e) {
+            handleNewMessage({
+                caseUuid:    e.caseUuid,
+                patientName: e.patientName,
+                snippet:     e.snippet,
+            });
+        });
+    } else {
+        // Fallback: reload on page visibility regain if tab was hidden
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') window.location.reload();
+        });
+    }
+})();
 </script>
 @endsection
