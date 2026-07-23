@@ -112,6 +112,11 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
 
     Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
 
+    // Messages For Provider (Devin msg 2256): a dedicated inbox screen, matching
+    // the design preview. Lives OUTSIDE the cases/{uuid} group so "messages" is
+    // never captured as a case uuid.
+    Route::get('/messages', [ClinicianCaseController::class, 'messagesInbox'])->name('messages.index');
+
     Route::get('/notifications', [ClinicianNotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{id}/read', [ClinicianNotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [ClinicianNotificationController::class, 'markAllRead'])->name('notifications.read-all');

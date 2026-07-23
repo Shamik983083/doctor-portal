@@ -179,6 +179,46 @@ class CaseController extends Controller
     }
 
     /**
+     * Messages For Provider (Devin msg 2256), the inbox screen from the design
+     * preview. Lists this clinician's cases that have a conversation, most
+     * recent message first, with the unread count and the last message preview.
+     *
+     * The thread itself lives on the case screen (with the existing send/poll
+     * endpoints), so each row links there. Real data throughout: a doctor with
+     * no messages sees an empty state, not a mock.
+     */
+    public function messagesInbox(Request $request)
+    {
+        $clinician = Auth::user()->clinician;
+
+        $cases = PatientCase::with(['patient', 'partner'])
+            ->where('clinician_id', $clinician->id)
+            ->whereHas('messages')
+            ->withCount(['messages as unread_messages_count' => fn ($q) =>
+                $q->where('direction', 'inbound')->where('is_read', false)
+            ])
+            ->withMax('messages as last_message_at', 'created_at')
+            ->when($request->filled('unread'), fn ($q) =>
+                $q->whereHas('messages', fn ($m) =>
+                    $m->where('direction', 'inbound')->where('is_read', false)
+                )
+            )
+            ->orderByDesc('last_message_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        // The last message body per case, for the preview line. Loaded in one
+        // pass keyed by case id rather than a query per row.
+        $latest = \App\Models\Message::whereIn('case_id', $cases->pluck('id'))
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('case_id')
+            ->map(fn ($group) => $group->first());
+
+        return view('clinician.messages.index', compact('cases', 'clinician', 'latest'));
+    }
+
+    /**
      * LAW 4: licensure is a hard gate, not a filter.
      *
      * A case for a patient in state X may only ever be viewed, assigned,

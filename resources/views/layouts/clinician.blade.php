@@ -63,10 +63,10 @@
         <span class="cn-count">{{ $nav['myCases'] }}</span>
     </a>
 
-    {{-- Messages and Escalations have no dedicated screen yet, so they link to
-         the closest real view. Counts are live; destinations are honest
-         placeholders until the filtered views are built. --}}
-    <a class="nav-link" href="{{ route('clinician.cases.my-cases') }}">
+    {{-- Messages now has its own screen (Devin msg 2256). Escalations still
+         links to the queue filtered to support until it gets a dedicated view. --}}
+    <a class="nav-link {{ request()->routeIs('clinician.messages.*') ? 'active' : '' }}"
+       href="{{ route('clinician.messages.index') }}">
         <i class="bi bi-chat-dots me-2"></i> Messages For Provider
         <span class="cn-count">{{ $nav['messages'] }}</span>
     </a>
