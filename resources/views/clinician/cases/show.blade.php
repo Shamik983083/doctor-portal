@@ -185,61 +185,73 @@
         <div class="case-pane" data-pane="notes" hidden>
             <section class="panel" style="margin-bottom:12px"><div style="padding:16px 18px">
                 <form method="POST" action="{{ route('clinician.cases.notes.store', $case->uuid) }}">@csrf
-                    <div class="field-row">
-                        <div class="field"><label>Type</label>
+                    {{-- Controls bar: type selector + private toggle --}}
+                    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+                        <div class="field" style="min-width:160px;flex:0 0 auto">
+                            <label>Type</label>
                             <select name="type" id="noteType">
                                 <option value="general">General</option>
                                 <option value="soap">SOAP</option>
                                 <option value="progress">Progress</option>
                             </select>
                         </div>
-                        <div class="field"><label>&nbsp;</label>
-                            <label class="check-line"><input type="checkbox" name="is_private" value="1"> Private note</label>
-                        </div>
+                        <label class="check-line" style="padding-bottom:2px">
+                            <input type="checkbox" name="is_private" value="1"> Private note
+                        </label>
                     </div>
-                    {{-- General (default) --}}
+
+                    {{-- General (free-form) --}}
                     <div id="note-fields-general">
-                        <textarea name="note" class="note-area" rows="3" placeholder="Add a clinical note." required></textarea>
+                        <textarea name="note" class="note-area" rows="4" placeholder="Add a clinical note." required></textarea>
                     </div>
-                    {{-- SOAP: Subjective / Objective / Assessment / Plan --}}
+
+                    {{-- SOAP --}}
                     <div id="note-fields-soap" hidden>
-                        <div class="field-row" style="margin-bottom:8px">
-                            <div class="field"><label style="font-size:12px">Subjective <span style="font-weight:400;color:var(--muted)">(patient-reported symptoms)</span></label>
-                                <textarea name="soap_s" class="note-area" rows="2" placeholder="What the patient reports — pain, complaints, history…"></textarea>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                            <div class="field">
+                                <label>Subjective <span class="note-hint">patient-reported</span></label>
+                                <textarea name="soap_s" class="note-area" rows="3" placeholder="Pain, complaints, history…"></textarea>
                             </div>
-                            <div class="field"><label style="font-size:12px">Objective <span style="font-weight:400;color:var(--muted)">(measurable findings)</span></label>
-                                <textarea name="soap_o" class="note-area" rows="2" placeholder="Vitals, exam findings, lab results…"></textarea>
+                            <div class="field">
+                                <label>Objective <span class="note-hint">measurable findings</span></label>
+                                <textarea name="soap_o" class="note-area" rows="3" placeholder="Vitals, exam, lab results…"></textarea>
                             </div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field"><label style="font-size:12px">Assessment <span style="font-weight:400;color:var(--muted)">(clinical diagnosis)</span></label>
-                                <textarea name="soap_a" class="note-area" rows="2" placeholder="Diagnosis or differential…"></textarea>
+                            <div class="field">
+                                <label>Assessment <span class="note-hint">diagnosis</span></label>
+                                <textarea name="soap_a" class="note-area" rows="3" placeholder="Diagnosis or differential…"></textarea>
                             </div>
-                            <div class="field"><label style="font-size:12px">Plan <span style="font-weight:400;color:var(--muted)">(treatment)</span></label>
-                                <textarea name="soap_p" class="note-area" rows="2" placeholder="Medications, referrals, follow-up…"></textarea>
+                            <div class="field">
+                                <label>Plan <span class="note-hint">treatment</span></label>
+                                <textarea name="soap_p" class="note-area" rows="3" placeholder="Medications, referrals, follow-up…"></textarea>
                             </div>
                         </div>
                     </div>
-                    {{-- Progress: Status / Changes / Response / Next Steps --}}
+
+                    {{-- Progress --}}
                     <div id="note-fields-progress" hidden>
-                        <div class="field-row" style="margin-bottom:8px">
-                            <div class="field"><label style="font-size:12px">Current Status</label>
-                                <textarea name="prog_status" class="note-area" rows="2" placeholder="Patient's current clinical status…"></textarea>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                            <div class="field">
+                                <label>Current Status</label>
+                                <textarea name="prog_status" class="note-area" rows="3" placeholder="Patient's current clinical status…"></textarea>
                             </div>
-                            <div class="field"><label style="font-size:12px">Changes Since Last Visit</label>
-                                <textarea name="prog_changes" class="note-area" rows="2" placeholder="Improvements, regressions, new symptoms…"></textarea>
+                            <div class="field">
+                                <label>Changes Since Last Visit</label>
+                                <textarea name="prog_changes" class="note-area" rows="3" placeholder="Improvements, regressions…"></textarea>
                             </div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field"><label style="font-size:12px">Treatment Response</label>
-                                <textarea name="prog_response" class="note-area" rows="2" placeholder="How the patient is responding to treatment…"></textarea>
+                            <div class="field">
+                                <label>Treatment Response</label>
+                                <textarea name="prog_response" class="note-area" rows="3" placeholder="Response to current treatment…"></textarea>
                             </div>
-                            <div class="field"><label style="font-size:12px">Next Steps</label>
-                                <textarea name="prog_next" class="note-area" rows="2" placeholder="Upcoming interventions, referrals, goals…"></textarea>
+                            <div class="field">
+                                <label>Next Steps</label>
+                                <textarea name="prog_next" class="note-area" rows="3" placeholder="Interventions, referrals, goals…"></textarea>
                             </div>
                         </div>
                     </div>
-                    <div style="margin-top:10px"><button class="button-primary">Add note</button></div>
+
+                    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+                        <button class="button-primary">Add note</button>
+                    </div>
                 </form>
             </div></section>
             @php
@@ -433,6 +445,7 @@
     .modal-back[hidden] { display:none; }
     .chat .chat-scroll { border-radius:0; }
     #note-fields-general[hidden], #note-fields-soap[hidden], #note-fields-progress[hidden] { display:none; }
+    .note-hint { text-transform:none; letter-spacing:0; font-weight:400; font-size:10px; color:var(--muted); margin-left:5px; }
 </style>
 <script>
     // Note type switcher — shows the matching field group and toggles required.
