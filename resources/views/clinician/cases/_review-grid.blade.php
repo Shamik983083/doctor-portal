@@ -33,13 +33,13 @@
             <span><span id="eligCount">0</span> batch-eligible · <span id="blkCount">0</span> rows blocked from selection</span>
         </div>
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-            <label class="density"><input type="checkbox" id="compact" /> Compact columns</label>
+            <label class="density"><input type="checkbox" id="compact" checked /> Compact columns</label>
             <label class="select-all"><input type="checkbox" id="selectAll" /> Select batch-eligible Green cases</label>
         </div>
     </div>
 
     <div class="review-grid-scroll">
-        <table class="review-grid" id="reviewGrid">
+        <table class="review-grid compact" id="reviewGrid">
             <thead>
                 <tr>
                     <th class="pin pin-select"></th>

@@ -225,24 +225,26 @@ class StagingPreviewSeeder extends Seeder
         // exact shape (Devin msg 2258), so the queue's medication columns and the
         // quick-review drawer render with real-looking data on staging instead of
         // a wall of dashes. Fictitious patients; safe on demo staging.
+        // Last element is is_refill: two of Dr. Alvarez's cases are check-ins from
+        // returning patients so the Refills screen is populated (Devin msg 2290).
         $rows = [
             ['Ada',   'Whitfield', 'TN', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_RED,
-             ['Semaglutide', 'L1 · 2.5 mg', '3M', 'Titration', 'Zofran', '-', '-', 'N', 'Y', 'Y', 'Reports hives after penicillin; documented at intake.']],
+             ['Semaglutide', 'L1 · 2.5 mg', '3M', 'Titration', 'Zofran', '-', '-', 'N', 'Y', 'Y', 'Reports hives after penicillin; documented at intake.'], false],
             ['Marcus', 'Lindqvist', 'TN', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_YELLOW,
-             ['Tirzepatide', 'L3 · 7.5 mg', '4M', 'Hold', 'NAD+', '-', '-', 'Y', 'N', 'N', null]],
+             ['Tirzepatide', 'L3 · 7.5 mg', '4M', 'Hold', 'NAD+', '-', '-', 'Y', 'N', 'N', null], false],
             ['Priya', 'Raman',     'CA', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_GREEN,
-             ['Semaglutide', 'L1 · 2.5 mg', '1M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null]],
+             ['Semaglutide', 'L1 · 2.5 mg', '1M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null], false],
             ['Joel',  'Berhane',   'TN', PatientCase::STATUS_ASSIGNED, $mine->id,     PatientCase::TRIAGE_YELLOW,
-             ['Tirzepatide', 'L2 · 5 mg', '3M', 'Titration', 'Zofran', '-', '-', 'N', 'Y', 'N', null]],
+             ['Tirzepatide', 'L2 · 5 mg', '3M', 'Titration', 'Zofran', '-', '-', 'N', 'Y', 'N', null], true],
             ['Nina',  'Kowalski',  'CA', PatientCase::STATUS_ASSIGNED, $mine->id,     PatientCase::TRIAGE_GREEN,
-             ['Semaglutide', 'L2 · 5 mg', '3M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null]],
+             ['Semaglutide', 'L2 · 5 mg', '3M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null], true],
             ['Terrence', 'Boyd',   'TX', PatientCase::STATUS_ASSIGNED, $notMine->id,  PatientCase::TRIAGE_RED,
-             ['Tirzepatide', 'L4 · 10 mg', '6M', 'Hold', 'NAD+', 'Zofran', '-', 'Y', 'Y', 'Y', 'Sulfa drugs, rash reported at intake.']],
+             ['Tirzepatide', 'L4 · 10 mg', '6M', 'Hold', 'NAD+', 'Zofran', '-', 'Y', 'Y', 'Y', 'Sulfa drugs, rash reported at intake.'], false],
             ['Sofia', 'Marchetti', 'FL', PatientCase::STATUS_ASSIGNED, $notMine->id,  PatientCase::TRIAGE_GREEN,
-             ['Semaglutide', 'L1 · 2.5 mg', '3M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null]],
+             ['Semaglutide', 'L1 · 2.5 mg', '3M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null], false],
         ];
 
-        foreach ($rows as $i => [$first, $last, $state, $status, $clinicianId, $triage, $ci]) {
+        foreach ($rows as $i => [$first, $last, $state, $status, $clinicianId, $triage, $ci, $isRefill]) {
             $externalId = 'staging-preview-' . ($i + 1);
 
             $patient = Patient::firstOrCreate(
@@ -306,6 +308,7 @@ class StagingPreviewSeeder extends Seeder
                     'status'          => $status,
                     'patient_state'   => $state,
                     'triage'          => $triage,
+                    'is_refill'       => $isRefill,
                     'assigned_at'     => $clinicianId ? now() : null,
                     'clinical_intake' => $clinicalIntake,
                 ]
