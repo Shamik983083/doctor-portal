@@ -16,13 +16,22 @@
         @include('layouts.partials.preview-css')
 
         /*
-            The preview's .source-answers sets display:grid, and an explicit
-            author display value overrides the browser's [hidden] rule, so the
-            "View source answers" list rendered expanded and the collapse did
-            nothing (Devin msg 2273). This makes the hidden attribute win, so it
-            starts collapsed and only opens on click.
+            An explicit author display value overrides the browser's [hidden]
+            rule, so a collapsed list rendered open (Devin msg 2273). Force hidden
+            to win for both the old and the new source containers.
         */
-        .source-answers[hidden] { display: none; }
+        .source-answers[hidden], .qa-sheet[hidden] { display: none; }
+
+        /*
+            Source answers, cleaned up (Devin msg 2275): the question / answer
+            rows use the preview's .qa grid so each pair reads on its own line
+            with a divider, not blended. Consents are collapsed to a name that
+            opens the full text, with the answer shown as a pill.
+        */
+        .qa-sheet { margin-top: 10px; }
+        .qa-sheet .qa { align-items: start; }
+        .qa-sheet summary { cursor: pointer; font-weight: 680; color: var(--ink); list-style: revert; }
+        .qa-sheet .consent-full { color: var(--muted); font-size: 12px; line-height: 1.55; margin-top: 6px; }
     </style>
 </head>
 <body>

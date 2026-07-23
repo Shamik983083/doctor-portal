@@ -165,27 +165,45 @@
         // "All the answers that were passed" (Devin msg 2271): the real intake.
         // Prefer the flat case_questions, then the questionnaire response answers,
         // then the storefront's clinical_intake sourceAnswers as a last resort.
-        // A blank answer is shown as "Not answered" rather than dropped, because a
-        // blank is itself information to a reviewer.
+        // A blank answer is shown as "Not answered" rather than dropped.
+        //
+        // Consents are NOT drawn out in full (Devin msg 2275): each becomes a
+        // short name that expands to the full text, with the answer shown as a
+        // pill. Everything else is a clean question / answer row.
+        $srcRow = function ($question, $answer, $type = null) {
+            $q = trim((string) $question);
+            $a = filled($answer) ? (string) $answer : 'Not answered';
+            $isConsent = ($type === 'consent')
+                || preg_match('/\b(consent|i agree|i acknowledge|i authorize|telehealth|hipaa|terms of|privacy policy)\b/i', $q);
+            $agreed = (bool) preg_match('/^(agreed|yes|i agree|accept|accepted|true|1)$/i', trim($a));
+
+            $name = null;
+            if ($isConsent) {
+                if (preg_match('/telehealth/i', $q))                 { $name = 'Telehealth consent'; }
+                elseif (preg_match('/hipaa|privacy/i', $q))          { $name = 'Privacy / HIPAA consent'; }
+                elseif (preg_match('/terms/i', $q))                  { $name = 'Terms of use'; }
+                elseif (preg_match('/sms|text|message/i', $q))       { $name = 'SMS / messaging consent'; }
+                else { $name = \Illuminate\Support\Str::limit($q, 42); }
+            }
+
+            return ['q' => $q, 'a' => $a, 'consent' => $isConsent, 'name' => $name, 'agreed' => $agreed];
+        };
+
         $source = [];
         if ($case->caseQuestions->isNotEmpty()) {
             foreach ($case->caseQuestions as $cq) {
-                if (filled($cq->question)) {
-                    $source[] = ['q' => $cq->question, 'a' => filled($cq->answer) ? $cq->answer : 'Not answered'];
-                }
+                if (filled($cq->question)) { $source[] = $srcRow($cq->question, $cq->answer, $cq->type); }
             }
         } elseif ($case->questionnaireResponses->isNotEmpty()) {
             foreach ($case->questionnaireResponses as $resp) {
                 foreach ($resp->answers as $ans) {
-                    if (filled($ans->question_text)) {
-                        $source[] = ['q' => $ans->question_text, 'a' => filled($ans->answer) ? $ans->answer : 'Not answered'];
-                    }
+                    if (filled($ans->question_text)) { $source[] = $srcRow($ans->question_text, $ans->answer); }
                 }
             }
         }
         if (empty($source)) {
             foreach (($ci['sourceAnswers'] ?? []) as $k => $v) {
-                $source[] = ['q' => \Illuminate\Support\Str::headline($k), 'a' => ($v === null || $v === '') ? 'Not answered' : $v];
+                $source[] = $srcRow(\Illuminate\Support\Str::headline($k), $v);
             }
         }
 
@@ -256,8 +274,13 @@
 
             var source = (d.source && d.source.length)
                 ? '<button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers (' + d.source.length + ')</button>'
-                  + '<div class="source-answers" id="sourceAnswers" hidden>' + d.source.map(function (r) {
-                    return '<div><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
+                  + '<div class="qa-sheet" id="sourceAnswers" hidden>' + d.source.map(function (r) {
+                    if (r.consent) {
+                        return '<div class="qa consent"><dt><details><summary>' + esc(r.name)
+                            + '</summary><div class="consent-full">' + esc(r.q) + '</div></details></dt>'
+                            + '<dd><span class="pill ' + (r.agreed ? 'green' : 'red') + '">' + esc(r.agreed ? 'Agreed' : r.a) + '</span></dd></div>';
+                    }
+                    return '<div class="qa"><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
                   }).join('') + '</div>'
                 : '<p class="ai-honesty">No intake answers were passed for this case yet.</p>';
 

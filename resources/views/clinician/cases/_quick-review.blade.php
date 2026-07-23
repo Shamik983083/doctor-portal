@@ -32,9 +32,16 @@
 
         @if(!empty($d['source']))
             <button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers ({{ count($d['source']) }})</button>
-            <div class="source-answers" id="sourceAnswers" hidden>
+            <div class="qa-sheet" id="sourceAnswers" hidden>
                 @foreach($d['source'] as $row)
-                    <div><dt>{{ $row['q'] }}</dt><dd>{{ $row['a'] }}</dd></div>
+                    @if($row['consent'])
+                        <div class="qa consent">
+                            <dt><details><summary>{{ $row['name'] }}</summary><div class="consent-full">{{ $row['q'] }}</div></details></dt>
+                            <dd><span class="pill {{ $row['agreed'] ? 'green' : 'red' }}">{{ $row['agreed'] ? 'Agreed' : $row['a'] }}</span></dd>
+                        </div>
+                    @else
+                        <div class="qa"><dt>{{ $row['q'] }}</dt><dd>{{ $row['a'] }}</dd></div>
+                    @endif
                 @endforeach
             </div>
         @else
