@@ -221,17 +221,28 @@ class StagingPreviewSeeder extends Seeder
      */
     private function cases(Partner $partner, Clinician $mine, Clinician $notMine): void
     {
+        // Each row also carries a clinical_intake block in the design preview's
+        // exact shape (Devin msg 2258), so the queue's medication columns and the
+        // quick-review drawer render with real-looking data on staging instead of
+        // a wall of dashes. Fictitious patients; safe on demo staging.
         $rows = [
-            ['Ada',   'Whitfield', 'TN', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_RED],
-            ['Marcus', 'Lindqvist', 'TN', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_YELLOW],
-            ['Priya', 'Raman',     'CA', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_GREEN],
-            ['Joel',  'Berhane',   'TN', PatientCase::STATUS_ASSIGNED, $mine->id,     PatientCase::TRIAGE_YELLOW],
-            ['Nina',  'Kowalski',  'CA', PatientCase::STATUS_ASSIGNED, $mine->id,     PatientCase::TRIAGE_GREEN],
-            ['Terrence', 'Boyd',   'TX', PatientCase::STATUS_ASSIGNED, $notMine->id,  PatientCase::TRIAGE_RED],
-            ['Sofia', 'Marchetti', 'FL', PatientCase::STATUS_ASSIGNED, $notMine->id,  PatientCase::TRIAGE_GREEN],
+            ['Ada',   'Whitfield', 'TN', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_RED,
+             ['Semaglutide', 'L1 · 2.5 mg', '3M', 'Titration', 'Zofran', '-', '-', 'N', 'Y', 'Y', 'Reports hives after penicillin; documented at intake.']],
+            ['Marcus', 'Lindqvist', 'TN', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_YELLOW,
+             ['Tirzepatide', 'L3 · 7.5 mg', '4M', 'Hold', 'NAD+', '-', '-', 'Y', 'N', 'N', null]],
+            ['Priya', 'Raman',     'CA', PatientCase::STATUS_WAITING,  null,          PatientCase::TRIAGE_GREEN,
+             ['Semaglutide', 'L1 · 2.5 mg', '1M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null]],
+            ['Joel',  'Berhane',   'TN', PatientCase::STATUS_ASSIGNED, $mine->id,     PatientCase::TRIAGE_YELLOW,
+             ['Tirzepatide', 'L2 · 5 mg', '3M', 'Titration', 'Zofran', '-', '-', 'N', 'Y', 'N', null]],
+            ['Nina',  'Kowalski',  'CA', PatientCase::STATUS_ASSIGNED, $mine->id,     PatientCase::TRIAGE_GREEN,
+             ['Semaglutide', 'L2 · 5 mg', '3M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null]],
+            ['Terrence', 'Boyd',   'TX', PatientCase::STATUS_ASSIGNED, $notMine->id,  PatientCase::TRIAGE_RED,
+             ['Tirzepatide', 'L4 · 10 mg', '6M', 'Hold', 'NAD+', 'Zofran', '-', 'Y', 'Y', 'Y', 'Sulfa drugs, rash reported at intake.']],
+            ['Sofia', 'Marchetti', 'FL', PatientCase::STATUS_ASSIGNED, $notMine->id,  PatientCase::TRIAGE_GREEN,
+             ['Semaglutide', 'L1 · 2.5 mg', '3M', 'Titration', '-', '-', '-', 'N', 'N', 'N', null]],
         ];
 
-        foreach ($rows as $i => [$first, $last, $state, $status, $clinicianId, $triage]) {
+        foreach ($rows as $i => [$first, $last, $state, $status, $clinicianId, $triage, $ci]) {
             $externalId = 'staging-preview-' . ($i + 1);
 
             $patient = Patient::firstOrCreate(
@@ -248,15 +259,55 @@ class StagingPreviewSeeder extends Seeder
                 ]
             );
 
-            PatientCase::firstOrCreate(
+            [$product, $dose, $term, $plan, $med2, $med3, $med4, $onGlp, $zofran, $allergy, $allergyDetail] = $ci;
+
+            $clinicalIntake = [
+                'product'         => $product,
+                'dose'            => $dose,
+                'term'            => $term,
+                'plan'            => $plan,
+                'med2'            => $med2,
+                'med3'            => $med3,
+                'med4'            => $med4,
+                'onGlp'           => $onGlp,
+                'zofran'          => $zofran,
+                'allergy'         => $allergy,
+                'allergyDetail'   => $allergyDetail,
+                'video'           => $triage === PatientCase::TRIAGE_GREEN ? 'Clear' : 'Required',
+                'protocolVersion' => 'GLP-1 protocol v8',
+                'findings'        => [
+                    [$triage === PatientCase::TRIAGE_GREEN ? 'green' : ($triage === PatientCase::TRIAGE_RED ? 'red' : 'yellow'),
+                     $triage === PatientCase::TRIAGE_GREEN
+                        ? 'Requested dose matches the current protocol titration step.'
+                        : 'Requested regimen needs clinician review.'],
+                ],
+                'summary'         => [
+                    ['Requested regimen: ' . $term . ' term, dose ' . $dose . ', plan ' . $plan . '.', ['requestedTerm', 'requestedDoseLevel', 'dosePlan']],
+                    ['Currently on GLP-1 therapy: ' . ($onGlp === 'Y' ? 'yes' : 'no') . '.', ['currentlyOnGlp']],
+                    ['Concerning allergies flagged: ' . ($allergy === 'Y' ? 'yes.' : 'no.'), ['concerningAllergies']],
+                ],
+                'sourceAnswers'   => [
+                    'requestedTerm'       => $term,
+                    'requestedDoseLevel'  => $dose,
+                    'dosePlan'            => $plan,
+                    'currentlyOnGlp'      => $onGlp === 'Y' ? 'Yes' : 'No',
+                    'concerningAllergies' => $allergy === 'Y' ? 'Yes' : 'No',
+                    'allergyDetail'       => $allergyDetail,
+                ],
+            ];
+
+            // updateOrCreate (not firstOrCreate) so a re-run backfills the
+            // clinical_intake onto cases seeded before this column existed.
+            PatientCase::updateOrCreate(
                 ['partner_id' => $partner->id, 'external_id' => $externalId],
                 [
-                    'patient_id'    => $patient->id,
-                    'clinician_id'  => $clinicianId,
-                    'status'        => $status,
-                    'patient_state' => $state,
-                    'triage'        => $triage,
-                    'assigned_at'   => $clinicianId ? now() : null,
+                    'patient_id'      => $patient->id,
+                    'clinician_id'    => $clinicianId,
+                    'status'          => $status,
+                    'patient_state'   => $state,
+                    'triage'          => $triage,
+                    'assigned_at'     => $clinicianId ? now() : null,
+                    'clinical_intake' => $clinicalIntake,
                 ]
             );
         }
