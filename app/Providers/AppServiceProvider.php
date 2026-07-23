@@ -90,8 +90,9 @@ class AppServiceProvider extends ServiceProvider
                 ->where('messages.is_read', false)
                 ->count();
 
-            // Triage bands across the open queue (matches the queue screen).
-            $triage = PatientCase::whereIn('status', $open)
+            // Triage bands scoped to this clinician's open cases.
+            $triage = PatientCase::where('clinician_id', $clinician->id)
+                ->whereIn('status', $open)
                 ->selectRaw('triage, COUNT(*) as c')
                 ->groupBy('triage')
                 ->pluck('c', 'triage');
