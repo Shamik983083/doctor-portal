@@ -125,7 +125,7 @@
                     <span class="nav-ico">&#128172;</span><span class="lbl">Messages For Provider</span>
                     <span class="nav-count {{ $nav['messages'] ? '' : 'zero' }}" id="msgBadge">{{ $nav['messages'] }}</span>
                 </a>
-                <a class="nav-link" href="{{ route('clinician.queue') }}?status=support">
+                <a class="nav-link {{ request()->routeIs('clinician.cases.my-cases') && request()->get('tab') === 'escalations' ? 'active' : '' }}" href="{{ route('clinician.cases.my-cases', ['tab' => 'escalations']) }}">
                     <span class="nav-ico">&#9888;</span><span class="lbl">My Escalations</span>
                     <span class="nav-count {{ $nav['escalations'] ? '' : 'zero' }}">{{ $nav['escalations'] }}</span>
                 </a>

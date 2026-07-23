@@ -172,16 +172,18 @@ class CaseController extends Controller
             ->when($request->filled('triage'), fn ($q) => $q->where('triage', $request->triage));
 
         $counts = [
-            'active'    => (clone $base)->whereIn('status', $activeStatuses)->count(),
-            'completed' => (clone $base)->whereIn('status', $completedStatuses)->count(),
-            'cancelled' => (clone $base)->whereIn('status', $cancelledStatuses)->count(),
-            'all'       => (clone $base)->count(),
+            'active'      => (clone $base)->whereIn('status', $activeStatuses)->count(),
+            'escalations' => (clone $base)->where('status', 'support')->count(),
+            'completed'   => (clone $base)->whereIn('status', $completedStatuses)->count(),
+            'cancelled'   => (clone $base)->whereIn('status', $cancelledStatuses)->count(),
+            'all'         => (clone $base)->count(),
         ];
 
         $cases = (clone $base)
-            ->when($tab === 'active',    fn ($q) => $q->whereIn('status', $activeStatuses))
-            ->when($tab === 'completed', fn ($q) => $q->whereIn('status', $completedStatuses))
-            ->when($tab === 'cancelled', fn ($q) => $q->whereIn('status', $cancelledStatuses))
+            ->when($tab === 'active',      fn ($q) => $q->whereIn('status', $activeStatuses))
+            ->when($tab === 'escalations', fn ($q) => $q->where('status', 'support'))
+            ->when($tab === 'completed',   fn ($q) => $q->whereIn('status', $completedStatuses))
+            ->when($tab === 'cancelled',   fn ($q) => $q->whereIn('status', $cancelledStatuses))
             ->orderByRaw("FIELD(status, 'waiting','support','assigned','approved','processing','completed','cancelled')")
             ->orderBy('created_at', 'desc')
             ->paginate(25)

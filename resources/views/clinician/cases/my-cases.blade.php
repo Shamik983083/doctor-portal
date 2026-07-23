@@ -18,7 +18,7 @@
 
 {{-- Status tabs --}}
 <div class="mc-tabs">
-    @foreach(['active' => 'Active', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'all' => 'All cases'] as $key => $label)
+    @foreach(['active' => 'Active', 'escalations' => 'My Escalations', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'all' => 'All cases'] as $key => $label)
         <a href="{{ route('clinician.cases.my-cases', array_merge(request()->except('tab','page'), ['tab' => $key])) }}"
            class="mc-tab {{ $tab === $key ? 'active' : '' }}">
             {{ $label }} <span class="mc-tab-count">{{ number_format($counts[$key]) }}</span>
@@ -26,11 +26,25 @@
     @endforeach
 </div>
 
+@php
+$tabTitle = match($tab) {
+    'active'      => 'Active cases',
+    'escalations' => 'My Escalations',
+    'completed'   => 'Completed cases',
+    'cancelled'   => 'Cancelled cases',
+    default       => 'All cases',
+};
+$tabSub = match($tab) {
+    'escalations' => number_format($counts['escalations']) . ' ' . ($counts['escalations'] === 1 ? 'case' : 'cases') . ' escalated to support.',
+    default       => number_format($counts[$tab]) . ' ' . ($counts[$tab] === 1 ? 'case' : 'cases') . ' assigned to you.',
+};
+@endphp
+
 @include('clinician.cases._review-grid', [
     'cases'   => $cases,
     'eyebrow' => 'My cases',
-    'title'   => ($tab === 'active' ? 'Active cases' : ($tab === 'completed' ? 'Completed cases' : ($tab === 'cancelled' ? 'Cancelled cases' : 'All cases'))),
-    'sub'     => number_format($counts[$tab]) . ' ' . ($counts[$tab] === 1 ? 'case' : 'cases') . ' assigned to you.',
+    'title'   => $tabTitle,
+    'sub'     => $tabSub,
 ])
 @endsection
 
