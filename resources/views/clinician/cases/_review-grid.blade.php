@@ -367,7 +367,10 @@
 <div class="modal-back" id="reviewOverlay" hidden>
     <div class="modal" style="width:min(1080px,94vw);height:88vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)">
-            <strong style="font-size:15px">Review and approve</strong>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <strong style="font-size:15px" id="reviewTitle">Review and approve</strong>
+                <span id="batchCounter" style="display:none;font-size:12px;color:var(--muted);background:var(--blue-bg);padding:2px 10px;border-radius:99px;font-weight:600;"></span>
+            </div>
             <button type="button" class="icon-btn" id="reviewClose" aria-label="Close">&times;</button>
         </div>
         <iframe id="reviewFrame" title="Review and approve" style="flex:1;width:100%;border:0"></iframe>
@@ -375,53 +378,104 @@
 </div>
 <script>
     (function () {
-        var overlay = document.getElementById('reviewOverlay');
-        var frame   = document.getElementById('reviewFrame');
+        var overlay    = document.getElementById('reviewOverlay');
+        var frame      = document.getElementById('reviewFrame');
+        var counter    = document.getElementById('batchCounter');
+        var preflight  = document.getElementById('preflight');
         if (!overlay || !frame) return;
 
-        var reviewPath = '/clinician/cases/';   // the prescribe form path fragment
+        var reviewPath = '/clinician/cases/';
 
-        function open(url) {
+        // Batch queue state
+        var batchQueue  = [];
+        var batchIndex  = 0;
+        var batchActive = false;
+
+        function updateCounter() {
+            if (!batchActive || batchQueue.length <= 1) { counter.style.display = 'none'; return; }
+            counter.style.display = 'inline-block';
+            counter.textContent   = 'Case ' + (batchIndex + 1) + ' of ' + batchQueue.length;
+        }
+
+        function openUrl(url) {
             frame.src = url;
             overlay.removeAttribute('hidden');
             document.body.style.overflow = 'hidden';
+            updateCounter();
         }
-        function close(reload) {
+
+        function closeModal(reload) {
             overlay.setAttribute('hidden', '');
             frame.src = 'about:blank';
             document.body.style.overflow = '';
+            batchActive = false;
+            batchQueue  = [];
+            batchIndex  = 0;
+            counter.style.display = 'none';
             if (reload) window.location.reload();
         }
 
-        // Any Review button (server-rendered or JS-rendered) opens the modal.
+        function onCaseSubmitted() {
+            batchIndex++;
+            if (batchIndex < batchQueue.length) {
+                // Open next case in the queue
+                openUrl(batchQueue[batchIndex]);
+            } else {
+                // All done — reload so statuses refresh
+                closeModal(true);
+            }
+        }
+
+        // Single Review button click (data-review-url attribute)
         document.addEventListener('click', function (e) {
             var link = e.target.closest('[data-review-url]');
             if (!link) return;
             e.preventDefault();
-            open(link.getAttribute('data-review-url'));
+            batchActive = false;
+            batchQueue  = [link.getAttribute('data-review-url')];
+            batchIndex  = 0;
+            openUrl(batchQueue[0]);
         });
 
-        // The bare form posts a message when Cancel is clicked.
+        // Batch preflight button — open selected cases in sequence
+        if (preflight) {
+            preflight.addEventListener('click', function () {
+                var grid = document.getElementById('reviewGrid');
+                if (!grid) return;
+                var urls = [];
+                grid.querySelectorAll('.row-check:checked:not(:disabled)').forEach(function (cb) {
+                    var uuid = cb.getAttribute('data-check');
+                    if (uuid) urls.push(reviewPath + uuid + '/prescribe?modal=1');
+                });
+                if (!urls.length) return;
+                batchQueue  = urls;
+                batchIndex  = 0;
+                batchActive = urls.length > 1;
+                openUrl(batchQueue[0]);
+            });
+        }
+
+        // Cancel message from inside the iframe
         window.addEventListener('message', function (e) {
-            if (e.data === 'close-review') close(false);
+            if (e.data === 'close-review') closeModal(false);
         });
 
-        // When the iframe navigates AWAY from the prescribe form (a submit
-        // redirects to the case screen), the decision was made: close and reload
-        // the grid so the case's new state shows.
+        // Iframe navigated away from the prescribe form = case was submitted
         frame.addEventListener('load', function () {
             var href;
             try { href = frame.contentWindow.location.href; } catch (err) { return; }
             if (!href || href === 'about:blank') return;
-            // The prescribe form URL carries ?modal=1; once it no longer does, the
-            // form has submitted and redirected.
             if (href.indexOf('modal=1') === -1 && href.indexOf(reviewPath) !== -1) {
-                close(true);
+                if (batchActive) {
+                    onCaseSubmitted();
+                } else {
+                    closeModal(true);
+                }
             }
         });
 
-        document.getElementById('reviewClose').addEventListener('click', function () { close(false); });
-        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false); });
-        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hasAttribute('hidden')) close(false); });
+        document.getElementById('reviewClose').addEventListener('click', function () { closeModal(false); });
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(false); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hasAttribute('hidden')) closeModal(false); });
     })();
 </script>
