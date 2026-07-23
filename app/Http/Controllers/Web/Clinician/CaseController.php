@@ -270,7 +270,26 @@ class CaseController extends Controller
             ->groupBy('case_id')
             ->map(fn ($group) => $group->first());
 
-        return view('clinician.messages.index', compact('cases', 'clinician', 'latest'));
+        // The conversation open in the right pane (Devin msg 2294): the one named
+        // in ?case=, else the most recent. Its full thread is loaded and its
+        // inbound messages are marked read now that the provider is looking.
+        $selected = null;
+        $thread = collect();
+        if ($cases->isNotEmpty()) {
+            $selected = $request->filled('case')
+                ? $cases->firstWhere('uuid', $request->get('case'))
+                : null;
+            $selected = $selected ?: $cases->first();
+
+            $selected->loadMissing('patient', 'partner');
+            $thread = $selected->messages()->orderBy('created_at')->get();
+
+            $selected->messages()
+                ->where('direction', 'inbound')->where('is_read', false)
+                ->update(['is_read' => true, 'read_at' => now()]);
+        }
+
+        return view('clinician.messages.index', compact('cases', 'clinician', 'latest', 'selected', 'thread'));
     }
 
     /**
