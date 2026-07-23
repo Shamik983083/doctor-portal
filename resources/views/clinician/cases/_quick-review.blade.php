@@ -71,7 +71,7 @@
     {{-- 3. Provider actions (link to the real case flows) --}}
     <div>
         <div class="subheading">Provider actions</div>
-        <a class="button-primary full-width" href="{{ $d['approveUrl'] }}">Review and approve</a>
+        <a class="button-primary full-width" href="{{ $d['approveUrl'] }}" data-review-url="{{ $d['reviewUrl'] }}">Review and approve</a>
         <a class="button-secondary full-width" href="{{ $d['showUrl'] }}">Request information</a>
         <a class="button-danger full-width" href="{{ $d['showUrl'] }}">Reject</a>
     </div>

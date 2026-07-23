@@ -206,6 +206,7 @@
             'source'   => $source,
             'hold'     => (bool) $case->hold_status,
             'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
+            'reviewUrl'  => route('clinician.cases.prescribe.form', $case->uuid) . '?modal=1',
             'showUrl'    => route('clinician.cases.show', $case->uuid),
         ];
     };
@@ -289,7 +290,7 @@
                 + '<ul class="finding-list">' + findings + '</ul>'
                 + '<div class="subheading holds-heading">Active workflow holds</div>' + holds + '</div>'
                 + '<div><div class="subheading">Provider actions</div>'
-                + '<a class="button-primary full-width" href="' + esc(d.approveUrl) + '">Review and approve</a>'
+                + '<a class="button-primary full-width" href="' + esc(d.approveUrl) + '" data-review-url="' + esc(d.reviewUrl) + '">Review and approve</a>'
                 + '<a class="button-secondary full-width" href="' + esc(d.showUrl) + '">Request information</a>'
                 + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a></div>'
                 + '</div>';
@@ -355,5 +356,72 @@
             grid.classList.toggle('compact', compact.checked);
         });
         refresh();
+    })();
+</script>
+
+{{-- Review and approve as a modal over the grid (Devin msg 2292: make it a pop
+     so providers don't change screens). The Review button opens the existing
+     prescribe form in an iframe (rendered bare via ?modal=1), so all its working
+     logic runs natively. On submit the form redirects to the case screen; the
+     iframe navigating away is the signal to close and refresh the grid. --}}
+<div class="modal-back" id="reviewOverlay" hidden>
+    <div class="modal" style="width:min(1080px,94vw);height:88vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)">
+            <strong style="font-size:15px">Review and approve</strong>
+            <button type="button" class="icon-btn" id="reviewClose" aria-label="Close">&times;</button>
+        </div>
+        <iframe id="reviewFrame" title="Review and approve" style="flex:1;width:100%;border:0"></iframe>
+    </div>
+</div>
+<script>
+    (function () {
+        var overlay = document.getElementById('reviewOverlay');
+        var frame   = document.getElementById('reviewFrame');
+        if (!overlay || !frame) return;
+
+        var reviewPath = '/clinician/cases/';   // the prescribe form path fragment
+
+        function open(url) {
+            frame.src = url;
+            overlay.removeAttribute('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function close(reload) {
+            overlay.setAttribute('hidden', '');
+            frame.src = 'about:blank';
+            document.body.style.overflow = '';
+            if (reload) window.location.reload();
+        }
+
+        // Any Review button (server-rendered or JS-rendered) opens the modal.
+        document.addEventListener('click', function (e) {
+            var link = e.target.closest('[data-review-url]');
+            if (!link) return;
+            e.preventDefault();
+            open(link.getAttribute('data-review-url'));
+        });
+
+        // The bare form posts a message when Cancel is clicked.
+        window.addEventListener('message', function (e) {
+            if (e.data === 'close-review') close(false);
+        });
+
+        // When the iframe navigates AWAY from the prescribe form (a submit
+        // redirects to the case screen), the decision was made: close and reload
+        // the grid so the case's new state shows.
+        frame.addEventListener('load', function () {
+            var href;
+            try { href = frame.contentWindow.location.href; } catch (err) { return; }
+            if (!href || href === 'about:blank') return;
+            // The prescribe form URL carries ?modal=1; once it no longer does, the
+            // form has submitted and redirected.
+            if (href.indexOf('modal=1') === -1 && href.indexOf(reviewPath) !== -1) {
+                close(true);
+            }
+        });
+
+        document.getElementById('reviewClose').addEventListener('click', function () { close(false); });
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hasAttribute('hidden')) close(false); });
     })();
 </script>

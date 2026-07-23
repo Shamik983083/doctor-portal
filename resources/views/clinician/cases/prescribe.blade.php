@@ -1,4 +1,6 @@
-@extends('layouts.clinician-exact')
+{{-- Full screen normally; bare (no sidebar) when opened as a modal over the grid
+     via ?modal=1 (Devin msg 2292). --}}
+@extends(request()->boolean('modal') ? 'layouts.bare' : 'layouts.clinician-exact')
 
 @section('title', 'Case Review')
 @section('page-title', 'Case Review')
@@ -115,7 +117,11 @@
         <div class="modal-foot">
             <div class="foot-status"><strong id="medCount">0</strong> medication(s) decided</div>
             <div class="foot-actions">
-                <a class="button-secondary" href="{{ route('clinician.cases.show', $case->uuid) }}">Cancel</a>
+                @if(request()->boolean('modal'))
+                    <button type="button" class="button-secondary" onclick="parent.postMessage('close-review','*')">Cancel</button>
+                @else
+                    <a class="button-secondary" href="{{ route('clinician.cases.show', $case->uuid) }}">Cancel</a>
+                @endif
                 <button type="submit" class="button-primary" id="submitBtn" disabled>Approve &amp; submit</button>
             </div>
         </div>

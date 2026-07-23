@@ -22,6 +22,10 @@
         */
         .source-answers[hidden], .qa-sheet[hidden] { display: none; }
 
+        /* The review modal overlay. .modal-back sets its own display, which beats
+           the [hidden] attribute, so force hidden to win here too. */
+        .modal-back[hidden] { display: none; }
+
         /*
             Source answers, cleaned up (Devin msg 2275): the question / answer
             rows use the preview's .qa grid so each pair reads on its own line
@@ -55,7 +59,7 @@
 
             <div class="nav-section"><span>Tasks</span></div>
             <div class="nav-group">
-                <a class="nav-link {{ request()->routeIs('clinician.queue') || (request()->routeIs('clinician.cases.*') && !request()->routeIs('clinician.cases.my-cases')) ? 'active' : '' }}" href="{{ route('clinician.queue') }}">
+                <a class="nav-link {{ request()->routeIs('clinician.queue') || request()->routeIs('clinician.cases.queue') ? 'active' : '' }}" href="{{ route('clinician.queue') }}">
                     <span class="nav-ico">&#128451;</span><span class="lbl">Case Queue</span>
                     <span class="nav-count {{ $nav['queue'] ? '' : 'zero' }}">{{ $nav['queue'] }}</span>
                 </a>
