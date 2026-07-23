@@ -8,9 +8,11 @@
     Both views include this inside @section('view'); the <script> blocks run in
     the body, so no separate scripts section is needed.
 --}}
-@php($eyebrow = $eyebrow ?? 'Provider review queue')
-@php($title = $title ?? 'Fast review, full context one click away')
-@php($sub = $sub ?? 'Highest-attention cases surface first. Triage is a review-priority signal, not a clinical decision.')
+@php
+    $eyebrow = $eyebrow ?? 'Provider review queue';
+    $title = $title ?? 'Fast review, full context one click away';
+    $sub = $sub ?? 'Highest-attention cases surface first. Triage is a review-priority signal, not a clinical decision.';
+@endphp
 
 <section class="panel queue-panel">
     <div class="panel-heading">
