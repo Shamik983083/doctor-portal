@@ -313,8 +313,8 @@
 
             {{-- Clinical Notes --}}
             <div class="tab-pane fade" id="tab-notes">
-                @forelse($case->clinicalNotes->sortByDesc('created_at') as $note)
-                <div class="card mb-2 {{ $note->is_private ? 'border-warning' : '' }}">
+                @forelse($case->clinicalNotes->where('is_private', false)->sortByDesc('created_at') as $note)
+                <div class="card mb-2">
                     <div class="card-body py-2 px-3">
                         <div class="d-flex justify-content-between mb-1">
                             <small class="fw-semibold">

@@ -197,11 +197,12 @@
                     <div style="margin-top:10px"><button class="button-primary">Add note</button></div>
                 </form>
             </div></section>
-            @forelse($case->clinicalNotes->sortByDesc('created_at') as $note)
+            @php($myClinicianId = Auth::user()->clinician?->id)
+            @forelse($case->clinicalNotes->filter(fn($n) => !$n->is_private || $n->clinician_id === $myClinicianId)->sortByDesc('created_at') as $note)
             <section class="panel" style="margin-bottom:8px;{{ $note->is_private ? 'border-color:#e5c07a' : '' }}"><div style="padding:12px 16px">
                 <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
                     <strong>{{ $note->clinician->full_name ?? 'Unknown' }} <span style="color:var(--muted)">· {{ ucfirst($note->type) }}</span></strong>
-                    <span style="color:var(--muted)">{{ $note->created_at->diffForHumans() }} {{ $note->is_private ? '(private)' : '' }}</span>
+                    <span style="color:var(--muted)">{{ $note->created_at->diffForHumans() }} {{ $note->is_private ? '· private' : '' }}</span>
                 </div>
                 <div style="font-size:13px">{{ $note->note }}</div>
             </div></section>
