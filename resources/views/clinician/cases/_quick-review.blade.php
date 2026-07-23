@@ -31,11 +31,14 @@
         <p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.</p>
 
         @if(!empty($d['source']))
-            <div class="source-answers">
+            <button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers ({{ count($d['source']) }})</button>
+            <div class="source-answers" id="sourceAnswers" hidden>
                 @foreach($d['source'] as $row)
                     <div><dt>{{ $row['q'] }}</dt><dd>{{ $row['a'] }}</dd></div>
                 @endforeach
             </div>
+        @else
+            <p class="ai-honesty">No intake answers were passed for this case yet.</p>
         @endif
     </div>
 

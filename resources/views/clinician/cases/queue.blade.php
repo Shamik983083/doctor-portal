@@ -162,9 +162,31 @@
         elseif (!in_array($case->status, ['waiting','assigned'])) { $tone='red'; $label='Blocked'; }
         else { $tone='green'; $label='Eligible'; }
 
+        // "All the answers that were passed" (Devin msg 2271): the real intake.
+        // Prefer the flat case_questions, then the questionnaire response answers,
+        // then the storefront's clinical_intake sourceAnswers as a last resort.
+        // A blank answer is shown as "Not answered" rather than dropped, because a
+        // blank is itself information to a reviewer.
         $source = [];
-        foreach (($ci['sourceAnswers'] ?? []) as $k => $v) {
-            $source[] = ['q' => \Illuminate\Support\Str::headline($k), 'a' => ($v === null || $v === '') ? 'Not answered' : $v];
+        if ($case->caseQuestions->isNotEmpty()) {
+            foreach ($case->caseQuestions as $cq) {
+                if (filled($cq->question)) {
+                    $source[] = ['q' => $cq->question, 'a' => filled($cq->answer) ? $cq->answer : 'Not answered'];
+                }
+            }
+        } elseif ($case->questionnaireResponses->isNotEmpty()) {
+            foreach ($case->questionnaireResponses as $resp) {
+                foreach ($resp->answers as $ans) {
+                    if (filled($ans->question_text)) {
+                        $source[] = ['q' => $ans->question_text, 'a' => filled($ans->answer) ? $ans->answer : 'Not answered'];
+                    }
+                }
+            }
+        }
+        if (empty($source)) {
+            foreach (($ci['sourceAnswers'] ?? []) as $k => $v) {
+                $source[] = ['q' => \Illuminate\Support\Str::headline($k), 'a' => ($v === null || $v === '') ? 'Not answered' : $v];
+            }
         }
 
         return [
@@ -233,10 +255,11 @@
                 : '<li><span class="finding-dot neutral"></span> No findings recorded from intake yet.</li>';
 
             var source = (d.source && d.source.length)
-                ? '<div class="source-answers">' + d.source.map(function (r) {
+                ? '<button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers (' + d.source.length + ')</button>'
+                  + '<div class="source-answers" id="sourceAnswers" hidden>' + d.source.map(function (r) {
                     return '<div><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
                   }).join('') + '</div>'
-                : '';
+                : '<p class="ai-honesty">No intake answers were passed for this case yet.</p>';
 
             var holds = d.hold
                 ? '<ul class="holds-list"><li><code class="audit-verb">WORKFLOW_HOLD_ACTIVE</code></li></ul>'
@@ -279,6 +302,18 @@
                 render(CASE_DATA[tr.getAttribute('data-row')]);
                 panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             });
+        });
+
+        // Delegated so it keeps working after the panel is re-rendered on a click.
+        panel.addEventListener('click', function (e) {
+            var btn = e.target.closest('#srcToggle');
+            if (!btn) return;
+            var box = document.getElementById('sourceAnswers');
+            if (!box) return;
+            var open = box.hasAttribute('hidden');
+            if (open) { box.removeAttribute('hidden'); } else { box.setAttribute('hidden', ''); }
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.textContent = (open ? 'Hide source answers' : 'View source answers') + ' (' + box.children.length + ')';
         });
     })();
 </script>

@@ -41,7 +41,13 @@ class CaseController extends Controller
     {
         $clinician = Auth::user()->clinician;
 
-        $cases = PatientCase::with(['patient', 'partner', 'caseOfferings.offering'])
+        // caseQuestions + questionnaire answers are eager-loaded so the quick
+        // review's "View source answers" can show the full intake (Devin msg
+        // 2271) without a query per case.
+        $cases = PatientCase::with([
+                'patient', 'partner', 'caseOfferings.offering',
+                'caseQuestions', 'questionnaireResponses.answers',
+            ])
             ->withCount(['messages as unread_messages_count' => fn ($q) => $q->where('direction', 'inbound')->where('is_read', false),
             ])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
