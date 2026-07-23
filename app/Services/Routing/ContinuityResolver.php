@@ -62,14 +62,32 @@ final class ContinuityResolver
         EligibilityEvaluator::MESSAGE_AGING_BLOCK,
     ];
 
+    /*
+     * THE TWO NEW AXES ARE ABSENT FROM THAT LIST ON PURPOSE (Devin msg 2313 Q3:
+     * "go with your rec, we can always adjust later, in that case if both blocked
+     * then route them to a new provider").
+     *
+     * CATEGORY_NOT_ACCEPTED, VISIT_TYPE_NOT_ACCEPTED and SCHEDULING_LINK_MISSING
+     * are clinical scope, not workload, so continuity does not beat them. A
+     * doctor who has stopped taking peptides does not keep receiving peptide
+     * check-ins from their own patients; that check-in falls through to the
+     * refill-path mode and gets a new provider, which is exactly what Devin
+     * asked for. The inverse allow-list above is what makes that automatic: a new
+     * reason code blocks by default rather than becoming overridable because
+     * nobody updated a list.
+     */
+
     /**
      * The doctor this check-in should go back to, or null.
      *
      * Null means "continuity does not apply, route normally" in every case: not a
      * check-in, no prior doctor, or that doctor can no longer take it.
      */
-    public function resolve(PatientCase $case, bool $requireRecordedLicensure = false): ?Clinician
-    {
+    public function resolve(
+        PatientCase $case,
+        bool $requireRecordedLicensure = true,
+        ?CaseRequirements $requirements = null,
+    ): ?Clinician {
         if (! $case->isRefillRequest()) {
             return null;
         }
@@ -81,7 +99,8 @@ final class ContinuityResolver
         }
 
         $clinician = $previous->clinician;
-        $blocking  = $this->blockingReasons($clinician, $case, $requireRecordedLicensure);
+        $clinician->loadMissing('acceptedCategories');
+        $blocking  = $this->blockingReasons($clinician, $case, $requireRecordedLicensure, $requirements);
 
         if ($blocking !== []) {
             // Logged because "why did my check-in go to a different doctor" is
@@ -142,8 +161,12 @@ final class ContinuityResolver
      *
      * @return string[]
      */
-    private function blockingReasons(Clinician $clinician, PatientCase $case, bool $requireRecordedLicensure): array
-    {
+    private function blockingReasons(
+        Clinician $clinician,
+        PatientCase $case,
+        bool $requireRecordedLicensure,
+        ?CaseRequirements $requirements = null,
+    ): array {
         $state = $case->patient_state ?: $case->patient?->state;
 
         $reasons = EligibilityEvaluator::evaluate(
@@ -158,6 +181,11 @@ final class ContinuityResolver
             ],
             null,
             $requireRecordedLicensure,
+            // Category and visit type are evaluated here too, and are NOT in
+            // OVERRIDABLE, so they block a check-in exactly as they block a first
+            // visit. Passing null would silently exempt continuity from the two
+            // new axes, which is the opposite of Devin's Q3 answer.
+            $requirements,
         );
 
         $reasons = array_values(array_diff($reasons, self::OVERRIDABLE));

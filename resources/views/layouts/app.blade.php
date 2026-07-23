@@ -327,6 +327,16 @@
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif
+            @if(session('warning'))
+                {{-- Controllers have flashed 'warning' since the routing screen
+                     shipped and there was no block for it here, so those messages
+                     were dropped. The pool refusal path depends on this one
+                     reaching the doctor. --}}
+                <div class="alert alert-warning alert-dismissible fade show">
+                    <i class="bi bi-exclamation-triangle me-2"></i>{{ session('warning') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
             @if(session('error'))
                 <div class="alert alert-danger alert-dismissible fade show">
                     <i class="bi bi-exclamation-circle me-2"></i>{{ session('error') }}

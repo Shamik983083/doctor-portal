@@ -90,8 +90,22 @@ class ClinicianController extends Controller
 
     public function edit(int $id)
     {
-        $clinician = Clinician::visibleTo(auth()->user())->with('user')->findOrFail($id);
-        return view('admin.clinicians.edit', compact('clinician'));
+        $clinician = Clinician::visibleTo(auth()->user())
+            ->with(['user', 'acceptedCategories'])
+            ->findOrFail($id);
+
+        // The eligibility gate's doctor side (Devin msg 2308). Only active
+        // categories are offered: a deactivated one should not be newly ticked,
+        // though an existing tick is left alone rather than silently dropped.
+        $categories = \App\Models\OfferingCategory::where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return view('admin.clinicians.edit', [
+            'clinician'            => $clinician,
+            'categories'           => $categories,
+            'acceptedCategoryIds'  => $clinician->acceptedCategories->pluck('id')->all(),
+        ]);
     }
 
     public function update(Request $request, int $id)
@@ -114,6 +128,12 @@ class ClinicianController extends Controller
             'max_daily_new_cases'          => 'nullable|integer|min:1',
             'max_open_cases'               => 'nullable|integer|min:1',
             'daily_refill_alert_threshold' => 'nullable|integer|min:1',
+            // The eligibility gate, doctor side (Devin msg 2308).
+            'accepted_categories'   => 'nullable|array',
+            'accepted_categories.*' => 'integer|exists:offering_categories,id',
+            'accepts_async_visits'  => 'nullable|boolean',
+            'accepts_sync_visits'   => 'nullable|boolean',
+            'scheduling_link'       => 'nullable|url|max:500',
             'license_info'         => 'required|array|min:1',
             'license_info.*.state' => 'required|string|size:2',
             'license_info.*.number'=> 'required|string|max:100',
@@ -148,8 +168,22 @@ class ClinicianController extends Controller
             'max_daily_new_cases'          => $data['max_daily_new_cases'] ?? null,
             'max_open_cases'               => $data['max_open_cases'] ?? null,
             'daily_refill_alert_threshold' => $data['daily_refill_alert_threshold'] ?? null,
+            'accepts_async_visits'         => $request->boolean('accepts_async_visits'),
+            'accepts_sync_visits'          => $request->boolean('accepts_sync_visits'),
+            // Blank clears it. A doctor who takes synchronous visits with no link
+            // is blocked from those cases rather than assigned ones nobody can
+            // book, which is why this is validated as a real URL.
+            'scheduling_link'              => $data['scheduling_link'] ?? null,
             'licensed_states' => $licensedStates,
         ]);
+
+        /*
+         * Accepted categories (Devin msg 2308). sync() rather than attach so
+         * unticking removes, and an empty array is a real answer meaning "this
+         * doctor accepts nothing" rather than "leave it alone". That is the
+         * fail-closed reading, matching how blank licensure now behaves.
+         */
+        $clinician->acceptedCategories()->sync($data['accepted_categories'] ?? []);
 
         return redirect()->route('admin.clinicians.show', $clinician->id)
             ->with('success', 'Clinician updated successfully.');

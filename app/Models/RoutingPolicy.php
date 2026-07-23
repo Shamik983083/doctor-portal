@@ -59,6 +59,79 @@ class RoutingPolicy extends Model
         return new RoutingWeights($this->config['intelligentWeights'] ?? []);
     }
 
+    /*
+     * ── The two paths (Devin msg 2308) ──────────────────────────────────────
+     *   "THERE ARE 2 CHECKS: 1. NEW CLIENTS 2. REFILL CLIENTS. WE NEED TO HAVE
+     *   CAPS AND ROUTING FOR EACH."
+     *
+     * A version used to carry ONE mode for everything. It now carries a mode per
+     * path, and the `mode` column remains the fallback for both. That is what
+     * keeps every already-stored version (v1 PRIORITY) meaning exactly what it
+     * meant: absent config reads through to the column.
+     */
+
+    /** The mode for first visits. */
+    public function newMode(): string
+    {
+        $mode = $this->config['newMode'] ?? null;
+
+        return is_string($mode) && $mode !== '' ? $mode : $this->mode;
+    }
+
+    /**
+     * The mode for check-ins that continuity could not place.
+     *
+     * Reached only when the patient's prior doctor cannot take the case, which is
+     * Devin's msg 2313 Q3 answer: "in that case if both blocked then route them
+     * to a new provider". This is which rule picks that new provider.
+     */
+    public function refillMode(): string
+    {
+        $mode = $this->config['refillMode'] ?? null;
+
+        return is_string($mode) && $mode !== '' ? $mode : $this->mode;
+    }
+
+    /** The mode governing a given case, by path. */
+    public function modeForCase(bool $isNewCase): string
+    {
+        return $isNewCase ? $this->newMode() : $this->refillMode();
+    }
+
+    /**
+     * Pool eligibility criteria (Devin msg 2313 Q5).
+     *
+     * "adjust it for pool eligibility. I think there was confusion on the initial
+     * build but that was meant to be the logic behind the pool."
+     *
+     * These decide whether a doctor may PULL work out of the pool, which is what
+     * the old INTELLIGENT coefficients were reaching for. Null means off. See
+     * PoolEligibilityEvaluator.
+     *
+     * @return array<string, int|float|null>
+     */
+    public function poolCriteria(): array
+    {
+        $criteria = $this->config['poolCriteria'] ?? [];
+
+        if (! is_array($criteria)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($criteria as $key => $value) {
+            $out[$key] = is_numeric($value) ? $value + 0 : null;
+        }
+
+        return $out;
+    }
+
+    public function poolCriterion(string $key): int|float|null
+    {
+        return $this->poolCriteria()[$key] ?? null;
+    }
+
     /** Per-doctor weights keyed by clinician id. Absent means the default, 1. */
     public function providerWeights(): array
     {
@@ -77,14 +150,22 @@ class RoutingPolicy extends Model
     /**
      * Whether a doctor with NO recorded licensed states is blocked.
      *
-     * Defaults to false, which preserves MEDAXIS's current behaviour, where blank
-     * licence data reads as "licensed everywhere". Turn it on once licensed states
-     * are actually populated; until then it would block every doctor whose data was
-     * never filled in. See docs/integrations/ROUTING.md section 2.3.
+     * DEFAULT FLIPPED TO TRUE on 2026-07-23 (Devin msg 2313: "empty should not
+     * show licensed everywhere it needs to reject"). It used to default false to
+     * avoid locking out doctors whose licence data was never populated. That is
+     * no longer the trade being made: blank licensure now blocks, under every
+     * stored version including v1, because the alternative is a licence gate that
+     * does nothing for the doctors most likely to be unlicensed.
+     *
+     * A stored version may still set it to false explicitly, which is left
+     * possible on purpose so a specific policy can be rolled back in an
+     * emergency without a deploy. `Clinician::isLicensedInState()` is ALSO
+     * fail-closed now, so setting this false no longer re-opens the prescribe and
+     * approve paths, only this one routing check.
      */
     public function requireRecordedLicensure(): bool
     {
-        return (bool) ($this->config['requireRecordedLicensure'] ?? false);
+        return (bool) ($this->config['requireRecordedLicensure'] ?? true);
     }
 
     /*

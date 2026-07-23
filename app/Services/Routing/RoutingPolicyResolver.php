@@ -45,9 +45,26 @@ final class RoutingPolicyResolver
 
         // No active policy: assign nobody. MA's posture, and the safe one. A
         // built-in fallback would route under rules nobody chose.
+        //
+        // Reported as its own systemic exception code: this is not "no doctor
+        // could take this case", it is "nothing in the system is being assigned
+        // at all", and those must not look the same on the exceptions screen.
         if (! $policy) {
-            return ['kind' => RoutingStrategy::NONE];
+            return [
+                'kind'       => RoutingStrategy::NONE,
+                'reasonCode' => \App\Models\RoutingException::NO_ACTIVE_POLICY,
+            ];
         }
+
+        /*
+         * THE ELIGIBILITY GATE'S FACTS, GATHERED ONCE (Devin msg 2308).
+         *
+         * State, product categories and visit type for this case. Built here
+         * rather than per candidate because the visit type costs a query against
+         * the state matrix, and doing that once per doctor per case is the kind
+         * of cost that hides in staging.
+         */
+        $requirements = CaseRequirements::fromCase($case);
 
         /*
          * CONTINUITY OF CARE RUNS FIRST (Devin msg 2244).
@@ -65,8 +82,20 @@ final class RoutingPolicyResolver
          * Returns null for anything that is not a check-in, so first visits
          * route exactly as they did before this existed.
          */
-        if ($policy->mode !== RoutingMode::PROVIDER_POOL) {
-            $continuous = $this->continuity->resolve($case, $policy->requireRecordedLicensure());
+        /*
+         * THE TWO PATHS (Devin msg 2308). A check-in and a first visit no longer
+         * share a mode: the policy carries one for each, and this is where the
+         * case picks its lane. An older version with no per-path config reads
+         * through to the single `mode` column, so v1 behaves exactly as before.
+         */
+        $mode = $policy->modeForCase($requirements->isNewCase);
+
+        if ($mode !== RoutingMode::PROVIDER_POOL) {
+            $continuous = $this->continuity->resolve(
+                $case,
+                $policy->requireRecordedLicensure(),
+                $requirements,
+            );
 
             if ($continuous) {
                 return [
@@ -77,14 +106,65 @@ final class RoutingPolicyResolver
             }
         }
 
-        $candidates = $this->candidates($case, $policy);
+        /*
+         * A case with no product category cannot be matched against any doctor's
+         * accepted-category list, so it is reported as a fault on the case rather
+         * than as "nobody was eligible". The fix is on the offering, not on any
+         * doctor's configuration, and conflating the two sends whoever reads the
+         * exceptions queue to the wrong screen.
+         */
+        if (! $requirements->hasCategory()) {
+            return [
+                'kind'       => RoutingStrategy::NONE,
+                'reasonCode' => \App\Models\RoutingException::NO_CATEGORY_ON_CASE,
+            ];
+        }
 
-        return RoutingStrategy::select(
-            $policy->mode,
+        $candidates = $this->candidates($case, $policy, $requirements);
+
+        $outcome = RoutingStrategy::select(
+            $mode,
             $candidates,
             $policy->intelligentWeights(),
             ['roundRobinCursor' => $this->roundRobinCursor()],
         );
+
+        /*
+         * NO SILENT FAILURES (Devin msg 2308). When nobody could take the case,
+         * carry the per-doctor block reasons out with the answer so the caller can
+         * record WHY rather than a bare "unassigned". An unknown mode is reported
+         * separately: it means the stored policy is malformed and NOTHING is being
+         * routed, which is a different emergency from a case nobody is licensed for.
+         */
+        if (($outcome['kind'] ?? null) === RoutingStrategy::NONE) {
+            $outcome['reasonCode'] = in_array($mode, RoutingMode::ALL_STORED, true)
+                ? \App\Models\RoutingException::NO_ELIGIBLE_PROVIDER
+                : \App\Models\RoutingException::UNKNOWN_MODE;
+
+            $outcome['providerReasons'] = $this->providerReasons($candidates);
+        }
+
+        return $outcome;
+    }
+
+    /**
+     * Per-doctor block reasons, for the exceptions record.
+     *
+     * Ids and reason codes only, no PHI, because this is written to a table an
+     * admin screen reads back months later.
+     *
+     * @param  ProviderCandidate[] $candidates
+     * @return array<int, string[]>
+     */
+    private function providerReasons(array $candidates): array
+    {
+        $out = [];
+
+        foreach ($candidates as $candidate) {
+            $out[$candidate->providerId] = $candidate->rejectionReasons;
+        }
+
+        return $out;
     }
 
     /**
@@ -97,9 +177,13 @@ final class RoutingPolicyResolver
      *
      * @return ProviderCandidate[]
      */
-    public function candidates(PatientCase $case, RoutingPolicy $policy): array
+    public function candidates(PatientCase $case, RoutingPolicy $policy, ?CaseRequirements $requirements = null): array
     {
-        $clinicians = Clinician::all();
+        $requirements ??= CaseRequirements::fromCase($case);
+
+        // Eager loaded because acceptsCategory() reads the relation per doctor,
+        // and a lazy load here is one query per clinician per case created.
+        $clinicians = Clinician::with('acceptedCategories')->get();
 
         if ($clinicians->isEmpty()) {
             return [];
@@ -117,7 +201,7 @@ final class RoutingPolicyResolver
         // Is the case being routed a first visit? A check-in must never be held
         // back by a new-case control, so this flag switches all of them off for
         // a refill. See EligibilityEvaluator's new-case block.
-        $isNewCase = ! $case->isRefillRequest();
+        $isNewCase = $requirements->isNewCase;
 
         /*
          * The two admin-set new-case criteria are computed ONLY when the policy
@@ -137,7 +221,7 @@ final class RoutingPolicyResolver
             ? $this->awaitingReplyCounts($ids)
             : [];
 
-        $state = $case->patient_state ?: $case->patient?->state;
+        $state = $requirements->state;
 
         $out = [];
 
@@ -182,6 +266,7 @@ final class RoutingPolicyResolver
                 $workload,
                 $agingThreshold,
                 $policy->requireRecordedLicensure(),
+                $requirements,
             );
 
             $weight = $providerWeights[(string) $clinician->id]

@@ -20,13 +20,70 @@ class Clinician extends Model
         // is a soft alert that never blocks. See the migration.
         'accepting_new_cases', 'max_daily_new_cases', 'max_open_cases',
         'daily_refill_alert_threshold',
+        // Visit-type acceptance and the booking link (Devin msg 2313 Q4).
+        'accepts_async_visits', 'accepts_sync_visits', 'scheduling_link',
     ];
 
     protected $casts = [
         'is_available' => 'boolean',
         'accepting_new_cases' => 'boolean',
         'licensed_states' => 'array',
+        'accepts_async_visits' => 'boolean',
+        'accepts_sync_visits' => 'boolean',
     ];
+
+    /**
+     * The product categories this doctor accepts (Devin msg 2313 Q2).
+     *
+     * The taxonomy is the existing global `offering_categories` table, which
+     * already has an admin screen that can add and remove categories, so a new
+     * category is tickable the moment it is created with no code change.
+     */
+    public function acceptedCategories()
+    {
+        return $this->belongsToMany(OfferingCategory::class, 'clinician_offering_category');
+    }
+
+    /**
+     * Does this doctor accept this product category?
+     *
+     * FAIL CLOSED. An empty accepted list means this doctor accepts NOTHING, not
+     * everything. The migration backfilled every existing doctor with every
+     * active category precisely so that this default cannot strand anyone: an
+     * unticked category is now an admin's decision rather than an absence of
+     * data. This is the same reasoning Devin applied to blank licensure in msg
+     * 2313 ("empty should not show licensed everywhere it needs to reject").
+     */
+    public function acceptsCategory(?int $categoryId): bool
+    {
+        if ($categoryId === null) {
+            return false;
+        }
+
+        return $this->acceptedCategories->contains('id', $categoryId);
+    }
+
+    /**
+     * Does this doctor take this kind of visit?
+     *
+     * A synchronous visit ALSO requires a booking link. Assigning a live-video
+     * case to a doctor a patient cannot book produces a case that looks routed
+     * and is not, and the patient is the one who discovers it. See
+     * EligibilityEvaluator::SCHEDULING_LINK_MISSING.
+     */
+    public function acceptsVisitType(string $visitType): bool
+    {
+        if ($visitType === \App\Services\Routing\VisitType::SYNCHRONOUS) {
+            return (bool) $this->accepts_sync_visits && $this->hasSchedulingLink();
+        }
+
+        return (bool) $this->accepts_async_visits;
+    }
+
+    public function hasSchedulingLink(): bool
+    {
+        return trim((string) $this->scheduling_link) !== '';
+    }
 
     /** A daily new-case cap of null means uncapped, matching max_daily_cases. */
     public function maxDailyNewCasesOrNull(): ?int
@@ -73,13 +130,10 @@ class Clinician extends Model
      *
      *  - An UNKNOWN patient state returns false. We cannot show a licence covers
      *     a state we do not know, and this is an authorization surface.
-     *  - Blank licensure on the clinician currently returns TRUE, because
-     *     `isLicensedInState()` treats an empty list as licensed everywhere. That
-     *     is fail-open and it is a KNOWN, LOGGED GAP, not an accident: changing
-     *     that helper today would lock out every clinician whose licence data was
-     *     never populated. It is tracked in docs/COMPLIANCE-LEDGER.md as the
-     *     blocking item for full Law 4 conformance, and closed by populating
-     *     licensed_states and then enabling requireRecordedLicensure.
+     *  - BLANK LICENSURE NOW RETURNS FALSE TOO (Devin msg 2313: "empty should not
+     *     show licensed everywhere it needs to reject"). See isLicensedInState().
+     *     This closes the item docs/COMPLIANCE-LEDGER.md tracked as blocking full
+     *     Law 4 conformance.
      */
     public function canPracticeIn(?string $state): bool
     {
@@ -108,10 +162,33 @@ class Clinician extends Model
         return trim(($this->credentials ? $this->credentials . ' ' : '') . $this->user->name);
     }
 
+    /**
+     * Is this doctor licensed in this state?
+     *
+     * FAIL CLOSED ON BLANK LICENSURE, changed 2026-07-23 on Devin's instruction
+     * (msg 2313): "empty should not show licensed everywhere it needs to reject".
+     *
+     * WHAT THIS USED TO DO AND WHY IT MATTERED. An empty `licensed_states`
+     * returned TRUE, so a doctor whose licence data was never filled in read as
+     * licensed in all fifty states. That made the state hard block vacuous for
+     * exactly the population most likely to be wrong, and it made
+     * `canPracticeIn()` pass for them on the prescribe and approve paths as well.
+     *
+     * WHAT FLIPPING IT COSTS, STATED PLAINLY. Any clinician with no recorded
+     * licensed states stops being routed cases, and stops being able to prescribe
+     * or approve, the moment this deploys. That is the intended reading of the
+     * instruction, and it is recoverable by populating their licences. Run
+     * `php artisan licensure:audit` first: it lists every clinician this will
+     * affect and exits non-zero while any remain.
+     */
     public function isLicensedInState(string $state): bool
     {
         $states = $this->licensed_states ?? [];
-        if (empty($states)) return true;
+
+        if (empty($states)) {
+            return false;
+        }
+
         return collect($states)->pluck('state')->contains(strtoupper($state));
     }
 }

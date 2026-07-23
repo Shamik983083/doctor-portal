@@ -14,17 +14,34 @@ use App\Models\Clinician;
  * so it returns a reason for EVERY block that fired, not just the first:
  *   - only an explicit active status passes;
  *   - a cap that cannot be evaluated BLOCKS rather than passing;
- *   - a missing licence blocks.
+ *   - a missing licence blocks, and so does blank licensure.
  *
- * ONE DELIBERATE BEHAVIOUR CHANGE, AND IT IS THE IMPORTANT ONE.
- * MEDAXIS's old CaseAutoAssigner, when no clinician was licensed in the patient's
- * state, logged a warning and then ASSIGNED SOMEONE UNLICENSED ANYWAY so cases
- * would not stick in the queue. MA treats a missing state licence as a hard block.
- * This port follows MA: an unlicensed doctor is never selected. A case with no
- * licensed doctor now WAITS instead of being routed to someone who cannot lawfully
- * prescribe for that patient. That trades a stuck case for a compliance problem,
- * which is the right way round, but it IS a change in behaviour and is called out
- * in docs/integrations/ROUTING.md.
+ * ── THE ELIGIBILITY GATE (Devin msg 2308) ────────────────────────────────────
+ *
+ * "SO THE CAVEAT FOR ANY OF THESE IS IT MUST CHECK THE STATE THE PRESCRIPTION IS
+ * NEEDED IN, PRODUCT CATEGORY ... AND WHAT TYPE OF VISIT (ASYNCHRONOUS VS
+ * SYNCHRONOUS), THEN DEFER TO CLINICIANS AVAILABLE IN THAT STATE, AND THEN IF
+ * THEY'RE OPEN FOR THE TYPE AND THEN TIE IN TO THE OPTIONS BELOW"
+ *
+ * Three axes are checked BEFORE anything about the doctor's workload, in Devin's
+ * order: state, then category, then visit type. All three are hard blocks that no
+ * mode can score past and, per his Q3 answer, that continuity may not override
+ * either: they are clinical and legal scope, not workload. When they block a
+ * check-in, the case falls through to normal routing and "route them to a new
+ * provider" (his words) is what happens.
+ *
+ * The order is deliberate. Every reason that fires is returned, so ordering is
+ * not about which block wins, it is about which one is read first by a human
+ * looking at the exceptions queue. The most legally consequential comes first.
+ *
+ * ── BLANK LICENSURE NOW BLOCKS (Devin msg 2313) ──────────────────────────────
+ *
+ * "empty should not show licensed everywhere it needs to reject". Previously a
+ * doctor with no recorded licensed states read as licensed everywhere and this
+ * whole gate did nothing for them. `Clinician::isLicensedInState()` is fail-closed
+ * now and `requireRecordedLicensure` defaults true, so blank licensure produces
+ * LICENSURE_NOT_RECORDED. Run `php artisan licensure:audit` before deploying:
+ * every clinician it lists stops receiving cases.
  */
 final class EligibilityEvaluator
 {
@@ -35,6 +52,15 @@ final class EligibilityEvaluator
     public const DAILY_VOLUME_CAP_REACHED          = 'DAILY_VOLUME_CAP_REACHED';
     public const OPEN_CASES_CAP_REACHED            = 'OPEN_CASES_CAP_REACHED';
     public const MESSAGE_AGING_BLOCK               = 'MESSAGE_AGING_BLOCK';
+
+    /*
+     * THE TWO NEW AXES (Devin msg 2308). Both are clinical scope rather than
+     * workload, so both sit outside ContinuityResolver::OVERRIDABLE and block a
+     * check-in as firmly as a first visit.
+     */
+    public const CATEGORY_NOT_ACCEPTED             = 'CATEGORY_NOT_ACCEPTED';
+    public const VISIT_TYPE_NOT_ACCEPTED           = 'VISIT_TYPE_NOT_ACCEPTED';
+    public const SCHEDULING_LINK_MISSING           = 'SCHEDULING_LINK_MISSING';
 
     /*
      * NEW-CASE-ONLY BLOCKS (Devin msgs 2248/2250). These fire for a first visit
@@ -52,6 +78,9 @@ final class EligibilityEvaluator
         self::PROVIDER_UNAVAILABLE            => 'Doctor is marked unavailable',
         self::RESIDENCE_STATE_LICENSE_MISSING => 'No licence in the patient\'s state',
         self::LICENSURE_NOT_RECORDED          => 'No licensed states recorded for this doctor',
+        self::CATEGORY_NOT_ACCEPTED           => 'Doctor does not accept this product category',
+        self::VISIT_TYPE_NOT_ACCEPTED         => 'Doctor does not take this type of visit',
+        self::SCHEDULING_LINK_MISSING         => 'Doctor has no booking link for synchronous visits',
         self::DAILY_VOLUME_CAP_REACHED        => 'Daily case cap reached',
         self::OPEN_CASES_CAP_REACHED          => 'Open case cap reached',
         self::MESSAGE_AGING_BLOCK             => 'Has a message older than the configured limit',
@@ -77,19 +106,14 @@ final class EligibilityEvaluator
         ?string $residenceState,
         array $workload,
         ?float $messageAgingThresholdHours = null,
-        bool $requireRecordedLicensure = false,
+        bool $requireRecordedLicensure = true,
+        ?CaseRequirements $requirements = null,
     ): array {
         $reasons = [];
 
-        if ($clinician->status !== 'active') {
-            $reasons[] = self::PROVIDER_NOT_ACTIVE;
-        }
-
-        if (! $clinician->is_available) {
-            $reasons[] = self::PROVIDER_UNAVAILABLE;
-        }
-
         /*
+         * ── AXIS 1: THE STATE THE PRESCRIPTION IS NEEDED IN ──────────────────
+         *
          * A missing patient state is NOT a free pass. If we do not know where the
          * patient is, we cannot show the doctor is licensed to treat them, and this
          * is a fail-closed surface. Blocking a routable case is recoverable;
@@ -101,23 +125,10 @@ final class EligibilityEvaluator
             $state = strtoupper(trim($residenceState));
 
             /*
-             * WATCH THIS ONE. `Clinician::isLicensedInState()` returns TRUE when a
-             * doctor has NO licensed states recorded: an empty list is treated as
-             * "licensed everywhere". That is fail-OPEN, and it silently makes the
-             * licence hard block vacuous for every doctor whose licence data was
-             * never filled in, which is the population most likely to be wrong.
-             *
-             * That shared helper is used elsewhere, so it is not quietly changed
-             * here. Instead the gap is made VISIBLE and closable:
-             *
-             *   $requireRecordedLicensure = false (default) keeps today's
-             *     behaviour, so activating a routing policy does not suddenly
-             *     block every doctor with blank licence data.
-             *   $requireRecordedLicensure = true treats blank licensure as a
-             *     block, which is the compliance-grade reading.
-             *
-             * Set it once licensed states are actually populated. See
-             * docs/integrations/ROUTING.md section 2.3.
+             * Blank licensure is its own reason code, distinct from "licensed,
+             * but not here". They look the same to routing and completely
+             * different to whoever has to fix it: one is a data-entry job, the
+             * other means recruiting in that state.
              */
             $hasRecordedLicensure = ! empty($clinician->licensed_states);
 
@@ -125,10 +136,65 @@ final class EligibilityEvaluator
                 if ($requireRecordedLicensure) {
                     $reasons[] = self::LICENSURE_NOT_RECORDED;
                 }
-                // else: falls through as licensed, matching current behaviour.
             } elseif (! $clinician->isLicensedInState($state)) {
                 $reasons[] = self::RESIDENCE_STATE_LICENSE_MISSING;
             }
+        }
+
+        /*
+         * ── AXIS 2: PRODUCT CATEGORY ─────────────────────────────────────────
+         *
+         * "PROVIDER SHOULD HAVE A SECTION FOR CATEGORIES THEY'LL ACCEPT, WE MUST
+         * BE ABLE TO ADJUST AND SET" (msg 2308).
+         *
+         * The doctor must accept EVERY category on the case, not merely one of
+         * them. A case carrying two products is one prescribing decision, and a
+         * doctor who takes GLP1 but not peptides cannot take half of it.
+         *
+         * Skipped entirely when no requirements were supplied, which is how the
+         * continuity path and older callers keep working unchanged.
+         */
+        if ($requirements !== null && $requirements->categoryIds !== []) {
+            foreach ($requirements->categoryIds as $categoryId) {
+                if (! $clinician->acceptsCategory($categoryId)) {
+                    $reasons[] = self::CATEGORY_NOT_ACCEPTED;
+                    break;
+                }
+            }
+        }
+
+        /*
+         * ── AXIS 3: VISIT TYPE ───────────────────────────────────────────────
+         *
+         * Synchronous is decided by the state matrix, never by the doctor. What
+         * the doctor decides is whether they take those visits, and a booking
+         * link is part of taking them: a live visit nobody can book is not an
+         * assignment, it is a case the patient discovers is stuck.
+         *
+         * The missing-link case gets its own reason code because the fix is
+         * different. VISIT_TYPE_NOT_ACCEPTED means "this doctor said no";
+         * SCHEDULING_LINK_MISSING means "this doctor said yes and cannot deliver
+         * it yet", which is a five-second fix on their profile.
+         */
+        if ($requirements !== null && $requirements->requiresSynchronous()) {
+            if (! $clinician->accepts_sync_visits) {
+                $reasons[] = self::VISIT_TYPE_NOT_ACCEPTED;
+            } elseif (! $clinician->hasSchedulingLink()) {
+                $reasons[] = self::SCHEDULING_LINK_MISSING;
+            }
+        } elseif ($requirements !== null && ! $clinician->accepts_async_visits) {
+            $reasons[] = self::VISIT_TYPE_NOT_ACCEPTED;
+        }
+
+        /*
+         * ── THEN THE DOCTOR'S OWN AVAILABILITY AND WORKLOAD ──────────────────
+         */
+        if ($clinician->status !== 'active') {
+            $reasons[] = self::PROVIDER_NOT_ACTIVE;
+        }
+
+        if (! $clinician->is_available) {
+            $reasons[] = self::PROVIDER_UNAVAILABLE;
         }
 
         if (self::capReached($workload['maxDailyVolume'] ?? null, $workload['currentDailyVolume'] ?? null)) {

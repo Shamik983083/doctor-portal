@@ -39,8 +39,22 @@ class RoutingPolicyController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'mode' => 'required|in:' . implode(',', RoutingMode::ALL),
+            /*
+             * TWO MODES, ONE PER PATH (Devin msg 2308: "THERE ARE 2 CHECKS:
+             * 1. NEW CLIENTS 2. REFILL CLIENTS. WE NEED TO HAVE CAPS AND ROUTING
+             * FOR EACH"). The refill mode is only reached when continuity cannot
+             * place the check-in with the patient's own doctor.
+             */
+            'new_mode'    => 'required|in:' . implode(',', RoutingMode::ALL),
+            'refill_mode' => 'required|in:' . implode(',', RoutingMode::ALL),
             'note' => 'nullable|string|max:1000',
+            // Pool eligibility (Devin msg 2313 Q5). Blank means the criterion is off.
+            'pool_max_outstanding_cases' => 'nullable|integer|min:1|max:9999',
+            'pool_max_overdue_cases'     => 'nullable|integer|min:1|max:9999',
+            'pool_overdue_after_hours'   => 'nullable|numeric|min:1|max:720',
+            'pool_max_awaiting_reply'    => 'nullable|integer|min:1|max:9999',
+            'pool_max_per_request'       => 'nullable|integer|min:1|max:500',
+            'pool_max_per_day'           => 'nullable|integer|min:1|max:999',
             'message_aging_hours' => 'nullable|numeric|min:0|max:720',
             'require_recorded_licensure' => 'nullable|boolean',
             // Admin-set criteria that stop NEW cases (Devin msg 2248). Optional;
@@ -85,10 +99,26 @@ class RoutingPolicyController extends Controller
             }
         }
 
+        /*
+         * The overdue criterion is a pair, exactly like the delayed one above: a
+         * count with no window cannot be evaluated and a window with no count
+         * blocks nobody. Store both or neither.
+         */
+        $overdueCount = $data['pool_max_overdue_cases'] ?? null;
+        $overdueHours = $data['pool_overdue_after_hours'] ?? null;
+        if ($overdueCount === null || $overdueHours === null) {
+            $overdueCount = null;
+            $overdueHours = null;
+        }
+
         $policy = RoutingPolicy::create([
             'version' => ((int) RoutingPolicy::max('version')) + 1,
-            'mode'    => $data['mode'],
+            // The column stays as the fallback any path reads through to when its
+            // own mode is absent, which is what keeps older versions meaningful.
+            'mode'    => $data['new_mode'],
             'config'  => [
+                'newMode'                    => $data['new_mode'],
+                'refillMode'                 => $data['refill_mode'],
                 'intelligentWeights'         => $weights,
                 'providerWeights'            => $providerWeights,
                 'messageAgingThresholdHours' => $data['message_aging_hours'] ?? null,
@@ -96,6 +126,14 @@ class RoutingPolicyController extends Controller
                 'newCaseMaxDelayedCases'     => $delayedCount,
                 'newCaseDelayedAfterHours'   => $delayedHours,
                 'newCaseMaxAwaitingReply'    => $data['new_case_max_awaiting_reply'] ?? null,
+                'poolCriteria'               => [
+                    'maxOutstandingCases' => $data['pool_max_outstanding_cases'] ?? null,
+                    'maxOverdueCases'     => $overdueCount,
+                    'overdueAfterHours'   => $overdueHours,
+                    'maxAwaitingReply'    => $data['pool_max_awaiting_reply'] ?? null,
+                    'maxCasesPerRequest'  => $data['pool_max_per_request'] ?? null,
+                    'maxCasesPerDay'      => $data['pool_max_per_day'] ?? null,
+                ],
             ],
             'status'     => RoutingPolicy::STATUS_DRAFT,
             'created_by' => $request->user()?->id,

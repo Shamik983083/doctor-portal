@@ -3,6 +3,18 @@
 Audience: the MEDAXIS dev team, and whoever activates a policy.
 Status: **fully wired.** Live behaviour is unchanged until a new version is activated.
 
+> **SUPERSEDED IN THREE PLACES by `ROUTING-V2-SPEC.md`** (built 2026-07-23, Devin msgs 2308/2313).
+> Everything else below still holds.
+>
+> 1. **Section 2.3 is closed.** Blank licensure no longer reads as "licensed everywhere"; it now
+>    REJECTS. Run `php artisan licensure:audit` before deploying.
+> 2. **Four modes, not five.** INTELLIGENT was retired as a way of choosing a doctor; its
+>    coefficients now decide who may pull from the provider pool.
+> 3. **PROVIDER_POOL is a pull queue**, not simply "cases wait to be claimed".
+>
+> v2 also adds an eligibility gate (state, product category, visit type) ahead of everything here,
+> separate modes for new cases and check-ins, and a routing exceptions record so no failure is silent.
+
 ---
 
 ## 1. What was brought over

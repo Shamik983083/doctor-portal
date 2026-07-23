@@ -7,6 +7,7 @@ use App\Models\PatientCase;
 use App\Models\RoutingPolicy;
 use App\Models\User;
 use App\Notifications\RefillLoadAlert;
+use App\Services\Routing\RoutingExceptionRecorder;
 use App\Services\Routing\RoutingPolicyResolver;
 use App\Services\Routing\RoutingStrategy;
 use Illuminate\Support\Facades\Log;
@@ -37,10 +38,14 @@ use Illuminate\Support\Facades\Log;
 class CaseAutoAssigner
 {
     private RoutingPolicyResolver $resolver;
+    private RoutingExceptionRecorder $exceptions;
 
-    public function __construct(?RoutingPolicyResolver $resolver = null)
-    {
-        $this->resolver = $resolver ?? new RoutingPolicyResolver();
+    public function __construct(
+        ?RoutingPolicyResolver $resolver = null,
+        ?RoutingExceptionRecorder $exceptions = null,
+    ) {
+        $this->resolver   = $resolver ?? new RoutingPolicyResolver();
+        $this->exceptions = $exceptions ?? new RoutingExceptionRecorder();
     }
 
     /**
@@ -74,6 +79,12 @@ class CaseAutoAssigner
                 }
             }
 
+            // Anything that was stuck is not stuck any more. Closing it here
+            // rather than waiting for the sweep keeps the exceptions screen
+            // showing what is wrong NOW, which is the only version of it anyone
+            // will keep looking at.
+            $this->exceptions->resolve($case);
+
             return $clinician;
         }
 
@@ -87,6 +98,25 @@ class CaseAutoAssigner
                 ? 'Routing policy is PROVIDER_POOL, the case waits to be claimed.'
                 : 'No eligible doctor. Check licences for the patient state, capacity caps and availability.',
         ]);
+
+        /*
+         * NO SILENT FAILURES (Devin msg 2308). A log line and an empty
+         * clinician_id look identical to a case created four seconds ago, so a
+         * failure to route now becomes a row an admin owns, with the reason code
+         * and the per-doctor block reasons attached.
+         *
+         * POOL IS NOT A FAILURE and deliberately records nothing: under
+         * PROVIDER_POOL a case waiting to be claimed is the design working. The
+         * pool queue is surfaced with its own ages on the exceptions screen, so
+         * a case rotting there is still visible without pretending it is broken.
+         */
+        if (($outcome['kind'] ?? null) !== RoutingStrategy::POOL) {
+            $this->exceptions->record(
+                $case,
+                $outcome['reasonCode'] ?? \App\Models\RoutingException::NO_ELIGIBLE_PROVIDER,
+                $outcome['providerReasons'] ?? [],
+            );
+        }
 
         return null;
     }

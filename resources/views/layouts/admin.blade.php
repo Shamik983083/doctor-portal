@@ -144,13 +144,59 @@
            href="{{ route('admin.triage-rules.index') }}">
             <i class="bi bi-funnel"></i> Triage Rule Set
         </a>
-        <a class="nav-link {{ request()->routeIs('admin.routing.*') ? 'active' : '' }}"
+        <a class="nav-link {{ request()->routeIs('admin.routing.index') ? 'active' : '' }}"
            href="{{ route('admin.routing.index') }}">
             <i class="bi bi-diagram-3"></i> Case Routing
+        </a>
+        {{-- Which states require a live video visit (Devin msg 2313 Q4). Super
+             admin only, with the rest of this section, because it encodes
+             telehealth law rather than one admin's operating preference. --}}
+        <a class="nav-link {{ request()->routeIs('admin.routing.visit-requirements*') ? 'active' : '' }}"
+           href="{{ route('admin.routing.visit-requirements') }}">
+            <i class="bi bi-camera-video"></i> State Visit Rules
         </a>
 
     </div>
     @endrole
+
+    {{-- ── Routing operations ──────────────────────────────────
+         NOT super-admin gated, unlike the configuration block above. Devin msg
+         2308 named the Doctor Admin FIRST for exception visibility, and msg 2313
+         Q6 put SLA ownership and pull approvals in their hands. Each screen
+         scopes its data to the doctors that admin is over, so opening the nav to
+         them does not widen what they can see. --}}
+    <button class="sidebar-section-toggle {{ request()->routeIs('admin.routing.exceptions') || request()->routeIs('admin.routing.pull-requests') || request()->routeIs('admin.routing.sla') ? '' : 'collapsed' }}"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#snav-routing-ops"
+            aria-expanded="false">
+        <span>Routing Operations</span>
+        <i class="bi bi-chevron-down sidebar-chevron"></i>
+    </button>
+    <div class="collapse {{ request()->routeIs('admin.routing.exceptions') || request()->routeIs('admin.routing.pull-requests') || request()->routeIs('admin.routing.sla') ? 'show' : '' }}" id="snav-routing-ops">
+
+        <a class="nav-link {{ request()->routeIs('admin.routing.exceptions') ? 'active' : '' }}"
+           href="{{ route('admin.routing.exceptions') }}">
+            <i class="bi bi-exclamation-octagon"></i> Routing Exceptions
+            @php $openRoutingExceptions = \App\Models\RoutingException::open()->count(); @endphp
+            @if($openRoutingExceptions > 0)
+                <span class="badge bg-danger ms-auto" style="font-size:.6rem;">{{ $openRoutingExceptions }}</span>
+            @endif
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.routing.pull-requests') ? 'active' : '' }}"
+           href="{{ route('admin.routing.pull-requests') }}">
+            <i class="bi bi-inbox-fill"></i> Case Pull Requests
+            @php $pendingPulls = \App\Models\CasePullRequest::pending()->count(); @endphp
+            @if($pendingPulls > 0)
+                <span class="badge bg-warning text-dark ms-auto" style="font-size:.6rem;">{{ $pendingPulls }}</span>
+            @endif
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.routing.sla') ? 'active' : '' }}"
+           href="{{ route('admin.routing.sla') }}">
+            <i class="bi bi-speedometer2"></i> Doctor SLA
+        </a>
+
+    </div>
 
     {{-- ── Super Admin ──────────────────────────────────────── --}}
     @role('super_admin')

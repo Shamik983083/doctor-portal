@@ -86,6 +86,15 @@ Route::prefix('ma-portal')->middleware(['auth'])->name('ma-portal.')->group(func
 Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinician.portal'])->name('clinician.')->group(function () {
     Route::get('/dashboard', [ClinicianDashboard::class, 'index'])->name('dashboard');
 
+    /*
+     * The provider pool (Devin msg 2308). A doctor asks for a number of cases and
+     * the pool decides what they get. They never see the queue, which is why
+     * there is no index of available cases here, only a request form and their
+     * own history.
+     */
+    Route::get('/pool',  [\App\Http\Controllers\Web\Clinician\PoolController::class, 'index'])->name('pool.index');
+    Route::post('/pool', [\App\Http\Controllers\Web\Clinician\PoolController::class, 'store'])->name('pool.request');
+
     Route::prefix('cases')->name('cases.')->group(function () {
         Route::get('/queue', [ClinicianCaseController::class, 'queue'])->name('queue');
         Route::get('/my-cases', [ClinicianCaseController::class, 'myCases'])->name('my-cases');
@@ -302,9 +311,43 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/',  [\App\Http\Controllers\Web\Admin\RoutingPolicyController::class, 'index'])->name('index');
         Route::post('/', [\App\Http\Controllers\Web\Admin\RoutingPolicyController::class, 'store'])->name('store');
         Route::post('/{id}/activate', [\App\Http\Controllers\Web\Admin\RoutingPolicyController::class, 'activate'])->name('activate');
+
+        /*
+         * The state synchronous-visit matrix. Super admin only, with the rest of
+         * this group, because it encodes telehealth law rather than day-to-day
+         * operations (Devin msg 2313 Q4: "we need to adjust as super admin as
+         * laws change frequently").
+         */
+        Route::get('/visit-requirements',  [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'visitRequirements'])->name('visit-requirements');
+        Route::post('/visit-requirements', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'storeVisitRequirement'])->name('visit-requirements.store');
+        Route::delete('/visit-requirements/{id}', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'destroyVisitRequirement'])->name('visit-requirements.destroy');
     });
 
     }); // end super-admin-only integration and configuration group
+
+    /*
+     * ROUTING OPERATIONS, open to Doctor Admins as well as super admins.
+     *
+     * Deliberately OUTSIDE the super-admin group above. Devin msg 2308 named the
+     * Doctor Admin first for exception visibility ("WE NEED THE DOCTOR ADMIN AND
+     * SUPER ADMIN TO SEE CASES THAT AREN'T ASSIGNED"), and msg 2313 Q6 put SLA
+     * ownership and pull approvals in their hands. A screen only a super admin
+     * can open cannot do either job.
+     *
+     * Each action scopes to the doctors the admin is over, via
+     * Clinician::visibleTo(), so widening the route does not widen the data.
+     */
+    Route::prefix('routing')->name('routing.')->group(function () {
+        Route::get('/exceptions', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'exceptions'])->name('exceptions');
+        Route::post('/exceptions/{id}/resolve', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'resolveException'])->name('exceptions.resolve');
+
+        Route::get('/pull-requests', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'pullRequests'])->name('pull-requests');
+        Route::post('/pull-requests/{id}/approve', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'approvePull'])->name('pull-requests.approve');
+        Route::post('/pull-requests/{id}/deny',    [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'denyPull'])->name('pull-requests.deny');
+
+        Route::get('/sla',  [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'slaIndex'])->name('sla');
+        Route::post('/sla', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'storeSla'])->name('sla.store');
+    });
 
     // Admin Users (Super Admin only)
     Route::prefix('admins')->name('admins.')->middleware('role:super_admin')->group(function () {

@@ -169,6 +169,81 @@ $hasLicenses = count($licenseInfo) > 0;
 
             <hr class="my-3">
 
+            {{-- The eligibility gate, doctor side (Devin msg 2308). What this
+                 doctor will take: which product categories, and which kinds of
+                 visit. Both are hard blocks, and neither is overridden by
+                 continuity, so unticking a category also stops that doctor's own
+                 returning patients on that category. --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-1">What this doctor accepts</h6>
+            <p class="text-muted small mb-3">
+                Both of these block cases outright. A doctor is never given a case in a category they
+                do not accept, including check-ins from patients they have treated before.
+            </p>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Product categories</label>
+                @if($categories->isEmpty())
+                    <div class="alert alert-warning small mb-0">
+                        No categories exist yet. Add them under Categories first.
+                    </div>
+                @else
+                    <div class="row">
+                        @foreach($categories as $category)
+                            <div class="col-md-3 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="category_{{ $category->id }}"
+                                           name="accepted_categories[]" value="{{ $category->id }}"
+                                           {{ in_array($category->id, old('accepted_categories', $acceptedCategoryIds)) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="category_{{ $category->id }}">
+                                        {{ $category->name }}
+                                    </label>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <small class="text-muted">
+                        None ticked means this doctor receives no cases at all.
+                    </small>
+                @endif
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Visit types</label>
+                    <div class="form-check">
+                        <input type="hidden" name="accepts_async_visits" value="0">
+                        <input class="form-check-input" type="checkbox" id="acceptsAsync"
+                               name="accepts_async_visits" value="1"
+                               {{ old('accepts_async_visits', $clinician->accepts_async_visits ? '1' : '0') === '1' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="acceptsAsync">Asynchronous review</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="hidden" name="accepts_sync_visits" value="0">
+                        <input class="form-check-input" type="checkbox" id="acceptsSync"
+                               name="accepts_sync_visits" value="1"
+                               {{ old('accepts_sync_visits', $clinician->accepts_sync_visits ? '1' : '0') === '1' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="acceptsSync">Synchronous video visit</label>
+                    </div>
+                    <small class="text-muted">
+                        Whether a case needs video is decided by the patient's state, not here.
+                    </small>
+                </div>
+                <div class="col-md-8 mb-3">
+                    <label class="form-label fw-semibold">Booking link</label>
+                    <input type="url" name="scheduling_link" class="form-control" maxlength="500"
+                           placeholder="https://calendly.com/..."
+                           value="{{ old('scheduling_link', $clinician->scheduling_link) }}">
+                    <small class="text-muted">
+                        Where a patient books a live visit. Required for synchronous cases: without
+                        it, a video case cannot be assigned to this doctor even with the box ticked,
+                        because the patient would have no way to book.
+                    </small>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
             {{-- Licensed States --}}
             <div class="mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-2">

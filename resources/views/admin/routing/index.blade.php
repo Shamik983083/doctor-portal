@@ -51,26 +51,107 @@
         <form method="POST" action="{{ route('admin.routing.store') }}">
             @csrf
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Mode</label>
-                @foreach($modes as $value => $label)
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="mode" id="mode_{{ $value }}"
-                               value="{{ $value }}" {{ old('mode', $active->mode ?? '') === $value ? 'checked' : '' }}>
-                        <label class="form-check-label" for="mode_{{ $value }}">
-                            <strong>{{ $label }}</strong>
-                            <span class="d-block text-muted small">{{ $modeNotes[$value] ?? '' }}</span>
-                        </label>
+            {{-- TWO PATHS (Devin msg 2308: "THERE ARE 2 CHECKS: 1. NEW CLIENTS
+                 2. REFILL CLIENTS. WE NEED TO HAVE CAPS AND ROUTING FOR EACH").
+                 A check-in only reaches its mode when continuity cannot place it
+                 with the patient's own doctor. --}}
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">New cases (first visits)</label>
+                    @foreach($modes as $value => $label)
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="new_mode" id="new_mode_{{ $value }}"
+                                   value="{{ $value }}"
+                                   {{ old('new_mode', $active?->newMode() ?? '') === $value ? 'checked' : '' }}>
+                            <label class="form-check-label" for="new_mode_{{ $value }}">
+                                <strong>{{ $label }}</strong>
+                                <span class="d-block text-muted small">{{ $modeNotes[$value] ?? '' }}</span>
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Check-ins that need a new doctor</label>
+                    <div class="form-text mb-2">
+                        A check-in goes back to the doctor who treated that patient. This is the rule
+                        for when that doctor cannot take it.
                     </div>
-                @endforeach
+                    @foreach($modes as $value => $label)
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="refill_mode" id="refill_mode_{{ $value }}"
+                                   value="{{ $value }}"
+                                   {{ old('refill_mode', $active?->refillMode() ?? '') === $value ? 'checked' : '' }}>
+                            <label class="form-check-label" for="refill_mode_{{ $value }}">
+                                <strong>{{ $label }}</strong>
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
             </div>
 
             <hr>
 
-            <h6 class="fw-semibold mb-1">Intelligent score weights</h6>
+            {{-- Pool eligibility (Devin msg 2313 Q5). These decide who may PULL
+                 from the pool, which is what the intelligent coefficients below
+                 were always meant to be for. --}}
+            <div class="border rounded p-3 mb-3 bg-light">
+                <div class="fw-semibold small mb-2">Provider pool: who may request cases</div>
+                <div class="form-text mb-3">
+                    Checked when a doctor asks the pool for work. Any of these blocks the request
+                    outright and tells them which one. Blank switches a rule off.
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Max open cases</label>
+                        <input type="number" min="1" class="form-control form-control-sm"
+                               name="pool_max_outstanding_cases"
+                               value="{{ old('pool_max_outstanding_cases', $active->config['poolCriteria']['maxOutstandingCases'] ?? '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Max overdue cases</label>
+                        <input type="number" min="1" class="form-control form-control-sm"
+                               name="pool_max_overdue_cases"
+                               value="{{ old('pool_max_overdue_cases', $active->config['poolCriteria']['maxOverdueCases'] ?? '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Counting overdue after (hours)</label>
+                        <input type="number" step="any" min="1" class="form-control form-control-sm"
+                               name="pool_overdue_after_hours"
+                               value="{{ old('pool_overdue_after_hours', $active->config['poolCriteria']['overdueAfterHours'] ?? '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Max patients awaiting a reply</label>
+                        <input type="number" min="1" class="form-control form-control-sm"
+                               name="pool_max_awaiting_reply"
+                               value="{{ old('pool_max_awaiting_reply', $active->config['poolCriteria']['maxAwaitingReply'] ?? '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Max cases per request</label>
+                        <input type="number" min="1" class="form-control form-control-sm"
+                               name="pool_max_per_request"
+                               value="{{ old('pool_max_per_request', $active->config['poolCriteria']['maxCasesPerRequest'] ?? '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Max pulled per day</label>
+                        <input type="number" min="1" class="form-control form-control-sm"
+                               name="pool_max_per_day"
+                               value="{{ old('pool_max_per_day', $active->config['poolCriteria']['maxCasesPerDay'] ?? '') }}">
+                    </div>
+                </div>
+                <div class="form-text mt-2">
+                    A doctor's own caps still apply on top of these: asking for 20 grants only what
+                    fits under their daily and open-case limits. SLA is separate and set by each
+                    Doctor Admin.
+                </div>
+            </div>
+
+            <h6 class="fw-semibold mb-1">Workload score weights</h6>
             <p class="text-muted small">
-                Only used by the intelligent mode. Lower total score wins, so a bigger number here
-                means that signal pushes work away from a doctor harder. Blank keeps the default.
+                How heavily each signal counts when scoring a doctor's workload. Lower total score is
+                a lighter load, so a bigger number here means that signal weighs more. Blank keeps
+                the default. Intelligent mode was retired as a way of choosing a doctor for a case;
+                these coefficients describe workload for the pool.
             </p>
             <div class="row">
                 @foreach($weightKeys as $key => $label)

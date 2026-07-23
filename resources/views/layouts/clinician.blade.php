@@ -142,6 +142,14 @@
         <span class="cn-count">{{ $nav['refills'] ?? 0 }}</span>
     </a>
 
+    {{-- The provider pool (Devin msg 2308). A doctor asks for a number of cases;
+         they never see what is in the queue, so this is a request form and not a
+         list. --}}
+    <a class="nav-link {{ request()->routeIs('clinician.pool.*') ? 'active' : '' }}"
+       href="{{ route('clinician.pool.index') }}">
+        <i class="bi bi-inbox-fill me-2"></i> Request Cases
+    </a>
+
     {{-- Messages now has its own screen (Devin msg 2256). Escalations still
          links to the queue filtered to support until it gets a dedicated view. --}}
     <a class="nav-link {{ request()->routeIs('clinician.messages.*') ? 'active' : '' }}"
