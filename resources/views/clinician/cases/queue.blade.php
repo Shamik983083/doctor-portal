@@ -144,6 +144,96 @@
     </div>
 </section>
 
+{{-- Quick review below the grid, the preview's renderDrawer (Devin msg 2267:
+     "the case queue should have a quick review below with the relevant data like
+     the reference"). Shows the top case in the current view; its summary,
+     findings and source answers come from the storefront clinical_intake. --}}
+@php($top = $cases->first())
+@if($top)
+    @php
+        $tclin  = $top->queueClinical();
+        $tci    = $top->clinical_intake ?? [];
+        $tSummary = $tci['summary'] ?? [];
+        $tFindings = $tci['findings'] ?? [];
+        $tSource = $tci['sourceAnswers'] ?? [];
+        $tProtocol = $tci['protocolVersion'] ?? null;
+
+        $topEligible = $top->triage === 'green' && in_array($top->status, ['waiting','assigned']) && !$top->hold_status;
+        if ($top->triage === 'red') { $tTone='red'; $tLabel='Blocked'; }
+        elseif ($top->hold_status || $top->status === 'support') { $tTone='red'; $tLabel='Blocked'; }
+        elseif ($top->triage === 'yellow') { $tTone='yellow'; $tLabel='Review'; }
+        elseif (!in_array($top->status, ['waiting','assigned'])) { $tTone='red'; $tLabel='Blocked'; }
+        else { $tTone='green'; $tLabel='Eligible'; }
+    @endphp
+    <section class="panel quick-review">
+        <div class="panel-heading">
+            <div>
+                <div class="eyebrow">Quick review · {{ $top->external_id ?? \Illuminate\Support\Str::limit($top->uuid, 8, '') }}</div>
+                <h2>{{ $top->patient?->full_name ?? 'Unknown' }}</h2>
+                <p>{{ $top->partner?->name ?? '-' }} · Request {{ $tclin['term'] }} · {{ $tclin['dose'] }}</p>
+            </div>
+            <div class="quick-pills">
+                <span class="pill {{ $top->triage }}">{{ ucfirst($top->triage ?? 'unclassified') }}</span>
+                <span class="pill {{ $tTone }}">{{ $tLabel }}</span>
+            </div>
+        </div>
+
+        <div class="quick-review-grid">
+            {{-- 1. AI draft summary --}}
+            <div>
+                <div class="subheading">AI draft summary</div>
+                <div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>
+                <ul class="summary-list">
+                    @forelse($tSummary as $line)
+                        <li>{{ is_array($line) ? ($line[0] ?? '') : $line }}</li>
+                    @empty
+                        <li>No AI draft yet. It is composed from the storefront intake once that is sent for this case.</li>
+                    @endforelse
+                </ul>
+                <p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.</p>
+
+                @if(!empty($tSource))
+                    <div class="source-answers">
+                        @foreach($tSource as $k => $v)
+                            <div><dt>{{ \Illuminate\Support\Str::headline($k) }}</dt><dd>{{ ($v === null || $v === '') ? 'Not answered' : $v }}</dd></div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
+            {{-- 2. Triage and findings --}}
+            <div>
+                <div class="subheading">Triage and findings</div>
+                <p class="protocol-version">{{ $tProtocol ? $tProtocol . ' · ' : '' }}classification {{ ucfirst($top->triage ?? 'unclassified') }}</p>
+                <ul class="finding-list">
+                    @forelse($tFindings as $f)
+                        <li><span class="finding-dot {{ is_array($f) ? ($f[0] ?? 'neutral') : 'neutral' }}"></span> {{ is_array($f) ? ($f[1] ?? '') : $f }}</li>
+                    @empty
+                        <li><span class="finding-dot neutral"></span> No findings recorded from intake yet.</li>
+                    @endforelse
+                </ul>
+                <div class="subheading holds-heading">Active workflow holds</div>
+                @if($top->hold_status)
+                    <ul class="holds-list"><li><code class="audit-verb">WORKFLOW_HOLD_ACTIVE</code></li></ul>
+                @else
+                    <p class="no-holds">No active workflow holds.</p>
+                @endif
+            </div>
+
+            {{-- 3. Provider actions (link to the real case flows) --}}
+            <div>
+                <div class="subheading">Provider actions</div>
+                <a class="button-primary full-width" href="{{ route('clinician.cases.prescribe.form', $top->uuid) }}">Review and approve</a>
+                <a class="button-secondary full-width" href="{{ route('clinician.cases.show', $top->uuid) }}">Request information</a>
+                <a class="button-danger full-width" href="{{ route('clinician.cases.show', $top->uuid) }}">Reject</a>
+                @unless($topEligible)
+                    <p class="action-reason">{{ $tLabel === 'Eligible' ? '' : 'This case is not batch-eligible; review it individually.' }}</p>
+                @endunless
+            </div>
+        </div>
+    </section>
+@endif
+
 @if($cases->hasPages())
     <div style="margin-top:16px">{{ $cases->withQueryString()->links() }}</div>
 @endif
