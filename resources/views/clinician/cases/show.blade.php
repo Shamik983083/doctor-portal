@@ -220,12 +220,12 @@
                 <div class="chat-scroll" id="clinThread" style="max-height:440px"
                      data-last-id="{{ $case->messages->sortBy('created_at')->last()?->id ?? 0 }}"
                      data-poll-url="{{ route('clinician.cases.messages.poll', $case->uuid) }}">
-                    @php($lastSide = null)
+                    @php $lastSide = null; @endphp
                     @forelse($case->messages->sortBy('created_at') as $msg)
-                        @php($side = $msg->sender_type === 'clinician' ? 'me' : 'them')
+                        @php $side = $msg->sender_type === 'clinician' ? 'me' : 'them'; @endphp
                         @if($side !== $lastSide)
                             <div class="chat-time" data-date="{{ $msg->created_at->format('Y-m-d') }}">{{ $msg->created_at->format('M j, g:i A') }}</div>
-                            @php($lastSide = $side)
+                            @php $lastSide = $side; @endphp
                         @endif
                         <div class="bubble-row {{ $side }}"><div class="bubble {{ $side }}">{{ $msg->body }}</div></div>
                     @empty
