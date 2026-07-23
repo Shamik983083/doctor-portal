@@ -14,6 +14,15 @@
             the earlier attempts close-but-larger. See docs/PREVIEW-GAP-ANALYSIS.md.
         --}}
         @include('layouts.partials.preview-css')
+
+        /*
+            The preview's .source-answers sets display:grid, and an explicit
+            author display value overrides the browser's [hidden] rule, so the
+            "View source answers" list rendered expanded and the collapse did
+            nothing (Devin msg 2273). This makes the hidden attribute win, so it
+            starts collapsed and only opens on click.
+        */
+        .source-answers[hidden] { display: none; }
     </style>
 </head>
 <body>
