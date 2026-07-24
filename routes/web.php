@@ -272,12 +272,14 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     // Developer Guide
     Route::get('/guide/messaging', fn() => view('admin.guide.messaging'))->name('guide.messaging');
     Route::get('/guide/webhooks', fn() => view('admin.guide.webhooks'))->name('guide.webhooks');
-    Route::get('/guide/weightloss-api', function () {
+    Route::get('/guide/glp-api', function () {
         $questionnaire = \App\Models\Questionnaire::with([
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
-        ])->where('name', 'MWL · Weight Loss')->first();
+        ])->where('name', 'GLP Questionnaire')->first();
         return view('admin.guide.weightloss-api', compact('questionnaire'));
-    })->name('guide.weightloss-api');
+    })->name('guide.glp-api');
+    // Legacy redirect so old bookmarks still work
+    Route::redirect('/guide/weightloss-api', '/admin/guide/glp-api', 301);
 
     Route::get('/guide/antiaging-api', function () {
         $questionnaire = \App\Models\Questionnaire::with([

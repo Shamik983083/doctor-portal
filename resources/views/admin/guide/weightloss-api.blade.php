@@ -1,6 +1,6 @@
 @extends('layouts.admin')
-@section('title', 'Weight Loss API Integration Guide')
-@section('page-title', 'Weight Loss API — Integration Guide')
+@section('title', 'GLP API Integration Guide')
+@section('page-title', 'GLP API — Integration Guide')
 
 @section('content')
 @php

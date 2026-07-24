@@ -98,9 +98,9 @@
            href="{{ route('admin.guide.messaging') }}">
             <i class="bi bi-chat-dots"></i> Messaging API
         </a>
-        <a class="nav-link {{ request()->routeIs('admin.guide.weightloss-api') ? 'active' : '' }}"
-           href="{{ route('admin.guide.weightloss-api') }}">
-            <i class="bi bi-journal-medical"></i> Weight Loss API
+        <a class="nav-link {{ request()->routeIs('admin.guide.glp-api') ? 'active' : '' }}"
+           href="{{ route('admin.guide.glp-api') }}">
+            <i class="bi bi-journal-medical"></i> GLP API
         </a>
         <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}"
            href="{{ route('admin.guide.antiaging-api') }}">
