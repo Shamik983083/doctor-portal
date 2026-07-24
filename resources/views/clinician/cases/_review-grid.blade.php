@@ -205,9 +205,12 @@
             'protocol' => $ci['protocolVersion'] ?? null,
             'source'   => $source,
             'hold'     => (bool) $case->hold_status,
+            'state'    => $case->patient_state ?? $case->patient?->state ?? '-',
+            'collab'   => $case->patient?->collaboratingClinician?->full_name ?? null,
             'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
             'reviewUrl'  => route('clinician.cases.prescribe.form', $case->uuid) . '?modal=1',
             'showUrl'    => route('clinician.cases.show', $case->uuid),
+            'msgUrl'     => route('clinician.messages.index', ['case' => $case->uuid]),
         ];
     };
 
@@ -228,6 +231,9 @@
 
 <script>
     var CASE_DATA = @json($caseData ?? []);
+    var AI_HONESTY_TEXT = @json(config('ai.enabled') && config('ai.baa_confirmed')
+        ? 'AI model draft. Statements are composed from the recorded intake answers and model output. The draft never approves, prescribes, or sends anything.'
+        : 'Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.');
 </script>
 <script>
     // Row click swaps the quick-review panel to the clicked case, rebuilding the
@@ -276,22 +282,24 @@
                 '<div class="panel-heading"><div>'
                 + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
                 + '<h2>' + esc(d.name) + '</h2>'
-                + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + '</p></div>'
+                + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state && d.state !== '-' ? ' · ' + esc(d.state) : '') + '</p></div>'
                 + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
                 + '<span class="pill ' + esc(d.tone) + '">' + esc(d.label) + '</span></div></div>'
                 + '<div class="quick-review-grid">'
                 + '<div><div class="subheading">AI draft summary</div>'
                 + '<div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>'
                 + '<ul class="summary-list">' + summary + '</ul>'
-                + '<p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.</p>'
+                + '<p class="ai-honesty">' + AI_HONESTY_TEXT + '</p>'
                 + source + '</div>'
                 + '<div><div class="subheading">Triage and findings</div>'
                 + '<p class="protocol-version">' + protocol + '</p>'
                 + '<ul class="finding-list">' + findings + '</ul>'
+                + (d.collab ? '<p class="ai-honesty" style="margin-top:8px"><strong>Collaborating:</strong> ' + esc(d.collab) + '</p>' : '')
                 + '<div class="subheading holds-heading">Active workflow holds</div>' + holds + '</div>'
                 + '<div><div class="subheading">Provider actions</div>'
                 + '<a class="button-primary full-width" href="' + esc(d.approveUrl) + '" data-review-url="' + esc(d.reviewUrl) + '">Review and approve</a>'
-                + '<a class="button-secondary full-width" href="' + esc(d.showUrl) + '">Request information</a>'
+                + '<a class="button-secondary full-width" href="' + esc(d.showUrl) + '">Show Full Profile</a>'
+                + '<a class="button-secondary full-width" href="' + esc(d.msgUrl) + '">Send Message</a>'
                 + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a></div>'
                 + '</div>';
         }

@@ -138,6 +138,44 @@
         </div>
     </div>
 
+    {{-- E17: New Messages --}}
+    <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.messages.index', $unreadMessagesCount > 0 ? ['filter' => 'unread'] : []) }}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $unreadMessagesCount > 0 ? '#e83e8c' : '#adb5bd' }} !important;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:48px;height:48px;background:{{ $unreadMessagesCount > 0 ? '#e83e8c1a' : '#adb5bd1a' }};">
+                    <i class="bi bi-chat-dots" style="font-size:1.3rem;color:{{ $unreadMessagesCount > 0 ? '#e83e8c' : '#adb5bd' }};"></i>
+                </div>
+                <div>
+                    <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">New Messages</p>
+                    <h3 class="fw-bold mb-0" style="color:{{ $unreadMessagesCount > 0 ? '#e83e8c' : '#adb5bd' }};">{{ $unreadMessagesCount }}</h3>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">unread from patients</p>
+                </div>
+            </div>
+        </div>
+        </a>
+    </div>
+
+    {{-- E17: New Cases --}}
+    <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.queue') }}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $newCasesCount > 0 ? '#fd7e14' : '#adb5bd' }} !important;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:48px;height:48px;background:{{ $newCasesCount > 0 ? '#fd7e141a' : '#adb5bd1a' }};">
+                    <i class="bi bi-inbox" style="font-size:1.3rem;color:{{ $newCasesCount > 0 ? '#fd7e14' : '#adb5bd' }};"></i>
+                </div>
+                <div>
+                    <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">New Cases</p>
+                    <h3 class="fw-bold mb-0" style="color:{{ $newCasesCount > 0 ? '#fd7e14' : '#adb5bd' }};">{{ $newCasesCount }}</h3>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">{{ $clinician?->cases_last_viewed_at ? 'since last queue visit' : 'in last 24 hours' }}</p>
+                </div>
+            </div>
+        </div>
+        </a>
+    </div>
+
     {{-- Completion rate with SVG ring --}}
     <div class="col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $rateColor }} !important;">

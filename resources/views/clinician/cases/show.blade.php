@@ -418,7 +418,16 @@
     <div class="modal" style="width:min(520px,94vw);padding:0">
         <form method="POST" action="{{ route('clinician.cases.cancel', $case->uuid) }}">@csrf
             <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)"><strong>Decline case</strong><button type="button" class="icon-btn" data-close-modal>&times;</button></div>
-            <div style="padding:16px 18px"><div class="field"><label>Reason <span class="req">*</span></label><textarea name="reason" class="note-area" rows="3" required placeholder="Reason for declining."></textarea></div></div>
+            <div style="padding:16px 18px">
+                <div class="field">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <label style="margin:0">Reason <span class="req">*</span></label>
+                        <button type="button" id="draftRejectionBtn" class="button-secondary" style="padding:3px 10px;font-size:12px">Draft with AI</button>
+                    </div>
+                    <textarea name="reason" id="rejectionReason" class="note-area" rows="4" required placeholder="Reason for declining."></textarea>
+                    <p class="ai-honesty" id="rejectionNotice" hidden style="margin-top:6px"></p>
+                </div>
+            </div>
             <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line)"><button type="button" class="button-secondary" data-close-modal>Go back</button><button class="button-danger">Decline</button></div>
         </form>
     </div>
@@ -515,6 +524,42 @@
         document.getElementById('reviewClose').addEventListener('click', function () { close(false); });
         overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false); });
     })();
+</script>
+
+<script>
+// A9: AI draft on rejection — fills the decline-reason textarea with a template
+(function () {
+    var btn    = document.getElementById('draftRejectionBtn');
+    var area   = document.getElementById('rejectionReason');
+    var notice = document.getElementById('rejectionNotice');
+    if (!btn || !area) return;
+
+    btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.textContent = 'Drafting…';
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+        fetch('{{ route('clinician.cases.draft-rejection', $case->uuid) }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf ? csrf.getAttribute('content') : '',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({}),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.text) { area.value = d.text; }
+            if (notice && d && d.notice) { notice.textContent = d.notice; notice.removeAttribute('hidden'); }
+            btn.textContent = 'Re-draft';
+            btn.disabled = false;
+        })
+        .catch(function () {
+            btn.textContent = 'Draft with AI';
+            btn.disabled = false;
+        });
+    });
+})();
 </script>
 
 <script>

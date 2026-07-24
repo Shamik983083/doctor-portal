@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\KarenInterface;
 use App\Models\Message;
 use App\Models\PatientCase;
+use App\Services\Karen\MockKarenService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
@@ -15,7 +17,16 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // F20: Karen automated-outreach service.
+        // Bind the real implementation when KAREN_ENABLED=true, otherwise the
+        // no-op mock so call sites always resolve the interface safely.
+        $this->app->singleton(KarenInterface::class, function () {
+            if (config('services.karen.enabled', false)) {
+                // Real implementation will be registered here once built.
+                // Until then fall through to the mock even when the flag is on.
+            }
+            return new MockKarenService();
+        });
     }
 
     public function boot(): void

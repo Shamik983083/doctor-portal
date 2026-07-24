@@ -69,6 +69,38 @@
         </div>
         @endif
 
+        {{-- E19: Collaborating Clinician --}}
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-person-plus me-2"></i>Collaborating Clinician</h6></div>
+            <div class="card-body">
+                @if($patient->collaboratingClinician)
+                    <p class="mb-2 small">
+                        <strong>{{ $patient->collaboratingClinician->full_name }}</strong>
+                        @if($patient->collaboratingClinician->license_state)
+                            <span class="text-muted">({{ $patient->collaboratingClinician->license_state }})</span>
+                        @endif
+                    </p>
+                @else
+                    <p class="text-muted small mb-2">No collaborating clinician assigned.</p>
+                @endif
+                <form method="POST" action="{{ route('admin.patients.collaborating-clinician.update', $patient->id) }}">
+                    @csrf
+                    @method('PATCH')
+                    <div class="input-group input-group-sm">
+                        <select name="collaborating_clinician_id" class="form-select form-select-sm">
+                            <option value="">— None —</option>
+                            @foreach($clinicians as $c)
+                                <option value="{{ $c->id }}" {{ $patient->collaborating_clinician_id == $c->id ? 'selected' : '' }}>
+                                    {{ $c->full_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {{-- Orders summary --}}
         <div class="card">
             <div class="card-header"><h6 class="mb-0"><i class="bi bi-cart me-2"></i>Orders ({{ $patient->orders->count() }})</h6></div>

@@ -94,8 +94,10 @@ return [
      * select "no instructions" and send an unguided prompt about a patient.
      */
     'contexts' => [
-        'clinical_note'     => 'Clinical note on approval',
-        'patient_message'   => 'Direct message to a patient',
+        'clinical_note'      => 'Clinical note on approval',
+        'patient_message'    => 'Direct message to a patient',
         'storefront_message' => 'Message to a storefront partner',
+        'case_summary'       => 'AI case summary for the quick review panel',
+        'rejection_reason'   => 'AI-assisted draft reason when declining a case',
     ],
 ];

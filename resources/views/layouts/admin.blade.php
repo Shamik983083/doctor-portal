@@ -48,13 +48,17 @@
             <i class="bi bi-building"></i> Partners
         </a>
         @endrole
-        <a class="nav-link {{ request()->routeIs('admin.clinicians.*') && !request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
+        <a class="nav-link {{ request()->routeIs('admin.clinicians.*') && !request()->routeIs('admin.clinicians.priority') && !request()->routeIs('admin.clinicians.bulk-reassign*') ? 'active' : '' }}"
            href="{{ route('admin.clinicians.index') }}">
             <i class="bi bi-person-badge"></i> Clinicians
         </a>
         <a class="nav-link sub {{ request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
            href="{{ route('admin.clinicians.priority') }}">
             <i class="bi bi-sort-numeric-down"></i> Assignment Priority
+        </a>
+        <a class="nav-link sub {{ request()->routeIs('admin.clinicians.bulk-reassign*') ? 'active' : '' }}"
+           href="{{ route('admin.clinicians.bulk-reassign') }}">
+            <i class="bi bi-arrow-left-right"></i> Bulk Reassign
         </a>
         <a class="nav-link {{ request()->routeIs('admin.offerings.*') ? 'active' : '' }}"
            href="{{ route('admin.offerings.index') }}">

@@ -39,7 +39,7 @@
 <div class="page-head">
     <div class="eyebrow">Clinician</div>
     <h1>Case Review for {{ $case->patient?->full_name ?? 'patient' }}</h1>
-    <p>{{ $case->patient?->age ?? '-' }} / {{ strtoupper(substr($case->patient?->gender ?? '-', 0, 1)) }} / {{ $case->partner?->name ?? '-' }} · case {{ $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, '') }}</p>
+    <p>{{ $case->patient?->age ?? '-' }} / {{ strtoupper(substr($case->patient?->gender ?? '-', 0, 1)) }} / {{ $case->patient_state ?? $case->patient?->state ?? '-' }} / {{ $case->partner?->name ?? '-' }} · case {{ $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, '') }}</p>
 </div>
 
 @if($errors->any())
@@ -62,7 +62,27 @@
             <div class="modal-left">
                 <dl class="rx-meta">
                     <div><dt>Time in queue</dt><dd>{{ $case->created_at->diffForHumans(null, true) }}</dd></div>
-                    <div><dt>Visit type</dt><dd>{{ strtolower($clin['video']) === 'required' ? 'Synchronous, video' : 'Asynchronous' }}</dd></div>
+                    @php
+                        $patientState = $case->patient_state ?? $case->patient?->state;
+                        $stateRequiresSync = $patientState
+                            ? \App\Models\StateVisitRequirement::where('state', strtoupper($patientState))->where('requires_sync', true)->exists()
+                            : false;
+                        $defaultVt = strtolower($clin['video']) === 'required' ? 'synchronous' : 'asynchronous';
+                        $rawVt = strtolower((string) ($case->visit_type ?? ''));
+                        $currentVt = str_contains($rawVt, 'sync') ? 'synchronous' : ($rawVt !== '' ? 'asynchronous' : $defaultVt);
+                    @endphp
+                    <div>
+                        <dt>Visit type</dt>
+                        <dd>
+                            <select name="visit_type" id="visitTypeSelect"
+                                    data-state-requires-sync="{{ $stateRequiresSync ? '1' : '0' }}"
+                                    data-original="{{ $currentVt }}"
+                                    style="font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+                                <option value="asynchronous" {{ $currentVt === 'asynchronous' ? 'selected' : '' }}>Asynchronous</option>
+                                <option value="synchronous"  {{ $currentVt === 'synchronous'  ? 'selected' : '' }}>Synchronous, video</option>
+                            </select>
+                        </dd>
+                    </div>
                     <div><dt>Requested term</dt><dd>{{ $clin['term'] }}</dd></div>
                     <div><dt>ID verified</dt><dd>{{ $idv ? 'Yes' : 'No' }}</dd></div>
                 </dl>
@@ -109,7 +129,7 @@
                     <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write the basics or your instructions here, then draft with AI. What you write is used, not replaced.">{{ old('directions') }}</textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
                     <div class="field" style="margin-top:10px"><label>Medical necessity</label>
-                        <textarea name="medical_necessity" class="note-area" rows="2" placeholder="Justify medical necessity for the prescribed medications.">{{ old('medical_necessity') }}</textarea>
+                        <textarea name="medical_necessity" class="note-area" rows="2" placeholder="Justify medical necessity for the prescribed medications.">{{ old('medical_necessity', $medicalNecessityPreset ?? '') }}</textarea>
                     </div>
                 </div>
             </div>
@@ -341,6 +361,20 @@
         if (addBtn) addBtn.addEventListener('click', function () { addRow(''); });
         var diag = form.querySelector('[name="diagnoses"]');
         if (diag) diag.addEventListener('input', refresh);
+
+        // C10: warn if provider downgrades a state-mandated sync visit to async
+        var vtSel = document.getElementById('visitTypeSelect');
+        if (vtSel) {
+            vtSel.addEventListener('change', function () {
+                var stateRequiresSync = this.getAttribute('data-state-requires-sync') === '1';
+                var original = this.getAttribute('data-original');
+                if (stateRequiresSync && this.value === 'asynchronous' && original === 'synchronous') {
+                    if (!confirm('This patient’s state requires a synchronous video visit. Downgrading to asynchronous may not comply with state regulations.\n\nContinue anyway?')) {
+                        this.value = 'synchronous';
+                    }
+                }
+            });
+        }
 
         // Pre-load a row for each medication the case actually requested; if none,
         // start with one empty row so there is always something to fill.

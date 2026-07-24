@@ -31,6 +31,21 @@
     {{-- Left: conversation list --}}
     <div class="panel msg-list">
         <div class="panel-heading"><div><h2>Conversations</h2><p>{{ $cases->total() }} with messages.</p></div></div>
+
+        {{-- A8: Search + filter bar --}}
+        <form method="GET" action="{{ route('clinician.messages.index') }}" style="padding:10px 14px 0;display:flex;flex-direction:column;gap:8px">
+            <input type="search" name="search" value="{{ request('search') }}"
+                   placeholder="Search by patient name or email…"
+                   style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--surface)">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                @foreach(['all' => 'All', 'unread' => 'Unread', 'waiting' => 'Waiting reply', 'read' => 'Read'] as $fv => $fl)
+                    @php $fActive = ($fv === 'all' ? !request('filter') : request('filter') === $fv); @endphp
+                    <a href="{{ route('clinician.messages.index', array_merge(request()->except(['filter','page']), $fv !== 'all' ? ['filter' => $fv] : [])) }}"
+                       class="pill {{ $fActive ? 'green' : 'neutral' }}" style="text-decoration:none;padding:3px 10px;font-size:12px">{{ $fl }}</a>
+                @endforeach
+            </div>
+        </form>
+
         @foreach($cases as $c)
             @php($msg = $latest->get($c->id))
             <a class="msg-row {{ $selected && $selected->id === $c->id ? 'active' : '' }}"

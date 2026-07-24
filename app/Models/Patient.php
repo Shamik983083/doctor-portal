@@ -19,6 +19,8 @@ class Patient extends Model
         'city', 'state', 'zip', 'country', 'status',
         'dosespot_patient_id', 'email_opt_in', 'sms_opt_in',
         'id_verified_status', 'id_verified_at', 'settings',
+        // E19: optional secondary clinician collaborating on this patient's care
+        'collaborating_clinician_id',
     ];
 
     protected $casts = [
@@ -38,6 +40,7 @@ class Patient extends Model
     public function partner() { return $this->belongsTo(Partner::class); }
     public function user() { return $this->belongsTo(User::class); }
     public function cases() { return $this->hasMany(PatientCase::class); }
+    public function collaboratingClinician() { return $this->belongsTo(Clinician::class, 'collaborating_clinician_id'); }
 
     /**
      * Restrict to patients this admin may see (Devin msg 2117).

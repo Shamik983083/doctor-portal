@@ -238,4 +238,69 @@ class ClinicianController extends Controller
         return redirect()->route('admin.clinicians.index')
             ->with('success', "Clinician {$name} has been deleted.");
     }
+
+    /**
+     * B4: Bulk-reassign open cases from one clinician to another.
+     *
+     * Only shows clinicians this admin is over.  The "from" clinician is
+     * optional — leaving it blank lists ALL open cases visible to the admin.
+     */
+    public function bulkReassign(Request $request)
+    {
+        $clinicians = Clinician::visibleTo($request->user())
+            ->with('user')
+            ->where('status', 'active')
+            ->get()
+            ->sortBy(fn($c) => $c->full_name)
+            ->values();
+
+        $fromId = $request->input('from_clinician_id');
+        $cases  = collect();
+
+        if ($fromId) {
+            // Validate the "from" doctor is within this admin's scope
+            $from = Clinician::visibleTo($request->user())->findOrFail($fromId);
+
+            $cases = PatientCase::where('clinician_id', $from->id)
+                ->whereIn('status', [
+                    PatientCase::STATUS_ASSIGNED,
+                    PatientCase::STATUS_APPROVED,
+                    PatientCase::STATUS_PROCESSING,
+                ])
+                ->with('patient')
+                ->latest()
+                ->get();
+        }
+
+        return view('admin.clinicians.bulk-reassign', compact('clinicians', 'cases', 'fromId'));
+    }
+
+    public function bulkReassignSubmit(Request $request)
+    {
+        $request->validate([
+            'to_clinician_id'   => 'required|exists:clinicians,id',
+            'case_ids'          => 'required|array|min:1',
+            'case_ids.*'        => 'integer|exists:patient_cases,id',
+        ]);
+
+        $toClinician = Clinician::visibleTo($request->user())->findOrFail($request->to_clinician_id);
+
+        // Guard: only move cases that originally belong to a visible clinician
+        $visibleIds = Clinician::visibleTo($request->user())->pluck('id');
+
+        $moved = PatientCase::whereIn('id', $request->case_ids)
+            ->whereIn('clinician_id', $visibleIds)
+            ->whereIn('status', [
+                PatientCase::STATUS_ASSIGNED,
+                PatientCase::STATUS_APPROVED,
+                PatientCase::STATUS_PROCESSING,
+            ])
+            ->update([
+                'clinician_id' => $toClinician->id,
+                'assigned_at'  => now(),
+            ]);
+
+        return redirect()->route('admin.clinicians.bulk-reassign')
+            ->with('success', "{$moved} case(s) reassigned to {$toClinician->full_name}.");
+    }
 }

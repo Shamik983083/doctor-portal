@@ -56,6 +56,38 @@
 
                     <hr class="my-4">
 
+                    <hr class="my-4">
+
+                    {{-- C11: Medical necessity preset --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold mb-1">Medical Necessity Default Text</label>
+                        <p class="text-muted mb-2" style="font-size:.78rem;">Pre-fills the Medical Necessity field on every prescription form. Clinicians can edit or clear it before submitting.</p>
+                        <textarea name="medical_necessity_preset" class="form-control @error('medical_necessity_preset') is-invalid @enderror"
+                                  rows="3" maxlength="2000"
+                                  placeholder="e.g. Patient meets clinical criteria for the requested medication based on the submitted intake and triage findings.">{{ old('medical_necessity_preset', $medicalNecessityPreset) }}</textarea>
+                        @error('medical_necessity_preset')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <hr class="my-4">
+
+                    {{-- B11: Message routing mode --}}
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold mb-1">Message Routing Mode</label>
+                        <p class="text-muted mb-2" style="font-size:.78rem;"><strong>Direct</strong> — patient messages go to the assigned clinician's inbox (current behaviour). <strong>Pool</strong> — messages surface in a shared inbox (stub; no behaviour change yet).</p>
+                        <div class="d-flex gap-3">
+                            @foreach(['direct' => 'Direct (default)', 'pool' => 'Pool (stub)'] as $val => $lbl)
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="message_routing_mode"
+                                           id="mrm_{{ $val }}" value="{{ $val }}"
+                                           {{ $messageRoutingMode === $val ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="mrm_{{ $val }}">{{ $lbl }}</label>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
                     <div class="d-flex align-items-center gap-3">
                         <button type="submit" class="btn btn-primary px-4">
                             <i class="bi bi-floppy me-2"></i>Save Settings

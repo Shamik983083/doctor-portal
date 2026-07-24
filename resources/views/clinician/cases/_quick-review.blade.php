@@ -8,7 +8,7 @@
     <div>
         <div class="eyebrow">Quick review · {{ $d['id'] }}</div>
         <h2>{{ $d['name'] }}</h2>
-        <p>{{ $d['company'] }} · Request {{ $d['term'] }} · {{ $d['dose'] }}</p>
+        <p>{{ $d['company'] }} · Request {{ $d['term'] }} · {{ $d['dose'] }}{{ !empty($d['state']) && $d['state'] !== '-' ? ' · ' . $d['state'] : '' }}</p>
     </div>
     <div class="quick-pills">
         <span class="pill {{ $d['triage'] }}">{{ ucfirst($d['triage']) }}</span>
@@ -28,7 +28,7 @@
                 <li>No AI draft yet. It is composed from the storefront intake once that is sent for this case.</li>
             @endforelse
         </ul>
-        <p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.</p>
+        <p class="ai-honesty">{{ config('ai.enabled') && config('ai.baa_confirmed') ? 'AI model draft. Statements are composed from the recorded intake answers and model output. The draft never approves, prescribes, or sends anything.' : 'Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.' }}</p>
 
         @if(!empty($d['source']))
             <button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers ({{ count($d['source']) }})</button>
@@ -60,6 +60,9 @@
                 <li><span class="finding-dot neutral"></span> No findings recorded from intake yet.</li>
             @endforelse
         </ul>
+        @if(!empty($d['collab']))
+            <p class="ai-honesty" style="margin-top:8px"><strong>Collaborating:</strong> {{ $d['collab'] }}</p>
+        @endif
         <div class="subheading holds-heading">Active workflow holds</div>
         @if($d['hold'])
             <ul class="holds-list"><li><code class="audit-verb">WORKFLOW_HOLD_ACTIVE</code></li></ul>
@@ -72,7 +75,8 @@
     <div>
         <div class="subheading">Provider actions</div>
         <a class="button-primary full-width" href="{{ $d['approveUrl'] }}" data-review-url="{{ $d['reviewUrl'] }}">Review and approve</a>
-        <a class="button-secondary full-width" href="{{ $d['showUrl'] }}">Request information</a>
+        <a class="button-secondary full-width" href="{{ $d['showUrl'] }}">Show Full Profile</a>
+        <a class="button-secondary full-width" href="{{ $d['msgUrl'] }}">Send Message</a>
         <a class="button-danger full-width" href="{{ $d['showUrl'] }}">Reject</a>
     </div>
 </div>

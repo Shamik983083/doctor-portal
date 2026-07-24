@@ -22,6 +22,9 @@ class Clinician extends Model
         'daily_refill_alert_threshold',
         // Visit-type acceptance and the booking link (Devin msg 2313 Q4).
         'accepts_async_visits', 'accepts_sync_visits', 'scheduling_link',
+        // E17: timestamp of the last time this clinician viewed the case queue,
+        // used to count how many new cases have arrived since their last visit.
+        'cases_last_viewed_at',
     ];
 
     protected $casts = [

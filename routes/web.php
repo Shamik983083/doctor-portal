@@ -109,6 +109,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
         Route::post('/{uuid}/approve', [ClinicianCaseController::class, 'approve'])->name('approve');
         // Returns a draft for the provider to edit. Persists nothing, sends nothing.
         Route::post('/{uuid}/draft-note', [ClinicianCaseController::class, 'draftNote'])->name('draft-note');
+        Route::post('/{uuid}/draft-rejection', [ClinicianCaseController::class, 'draftRejection'])->name('draft-rejection');
         Route::post('/{uuid}/cancel', [ClinicianCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/support', [ClinicianCaseController::class, 'escalateToSupport'])->name('support');
         Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
@@ -148,6 +149,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     Route::prefix('patients')->name('patients.')->group(function () {
         Route::get('/', [AdminPatientController::class, 'index'])->name('index');
         Route::get('/{id}', [AdminPatientController::class, 'show'])->name('show');
+        Route::patch('/{id}/collaborating-clinician', [AdminPatientController::class, 'updateCollaboratingClinician'])->name('collaborating-clinician.update');
         Route::delete('/{id}', [AdminPatientController::class, 'destroy'])->name('destroy');
     });
 
@@ -187,6 +189,9 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/', [AdminClinicianController::class, 'index'])->name('index');
         Route::get('/create', [AdminClinicianController::class, 'create'])->name('create');
         Route::post('/', [AdminClinicianController::class, 'store'])->name('store');
+        // B4: Doctor Admin bulk case reassignment by provider
+        Route::get('/bulk-reassign',  [AdminClinicianController::class, 'bulkReassign'])->name('bulk-reassign');
+        Route::post('/bulk-reassign', [AdminClinicianController::class, 'bulkReassignSubmit'])->name('bulk-reassign.submit');
         // Priority management · must be before /{id} wildcard
         Route::get('/priority', [AdminClinicianController::class, 'priorityIndex'])->name('priority');
         Route::patch('/reorder', [AdminClinicianController::class, 'reorder'])->name('reorder');

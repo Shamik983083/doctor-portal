@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Clinician;
 use App\Models\Patient;
 use App\Models\Partner;
 use Illuminate\Http\Request;
@@ -39,11 +40,34 @@ class PatientController extends Controller
         // is one guessed id away from being no protection at all.
         $patient = Patient::visibleTo(auth()->user())->with([
             'partner',
+            'collaboratingClinician.user',
             'cases' => fn($q) => $q->with(['clinician.user', 'caseOfferings.offering'])->latest(),
             'orders.pharmacy', 'files', 'tags',
         ])->findOrFail($id);
 
-        return view('admin.patients.show', compact('patient'));
+        $clinicians = Clinician::with('user')
+            ->where('status', 'active')
+            ->get()
+            ->sortBy(fn($c) => $c->full_name)
+            ->values();
+
+        return view('admin.patients.show', compact('patient', 'clinicians'));
+    }
+
+    public function updateCollaboratingClinician(Request $request, int $id)
+    {
+        $patient = Patient::visibleTo(auth()->user())->findOrFail($id);
+
+        $request->validate([
+            'collaborating_clinician_id' => 'nullable|exists:clinicians,id',
+        ]);
+
+        $patient->update([
+            'collaborating_clinician_id' => $request->input('collaborating_clinician_id') ?: null,
+        ]);
+
+        return redirect()->route('admin.patients.show', $patient->id)
+            ->with('success', 'Collaborating clinician updated.');
     }
 
     public function destroy(int $id)

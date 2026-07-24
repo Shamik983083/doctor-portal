@@ -103,7 +103,7 @@
                     <div class="ma-subheading">Provider decision</div>
                     <div class="d-grid gap-2 mb-3">
                         <button class="btn btn-sm btn-primary" disabled title="Preview — decisions are made on the real case screen">Approve &amp; queue order</button>
-                        <button class="btn btn-sm btn-outline-primary" disabled title="Preview only">Request information</button>
+                        <button class="btn btn-sm btn-outline-primary" disabled title="Preview only">Show Full Profile</button>
                         <button class="btn btn-sm btn-outline-primary ma-btn-danger" disabled title="Preview only">Reject</button>
                         <a class="btn btn-sm btn-outline-primary" href="{{ route('clinician.cases.show', $topCase->uuid) }}">Open full case &rarr;</a>
                     </div>

@@ -41,6 +41,12 @@ class CaseController extends Controller
     {
         $clinician = Auth::user()->clinician;
 
+        // E17: stamp when this clinician last visited the queue so the dashboard
+        // can show how many new cases arrived since their last look.
+        if ($clinician) {
+            $clinician->updateQuietly(['cases_last_viewed_at' => now()]);
+        }
+
         // caseQuestions + questionnaire answers are eager-loaded so the quick
         // review's "View source answers" can show the full intake (Devin msg
         // 2271) without a query per case.
@@ -261,9 +267,30 @@ class CaseController extends Controller
                 $q->where('direction', 'inbound')->where('is_read', false)
             ])
             ->withMax('messages as last_message_at', 'created_at')
-            ->when($request->filled('unread'), fn ($q) =>
+            ->when($request->filter === 'unread', fn ($q) =>
                 $q->whereHas('messages', fn ($m) =>
                     $m->where('direction', 'inbound')->where('is_read', false)
+                )
+            )
+            ->when($request->filter === 'waiting', fn ($q) =>
+                $q->whereExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from('messages as mw')
+                        ->whereColumn('mw.case_id', 'patient_cases.id')
+                        ->where('mw.direction', 'inbound')
+                        ->whereRaw('mw.created_at = (SELECT MAX(m2.created_at) FROM messages m2 WHERE m2.case_id = patient_cases.id)');
+                })
+            )
+            ->when($request->filter === 'read', fn ($q) =>
+                $q->whereDoesntHave('messages', fn ($m) =>
+                    $m->where('direction', 'inbound')->where('is_read', false)
+                )
+            )
+            ->when($request->filled('search'), fn ($q) =>
+                $q->whereHas('patient', fn ($p) =>
+                    $p->where('first_name', 'like', '%' . $request->search . '%')
+                      ->orWhere('last_name', 'like', '%' . $request->search . '%')
+                      ->orWhere('email', 'like', '%' . $request->search . '%')
                 )
             )
             ->orderByDesc('last_message_at')
@@ -414,7 +441,9 @@ class CaseController extends Controller
             ->get(['id', 'name', 'internal_name', 'compound_formula', 'refills',
                 'quantity', 'days_supply', 'dispense_unit', 'days_until_dispense', 'directions', 'levels']);
 
-        return view('clinician.cases.prescribe', compact('case', 'offerings'));
+        $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
+
+        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset'));
     }
 
     public function prescribe(Request $request, string $uuid)
@@ -423,6 +452,7 @@ class CaseController extends Controller
             'diagnoses' => 'required|string',
             'directions' => 'nullable|string',
             'medical_necessity' => 'nullable|string',
+            'visit_type' => 'nullable|in:asynchronous,synchronous',
             'medications' => 'nullable|array',
             'medications.*.offering_id' => 'nullable|exists:offerings,id',
             'medications.*.name' => 'required_with:medications|string|max:255',
@@ -446,6 +476,11 @@ class CaseController extends Controller
         // LAW 4: licensure gates every action, not only auto-routing.
         $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
+
+        // C10: persist the provider's visit-type choice on the case.
+        if ($request->filled('visit_type')) {
+            $case->update(['visit_type' => $request->input('visit_type')]);
+        }
 
         $prescription = DB::transaction(function () use ($request, $case, $clinician): CasePrescription {
             $prescription = CasePrescription::create([
@@ -617,6 +652,26 @@ class CaseController extends Controller
             'source' => $draft['source'],   // 'model' or 'local', so the UI can be honest about which
             'notice' => $draft['notice'],
         ]);
+    }
+
+    public function draftRejection(Request $request, string $uuid)
+    {
+        $case = PatientCase::with(['patient', 'caseOfferings.offering'])->where('uuid', $uuid)->firstOrFail();
+
+        $this->assertLicensedForCase($case);
+
+        $clin    = $case->queueClinical();
+        $name    = $case->patient?->full_name ?? 'the patient';
+        $product = $clin['product'] ?? null;
+        $productText = $product && $product !== '-' ? "for {$product}" : '';
+
+        $text = "After a thorough clinical review, the prescription request {$productText} cannot be approved at this time. "
+              . "The submitted information does not meet the clinical criteria required to safely prescribe the requested medication. "
+              . "Please consult with a licensed healthcare provider for alternative treatment options.";
+
+        $notice = 'Draft composed from case data. Edit and personalise before submitting.';
+
+        return response()->json(['text' => $text, 'notice' => $notice]);
     }
 
     public function cancel(Request $request, string $uuid)

@@ -126,11 +126,27 @@ class DashboardController extends Controller
         $slaAtRisk     = $recentCases->where('sla_at_risk', true)->count();
         $slaReviewHours = $effectiveSlaHours; // view uses this name for the deadline label
 
+        // E17: unread patient messages across all this clinician's cases
+        $unreadMessagesCount = \App\Models\Message::whereHas('case', fn ($q) =>
+                $q->where('clinician_id', $clinicianId)
+            )
+            ->where('direction', 'inbound')
+            ->where('is_read', false)
+            ->count();
+
+        // E17: cases that arrived in the waiting queue since this clinician last
+        // viewed it. Falls back to the last 24 h if they have never visited.
+        $lastViewed = $clinician?->cases_last_viewed_at;
+        $newCasesCount = PatientCase::where('status', PatientCase::STATUS_WAITING)
+            ->where('created_at', '>', $lastViewed ?? now()->subDay())
+            ->count();
+
         return view('clinician.dashboard', compact(
             'stats', 'clinician',
             'trendLabels', 'trendAssigned', 'trendCompleted',
             'visitTypeLabels', 'visitTypeCounts',
-            'recentCases', 'slaReviewHours', 'slaBreached', 'slaAtRisk'
+            'recentCases', 'slaReviewHours', 'slaBreached', 'slaAtRisk',
+            'unreadMessagesCount', 'newCasesCount'
         ));
     }
 }
