@@ -185,7 +185,7 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
         return [
             // ── STEP 1: Personal info ──────────────────────────────────────────
 
-            ['tag' => 'standard', 'key' => 'product_pick',    'type' => 'hidden', 'title' => 'Product pick',                                                               'required' => true,  'step' => 1],
+            ['tag' => 'standard', 'key' => 'product_pick',    'type' => 'hidden', 'title' => 'Product pick',                                                               'required' => false, 'step' => 1],
             ['tag' => 'standard', 'key' => 'first_name',      'type' => 'input',  'title' => 'First name',                                                                  'required' => true,  'step' => 1],
             ['tag' => 'standard', 'key' => 'last_name',       'type' => 'input',  'title' => 'Last name',                                                                   'required' => true,  'step' => 1],
             ['tag' => 'standard', 'key' => 'email',           'type' => 'email',  'title' => 'Email',                                                                       'required' => true,  'step' => 1],
@@ -420,6 +420,7 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
                     'Dulaglutide' => 'yes',
                     'I am NOT allergic to any of these medications' => 'no',
                 ],
+                'operator' => [['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp']],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
@@ -436,15 +437,17 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
                     'Alogliptin' => 'yes',
                     'I am NOT on any of these medications' => 'no',
                 ],
+                'operator' => [['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp']],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
                 'tag' => 'glp', 'key' => 'weight_loss_medications', 'type' => 'radio',
                 'title' => 'Have you taken medication for weight loss within the past month?',
                 'options' => ['Semaglutide' => 'no', 'Tirzepatide' => 'no', 'None' => 'no'],
+                'operator' => [['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp']],
                 'required' => true, 'step' => $stepNumber,
             ],
-            // Semaglutide follow-ups
+            // Semaglutide follow-ups (2-condition: product_pick=glp AND weight_loss_medications=Semaglutide)
             [
                 'tag' => 'glp', 'key' => 'previous_semaglutide_medication_last_dose', 'type' => 'radio',
                 'title' => 'What was your last dose?',
@@ -454,14 +457,20 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
                     'Semaglutide 2 mg' => 'no', 'Semaglutide 2.5 mg' => 'no',
                     'Semaglutide - Unknown' => 'no',
                 ],
-                'operator' => [['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Semaglutide']],
+                'operator' => [
+                    ['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp'],
+                    ['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Semaglutide'],
+                ],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
                 'tag' => 'glp', 'key' => 'previous_semaglutide_medication_last_dose_date', 'type' => 'radio',
                 'title' => 'When did you take that last dose?',
                 'options' => ['0-7 days' => 'no', '8-14 days' => 'no', '15-30 days' => 'no', '30+ days' => 'no'],
-                'operator' => [['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Semaglutide']],
+                'operator' => [
+                    ['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp'],
+                    ['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Semaglutide'],
+                ],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
@@ -474,10 +483,13 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
                     'Decrease my dosage' => 'no',
                     'Let the provider decide what dose is best for me' => 'no',
                 ],
-                'operator' => [['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Semaglutide']],
+                'operator' => [
+                    ['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp'],
+                    ['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Semaglutide'],
+                ],
                 'required' => true, 'step' => $stepNumber,
             ],
-            // Tirzepatide follow-ups
+            // Tirzepatide follow-ups (2-condition: product_pick=glp AND weight_loss_medications=Tirzepatide)
             [
                 'tag' => 'glp', 'key' => 'previous_tirzepatide_medication_last_dose', 'type' => 'radio',
                 'title' => 'What was your last dose?',
@@ -487,14 +499,20 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
                     'Tirzepatide 12.5 mg' => 'no', 'Tirzepatide 15 mg' => 'no',
                     'Tirzepatide - Unknown' => 'no',
                 ],
-                'operator' => [['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Tirzepatide']],
+                'operator' => [
+                    ['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp'],
+                    ['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Tirzepatide'],
+                ],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
                 'tag' => 'glp', 'key' => 'previous_tirzepatide_medication_last_dose_date', 'type' => 'radio',
                 'title' => 'When did you take that last dose?',
                 'options' => ['0-7 days' => 'no', '8-14 days' => 'no', '15-30 days' => 'no', '30+ days' => 'no'],
-                'operator' => [['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Tirzepatide']],
+                'operator' => [
+                    ['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp'],
+                    ['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Tirzepatide'],
+                ],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
@@ -507,13 +525,17 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
                     'Decrease my dosage' => 'no',
                     'Let the provider decide what dose is best for me' => 'no',
                 ],
-                'operator' => [['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Tirzepatide']],
+                'operator' => [
+                    ['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp'],
+                    ['question_key' => 'weight_loss_medications', 'operator' => 'equal_to', 'value' => 'Tirzepatide'],
+                ],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
                 'tag' => 'glp', 'key' => 'gastric_bypass_6_months', 'type' => 'select',
                 'title' => 'Have you had gastric bypass surgery in the past 6 months?',
                 'options' => ['Yes' => 'yes', 'No' => 'no'],
+                'operator' => [['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp']],
                 'required' => true, 'step' => $stepNumber,
             ],
             [
@@ -521,6 +543,7 @@ class OfferIntakeQuestionnairesSeeder extends Seeder
                 'title' => 'Please read and acknowledge before continuing',
                 'description' => 'You are requesting treatment with a GLP-1 receptor agonist (such as semaglutide) or a GLP-1/GIP receptor agonist (such as tirzepatide) for weight management. These medications work by mimicking hormones that regulate appetite and blood sugar. They may be compounded by a licensed 503A pharmacy. Compounded medications are not FDA-approved. Potential benefits include: reduced appetite, weight loss, improved blood sugar control. Potential risks and side effects include: nausea, vomiting, diarrhea, constipation, abdominal pain, injection site reactions, pancreatitis (rare), gallbladder problems (rare), thyroid tumors (observed in animal studies). You should not take these medications if you have a personal or family history of medullary thyroid carcinoma or Multiple Endocrine Neoplasia syndrome type 2.',
                 'options' => ['I have read and understand the considerations above.' => 'no'],
+                'operator' => [['question_key' => 'product_pick', 'operator' => 'equal_to', 'value' => 'glp']],
                 'required' => true, 'step' => $stepNumber,
             ],
         ];
