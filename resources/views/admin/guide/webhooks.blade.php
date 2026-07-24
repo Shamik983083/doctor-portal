@@ -52,6 +52,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
             <li><a class="toc-link text-decoration-none" href="#ev-case-support">case_support</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-approved">case_approved</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-prescription-written">prescription_written</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-case-processing">case_processing</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-completed">case_completed</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-cancelled">case_cancelled</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-note-added">clinical_note_added</a></li>
@@ -60,6 +61,8 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
             <li><a class="toc-link text-decoration-none" href="#ev-order-status">order_status_changed</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-tracking">tracking_number_changed</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-patient-modified">patient_modified</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-patient-created">patient_created</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-patient-deleted">patient_deleted</a></li>
         </ol>
     </li>
     <li><a class="toc-link text-decoration-none" href="#checklist">Checklist</a></li>
@@ -277,6 +280,7 @@ def webhook():
   "case_id":    "9d2f1c3e-...",
   "patient_id": "a1b2c3d4-...",
   "status":     "created",
+  "visit_type": "asynchronous",
   "timestamp":  1751539200
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-created')">Copy</button>
@@ -299,6 +303,7 @@ def webhook():
   "case_id":    "9d2f1c3e-...",
   "patient_id": "a1b2c3d4-...",
   "status":     "waiting",
+  "visit_type": "asynchronous",
   "timestamp":  1751539201
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-waiting')">Copy</button>
@@ -321,6 +326,7 @@ def webhook():
   "case_id":    "9d2f1c3e-...",
   "patient_id": "a1b2c3d4-...",
   "status":     "assigned",
+  "visit_type": "asynchronous",
   "timestamp":  1751539260
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-assigned')">Copy</button>
@@ -343,6 +349,7 @@ def webhook():
   "case_id":    "9d2f1c3e-...",
   "patient_id": "a1b2c3d4-...",
   "status":     "support",
+  "visit_type": "asynchronous",
   "timestamp":  1751539800
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-support')">Copy</button>
@@ -370,6 +377,7 @@ def webhook():
   "case_id":    "9d2f1c3e-...",
   "patient_id": "a1b2c3d4-...",
   "status":     "approved",
+  "visit_type": "asynchronous",
   "timestamp":  1751540000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-approved')">Copy</button>
@@ -401,12 +409,22 @@ def webhook():
   "diagnoses":       "Obesity (E66.9), Hypertension (I10)",
   "meds_prescribed": [
     {
-      "name":             "Semaglutide",
-      "compound_formula": "Semaglutide 0.5mg/mL in bacteriostatic water",
-      "refills":          "3",
-      "quantity":         "1",
-      "days_supply":      "30",
-      "dispense_unit":    "vial"
+      "name":                "Semaglutide",
+      "compound_formula":    "Semaglutide 0.5mg/mL in bacteriostatic water",
+      "refills":             "3",
+      "quantity":            "1",
+      "days_supply":         "30",
+      "dispense_unit":       "vial",
+      "days_until_dispense": "7",
+      "dosing":              {
+        "frequency": "Once weekly",
+        "term":      "3 months",
+        "months": [
+          { "month": 1, "dose": "0.25 mg" },
+          { "month": 2, "dose": "0.5 mg"  },
+          { "month": 3, "dose": "1.0 mg"  }
+        ]
+      }
     }
   ],
   "timestamp":       1751540001
@@ -421,6 +439,29 @@ def webhook():
 </div>
 </div>
 
+{{-- case_processing --}}
+<div id="ev-case-processing" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge">case_processing</span>
+    <span class="text-muted small">Case has entered fulfilment processing (prescription sent to pharmacy / dispenser)</span>
+</div>
+<div class="card-body">
+<pre id="code-ev-processing">{
+  "case_id":    "9d2f1c3e-...",
+  "patient_id": "a1b2c3d4-...",
+  "status":     "processing",
+  "visit_type": "asynchronous",
+  "timestamp":  1751540100
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-processing')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— fetch current order and tracking details</span>
+</div>
+</div>
+</div>
+
 {{-- case_completed --}}
 <div id="ev-case-completed" class="card mb-3 section-anchor">
 <div class="card-header py-2 d-flex align-items-center gap-2">
@@ -432,6 +473,7 @@ def webhook():
   "case_id":    "9d2f1c3e-...",
   "patient_id": "a1b2c3d4-...",
   "status":     "completed",
+  "visit_type": "asynchronous",
   "timestamp":  1751599200
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-completed')">Copy</button>
@@ -454,6 +496,7 @@ def webhook():
   "case_id":    "9d2f1c3e-...",
   "patient_id": "a1b2c3d4-...",
   "status":     "cancelled",
+  "visit_type": "asynchronous",
   "timestamp":  1751540500
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-cancelled')">Copy</button>
@@ -536,11 +579,15 @@ def webhook():
 <div class="card-body">
 <pre id="code-ev-order">{
   "order_id":  "ord-uuid-...",
-  "case_id":   "9d2f1c3e-...",
+  "case_id":   "9d2f1c3e-...",   // omitted when triggered by a cancel action
   "status":    "shipped",
   "timestamp": 1751599000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-order')">Copy</button>
+<div class="alert alert-warning mt-2 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <code>case_id</code> is present when triggered by a status update but <strong>omitted</strong> when triggered by a cancel action. Always guard for its absence before using it.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
@@ -591,6 +638,45 @@ def webhook():
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/patients/{patient_id}</code>
     <span class="text-muted" style="font-size:.75rem">— confirm updated <code>id_verified_status</code> and <code>id_verified_at</code> on the patient record</span>
+</div>
+</div>
+</div>
+
+{{-- patient_created --}}
+<div id="ev-patient-created" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge">patient_created</span>
+    <span class="text-muted small">Fired when a new patient record is created via <code>POST /api/partner/patients</code></span>
+</div>
+<div class="card-body">
+<pre id="code-ev-patient-created">{
+  "patient_id": "a1b2c3d4-...",
+  "timestamp":  1751599350
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-created')">Copy</button>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/patients/{patient_id}</code>
+    <span class="text-muted" style="font-size:.75rem">— retrieve the full patient record just created</span>
+</div>
+</div>
+</div>
+
+{{-- patient_deleted --}}
+<div id="ev-patient-deleted" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge">patient_deleted</span>
+    <span class="text-muted small">Fired when a patient record is soft-deleted via <code>DELETE /api/partner/patients/{uuid}</code></span>
+</div>
+<div class="card-body">
+<pre id="code-ev-patient-deleted">{
+  "patient_id": "a1b2c3d4-...",
+  "timestamp":  1751599400
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-deleted')">Copy</button>
+<div class="alert alert-info mt-2 mb-0 small">
+    <i class="bi bi-info-circle me-1"></i>
+    The patient record is <strong>soft-deleted</strong> — it is no longer accessible via the API but data is retained for audit purposes. Any open cases for this patient should be considered stale.
 </div>
 </div>
 </div>
