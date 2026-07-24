@@ -34,6 +34,8 @@ class AdminUserController extends Controller
 
     public function store(Request $request)
     {
+        $this->cleanClinicianIds($request);
+
         $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
@@ -68,6 +70,8 @@ class AdminUserController extends Controller
      */
     public function updateClinicians(Request $request, int $id)
     {
+        $this->cleanClinicianIds($request);
+
         $request->validate([
             'clinician_ids'   => 'nullable|array',
             'clinician_ids.*' => 'integer|exists:clinicians,id',
@@ -81,6 +85,16 @@ class AdminUserController extends Controller
         return redirect()->route('admin.admins.show', $id)
             ->with('success', 'Doctors updated for ' . $admin->name . '.')
             ->with('warning', $this->scopeWarning($admin));
+    }
+
+    private function cleanClinicianIds(Request $request): void
+    {
+        $request->merge([
+            'clinician_ids' => array_values(array_filter(
+                (array) $request->input('clinician_ids', []),
+                fn($v) => $v !== ''
+            )),
+        ]);
     }
 
     private function syncManagedClinicians(User $admin, Request $request): void
