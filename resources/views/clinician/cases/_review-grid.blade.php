@@ -161,7 +161,7 @@
      data is built once below and embedded as JSON; the panel renders the top
      case server-side and JS re-renders it when a row is clicked. --}}
 @php
-    $buildCard = function ($case) {
+    $buildCard = function ($case) use ($expandState) {
         $clin = $case->queueClinical();
         $ci   = $case->clinical_intake ?? [];
 
