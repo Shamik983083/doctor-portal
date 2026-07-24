@@ -417,13 +417,10 @@ def webhook():
       "dispense_unit":       "vial",
       "days_until_dispense": "7",
       "dosing":              {
-        "frequency": "Once weekly",
-        "term":      "3 months",
-        "months": [
-          { "month": 1, "dose": "0.25 mg" },
-          { "month": 2, "dose": "0.5 mg"  },
-          { "month": 3, "dose": "1.0 mg"  }
-        ]
+        "medication": "Semaglutide",
+        "frequency":  "Once weekly",
+        "term":       "3M",
+        "months":     ["0.25 mg", "0.5 mg", "1.0 mg"]
       }
     }
   ],
