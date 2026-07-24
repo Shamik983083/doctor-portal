@@ -229,11 +229,14 @@
     <div style="margin-top:16px">{{ $cases->withQueryString()->links() }}</div>
 @endif
 
+@php
+    $aiHonestyText = (config('ai.enabled') && config('ai.baa_confirmed'))
+        ? 'AI model draft. Statements are composed from the recorded intake answers and model output. The draft never approves, prescribes, or sends anything.'
+        : 'Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.';
+@endphp
 <script>
     var CASE_DATA = @json($caseData ?? []);
-    var AI_HONESTY_TEXT = @json(config('ai.enabled') && config('ai.baa_confirmed')
-        ? 'AI model draft. Statements are composed from the recorded intake answers and model output. The draft never approves, prescribes, or sends anything.'
-        : 'Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.');
+    var AI_HONESTY_TEXT = @json($aiHonestyText);
 </script>
 <script>
     // Row click swaps the quick-review panel to the clicked case, rebuilding the
