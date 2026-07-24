@@ -8,7 +8,7 @@
         'admin.questionnaires.*', 'admin.questions.*'
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
-    $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*');
+    $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*');
     $superActive = request()->routeIs('admin.admins.*');
 @endphp
 
