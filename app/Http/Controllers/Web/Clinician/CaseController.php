@@ -276,9 +276,9 @@ class CaseController extends Controller
                 $q->whereExists(function ($sub) {
                     $sub->selectRaw('1')
                         ->from('messages as mw')
-                        ->whereColumn('mw.case_id', 'patient_cases.id')
+                        ->whereColumn('mw.case_id', 'cases.id')
                         ->where('mw.direction', 'inbound')
-                        ->whereRaw('mw.created_at = (SELECT MAX(m2.created_at) FROM messages m2 WHERE m2.case_id = patient_cases.id)');
+                        ->whereRaw('mw.created_at = (SELECT MAX(m2.created_at) FROM messages m2 WHERE m2.case_id = cases.id)');
                 })
             )
             ->when($request->filter === 'read', fn ($q) =>
