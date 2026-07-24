@@ -47,8 +47,8 @@ return new class extends Migration
             $table->json('provider_reasons')->nullable();
 
             $table->unsignedInteger('occurrences')->default(1);
-            $table->timestamp('first_seen_at');
-            $table->timestamp('last_seen_at');
+            $table->timestamp('first_seen_at')->useCurrent();
+            $table->timestamp('last_seen_at')->useCurrent();
 
             // Set when the case finally routes, or when an admin clears it.
             $table->timestamp('resolved_at')->nullable();
