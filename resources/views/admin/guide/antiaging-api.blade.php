@@ -145,6 +145,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <li><a class="toc-link text-decoration-none" href="#questions">Question Reference</a></li>
     <li><a class="toc-link text-decoration-none" href="#errors">Error Responses</a></li>
     <li><a class="toc-link text-decoration-none" href="#db">What Gets Created in DB</a></li>
+    <li><a class="toc-link text-decoration-none" href="#endpoints">Additional Endpoints</a></li>
     <li><a class="toc-link text-decoration-none" href="#checklist">Integration Checklist</a></li>
 </ol>
 </div>
@@ -300,6 +301,8 @@ Content-Type: application/json
   "visit_type":     "antiaging",
   "is_chargeable":  true,
   "hold_status":    false,
+  "is_refill":      false,         // true = check-in — re-routes to prior doctor, counts as check-in not first visit
+  "metadata":       { "source": "patient-portal" },  // optional free-form object, stored verbatim on the case
 
   "offerings": [
     { "offering_id": "YOUR_AA_OFFERING_UUID", "quantity": 1 }
@@ -519,9 +522,47 @@ function renderAAQRows($rows, $allRows) {
 </div>
 </div>
 
-{{-- ── 7. CHECKLIST ─────────────────────────────────────────── --}}
+{{-- ── 7. ADDITIONAL ENDPOINTS ───────────────────────────────── --}}
+<div id="endpoints" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">7</span>Additional API Endpoints</div>
+<div class="card-body">
+
+<h6 class="fw-semibold mb-2">Patient Management</h6>
+<table class="table table-sm table-bordered mb-3" style="font-size:.84rem">
+<thead class="table-light"><tr><th>Method</th><th>URL</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/patients</code></td><td>List all patients for this partner (paginated)</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/patients/{uuid}</code></td><td>Get single patient by UUID</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/patients/by-external-id/{id}</code></td><td>Look up patient by your <code>external_id</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/patients</code></td><td>Create a standalone patient record (no case)</td></tr>
+<tr><td><span class="badge-method method-post" style="background:#fff3cd;color:#664d03">PATCH</span></td><td><code>/api/partner/patients/{uuid}</code></td><td>Update patient fields — use for async Vouched IDV pushes and demographic corrections</td></tr>
+<tr><td><span class="badge-method method-post" style="background:#f8d7da;color:#842029">DELETE</span></td><td><code>/api/partner/patients/{uuid}</code></td><td>Soft-delete patient — fires <code>patient_deleted</code> webhook; data retained for audit</td></tr>
+</tbody>
+</table>
+
+<h6 class="fw-semibold mb-2">Case Actions</h6>
+<table class="table table-sm table-bordered mb-3" style="font-size:.84rem">
+<thead class="table-light"><tr><th>Method</th><th>URL</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases</code></td><td>List cases for this partner (paginated; filter by <code>?status=</code>)</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}</code></td><td>Get single case — includes patient, clinician, offerings, questionnaire answers, prescription</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/by-external-id/{id}</code></td><td>Look up case by your <code>external_id</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/cancel</code></td><td>Cancel a case. Body: <code>{ "reason": "..." }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/hold</code></td><td>Put on or release a hold. Body: <code>{ "hold": true|false }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/support</code></td><td>Escalate case to support. Body: <code>{ "note": "..." }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/return-to-clinician</code></td><td>Respond to a support escalation and return the case to the clinician. Body: <code>{ "partner_note": "..." }</code> (required)</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}/events</code></td><td>Full event log for the case</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}/messages</code></td><td>Full message thread for the case</td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/messages</code></td><td>Send a patient message. Body: <code>{ "body": "...", "sender_name": "Jane" }</code></td></tr>
+</tbody>
+</table>
+
+</div>
+</div>
+
+{{-- ── 8. CHECKLIST ─────────────────────────────────────────── --}}
 <div id="checklist" class="card mb-4 section-anchor">
-<div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">7</span>Integration Checklist</div>
+<div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">8</span>Integration Checklist</div>
 <div class="card-body">
 <ul class="list-unstyled mb-0">
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code>, <code>client_secret</code>, and your <strong>Offering UUID(s)</strong> from the admin — Partner → Offerings (shown once approved)</li>

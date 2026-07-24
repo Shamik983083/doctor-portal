@@ -384,7 +384,7 @@ class CaseController extends Controller
     public function show(Request $request, string $id)
     {
         $case = $this->partner($request)->cases()
-            ->with(['patient', 'clinician.user', 'caseOfferings.offering', 'caseQuestions', 'diseases', 'orders', 'clinicalNotes', 'tags'])
+            ->with(['patient', 'clinician.user', 'caseOfferings.offering', 'caseQuestions', 'diseases', 'orders', 'clinicalNotes', 'tags', 'casePrescription.medications'])
             ->where('uuid', $id)->firstOrFail();
 
         return response()->json($case);
@@ -477,6 +477,33 @@ class CaseController extends Controller
         $this->stateMachine->escalateToSupport($case, $request->note ?? '');
 
         return response()->json($case->fresh());
+    }
+
+    public function returnToClinician(Request $request, string $id)
+    {
+        $request->validate(['partner_note' => 'required|string|max:1000']);
+
+        $case = $this->partner($request)->cases()
+            ->where('uuid', $id)
+            ->whereNotNull('support_at')
+            ->where('status', 'support')
+            ->firstOrFail();
+
+        $partnerNote = $request->input('partner_note');
+
+        $this->stateMachine->returnToClinicianFromSupport($case, $partnerNote);
+
+        if ($case->clinician_id) {
+            \App\Models\ClinicalNote::create([
+                'case_id'      => $case->id,
+                'clinician_id' => $case->clinician_id,
+                'type'         => 'general',
+                'note'         => 'Support response: ' . $partnerNote,
+                'is_private'   => false,
+            ]);
+        }
+
+        return response()->json(['message' => 'Case returned to clinician.', 'case' => $case->fresh()]);
     }
 
     public function events(Request $request, string $id)

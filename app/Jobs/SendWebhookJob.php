@@ -39,7 +39,11 @@ class SendWebhookJob implements ShouldQueue
         $payload  = $delivery->payload;
         $payload['event'] = $delivery->event_type;
         $jsonBody = json_encode($payload);
-        $signature = hash_hmac('sha256', $jsonBody, $partner->webhook_secret ?? '');
+        // Sign with the per-webhook secret returned at registration time.
+        // The legacy partner-level webhook_secret is kept as a fallback so
+        // deliveries created before this change continue to verify correctly.
+        $signingKey = $webhook->secret ?? $partner->webhook_secret ?? '';
+        $signature  = hash_hmac('sha256', $jsonBody, $signingKey);
 
         $delivery->increment('attempts');
         $delivery->update(['last_attempted_at' => now(), 'status' => WebhookDelivery::STATUS_RETRYING]);

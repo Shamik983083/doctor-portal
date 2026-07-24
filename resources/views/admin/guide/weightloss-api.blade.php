@@ -160,6 +160,8 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <li><a class="toc-link text-decoration-none" href="#questions">Question Reference</a></li>
     <li><a class="toc-link text-decoration-none" href="#errors">Error Responses</a></li>
     <li><a class="toc-link text-decoration-none" href="#db">What Gets Created in DB</a></li>
+    <li><a class="toc-link text-decoration-none" href="#clinical">Push Clinical Intake</a></li>
+    <li><a class="toc-link text-decoration-none" href="#endpoints">Additional Endpoints</a></li>
     <li><a class="toc-link text-decoration-none" href="#checklist">Integration Checklist</a></li>
 </ol>
 </div>
@@ -343,6 +345,8 @@ Content-Type: application/json
   "visit_type":     "weightloss",
   "is_chargeable":  true,
   "hold_status":    false,
+  "is_refill":      false,         // true = check-in — re-routes to prior doctor, counts as check-in not first visit
+  "metadata":       { "source": "patient-portal" },  // optional free-form object, stored verbatim on the case
 
   "offerings": [
     { "offering_id": "YOUR_MWL_OFFERING_UUID", "quantity": 1 }
@@ -571,9 +575,92 @@ function renderQRows($rows, $allRows) {
 </div>
 </div>
 
-{{-- ── 8. CHECKLIST ─────────────────────────────────────────── --}}
+{{-- ── 8. PUSH CLINICAL INTAKE ──────────────────────────────── --}}
+<div id="clinical" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">8</span>Push Clinical Intake Data <span class="text-muted fw-normal small">(optional, post-creation update)</span></div>
+<div class="card-body">
+<p class="mb-2">If your storefront collects medication details (current dose, GLP-1 history, protocol, etc.) <em>after</em> the case is created — or if that data changes — push it with this endpoint. It <strong>replaces</strong> the clinical intake block wholesale; whatever you last sent is what the clinician sees.</p>
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge-method method-post">POST</span>
+    <code>{{ $base }}/api/partner/cases/{case_uuid}/clinical</code>
+</div>
+<pre id="code-clinical">POST {{ $base }}/api/partner/cases/{case_uuid}/clinical
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "clinical_intake": {
+    "product":         "Semaglutide",          // offering / product name
+    "dose":            "0.25 mg",              // current dose
+    "term":            "3M",                   // term: 1M | 3M | 6M | 12M
+    "plan":            "M1",                   // plan tier
+    "med2":            "Metformin",            // additional medications (optional)
+    "med3":            null,
+    "med4":            null,
+    "onGlp":           "yes",                  // "yes" | "no"
+    "zofran":          "no",                   // anti-nausea rider: "yes" | "no"
+    "allergy":         "no",                   // allergy flag: "yes" | "no"
+    "allergyDetail":   null,                   // required when allergy = "yes"
+    "video":           "not_required",         // "not_required" | "scheduled" | "completed"
+    "protocolVersion": "v2.1",
+    "findings":        ["bmi_30_39"],          // array of clinical finding codes
+    "summary":         ["approved_for_glp1"],  // array of summary codes
+    "sourceAnswers":   { "custom_key": "val" } // any extra key-value pairs your system tracks
+  }
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-clinical')">Copy</button>
+
+<p class="mt-3 mb-1"><strong>Success 200</strong></p>
+<pre id="code-clinical-resp">{
+  "message": "Clinical intake updated.",
+  "case": { "uuid": "case-uuid-here", "status": "waiting", ... }
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-clinical-resp')">Copy</button>
+</div>
+</div>
+
+{{-- ── 9. ADDITIONAL ENDPOINTS ───────────────────────────────── --}}
+<div id="endpoints" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">9</span>Additional API Endpoints</div>
+<div class="card-body">
+
+<h6 class="fw-semibold mb-2">Patient Management</h6>
+<table class="table table-sm table-bordered mb-3" style="font-size:.84rem">
+<thead class="table-light"><tr><th>Method</th><th>URL</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/patients</code></td><td>List all patients for this partner (paginated)</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/patients/{uuid}</code></td><td>Get single patient by UUID</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/patients/by-external-id/{id}</code></td><td>Look up patient by your <code>external_id</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/patients</code></td><td>Create a standalone patient record (no case)</td></tr>
+<tr><td><span class="badge-method method-post" style="background:#fff3cd;color:#664d03">PATCH</span></td><td><code>/api/partner/patients/{uuid}</code></td><td>Update patient fields — use for async Vouched IDV pushes and demographic corrections</td></tr>
+<tr><td><span class="badge-method method-post" style="background:#f8d7da;color:#842029">DELETE</span></td><td><code>/api/partner/patients/{uuid}</code></td><td>Soft-delete patient — fires <code>patient_deleted</code> webhook; data retained for audit</td></tr>
+</tbody>
+</table>
+
+<h6 class="fw-semibold mb-2">Case Actions</h6>
+<table class="table table-sm table-bordered mb-3" style="font-size:.84rem">
+<thead class="table-light"><tr><th>Method</th><th>URL</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases</code></td><td>List cases for this partner (paginated; filter by <code>?status=</code>)</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}</code></td><td>Get single case — includes patient, clinician, offerings, questionnaire answers, prescription</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/by-external-id/{id}</code></td><td>Look up case by your <code>external_id</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/cancel</code></td><td>Cancel a case. Body: <code>{ "reason": "..." }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/hold</code></td><td>Put on or release a hold. Body: <code>{ "hold": true|false }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/support</code></td><td>Escalate case to support. Body: <code>{ "note": "..." }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/return-to-clinician</code></td><td>Respond to a support escalation and return the case to the clinician. Body: <code>{ "partner_note": "..." }</code> (required)</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}/events</code></td><td>Full event log for the case (status transitions, notes, assignments)</td></tr>
+<tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}/messages</code></td><td>Full message thread for the case</td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/messages</code></td><td>Send a patient message. Body: <code>{ "body": "...", "sender_name": "Jane" }</code></td></tr>
+</tbody>
+</table>
+
+</div>
+</div>
+
+{{-- ── 10. CHECKLIST ─────────────────────────────────────────── --}}
 <div id="checklist" class="card mb-4 section-anchor">
-<div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">8</span>Integration Checklist</div>
+<div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">10</span>Integration Checklist</div>
 <div class="card-body">
 <ul class="list-unstyled mb-0">
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code>, <code>client_secret</code>, and your <strong>Offering UUID(s)</strong> from the admin — Partner → Offerings (shown once approved)</li>
