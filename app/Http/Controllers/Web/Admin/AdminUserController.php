@@ -92,7 +92,7 @@ class AdminUserController extends Controller
         $request->merge([
             'clinician_ids' => array_values(array_filter(
                 (array) $request->input('clinician_ids', []),
-                fn($v) => $v !== ''
+                fn($v) => is_numeric($v)
             )),
         ]);
     }
