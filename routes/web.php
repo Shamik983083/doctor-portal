@@ -298,8 +298,14 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     Route::get('/settings',  [AdminSettingsController::class, 'index'])->name('settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
 
-    // Triage Rule Set — read-only; disqualifier rules are managed via the Question Bank
-    Route::get('/triage-rules', [AdminTriageRuleController::class, 'index'])->name('triage-rules.index');
+    // Triage Rule Set — per-questionnaire disqualifier rules
+    Route::prefix('triage-rules')->name('triage-rules.')->group(function () {
+        Route::get('/', [AdminTriageRuleController::class, 'index'])->name('index');
+        Route::post('/option/{questionnaireQuestion}',         [AdminTriageRuleController::class, 'storeOption'])->name('option.store');
+        Route::patch('/option/{questionnaireQuestion}/toggle', [AdminTriageRuleController::class, 'toggleOption'])->name('option.toggle');
+        Route::put('/option/{questionnaireQuestion}',          [AdminTriageRuleController::class, 'updateOption'])->name('option.update');
+        Route::delete('/option/{questionnaireQuestion}',       [AdminTriageRuleController::class, 'destroyOption'])->name('option.destroy');
+    });
 
     // Case routing policy. Decides which doctor sees which patient, so it sits
     // with the other super-admin configuration.

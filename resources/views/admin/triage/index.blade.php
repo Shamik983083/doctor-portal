@@ -5,165 +5,167 @@
 
 @section('content')
 
-{{-- Flash --}}
 @if(session('success'))
-<div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
     <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 @endif
 @if(session('error'))
-<div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+<div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
     <i class="bi bi-exclamation-circle me-2"></i>{{ session('error') }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 @endif
 
-{{-- Page header --}}
-<div class="d-flex justify-content-between align-items-start mb-4">
-    <div>
-        <p class="text-muted mb-0" style="font-size:.85rem;">
-            Disqualifier rules are defined per questionnaire. Any case where a patient selects a disqualifying answer
-            is automatically classified <span class="text-danger fw-semibold">Red</span>.
-            To add, remove, or change a disqualifying option, edit the question in the
-            <a href="{{ route('admin.questions.index') }}" class="text-decoration-none">Question Bank</a>.
-        </p>
-    </div>
+{{-- Header --}}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0 small">
+        Disqualifier rules are defined per questionnaire. Any case where a patient selects a disqualifying
+        answer is automatically classified <span class="text-danger fw-semibold">Red</span>.
+    </p>
     <span class="badge bg-secondary ms-3 flex-shrink-0">{{ $version }}</span>
 </div>
 
-{{-- Stats row --}}
+{{-- Stats --}}
 @php
-    $totalDisqQuestions = $questionnairesWithRules->sum(fn($q) => $q->disqualifierQuestions->count());
-    $totalDisqOptions   = $questionnairesWithRules->sum(function ($q) {
+    $totalDisqOptions = $questionnairesWithRules->sum(function ($q) {
         return $q->disqualifierQuestions->sum(function ($question) {
             return collect($question->options ?? [])->filter(fn($o) => !empty($o['is_disqualify']) || !empty($o['disqualifies']))->count();
         });
     });
 @endphp
-<div class="row g-3 mb-4">
+<div class="row g-2 mb-4">
     <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body d-flex align-items-center gap-3 py-3">
-                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                     style="width:40px;height:40px;background:#4361ee1a;">
-                    <i class="bi bi-ui-checks" style="color:#4361ee;font-size:1.1rem;"></i>
-                </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-2 py-2 px-3">
+                <i class="bi bi-ui-checks text-primary" style="font-size:1.2rem;"></i>
                 <div>
-                    <div class="fw-bold fs-5 lh-1">{{ $questionnairesWithRules->count() }}</div>
-                    <div class="text-muted" style="font-size:.73rem;">Questionnaires</div>
+                    <div class="fw-bold lh-1">{{ $questionnairesWithRules->count() }}</div>
+                    <div class="text-muted" style="font-size:.7rem;">Questionnaires</div>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body d-flex align-items-center gap-3 py-3">
-                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                     style="width:40px;height:40px;background:#e639461a;">
-                    <i class="bi bi-question-circle" style="color:#e63946;font-size:1.1rem;"></i>
-                </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-2 py-2 px-3">
+                <i class="bi bi-question-circle text-danger" style="font-size:1.2rem;"></i>
                 <div>
-                    <div class="fw-bold fs-5 lh-1">{{ $totalDisqQuestions }}</div>
-                    <div class="text-muted" style="font-size:.73rem;">Screened Questions</div>
+                    <div class="fw-bold lh-1">{{ $questionnairesWithRules->sum(fn($q) => $q->disqualifierQuestions->count()) }}</div>
+                    <div class="text-muted" style="font-size:.7rem;">Screened Questions</div>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body d-flex align-items-center gap-3 py-3">
-                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                     style="width:40px;height:40px;background:#e639461a;">
-                    <i class="bi bi-x-octagon" style="color:#e63946;font-size:1.1rem;"></i>
-                </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-2 py-2 px-3">
+                <i class="bi bi-x-octagon text-danger" style="font-size:1.2rem;"></i>
                 <div>
-                    <div class="fw-bold fs-5 lh-1">{{ $totalDisqOptions }}</div>
-                    <div class="text-muted" style="font-size:.73rem;">Disqualifying Options</div>
+                    <div class="fw-bold lh-1">{{ $totalDisqOptions }}</div>
+                    <div class="text-muted" style="font-size:.7rem;">Disqualifying Options</div>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body d-flex align-items-center gap-3 py-3">
-                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                     style="width:40px;height:40px;background:#2dc6531a;">
-                    <i class="bi bi-shield-check" style="color:#2dc653;font-size:1.1rem;"></i>
-                </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-2 py-2 px-3">
+                <i class="bi bi-shield-check text-success" style="font-size:1.2rem;"></i>
                 <div>
-                    <div class="fw-bold fs-5 lh-1">{{ $questionnairesWithoutRules->count() }}</div>
-                    <div class="text-muted" style="font-size:.73rem;">Baseline Only</div>
+                    <div class="fw-bold lh-1">{{ $questionnairesWithoutRules->count() }}</div>
+                    <div class="text-muted" style="font-size:.7rem;">Baseline Only</div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{{-- ═══════════════ Per-questionnaire disqualifier sections ═══════════════ --}}
+{{-- ═══════════════ Per-questionnaire rule tables ═══════════════ --}}
 @forelse($questionnairesWithRules as $questionnaire)
-@php
-    $colors = ['#4361ee','#2f9e73','#c98a2f','#a7566b','#7b5ea7','#e63946'];
-    $color  = $colors[$loop->index % count($colors)];
-@endphp
-<div class="card border-0 shadow-sm mb-4" style="border-left: 4px solid {{ $color }} !important;">
-    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center justify-content-between">
-        <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                 style="width:34px;height:34px;background:{{ $color }}1a;">
-                <i class="bi bi-ui-checks" style="color:{{ $color }};font-size:.9rem;"></i>
-            </div>
-            <div>
-                <h6 class="mb-0 fw-semibold">{{ $questionnaire->name }}</h6>
-                <p class="text-muted mb-0" style="font-size:.71rem;">
-                    {{ $questionnaire->disqualifierQuestions->count() }} screened
-                    {{ Str::plural('question', $questionnaire->disqualifierQuestions->count()) }}
-                    &middot; all disqualifying answers → <span class="text-danger fw-semibold">Red</span>
-                </p>
-            </div>
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-bottom py-2 px-3 d-flex align-items-center justify-content-between">
+        <div>
+            <span class="fw-semibold">{{ $questionnaire->name }}</span>
+            <span class="text-muted ms-2" style="font-size:.75rem;">
+                {{ $questionnaire->disqualifierQuestions->count() }} question(s) &middot;
+                {{ $questionnaire->disqualifierQuestions->sum(fn($q) => collect($q->options ?? [])->filter(fn($o) => !empty($o['is_disqualify']))->count()) }} rules
+                &middot; all trigger <span class="text-danger">Red</span>
+            </span>
         </div>
-        <a href="{{ route('admin.questions.index') }}"
-           class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-pencil me-1"></i>Edit in Question Bank
-        </a>
+        <button class="btn btn-sm btn-primary py-1"
+                onclick="openAddModal({{ $questionnaire->id }}, '{{ addslashes($questionnaire->name) }}', {{ $questionnaire->questions->toJson() }})">
+            <i class="bi bi-plus-lg me-1"></i>Add Rule
+        </button>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0" style="font-size:.83rem;">
                 <thead class="table-light">
                     <tr>
-                        <th class="ps-4" style="width:22%">Question Key</th>
-                        <th style="width:28%">Question</th>
-                        <th>Disqualifying Options → <span class="text-danger">Red</span></th>
-                        <th style="width:12%">Safe Options</th>
+                        <th class="ps-3" style="width:22%;">Question Key</th>
+                        <th style="width:30%;">Question</th>
+                        <th>Disqualifying Option</th>
+                        <th style="width:8%;">Result</th>
+                        <th style="width:10%;">Status</th>
+                        <th class="text-end pe-3" style="width:10%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($questionnaire->disqualifierQuestions as $question)
-                    @php
-                        $disqOpts = collect($question->options ?? [])->filter(fn($o) => !empty($o['is_disqualify']) || !empty($o['disqualifies']));
-                        $safeOpts = collect($question->options ?? [])->reject(fn($o) => !empty($o['is_disqualify']) || !empty($o['disqualifies']));
-                    @endphp
-                    <tr>
-                        <td class="ps-4">
-                            <code class="text-secondary" style="font-size:.8rem;">{{ $question->key }}</code>
-                            <div class="text-muted" style="font-size:.7rem;">Step {{ $question->step_number }}</div>
-                        </td>
-                        <td class="text-muted small">{{ $question->question }}</td>
-                        <td>
-                            <div class="d-flex flex-wrap gap-1">
-                                @foreach($disqOpts as $opt)
-                                <span class="badge rounded-pill"
-                                      style="background:#fdf0f0;color:#8a3b3b;border:1px solid #f0d8d8;font-size:.72rem;font-weight:500;">
-                                    <i class="bi bi-x-circle me-1" style="font-size:.65rem;"></i>{{ $opt['value'] }}
+                        @php
+                            $dqOpts = collect($question->options ?? [])->filter(fn($o) => !empty($o['is_disqualify']) || !empty($o['disqualifies']))->values();
+                        @endphp
+                        @foreach($dqOpts as $optIdx => $opt)
+                        <tr>
+                            @if($optIdx === 0)
+                            <td class="ps-3" rowspan="{{ $dqOpts->count() }}" style="border-right:1px solid #f0f0f0;vertical-align:top;padding-top:10px;">
+                                <code style="font-size:.78rem;color:#5b6b7c;">{{ $question->key }}</code>
+                                <div class="text-muted" style="font-size:.68rem;">Step {{ $question->step_number }}</div>
+                            </td>
+                            <td rowspan="{{ $dqOpts->count() }}" class="text-muted" style="border-right:1px solid #f0f0f0;vertical-align:top;padding-top:10px;font-size:.78rem;">
+                                {{ Str::limit($question->question, 70) }}
+                            </td>
+                            @endif
+                            <td class="fw-semibold">{{ $opt['value'] }}</td>
+                            <td>
+                                <span class="badge" style="background:#fdf0f0;color:#c0392b;border:1px solid #f5c6c6;font-size:.7rem;">
+                                    <i class="bi bi-circle-fill me-1" style="font-size:.45rem;vertical-align:1px;"></i>Red
                                 </span>
-                                @endforeach
-                            </div>
-                        </td>
-                        <td>
-                            <span class="text-muted small">{{ $safeOpts->count() }} safe</span>
-                        </td>
-                    </tr>
+                            </td>
+                            <td>
+                                <form method="POST"
+                                      action="{{ route('admin.triage-rules.option.toggle', $question->id) }}"
+                                      style="display:inline;">
+                                    @csrf @method('PATCH')
+                                    <input type="hidden" name="option_value" value="{{ $opt['value'] }}">
+                                    <button type="submit"
+                                            class="btn btn-sm py-0 px-2 {{ ($opt['is_disqualify'] ?? false) ? 'btn-success' : 'btn-secondary' }}"
+                                            style="font-size:.72rem;">
+                                        {{ ($opt['is_disqualify'] ?? false) ? 'Active' : 'Inactive' }}
+                                    </button>
+                                </form>
+                            </td>
+                            <td class="text-end pe-3">
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1"
+                                        style="font-size:.72rem;"
+                                        onclick="openEditModal({{ $question->id }}, '{{ addslashes($opt['value']) }}')">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="POST"
+                                      action="{{ route('admin.triage-rules.option.destroy', $question->id) }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Remove \'{{ addslashes($opt['value']) }}\' from disqualifiers?')">
+                                    @csrf @method('DELETE')
+                                    <input type="hidden" name="option_value" value="{{ $opt['value'] }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:.72rem;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        @endforeach
                     @endforeach
                 </tbody>
             </table>
@@ -171,142 +173,179 @@
     </div>
 </div>
 @empty
-<div class="alert alert-info">
+<div class="alert alert-info small">
     <i class="bi bi-info-circle me-2"></i>
     No questionnaires have disqualifying options defined yet.
-    Go to the <a href="{{ route('admin.questions.index') }}" class="alert-link">Question Bank</a>
-    and mark options as disqualifying to define the rule set.
 </div>
 @endforelse
 
-{{-- ═══════════════ Questionnaires with no disqualifier rules ═══════════════ --}}
+{{-- Questionnaires with no rules --}}
 @if($questionnairesWithoutRules->isNotEmpty())
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center gap-2">
-        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-             style="width:34px;height:34px;background:#6c757d1a;">
-            <i class="bi bi-dash-circle" style="color:#6c757d;font-size:.9rem;"></i>
-        </div>
-        <div>
-            <h6 class="mb-0 fw-semibold text-muted">No Disqualifier Rules Yet</h6>
-            <p class="text-muted mb-0" style="font-size:.71rem;">
-                These questionnaires have no disqualifying options — every answer passes the screen
-            </p>
-        </div>
-    </div>
-    <div class="card-body py-3">
-        <div class="d-flex flex-wrap gap-2">
-            @foreach($questionnairesWithoutRules as $q)
-            <span class="badge bg-light text-secondary border" style="font-size:.8rem;font-weight:500;">
-                <i class="bi bi-ui-checks me-1"></i>{{ $q->name }}
-            </span>
-            @endforeach
-        </div>
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
+        <i class="bi bi-dash-circle text-muted"></i>
+        <span class="text-muted small fw-semibold me-2">Baseline Only (no disqualifier rules):</span>
+        @foreach($questionnairesWithoutRules as $q)
+        <span class="badge bg-light text-secondary border" style="font-size:.75rem;">{{ $q->name }}</span>
+        @endforeach
     </div>
 </div>
 @endif
 
-{{-- ══════════════════ Config-Managed Rules (read-only) ══════════════════ --}}
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center gap-2">
-        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-             style="width:34px;height:34px;background:#6c757d1a;">
-            <i class="bi bi-lock" style="color:#6c757d;font-size:.9rem;"></i>
-        </div>
-        <div>
-            <h6 class="mb-0 fw-semibold text-muted">Config-Managed Rules</h6>
-            <p class="text-muted mb-0" style="font-size:.71rem;">
-                Non-questionnaire signals managed in <code>config/triage.php</code>
-            </p>
-        </div>
+{{-- Config-managed rules --}}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-bottom py-2 px-3 d-flex align-items-center gap-2">
+        <i class="bi bi-lock text-muted"></i>
+        <span class="fw-semibold text-muted small">Config-Managed Rules</span>
+        <span class="text-muted" style="font-size:.71rem;">(managed in <code>config/triage.php</code>)</span>
     </div>
-    <div class="card-body">
-        <div class="row g-4">
-            {{-- IDV --}}
+    <div class="card-body py-3 px-3">
+        <div class="row g-3">
             <div class="col-md-6">
                 <p class="fw-semibold small mb-2">
-                    <i class="bi bi-shield-check me-1 text-muted"></i>
-                    Identity Verification
-                    <span class="text-muted" style="font-size:.71rem;">(patient.id_verified_status)</span>
+                    <i class="bi bi-shield-check me-1 text-muted"></i>Identity Verification
+                    <span class="text-muted fw-normal" style="font-size:.71rem;">(patient.id_verified_status)</span>
                 </p>
-                <div class="d-flex flex-column gap-1">
+                <div class="d-flex flex-column gap-1" style="font-size:.8rem;">
                     <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size:.7rem;">PASS</span>
-                        <span class="text-muted small">Status is: <code>{{ implode(', ', $cfg['id_verification']['cleared']) }}</code></span>
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size:.68rem;">PASS</span>
+                        <span class="text-muted">Status is: <code>{{ implode(', ', $cfg['id_verification']['cleared']) }}</code></span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25" style="font-size:.7rem;">YELLOW</span>
-                        <span class="text-muted small">Unverified / unknown status</span>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25" style="font-size:.68rem;">YELLOW</span>
+                        <span class="text-muted">Unverified / unknown status</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size:.7rem;">RED</span>
-                        <span class="text-muted small">Status is: <code>{{ implode(', ', $cfg['id_verification']['failed_values']) }}</code></span>
+                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size:.68rem;">RED</span>
+                        <span class="text-muted">Status is: <code>{{ implode(', ', $cfg['id_verification']['failed_values']) }}</code></span>
                     </div>
                 </div>
             </div>
-            {{-- Hold --}}
             <div class="col-md-6">
                 <p class="fw-semibold small mb-2">
-                    <i class="bi bi-pause-circle me-1 text-muted"></i>
-                    Workflow Hold
-                    <span class="text-muted" style="font-size:.71rem;">(case.hold_status)</span>
+                    <i class="bi bi-pause-circle me-1 text-muted"></i>Workflow Hold
+                    <span class="text-muted fw-normal" style="font-size:.71rem;">(case.hold_status)</span>
                 </p>
-                <div class="d-flex align-items-center gap-2">
-                    @if($cfg['hold_is_at_least'] === 'red')
-                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size:.7rem;">RED</span>
-                    @else
-                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25" style="font-size:.7rem;">YELLOW</span>
-                    @endif
-                    <span class="text-muted small">Any case with an active hold is elevated to at least <strong>{{ strtoupper($cfg['hold_is_at_least']) }}</strong></span>
+                <div class="d-flex align-items-center gap-2" style="font-size:.8rem;">
+                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25" style="font-size:.68rem;">{{ strtoupper($cfg['hold_is_at_least']) }}</span>
+                    <span class="text-muted">Any case on hold is elevated to at least <strong>{{ strtoupper($cfg['hold_is_at_least']) }}</strong></span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{{-- ═══════════════════════════════ How It Works ═══════════════════════════════ --}}
+{{-- How it works (collapsed) --}}
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between"
+    <div class="card-header bg-white py-2 px-3 d-flex align-items-center justify-content-between"
          style="cursor:pointer;" onclick="toggleInfo()">
         <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-info-circle text-muted"></i>
+            <i class="bi bi-info-circle text-muted small"></i>
             <span class="fw-semibold small">How Triage Rules Work</span>
         </div>
-        <i class="bi bi-chevron-down text-muted" id="infoChevron"></i>
+        <i class="bi bi-chevron-down text-muted small" id="infoChevron"></i>
     </div>
     <div id="infoBody" style="display:none;">
-        <div class="card-body">
-            <div class="row g-4">
+        <div class="card-body py-3 px-3">
+            <div class="row g-3">
                 <div class="col-md-6">
-                    <p class="fw-semibold small mb-2"><i class="bi bi-diagram-3 me-1 text-primary"></i>Evaluation Order</p>
-                    <ol class="text-muted small ps-3 mb-0">
-                        <li class="mb-1">
-                            <strong>Questionnaire disqualifiers</strong> — any answer with
-                            <code>is_disqualify: true</code> in its question's options → <span class="text-danger">Red</span>
-                        </li>
-                        <li class="mb-1">Identity Verification status (config-managed)</li>
-                        <li class="mb-1">Workflow Hold flag (config-managed)</li>
+                    <p class="fw-semibold small mb-1"><i class="bi bi-diagram-3 me-1 text-primary"></i>Evaluation Order</p>
+                    <ol class="text-muted small ps-3 mb-0" style="font-size:.8rem;">
+                        <li class="mb-1"><strong>Questionnaire disqualifiers</strong> — any answer with is_disqualify=true → <span class="text-danger">Red</span></li>
+                        <li class="mb-1">Identity Verification status (config)</li>
+                        <li>Workflow Hold flag (config)</li>
                     </ol>
                 </div>
                 <div class="col-md-6">
-                    <p class="fw-semibold small mb-2"><i class="bi bi-shield-exclamation me-1 text-warning"></i>Severity Priority</p>
-                    <p class="text-muted small mb-2">
-                        All matching signals are evaluated. The <strong>highest severity</strong> result wins:<br>
+                    <p class="fw-semibold small mb-1"><i class="bi bi-shield-exclamation me-1 text-warning"></i>Severity Priority</p>
+                    <p class="text-muted mb-1" style="font-size:.8rem;">
                         <span class="text-danger fw-semibold">Red</span> &gt;
                         <span class="text-warning fw-semibold">Yellow</span> &gt;
                         <span class="text-success fw-semibold">Green</span>.
+                        All signals are recorded even if a higher band already wins.
                     </p>
-                    <p class="text-muted small mb-2">
-                        All matching reasons are recorded in the case's triage log regardless of final band.
-                    </p>
-                    <p class="text-muted small mb-0">
-                        <i class="bi bi-gear me-1"></i>
-                        To change which answers are disqualifying, edit the question's options in the
-                        <a href="{{ route('admin.questions.index') }}">Question Bank</a>.
-                        Changes take effect immediately on the next case submission.
+                    <p class="text-muted mb-0" style="font-size:.8rem;">
+                        Use <strong>Add Rule</strong> to mark an existing question option as disqualifying,
+                        or the <strong>Active</strong> toggle to temporarily suspend a rule without deleting it.
                     </p>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+{{-- ═══════════════ Add Rule Modal ═══════════════ --}}
+<div class="modal fade" id="addRuleModal" tabindex="-1" aria-labelledby="addRuleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-semibold" id="addRuleModalLabel">
+                    <i class="bi bi-plus-circle me-2"></i>Add Disqualifier Rule
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addRuleForm" method="POST" action="">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Questionnaire</label>
+                        <div id="addModalQuestionnaireName" class="form-control bg-light text-muted" style="font-size:.85rem;"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Question <span class="text-danger">*</span></label>
+                        <select id="addModalQuestion" class="form-select form-select-sm" required>
+                            <option value="">— Select a question —</option>
+                        </select>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold small">Disqualifying Option Value <span class="text-danger">*</span></label>
+                        <input type="text" name="option_value" id="addModalOptionValue"
+                               class="form-control form-control-sm" placeholder="e.g. Semaglutide" required>
+                        <div class="form-text small">
+                            If this value already exists as an option on the question, it will be flagged as disqualifying.
+                            Otherwise it will be added as a new option.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-floppy me-1"></i>Save Rule
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- ═══════════════ Edit Rule Modal ═══════════════ --}}
+<div class="modal fade" id="editRuleModal" tabindex="-1" aria-labelledby="editRuleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-semibold" id="editRuleModalLabel">
+                    <i class="bi bi-pencil me-2"></i>Edit Disqualifier Rule
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editRuleForm" method="POST" action="">
+                @csrf @method('PUT')
+                <div class="modal-body">
+                    <input type="hidden" name="old_value" id="editOldValue">
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold small">Option Value <span class="text-danger">*</span></label>
+                        <input type="text" name="new_value" id="editNewValue"
+                               class="form-control form-control-sm" required>
+                        <div class="form-text small">Renames this option across the question's option list.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-floppy me-1"></i>Update Rule
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -315,12 +354,67 @@
 
 @section('scripts')
 <script>
-window.toggleInfo = function () {
-    const body    = document.getElementById('infoBody');
-    const chevron = document.getElementById('infoChevron');
-    const showing = body.style.display !== 'none';
-    body.style.display = showing ? 'none' : '';
-    chevron.className  = showing ? 'bi bi-chevron-down text-muted' : 'bi bi-chevron-up text-muted';
-};
+(function () {
+    // ── Info toggle ────────────────────────────────────────────────────────
+    window.toggleInfo = function () {
+        const body    = document.getElementById('infoBody');
+        const chevron = document.getElementById('infoChevron');
+        const showing = body.style.display !== 'none';
+        body.style.display = showing ? 'none' : '';
+        chevron.className  = showing ? 'bi bi-chevron-down text-muted small' : 'bi bi-chevron-up text-muted small';
+    };
+
+    // ── Add Rule Modal ─────────────────────────────────────────────────────
+    const addForm       = document.getElementById('addRuleForm');
+    const addQName      = document.getElementById('addModalQuestionnaireName');
+    const addQSelect    = document.getElementById('addModalQuestion');
+    const addOptionVal  = document.getElementById('addModalOptionValue');
+    const storeBaseUrl  = '{{ rtrim(route("admin.triage-rules.index"), "/") }}/option/';
+
+    window.openAddModal = function (qId, qName, questions) {
+        addQName.textContent = qName;
+        addQSelect.innerHTML = '<option value="">— Select a question —</option>';
+        addOptionVal.value   = '';
+
+        questions.forEach(function (q) {
+            const opt = document.createElement('option');
+            opt.value       = q.id;
+            opt.textContent = (q.key || ('Q' + q.id)) + ' — ' + q.question.substring(0, 60);
+            addQSelect.appendChild(opt);
+        });
+
+        // Update form action when question changes
+        addQSelect.onchange = function () {
+            if (this.value) {
+                addForm.action = storeBaseUrl + this.value;
+            }
+        };
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('addRuleModal')).show();
+    };
+
+    addForm.addEventListener('submit', function (e) {
+        if (!addQSelect.value) {
+            e.preventDefault();
+            addQSelect.classList.add('is-invalid');
+            return;
+        }
+        addQSelect.classList.remove('is-invalid');
+        addForm.action = storeBaseUrl + addQSelect.value;
+    });
+
+    // ── Edit Modal ─────────────────────────────────────────────────────────
+    const editForm     = document.getElementById('editRuleForm');
+    const editOldValue = document.getElementById('editOldValue');
+    const editNewValue = document.getElementById('editNewValue');
+    const updateBaseUrl = '{{ rtrim(route("admin.triage-rules.index"), "/") }}/option/';
+
+    window.openEditModal = function (questionId, optionValue) {
+        editOldValue.value = optionValue;
+        editNewValue.value = optionValue;
+        editForm.action    = updateBaseUrl + questionId;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('editRuleModal')).show();
+    };
+})();
 </script>
 @endsection
