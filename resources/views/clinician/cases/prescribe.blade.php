@@ -65,7 +65,7 @@
                     @php
                         $patientState = $case->patient_state ?? $case->patient?->state;
                         $stateRequiresSync = $patientState
-                            ? \App\Models\StateVisitRequirement::where('state', strtoupper($patientState))->where('requires_sync', true)->exists()
+                            ? \App\Models\StateVisitRequirement::where('state', strtoupper($patientState))->where('requires_synchronous', true)->exists()
                             : false;
                         $defaultVt = strtolower($clin['video']) === 'required' ? 'synchronous' : 'asynchronous';
                         $rawVt = strtolower((string) ($case->visit_type ?? ''));
