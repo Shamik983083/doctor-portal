@@ -33,13 +33,29 @@
     ])->values();
 
     $requestedIds = $case->caseOfferings->pluck('offering.id')->filter()->values();
+
+    $usStates = [
+        'AL'=>'Alabama','AK'=>'Alaska','AZ'=>'Arizona','AR'=>'Arkansas','CA'=>'California',
+        'CO'=>'Colorado','CT'=>'Connecticut','DE'=>'Delaware','FL'=>'Florida','GA'=>'Georgia',
+        'HI'=>'Hawaii','ID'=>'Idaho','IL'=>'Illinois','IN'=>'Indiana','IA'=>'Iowa',
+        'KS'=>'Kansas','KY'=>'Kentucky','LA'=>'Louisiana','ME'=>'Maine','MD'=>'Maryland',
+        'MA'=>'Massachusetts','MI'=>'Michigan','MN'=>'Minnesota','MS'=>'Mississippi','MO'=>'Missouri',
+        'MT'=>'Montana','NE'=>'Nebraska','NV'=>'Nevada','NH'=>'New Hampshire','NJ'=>'New Jersey',
+        'NM'=>'New Mexico','NY'=>'New York','NC'=>'North Carolina','ND'=>'North Dakota','OH'=>'Ohio',
+        'OK'=>'Oklahoma','OR'=>'Oregon','PA'=>'Pennsylvania','RI'=>'Rhode Island','SC'=>'South Carolina',
+        'SD'=>'South Dakota','TN'=>'Tennessee','TX'=>'Texas','UT'=>'Utah','VT'=>'Vermont',
+        'VA'=>'Virginia','WA'=>'Washington','WV'=>'West Virginia','WI'=>'Wisconsin','WY'=>'Wyoming',
+        'DC'=>'Washington D.C.',
+    ];
+    $rawState   = $case->patient_state ?? $case->patient?->state ?? null;
+    $stateLabel = $rawState ? ($usStates[strtoupper(trim($rawState))] ?? $rawState) : '-';
 @endphp
 
 @section('view')
 <div class="page-head">
     <div class="eyebrow">Clinician</div>
     <h1>Case Review for {{ $case->patient?->full_name ?? 'patient' }}</h1>
-    <p>{{ $case->patient?->age ?? '-' }} / {{ strtoupper(substr($case->patient?->gender ?? '-', 0, 1)) }} / {{ $case->patient_state ?? $case->patient?->state ?? '-' }} / {{ $case->partner?->name ?? '-' }} · case {{ $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, '') }}</p>
+    <p>{{ $case->patient?->age ?? '-' }} / {{ strtoupper(substr($case->patient?->gender ?? '-', 0, 1)) }} / {{ $stateLabel }} / {{ $case->partner?->name ?? '-' }} · case {{ $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, '') }}</p>
 </div>
 
 @if($errors->any())
