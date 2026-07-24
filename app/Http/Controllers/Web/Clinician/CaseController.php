@@ -447,9 +447,7 @@ class CaseController extends Controller
         $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
-        $prescription = null;
-
-        DB::transaction(function () use ($request, $case, $clinician, &$prescription) {
+        $prescription = DB::transaction(function () use ($request, $case, $clinician): CasePrescription {
             $prescription = CasePrescription::create([
                 'case_id' => $case->id,
                 'clinician_id' => $clinician->id,
@@ -487,6 +485,8 @@ class CaseController extends Controller
             }
 
             $this->stateMachine->approve($case, $clinician->id);
+
+            return $prescription;
         });
 
         // Complete immediately · no manual pharmacy step required.
@@ -849,7 +849,10 @@ class CaseController extends Controller
             'Prescription document is no longer available.'
         );
 
-        return \Illuminate\Support\Facades\Storage::disk($disk)->download(
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $fs */
+        $fs = Storage::disk($disk);
+
+        return $fs->download(
             $document->document_path,
             "prescription-{$case->uuid}.pdf",
             ['Content-Type' => 'application/pdf']
@@ -867,7 +870,10 @@ class CaseController extends Controller
             ->where('case_id', $case->id)
             ->firstOrFail();
 
-        return Storage::disk($file->disk)->download($file->path, $file->original_name);
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $fs */
+        $fs = Storage::disk($file->disk);
+
+        return $fs->download($file->path, $file->original_name);
     }
 
     public function previewFile(string $uuid, string $fileUuid)
