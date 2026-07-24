@@ -95,7 +95,7 @@ class DemoDataSeeder extends Seeder
             'AntiAging'  => $antiAgingCategory->id,
         ];
 
-        // Offerings (mapped from tenant portal products)
+        // Offerings (mapped from tenant portal products) 
         $items = [
             // ===== Regular Products =====
             [
