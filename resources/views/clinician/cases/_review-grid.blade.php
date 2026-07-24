@@ -12,6 +12,23 @@
     $eyebrow = $eyebrow ?? 'Provider review queue';
     $title = $title ?? 'Fast review, full context one click away';
     $sub = $sub ?? 'Highest-attention cases surface first. Triage is a review-priority signal, not a clinical decision.';
+
+    $usStates = [
+        'AL'=>'Alabama','AK'=>'Alaska','AZ'=>'Arizona','AR'=>'Arkansas','CA'=>'California',
+        'CO'=>'Colorado','CT'=>'Connecticut','DE'=>'Delaware','FL'=>'Florida','GA'=>'Georgia',
+        'HI'=>'Hawaii','ID'=>'Idaho','IL'=>'Illinois','IN'=>'Indiana','IA'=>'Iowa',
+        'KS'=>'Kansas','KY'=>'Kentucky','LA'=>'Louisiana','ME'=>'Maine','MD'=>'Maryland',
+        'MA'=>'Massachusetts','MI'=>'Michigan','MN'=>'Minnesota','MS'=>'Mississippi','MO'=>'Missouri',
+        'MT'=>'Montana','NE'=>'Nebraska','NV'=>'Nevada','NH'=>'New Hampshire','NJ'=>'New Jersey',
+        'NM'=>'New Mexico','NY'=>'New York','NC'=>'North Carolina','ND'=>'North Dakota','OH'=>'Ohio',
+        'OK'=>'Oklahoma','OR'=>'Oregon','PA'=>'Pennsylvania','RI'=>'Rhode Island','SC'=>'South Carolina',
+        'SD'=>'South Dakota','TN'=>'Tennessee','TX'=>'Texas','UT'=>'Utah','VT'=>'Vermont',
+        'VA'=>'Virginia','WA'=>'Washington','WV'=>'West Virginia','WI'=>'Wisconsin','WY'=>'Wyoming',
+        'DC'=>'Washington D.C.',
+    ];
+    $expandState = fn(?string $abbr) => ($abbr && $abbr !== '-')
+        ? ($usStates[strtoupper(trim($abbr))] ?? $abbr)
+        : null;
 @endphp
 
 <section class="panel queue-panel">
@@ -205,7 +222,7 @@
             'protocol' => $ci['protocolVersion'] ?? null,
             'source'   => $source,
             'hold'     => (bool) $case->hold_status,
-            'state'    => $case->patient_state ?? $case->patient?->state ?? '-',
+            'state'    => $expandState($case->patient_state ?? $case->patient?->state ?? null),
             'collab'   => $case->patient?->collaboratingClinician?->full_name ?? null,
             'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
             'reviewUrl'  => route('clinician.cases.prescribe.form', $case->uuid) . '?modal=1',
@@ -285,7 +302,7 @@
                 '<div class="panel-heading"><div>'
                 + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
                 + '<h2>' + esc(d.name) + '</h2>'
-                + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state && d.state !== '-' ? ' · ' + esc(d.state) : '') + '</p></div>'
+                + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state ? ' · ' + esc(d.state) : '') + '</p></div>'
                 + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
                 + '<span class="pill ' + esc(d.tone) + '">' + esc(d.label) + '</span></div></div>'
                 + '<div class="quick-review-grid">'

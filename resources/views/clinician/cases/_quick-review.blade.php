@@ -8,7 +8,7 @@
     <div>
         <div class="eyebrow">Quick review · {{ $d['id'] }}</div>
         <h2>{{ $d['name'] }}</h2>
-        <p>{{ $d['company'] }} · Request {{ $d['term'] }} · {{ $d['dose'] }}{{ !empty($d['state']) && $d['state'] !== '-' ? ' · ' . $d['state'] : '' }}</p>
+        <p>{{ $d['company'] }} · Request {{ $d['term'] }} · {{ $d['dose'] }}{{ !empty($d['state']) ? ' · ' . $d['state'] : '' }}</p>
     </div>
     <div class="quick-pills">
         <span class="pill {{ $d['triage'] }}">{{ ucfirst($d['triage']) }}</span>
