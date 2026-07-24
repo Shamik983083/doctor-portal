@@ -142,7 +142,7 @@
 
         <a class="nav-link {{ request()->routeIs('admin.settings*') ? 'active' : '' }}"
            href="{{ route('admin.settings') }}">
-            <i class="bi bi-sliders"></i> SLA Settings
+            <i class="bi bi-sliders"></i> Settings
         </a>
         <a class="nav-link {{ request()->routeIs('admin.triage-rules.*') ? 'active' : '' }}"
            href="{{ route('admin.triage-rules.index') }}">
