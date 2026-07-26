@@ -433,13 +433,16 @@ class CaseController extends Controller
             ->unique()
             ->values();
 
-        $offerings = Offering::with('category')
-            ->where('is_active', true)
+        $offerings = $case->partner
+            ->accessibleOfferings()
+            ->with('category')
+            ->where('offerings.is_active', true)
             ->approved()
-            ->when($categoryIds->count(), fn ($q) => $q->whereIn('category_id', $categoryIds))
-            ->orderBy('name')
-            ->get(['id', 'name', 'internal_name', 'compound_formula', 'refills',
-                'quantity', 'days_supply', 'dispense_unit', 'days_until_dispense', 'directions', 'levels']);
+            ->when($categoryIds->count(), fn ($q) => $q->whereIn('offerings.category_id', $categoryIds))
+            ->orderBy('offerings.name')
+            ->get(['offerings.id', 'offerings.name', 'offerings.internal_name', 'offerings.compound_formula',
+                'offerings.refills', 'offerings.quantity', 'offerings.days_supply', 'offerings.dispense_unit',
+                'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels']);
 
         $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
 
