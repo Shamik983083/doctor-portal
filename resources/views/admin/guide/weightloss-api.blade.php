@@ -606,7 +606,14 @@ Content-Type: application/json
     "protocolVersion": "v2.1",
     "findings":        ["bmi_30_39"],          // array of clinical finding codes
     "summary":         ["approved_for_glp1"],  // array of summary codes
-    "sourceAnswers":   { "custom_key": "val" } // any extra key-value pairs your system tracks
+    "sourceAnswers":   { "custom_key": "val" }, // any extra key-value pairs your system tracks
+
+    // ── ICD-10 auto-population (send any of these keys — all are checked) ──────
+    // The portal automatically maps comorbidities to ICD-10 codes for the clinician.
+    // Supply comorbidities as an array, a comma-separated string, or a {condition: true} map.
+    "comorbidities":   ["hypertension", "type_2_diabetes", "sleep_apnea"],
+    "conditions":      "hypertension, sleep_apnea",       // alternative key (same effect)
+    "medical_conditions": { "hypertension": true }        // associative form also accepted
   }
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-clinical')">Copy</button>

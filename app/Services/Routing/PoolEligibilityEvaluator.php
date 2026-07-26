@@ -7,6 +7,7 @@ use App\Models\Clinician;
 use App\Models\PatientCase;
 use App\Models\RoutingPolicy;
 use App\Models\SlaPolicy;
+use App\Services\CaseElapsedTime;
 
 /**
  * May this doctor pull work out of the pool? (Devin msgs 2308 and 2313 Q5/Q6.)
@@ -189,17 +190,19 @@ final class PoolEligibilityEvaluator
     /**
      * Cases sitting longer than the threshold without reaching a terminal state.
      *
-     * Measured on case age from assigned_at (falling back to created_at), never
-     * on a message read flag, so a doctor cannot clear an overdue case by opening
-     * it. Same definition as the delayed-case criterion in RoutingPolicyResolver.
+     * Uses CaseElapsedTime::active() so paused cases (D16) are not counted as
+     * overdue for the time they were legitimately waiting on a client response.
+     * Previously used a raw SQL date-diff — kept semantically identical for cases
+     * that have no pause intervals (all existing cases until D16 is wired).
      */
     private function overdueCaseCount(Clinician $clinician, float $afterHours): int
     {
-        $cutoff = now()->subMinutes((int) round($afterHours * 60));
+        $thresholdMinutes = (int) round($afterHours * 60);
 
         return PatientCase::where('clinician_id', $clinician->id)
             ->whereIn('status', self::OPEN_STATUSES)
-            ->whereRaw('COALESCE(assigned_at, created_at) <= ?', [$cutoff])
+            ->get(['id', 'assigned_at', 'created_at'])
+            ->filter(fn (PatientCase $case) => CaseElapsedTime::active($case) >= $thresholdMinutes)
             ->count();
     }
 

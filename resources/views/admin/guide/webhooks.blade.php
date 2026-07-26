@@ -347,13 +347,25 @@ def webhook():
 </div>
 <div class="card-body">
 <pre id="code-ev-support">{
-  "case_id":    "9d2f1c3e-...",
-  "patient_id": "a1b2c3d4-...",
-  "status":     "support",
-  "visit_type": "asynchronous",
-  "timestamp":  1751539800
+  "case_id":          "9d2f1c3e-...",
+  "patient_id":       "a1b2c3d4-...",
+  "status":           "support",
+  "visit_type":       "asynchronous",
+  "escalation_target": "support",       // who the escalation is directed at (see below)
+  "escalation_reason": "Need lab confirmation before prescribing",  // omitted when blank
+  "timestamp":        1751539800
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-support')">Copy</button>
+<div class="alert alert-info mt-3 mb-2 small">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong><code>escalation_target</code></strong> tells you who the clinician needs a response from:
+    <ul class="mb-0 mt-1">
+        <li><code>support</code> — general support escalation; the portal team will handle it</li>
+        <li><code>doctor_admin</code> — needs a physician admin review (complex clinical case)</li>
+        <li><code>client_response</code> — waiting for the patient or partner to supply additional information</li>
+    </ul>
+    For all three values, your portal should surface the case status to the patient and/or your ops team. For <code>client_response</code>, prompt the patient to check their messaging thread — the clinician has left a note there.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>

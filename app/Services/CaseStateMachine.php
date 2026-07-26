@@ -58,6 +58,9 @@ class CaseStateMachine
                 if (isset($context['support_note'])) {
                     $updates['support_note'] = $context['support_note'];
                 }
+                if (isset($context['escalation_target'])) {
+                    $updates['escalation_target'] = $context['escalation_target'];
+                }
                 // Record first time this case entered support — never overwrite
                 if (!$case->support_at) {
                     $updates['support_at'] = now();
@@ -177,12 +180,25 @@ class CaseStateMachine
         return $this->transition($case, PatientCase::STATUS_COMPLETED, ['actor_type' => 'system']);
     }
 
-    public function escalateToSupport(PatientCase $case, string $note = ''): PatientCase
+    public function escalateToSupport(PatientCase $case, string $note = '', string $target = PatientCase::ESCALATION_SUPPORT): PatientCase
     {
         return $this->transition($case, PatientCase::STATUS_SUPPORT, [
-            'support_note' => $note,
-            'actor_type'   => 'system',
+            'support_note'      => $note,
+            'escalation_target' => $target,
+            'actor_type'        => 'system',
         ]);
+    }
+
+    /** Escalate to a Doctor Admin (B10). Wired to UI in Phase 3. */
+    public function escalateToDoctorAdmin(PatientCase $case, string $reason = ''): PatientCase
+    {
+        return $this->escalateToSupport($case, $reason, PatientCase::ESCALATION_DOCTOR_ADMIN);
+    }
+
+    /** Pause a case awaiting a client/patient response (D15/D16). */
+    public function escalateAwaitingClientResponse(PatientCase $case, string $reason = ''): PatientCase
+    {
+        return $this->escalateToSupport($case, $reason, PatientCase::ESCALATION_CLIENT_RESPONSE);
     }
 
     private function dispatchWebhookEvent(PatientCase $case, string $status): void
@@ -200,13 +216,22 @@ class CaseStateMachine
 
         $eventType = $eventMap[$status] ?? "case_{$status}";
 
-        $this->webhookDispatcher->dispatch($case->partner_id, $eventType, [
+        $payload = [
             'case_id'    => $case->uuid,
             'patient_id' => $case->patient->uuid ?? null,
             'status'     => $status,
             'visit_type' => $case->visit_type,
             'timestamp'  => now()->timestamp,
-        ]);
+        ];
+
+        if ($status === PatientCase::STATUS_SUPPORT) {
+            $payload['escalation_target'] = $case->escalation_target;
+            if ($case->escalation_reason) {
+                $payload['escalation_reason'] = $case->escalation_reason;
+            }
+        }
+
+        $this->webhookDispatcher->dispatch($case->partner_id, $eventType, $payload);
     }
 
     private function notifyAdmins(PatientCase $case, string $toStatus): void

@@ -14,9 +14,9 @@ class Offering extends Model
     protected $fillable = [
         'uuid', 'partner_id', 'category_id', 'name', 'internal_name', 'type', 'description', 'sku',
         'price', 'dosespot_medication_id', 'boothwyn_compound_id',
-        'pharmacy_type', 'pharmacy_name', 'pharmacy_notes',
+        'pharmacy_type', 'pharmacy_id', 'pharmacy_name', 'pharmacy_notes',
         'compound_formula', 'refills', 'quantity', 'days_supply',
-        'dispense_unit', 'dispense_units', 'days_until_dispense', 'directions',
+        'dispense_unit', 'dispense_units', 'days_until_dispense', 'directions', 'sig',
         'available_states', 'video_required_states', 'images', 'faqs', 'is_active', 'is_controlled_substance', 'metadata',
         'approval_status', 'approved_by', 'approved_at', 'rejection_note',
         'levels',
@@ -42,11 +42,38 @@ class Offering extends Model
         static::creating(fn($m) => $m->uuid ??= (string) Str::uuid());
     }
 
+    // Ownership — the storefront that created this offering.
     public function partner()       { return $this->belongsTo(Partner::class); }
     public function category()      { return $this->belongsTo(OfferingCategory::class, 'category_id'); }
     public function caseOfferings() { return $this->hasMany(CaseOffering::class); }
     public function cases()         { return $this->belongsToMany(PatientCase::class, 'case_offerings', 'offering_id', 'case_id'); }
     public function approvedBy()    { return $this->belongsTo(User::class, 'approved_by'); }
+    public function pharmacy()      { return $this->belongsTo(\App\Models\Pharmacy::class); }
+
+    // Access — all storefronts that may prescribe this offering (Phase 1a).
+    public function partners()
+    {
+        return $this->belongsToMany(Partner::class, 'offering_partner')
+            ->withPivot('sig_override', 'is_active')
+            ->withTimestamps();
+    }
+
+    /**
+     * The effective SIG for a given partner.
+     * Returns the per-storefront override when set, falling back to the global sig.
+     */
+    public function effectiveSig(?Partner $partner = null): ?string
+    {
+        if ($partner) {
+            $pivot = $this->partners->firstWhere('id', $partner->id);
+            $override = $pivot?->pivot?->sig_override;
+            if ($override !== null && $override !== '') {
+                return $override;
+            }
+        }
+
+        return $this->sig;
+    }
 
     public function scopeApproved($query) { return $query->where('approval_status', 'approved'); }
 

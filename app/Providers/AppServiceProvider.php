@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Adapters\Sms\MockSmsAdapter;
+use App\Adapters\Sms\TwilioSmsAdapter;
 use App\Contracts\KarenInterface;
+use App\Contracts\SmsAdapter;
 use App\Models\Message;
 use App\Models\PatientCase;
 use App\Services\Karen\MockKarenService;
@@ -18,14 +21,29 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         // F20: Karen automated-outreach service.
-        // Bind the real implementation when KAREN_ENABLED=true, otherwise the
-        // no-op mock so call sites always resolve the interface safely.
         $this->app->singleton(KarenInterface::class, function () {
             if (config('services.karen.enabled', false)) {
-                // Real implementation will be registered here once built.
-                // Until then fall through to the mock even when the flag is on.
+                // Real implementation registered here once built.
             }
             return new MockKarenService();
+        });
+
+        // Phase 1d: SMS adapter scaffold.
+        // Both gates must be open for live delivery; otherwise mock logs and returns true.
+        $this->app->singleton(SmsAdapter::class, function () {
+            if (
+                config('sms.enabled', false) &&
+                config('sms.baa_confirmed', false) &&
+                config('sms.driver') === 'twilio'
+            ) {
+                return new TwilioSmsAdapter(
+                    config('sms.twilio.sid', ''),
+                    config('sms.twilio.token', ''),
+                    config('sms.twilio.from', ''),
+                );
+            }
+
+            return new MockSmsAdapter();
         });
     }
 

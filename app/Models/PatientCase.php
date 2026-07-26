@@ -21,6 +21,8 @@ class PatientCase extends Model
         'assigned_at', 'approved_at', 'processing_at', 'completed_at', 'cancelled_at',
         'metadata', 'clinical_intake',
         'triage', 'triage_reasons', 'triage_ruleset', 'triaged_at',
+        // Phase 1c: unified escalation model (B10 + D15)
+        'escalation_target', 'escalation_reason',
     ];
 
     protected $casts = [
@@ -53,6 +55,11 @@ class PatientCase extends Model
     const TRIAGE_GREEN  = 'green';
     const TRIAGE_YELLOW = 'yellow';
     const TRIAGE_RED    = 'red';
+
+    // Escalation target constants (Phase 1c — unified escalation model)
+    const ESCALATION_SUPPORT         = 'support';        // storefront → portal support team
+    const ESCALATION_DOCTOR_ADMIN    = 'doctor_admin';   // provider → their Doctor Admin (B10)
+    const ESCALATION_CLIENT_RESPONSE = 'client_response'; // awaiting patient/client reply (D15/D16)
 
     /*
      * ── Re-bill / check-in cases ──────────────────────────────────────────

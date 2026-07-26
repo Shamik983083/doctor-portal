@@ -145,6 +145,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <li><a class="toc-link text-decoration-none" href="#questions">Question Reference</a></li>
     <li><a class="toc-link text-decoration-none" href="#errors">Error Responses</a></li>
     <li><a class="toc-link text-decoration-none" href="#db">What Gets Created in DB</a></li>
+    <li><a class="toc-link text-decoration-none" href="#clinical">Push Clinical Intake</a></li>
     <li><a class="toc-link text-decoration-none" href="#endpoints">Additional Endpoints</a></li>
     <li><a class="toc-link text-decoration-none" href="#checklist">Integration Checklist</a></li>
 </ol>
@@ -522,9 +523,52 @@ function renderAAQRows($rows, $allRows) {
 </div>
 </div>
 
-{{-- ── 7. ADDITIONAL ENDPOINTS ───────────────────────────────── --}}
+{{-- ── 7. PUSH CLINICAL INTAKE ──────────────────────────────── --}}
+<div id="clinical" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">7</span>Push Clinical Intake Data <span class="text-muted fw-normal small">(optional, post-creation update)</span></div>
+<div class="card-body">
+<p class="mb-2">If your storefront collects medication details after the case is created, push them with this endpoint. It <strong>replaces</strong> the clinical intake block wholesale.</p>
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge-method method-post">POST</span>
+    <code>{{ $base }}/api/partner/cases/{case_uuid}/clinical</code>
+</div>
+<pre id="code-clinical">POST {{ $base }}/api/partner/cases/{case_uuid}/clinical
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "clinical_intake": {
+    "product":         "Sermorelin",         // offering / product name
+    "dose":            "0.5 mg",             // current dose
+    "term":            "3M",                 // term: 1M | 3M | 6M | 12M
+    "plan":            "M1",                 // plan tier
+    "video":           "not_required",       // "not_required" | "scheduled" | "completed"
+    "protocolVersion": "v1.0",
+    "findings":        ["anti_aging"],       // array of clinical finding codes
+    "summary":         ["approved"],         // array of summary codes
+    "sourceAnswers":   { "custom_key": "val" }, // any extra key-value pairs your system tracks
+
+    // ── ICD-10 auto-population (optional — improves clinical documentation) ────
+    // Pass comorbidities so the portal can pre-populate ICD-10 diagnoses for the clinician.
+    "comorbidities":   ["hypertension", "hypothyroidism"],
+    "conditions":      "hypertension, hypothyroidism"  // alternative key (same effect)
+  }
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-clinical')">Copy</button>
+
+<p class="mt-3 mb-1"><strong>Success 200</strong></p>
+<pre id="code-clinical-resp">{
+  "message": "Clinical intake updated.",
+  "case": { "uuid": "case-uuid-here", "status": "waiting", ... }
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-clinical-resp')">Copy</button>
+</div>
+</div>
+
+{{-- ── 8. ADDITIONAL ENDPOINTS ───────────────────────────────── --}}
 <div id="endpoints" class="card mb-4 section-anchor">
-<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">7</span>Additional API Endpoints</div>
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">8</span>Additional API Endpoints</div>
 <div class="card-body">
 
 <h6 class="fw-semibold mb-2">Patient Management</h6>
@@ -560,9 +604,9 @@ function renderAAQRows($rows, $allRows) {
 </div>
 </div>
 
-{{-- ── 8. CHECKLIST ─────────────────────────────────────────── --}}
+{{-- ── 9. CHECKLIST ─────────────────────────────────────────── --}}
 <div id="checklist" class="card mb-4 section-anchor">
-<div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">8</span>Integration Checklist</div>
+<div class="card-header fw-semibold"><span class="step-badge bg-secondary text-white me-2">9</span>Integration Checklist</div>
 <div class="card-body">
 <ul class="list-unstyled mb-0">
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code>, <code>client_secret</code>, and your <strong>Offering UUID(s)</strong> from the admin — Partner → Offerings (shown once approved)</li>

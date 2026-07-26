@@ -189,8 +189,8 @@ class CaseController extends Controller
         $effectiveState = $data['patient_state'] ?? $patientData['state'] ?? null;
         if ($effectiveState && !empty($data['offerings'])) {
             foreach ($data['offerings'] as $offeringData) {
-                $offering = $partner->offerings()
-                    ->where('uuid', $offeringData['offering_id'])
+                $offering = $partner->accessibleOfferings()
+                    ->where('offerings.uuid', $offeringData['offering_id'])
                     ->first();
                 if ($offering && !$offering->isAvailableInState($effectiveState)) {
                     return response()->json([
@@ -240,8 +240,8 @@ class CaseController extends Controller
             $attachedOfferingsIds = [];
             if (!empty($data['offerings'])) {
                 foreach ($data['offerings'] as $offeringData) {
-                    $offering = $partner->offerings()
-                        ->where('uuid', $offeringData['offering_id'])
+                    $offering = $partner->accessibleOfferings()
+                        ->where('offerings.uuid', $offeringData['offering_id'])
                         ->first();
                     if ($offering) {
                         $case->caseOfferings()->create([
@@ -525,8 +525,8 @@ class CaseController extends Controller
 
         $offeringUuids = array_column($offeringsData, 'offering_id');
 
-        $offerings = $partner->offerings()
-            ->whereIn('uuid', $offeringUuids)
+        $offerings = $partner->accessibleOfferings()
+            ->whereIn('offerings.uuid', $offeringUuids)
             ->with([
                 'questionnaires.questions'                     => fn($q) => $q->where('is_active', true),
                 'questionnaires.linkedQuestionnaire.questions' => fn($q) => $q->where('is_active', true),

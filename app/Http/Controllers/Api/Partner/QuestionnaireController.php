@@ -57,9 +57,8 @@ class QuestionnaireController extends Controller
             ->where(function ($q) use ($partnerId) {
                 $q->whereNull('partner_id')
                   ->orWhere('partner_id', $partnerId)
-                  // Column qualified: the subquery joins offering_questionnaire,
-                  // so an unqualified partner_id is asking to be ambiguous later.
-                  ->orWhereHas('offerings', fn($o) => $o->where('offerings.partner_id', $partnerId));
+                  // Phase 1a: check access via offering_partner pivot (replaces offerings.partner_id filter).
+                  ->orWhereHas('offerings', fn($o) => $o->whereHas('partners', fn($p) => $p->where('partners.id', $partnerId)));
             })
             ->firstOrFail();
 

@@ -35,7 +35,21 @@ class Partner extends Model
     public function users() { return $this->hasMany(User::class); }
     public function patients() { return $this->hasMany(Patient::class); }
     public function cases() { return $this->hasMany(PatientCase::class); }
+
+    // Ownership: offerings this partner created (partner_id FK).
+    // Used for management endpoints (create / edit / delete).
     public function offerings() { return $this->hasMany(Offering::class); }
+
+    // Access: offerings this partner may prescribe (Phase 1a pivot).
+    // Use this for case creation, prescribe form, and routing lookups.
+    public function accessibleOfferings()
+    {
+        return $this->belongsToMany(Offering::class, 'offering_partner')
+            ->withPivot('sig_override', 'is_active')
+            ->withTimestamps()
+            ->wherePivot('is_active', true);
+    }
+
     public function webhooks() { return $this->hasMany(Webhook::class); }
     public function vouchers() { return $this->hasMany(Voucher::class); }
 
