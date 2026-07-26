@@ -332,6 +332,11 @@ final class PoolPullService
                     'source'       => 'pool_pull',
                 ]);
 
+                // B3: stamp the completion deadline so the sweep command can warn
+                // and auto-release when the provider misses the window.
+                $hours = (int) config('routing.completion_deadline_hours', 24);
+                $fresh->updateQuietly(['completion_deadline_at' => now()->addHours($hours)]);
+
                 return true;
             });
         } catch (\Throwable $e) {

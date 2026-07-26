@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Web\Clinician;
 use App\Events\CaseMessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\CasePrescription;
+use App\Models\CasePrescriptionDiagnosis;
 use App\Models\ClinicalNote;
 use App\Models\Message;
 use App\Models\Offering;
+use App\Services\Icd10Ruleset;
 use App\Models\PatientCase;
 use App\Models\PatientFile;
 use App\Models\User;
@@ -426,6 +428,19 @@ class CaseController extends Controller
             'caseOfferings.offering.category',
         ])->where('uuid', $uuid)->firstOrFail();
 
+        // C12: if there is already a draft prescription, send the provider straight
+        // to the review page rather than letting them start a duplicate.
+        $draft = CasePrescription::where('case_id', $case->id)
+            ->where('review_status', CasePrescription::REVIEW_DRAFT)
+            ->latest()
+            ->first();
+
+        if ($draft) {
+            return redirect()
+                ->route('clinician.cases.prescribe.review', $case->uuid)
+                ->with('info', 'A draft prescription is waiting for your review.');
+        }
+
         // Filter offerings by categories already on the case; if none, show all
         $categoryIds = $case->caseOfferings
             ->pluck('offering.category_id')
@@ -446,32 +461,36 @@ class CaseController extends Controller
 
         $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
 
-        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset'));
+        // C9: auto-populate ICD-10 suggestions from the case's clinical intake
+        $icd10Suggestions = Icd10Ruleset::for($case);
+
+        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions'));
     }
 
     public function prescribe(Request $request, string $uuid)
     {
         $request->validate([
-            'diagnoses' => 'required|string',
-            'directions' => 'nullable|string',
-            'medical_necessity' => 'nullable|string',
-            'visit_type' => 'nullable|in:asynchronous,synchronous',
-            'medications' => 'nullable|array',
-            'medications.*.offering_id' => 'nullable|exists:offerings,id',
-            'medications.*.name' => 'required_with:medications|string|max:255',
-            'medications.*.compound_formula' => 'nullable|string',
-            'medications.*.refills' => 'nullable|integer|min:0',
-            'medications.*.quantity' => 'nullable|numeric|min:0',
-            'medications.*.days_supply' => 'nullable|integer|min:0',
-            'medications.*.dispense_unit' => 'nullable|string|max:100',
+            // C9: structured ICD-10 codes instead of a free-text string
+            'diagnoses'                         => 'required|array|min:1',
+            'diagnoses.*.code'                  => 'required|string|max:30',
+            'diagnoses.*.description'           => 'required|string|max:255',
+            // C8: directions become an internal ClinicalNote
+            'directions'                        => 'nullable|string',
+            'medical_necessity'                 => 'nullable|string',
+            'visit_type'                        => 'nullable|in:asynchronous,synchronous',
+            'medications'                       => 'nullable|array',
+            'medications.*.offering_id'         => 'nullable|exists:offerings,id',
+            'medications.*.name'                => 'required_with:medications|string|max:255',
+            'medications.*.compound_formula'    => 'nullable|string',
+            'medications.*.refills'             => 'nullable|integer|min:0',
+            'medications.*.quantity'            => 'nullable|numeric|min:0',
+            'medications.*.days_supply'         => 'nullable|integer|min:0',
+            'medications.*.dispense_unit'       => 'nullable|string|max:100',
             'medications.*.days_until_dispense' => 'nullable|integer|min:0',
-            // Rich dosing from the full review model (Devin msg 2279): frequency,
-            // term, and a dose per month of the term. Optional, stored alongside
-            // the flat columns in the `dosing` json.
-            'medications.*.frequency' => 'nullable|string|max:60',
-            'medications.*.term' => 'nullable|string|max:20',
-            'medications.*.months' => 'nullable|array',
-            'medications.*.months.*' => 'nullable|string|max:60',
+            'medications.*.frequency'           => 'nullable|string|max:60',
+            'medications.*.term'                => 'nullable|string|max:20',
+            'medications.*.months'              => 'nullable|array',
+            'medications.*.months.*'            => 'nullable|string|max:60',
         ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
@@ -485,19 +504,50 @@ class CaseController extends Controller
             $case->update(['visit_type' => $request->input('visit_type')]);
         }
 
-        $prescription = DB::transaction(function () use ($request, $case, $clinician): CasePrescription {
+        // C8: pre-load offerings so we can resolve the effective SIG per partner
+        // without an N+1 query inside the medication loop.
+        $offeringIds = collect($request->input('medications', []))
+            ->pluck('offering_id')->filter()->unique()->values()->all();
+
+        $offeringsMap = Offering::with(['partners' => fn ($q) => $q->where('partners.id', $case->partner_id)])
+            ->whereIn('id', $offeringIds)
+            ->get()
+            ->keyBy('id');
+
+        // C9: build a comma-joined string for the legacy diagnoses column.
+        $diagnosesArray = $request->input('diagnoses', []);
+        $diagnosesLegacy = collect($diagnosesArray)->map(fn ($d) => $d['code'])->implode(', ');
+
+        // C12: discard any existing draft for this case before creating a fresh one.
+        CasePrescription::where('case_id', $case->id)
+            ->where('review_status', CasePrescription::REVIEW_DRAFT)
+            ->delete();
+
+        $prescription = DB::transaction(function () use (
+            $request, $case, $clinician, $diagnosesArray, $diagnosesLegacy, $offeringsMap
+        ): CasePrescription {
+            // C12: status='draft' — approve()/complete() fire only after the provider
+            // confirms on the review page.
             $prescription = CasePrescription::create([
-                'case_id' => $case->id,
-                'clinician_id' => $clinician->id,
-                'diagnoses' => $request->input('diagnoses'),
-                'directions' => $request->input('directions'),
+                'case_id'          => $case->id,
+                'clinician_id'     => $clinician->id,
+                'diagnoses'        => $diagnosesLegacy,
                 'medical_necessity' => $request->input('medical_necessity'),
-                'prescribed_at' => now(),
+                'prescribed_at'    => now(),
+                'review_status'    => CasePrescription::REVIEW_DRAFT,
             ]);
 
+            // C9: save structured ICD-10 codes
+            foreach ($diagnosesArray as $i => $diag) {
+                CasePrescriptionDiagnosis::create([
+                    'case_prescription_id' => $prescription->id,
+                    'icd_code'             => $diag['code'],
+                    'description'          => $diag['description'],
+                    'sort_order'           => $i,
+                ]);
+            }
+
             foreach ($request->input('medications', []) as $med) {
-                // Keep only the real month doses, so a 3M ladder with a blank
-                // month is not stored as an empty step.
                 $months = array_values(array_filter($med['months'] ?? [], fn ($m) => filled($m)));
                 $dosing = null;
                 if (filled($med['frequency'] ?? null) || filled($med['term'] ?? null) || $months !== []) {
@@ -509,29 +559,98 @@ class CaseController extends Controller
                     ];
                 }
 
+                // C8: resolve the effective SIG for this partner at prescription time.
+                $offering = $offeringsMap->get($med['offering_id'] ?? '');
+                $sig = $offering ? $offering->effectiveSig($case->partner) : null;
+
                 $prescription->medications()->create([
-                    'offering_id' => $med['offering_id'] ?? null,
-                    'name' => $med['name'],
-                    'compound_formula' => $med['compound_formula'] ?? null,
-                    'dosing' => $dosing,
-                    'refills' => $med['refills'] ?? null,
-                    'quantity' => $med['quantity'] ?? null,
-                    'days_supply' => $med['days_supply'] ?? null,
-                    'dispense_unit' => $med['dispense_unit'] ?? null,
+                    'offering_id'         => $med['offering_id'] ?? null,
+                    'name'                => $med['name'],
+                    'compound_formula'    => $med['compound_formula'] ?? null,
+                    'dosing'              => $dosing,
+                    'refills'             => $med['refills'] ?? null,
+                    'quantity'            => $med['quantity'] ?? null,
+                    'days_supply'         => $med['days_supply'] ?? null,
+                    'dispense_unit'       => $med['dispense_unit'] ?? null,
                     'days_until_dispense' => $med['days_until_dispense'] ?? null,
+                    'sig'                 => $sig,
                 ]);
             }
 
-            $this->stateMachine->approve($case, $clinician->id);
+            // C8: internal clinical note (provider's directions) → ClinicalNote, not directions column.
+            if ($request->filled('directions')) {
+                ClinicalNote::create([
+                    'case_id'      => $case->id,
+                    'clinician_id' => $clinician->id,
+                    'type'         => 'internal',
+                    'note'         => $request->input('directions'),
+                    'is_private'   => true,
+                ]);
+            }
 
             return $prescription;
         });
 
-        // Complete immediately · no manual pharmacy step required.
+        // C12: redirect to review page — approve()/complete()/webhook fire on confirmation.
+        return redirect()->route('clinician.cases.prescribe.review', $case->uuid);
+    }
+
+    // C12: show the draft prescription for review before the provider confirms.
+    public function prescribeReview(string $uuid)
+    {
+        $case = PatientCase::with(['patient', 'partner', 'clinician.user'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        $this->assertLicensedForCase($case);
+
+        $prescription = CasePrescription::where('case_id', $case->id)
+            ->where('review_status', CasePrescription::REVIEW_DRAFT)
+            ->with(['medications', 'diagnosesCodes'])
+            ->latest()
+            ->firstOrFail();
+
+        return view('clinician.cases.prescribe-review', compact('case', 'prescription'));
+    }
+
+    // C12: provider has reviewed and confirmed — approve(), complete(), fire webhook.
+    public function prescribeConfirm(Request $request, string $uuid)
+    {
+        $request->validate(['charting_note' => 'nullable|string']);
+
+        $case = PatientCase::with(['patient', 'partner'])->where('uuid', $uuid)->firstOrFail();
+
+        $this->assertLicensedForCase($case);
+        $clinician = Auth::user()->clinician;
+
+        $prescription = CasePrescription::where('case_id', $case->id)
+            ->where('review_status', CasePrescription::REVIEW_DRAFT)
+            ->with(['medications', 'diagnosesCodes'])
+            ->latest()
+            ->firstOrFail();
+
+        DB::transaction(function () use ($request, $case, $clinician, $prescription) {
+            $prescription->update([
+                'review_status' => CasePrescription::REVIEW_CONFIRMED,
+                'charting_note' => $request->input('charting_note'),
+            ]);
+
+            // C12: persist the charting note as a proper ClinicalNote on confirmation.
+            if ($request->filled('charting_note')) {
+                ClinicalNote::create([
+                    'case_id'      => $case->id,
+                    'clinician_id' => $clinician->id,
+                    'type'         => 'internal',
+                    'note'         => $request->input('charting_note'),
+                    'is_private'   => true,
+                ]);
+            }
+
+            $this->stateMachine->approve($case, $clinician->id);
+        });
+
         $this->stateMachine->complete($case);
 
-        // Generate the signed prescription PDF and queue it for pharmacy dispatch.
-        // Best-effort and fully feature-flagged · a failure here must never break case completion.
         try {
             $document = $this->prescriptionDocuments->generate($case, $prescription);
             $this->pharmacyDispatch->queue($document);
@@ -542,17 +661,21 @@ class CaseController extends Controller
             ]);
         }
 
-        // Fire prescription_written webhook alongside case_approved + case_completed.
+        // C8: include SIG per medication; C9: send structured codes
         $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
-            'case_id' => $case->uuid,
-            'external_id' => $case->external_id,
-            'patient_id' => $case->patient->uuid ?? null,
-            'clinician_name' => $clinician->full_name,
-            'clinician_npi' => $clinician->npi,
-            'diagnoses' => $prescription->diagnoses,
-            'meds_prescribed' => $prescription->load('medications')->medications->map(fn ($m) => [
+            'case_id'         => $case->uuid,
+            'external_id'     => $case->external_id,
+            'patient_id'      => $case->patient->uuid ?? null,
+            'clinician_name'  => $clinician->full_name,
+            'clinician_npi'   => $clinician->npi,
+            'diagnoses'       => $prescription->diagnosesCodes->map(fn ($d) => [
+                'code'        => $d->icd_code,
+                'description' => $d->description,
+            ])->toArray() ?: $prescription->diagnoses,
+            'meds_prescribed' => $prescription->medications->map(fn ($m) => [
                 'name'                => $m->name,
                 'compound_formula'    => $m->compound_formula,
+                'sig'                 => $m->sig,
                 'refills'             => (string) $m->refills,
                 'quantity'            => (string) $m->quantity,
                 'days_supply'         => (string) $m->days_supply,
@@ -564,7 +687,22 @@ class CaseController extends Controller
         ]);
 
         return redirect()->route('clinician.cases.show', $uuid)
-            ->with('success', 'Prescription submitted · case completed.');
+            ->with('success', 'Prescription confirmed · case completed.');
+    }
+
+    // C12: discard the draft prescription and return to the prescribe form.
+    public function prescribeDiscard(string $uuid)
+    {
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $this->assertLicensedForCase($case);
+
+        CasePrescription::where('case_id', $case->id)
+            ->where('review_status', CasePrescription::REVIEW_DRAFT)
+            ->delete();
+
+        return redirect()->route('clinician.cases.prescribe.form', $uuid)
+            ->with('info', 'Draft discarded. Start a new prescription below.');
     }
 
     public function approve(Request $request, string $uuid)
@@ -1186,9 +1324,10 @@ class CaseController extends Controller
                     'clinician_name'  => $clinician->full_name,
                     'clinician_npi'   => $clinician->npi,
                     'diagnoses'       => $prescription->diagnoses,
-                    'meds_prescribed' => $prescription->load('medications')->medications->map(fn($m) => [
+                    'meds_prescribed' => $prescription->load('medications')->medications->map(fn ($m) => [
                         'name'                => $m->name,
                         'compound_formula'    => $m->compound_formula,
+                        'sig'                 => $m->sig,
                         'refills'             => (string) $m->refills,
                         'quantity'            => (string) $m->quantity,
                         'days_supply'         => (string) $m->days_supply,

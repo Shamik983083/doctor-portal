@@ -106,6 +106,10 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
         Route::post('/{uuid}/assign', [ClinicianCaseController::class, 'assign'])->name('assign');
         Route::get('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribeForm'])->name('prescribe.form');
         Route::post('/{uuid}/prescribe', [ClinicianCaseController::class, 'prescribe'])->name('prescribe');
+        // C12: review-before-send — must be before /{uuid}/approve so 'review' is not parsed as a case uuid
+        Route::get('/{uuid}/prescribe/review', [ClinicianCaseController::class, 'prescribeReview'])->name('prescribe.review');
+        Route::post('/{uuid}/prescribe/confirm', [ClinicianCaseController::class, 'prescribeConfirm'])->name('prescribe.confirm');
+        Route::get('/{uuid}/prescribe/discard', [ClinicianCaseController::class, 'prescribeDiscard'])->name('prescribe.discard');
         Route::post('/{uuid}/approve', [ClinicianCaseController::class, 'approve'])->name('approve');
         // Returns a draft for the provider to edit. Persists nothing, sends nothing.
         Route::post('/{uuid}/draft-note', [ClinicianCaseController::class, 'draftNote'])->name('draft-note');

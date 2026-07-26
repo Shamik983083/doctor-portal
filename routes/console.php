@@ -17,3 +17,7 @@ Schedule::command('webhooks:recover')->everyFiveMinutes();
  * a guarantee rather than a side effect of traffic.
  */
 Schedule::command('routing:sweep-exceptions')->everyFifteenMinutes();
+
+// B3: warn clinicians whose pool-assigned cases are within 15 minutes of their
+// completion deadline, and auto-release any that have already passed it.
+Schedule::command('case:check-deadlines')->everyFiveMinutes();

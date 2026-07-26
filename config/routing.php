@@ -35,4 +35,18 @@ return [
 
     'pool_default_max_per_request' => env('ROUTING_POOL_MAX_PER_REQUEST', 50),
 
+    /*
+    |--------------------------------------------------------------------------
+    | B3: Pull-assigned case completion deadline
+    |--------------------------------------------------------------------------
+    |
+    | Hours from when a pool pull is granted until the clinician must complete
+    | the case. If they miss the window, the case auto-releases back to WAITING
+    | and a cooldown blocks them from pulling again for `deadline_cooldown_hours`.
+    |
+    */
+
+    'completion_deadline_hours' => env('ROUTING_COMPLETION_DEADLINE_HOURS', 24),
+    'deadline_cooldown_hours'   => env('ROUTING_DEADLINE_COOLDOWN_HOURS', 4),
+
 ];

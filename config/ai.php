@@ -88,6 +88,10 @@ return [
     // Hard ceiling on a draft, so a runaway response cannot land in a chart note.
     'max_output_chars' => (int) env('AI_ASSIST_MAX_OUTPUT_CHARS', 6000),
 
+    // A1: master switch for the intake confirmation message drafted on assignment.
+    // When false a deterministic template fires; the patient still receives a message.
+    'karen_enabled' => env('KAREN_ENABLED', false),
+
     /*
      * The contexts a draft can be requested for. Each one maps to an instruction
      * set the admin owns. Kept here (not free-text) so a typo cannot silently

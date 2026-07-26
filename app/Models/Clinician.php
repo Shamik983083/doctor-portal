@@ -25,6 +25,8 @@ class Clinician extends Model
         // E17: timestamp of the last time this clinician viewed the case queue,
         // used to count how many new cases have arrived since their last visit.
         'cases_last_viewed_at',
+        // B3: set when a case auto-releases due to a missed deadline; blocks pool pulls until it clears.
+        'pool_cooldown_until',
     ];
 
     protected $casts = [
@@ -33,6 +35,8 @@ class Clinician extends Model
         'licensed_states' => 'array',
         'accepts_async_visits' => 'boolean',
         'accepts_sync_visits' => 'boolean',
+        'pool_cooldown_until' => 'datetime',
+        'cases_last_viewed_at' => 'datetime',
     ];
 
     /**

@@ -23,6 +23,8 @@ class PatientCase extends Model
         'triage', 'triage_reasons', 'triage_ruleset', 'triaged_at',
         // Phase 1c: unified escalation model (B10 + D15)
         'escalation_target', 'escalation_reason',
+        // B3: per-pull completion deadline
+        'completion_deadline_at', 'deadline_warned',
     ];
 
     protected $casts = [
@@ -39,6 +41,8 @@ class PatientCase extends Model
         'metadata' => 'array',
         'triage_reasons' => 'array',
         'triaged_at' => 'datetime',
+        'completion_deadline_at' => 'datetime',
+        'deadline_warned' => 'boolean',
     ];
 
     // Status constants

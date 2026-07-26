@@ -120,9 +120,19 @@
 
             {{-- Right: diagnosis, medications, note --}}
             <div class="modal-right">
+                {{-- C9: ICD-10 structured code editor --}}
                 <div class="field">
-                    <label>Diagnoses <span class="req">*</span></label>
-                    <textarea name="diagnoses" class="note-area" rows="2" required placeholder="e.g. E66.01 obesity due to excess calories">{{ old('diagnoses') }}</textarea>
+                    <label>ICD-10 Diagnoses <span class="req">*</span>
+                        <span class="pill neutral" style="margin-left:6px">Auto-populated · edit as needed</span>
+                    </label>
+                    <div id="icdEditor" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;padding:8px;border:1px solid var(--line);border-radius:8px;min-height:44px;background:var(--surface)"></div>
+                    <div style="display:flex;gap:8px;margin-top:8px">
+                        <input id="icdCodeInput" type="text" placeholder="Code e.g. E66.01" style="flex:0 0 120px;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+                        <input id="icdDescInput" type="text" placeholder="Description" style="flex:1;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+                        <button type="button" id="icdAddBtn" class="button-secondary">Add code</button>
+                    </div>
+                    <div id="icdHiddens"></div>
+                    <p class="ai-honesty" style="margin-top:4px">Codes are auto-populated from the patient's intake. You can remove, edit, or add codes before confirming.</p>
                 </div>
 
                 <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px">
@@ -138,11 +148,11 @@
 
                 <div class="note-block">
                     <div class="note-head">
-                        <div><div class="subheading">Clinical note (directions)</div>
+                        <div><div class="subheading">Internal clinical note <span style="font-size:11px;font-weight:400;color:var(--muted)">(private · not sent to patient or partner)</span></div>
                         <span class="pill neutral">AI draft · provider edits and signs</span></div>
                         <button type="button" class="button-secondary" id="genNote">Draft with AI</button>
                     </div>
-                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write the basics or your instructions here, then draft with AI. What you write is used, not replaced.">{{ old('directions') }}</textarea>
+                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write your clinical rationale here. This is an internal note — it will not be visible to the patient or the partner.">{{ old('directions') }}</textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
                     <div class="field" style="margin-top:10px"><label>Medical necessity</label>
                         <textarea name="medical_necessity" class="note-area" rows="2" placeholder="Justify medical necessity for the prescribed medications.">{{ old('medical_necessity', $medicalNecessityPreset ?? '') }}</textarea>
@@ -170,6 +180,80 @@
 <script>
     var OFFERINGS = @json($offeringData);
     var REQUESTED = @json($requestedIds);
+    var ICD10_SUGGESTIONS = @json($icd10Suggestions ?? []);
+</script>
+<script>
+    // C9: ICD-10 chip editor
+    (function () {
+        var editor   = document.getElementById('icdEditor');
+        var hiddens  = document.getElementById('icdHiddens');
+        var codeIn   = document.getElementById('icdCodeInput');
+        var descIn   = document.getElementById('icdDescInput');
+        var addBtn   = document.getElementById('icdAddBtn');
+        if (!editor) return;
+
+        var codes = [];
+
+        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+        function render() {
+            editor.innerHTML = '';
+            hiddens.innerHTML = '';
+            codes.forEach(function (c, i) {
+                var chip = document.createElement('span');
+                chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:var(--blue-soft,#e8f0fe);color:var(--blue,#1a56db);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:500';
+                chip.innerHTML = esc(c.code) + ' <span style="font-weight:400;color:var(--muted)">' + esc(c.description) + '</span>'
+                    + '<button type="button" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0 0 0 4px;font-size:14px;line-height:1" data-idx="' + i + '">×</button>';
+                chip.querySelector('button').addEventListener('click', function () { codes.splice(+this.getAttribute('data-idx'), 1); render(); refreshSubmit(); });
+                editor.appendChild(chip);
+
+                var inCode = document.createElement('input');
+                inCode.type = 'hidden';
+                inCode.name = 'diagnoses[' + i + '][code]';
+                inCode.value = c.code;
+                hiddens.appendChild(inCode);
+
+                var inDesc = document.createElement('input');
+                inDesc.type = 'hidden';
+                inDesc.name = 'diagnoses[' + i + '][description]';
+                inDesc.value = c.description;
+                hiddens.appendChild(inDesc);
+            });
+        }
+
+        function refreshSubmit() {
+            var submit = document.getElementById('submitBtn');
+            if (!submit) return;
+            var hasMed = document.querySelectorAll('#medList .med-decision').length >= 1;
+            submit.disabled = !(codes.length >= 1 && hasMed);
+        }
+
+        function addCode(code, desc) {
+            code = (code || '').trim().toUpperCase();
+            desc = (desc || '').trim();
+            if (!code) return;
+            // deduplicate
+            if (codes.some(function(c){ return c.code === code; })) return;
+            codes.push({ code: code, description: desc || code });
+            render();
+            refreshSubmit();
+        }
+
+        addBtn.addEventListener('click', function () {
+            addCode(codeIn.value, descIn.value);
+            codeIn.value = '';
+            descIn.value = '';
+            codeIn.focus();
+        });
+
+        codeIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); } });
+        descIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); } });
+
+        // Seed with auto-populated suggestions
+        if (Array.isArray(ICD10_SUGGESTIONS)) {
+            ICD10_SUGGESTIONS.forEach(function (s) { addCode(s.code, s.description); });
+        }
+    })();
 </script>
 <script>
     (function () {
@@ -313,8 +397,9 @@
             var withMed = 0;
             rows.forEach(function (r) { if (r.querySelector('[data-f="med"]').value) withMed++; });
             if (medCount) medCount.textContent = withMed;
-            var diagnoses = form.querySelector('[name="diagnoses"]');
-            var ready = withMed >= 1 && diagnoses && diagnoses.value.trim() !== '';
+            // C9: ready when at least one ICD-10 code exists AND at least one medication is selected
+            var hasIcd = document.querySelectorAll('#icdHiddens input[name$="[code]"]').length >= 1;
+            var ready = withMed >= 1 && hasIcd;
             if (submit) submit.disabled = !ready;
         }
 

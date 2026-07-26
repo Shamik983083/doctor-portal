@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendIntakeConfirmationJob;
 use App\Models\PatientCase;
 use App\Models\Clinician;
 use App\Models\CaseEvent;
@@ -269,6 +270,15 @@ class CaseStateMachine
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Clinician assignment notification failed: ' . $e->getMessage());
+            }
+
+            // A1: queue the intake confirmation message to the patient.
+            // Dispatched after notifications so a notification failure cannot
+            // prevent the patient message from being queued.
+            try {
+                SendIntakeConfirmationJob::dispatch($case->id)->onQueue('default');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('A1: intake confirmation dispatch failed: ' . $e->getMessage());
             }
         }
     }

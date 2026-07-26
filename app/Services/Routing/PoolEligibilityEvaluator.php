@@ -46,6 +46,9 @@ final class PoolEligibilityEvaluator
     public const SLA_OVERDUE_CASES       = 'SLA_OVERDUE_CASES';
     public const SLA_DECISION_TIME       = 'SLA_DECISION_TIME';
 
+    // B3: added when a clinician auto-released a past-deadline case.
+    public const POOL_COOLDOWN = 'POOL_COOLDOWN';
+
     public const REASON_LABELS = [
         self::POOL_OUTSTANDING_CASES => 'Too many open cases already',
         self::POOL_OVERDUE_CASES     => 'Too many overdue cases',
@@ -56,6 +59,7 @@ final class PoolEligibilityEvaluator
         self::SLA_OUTSTANDING_CASES  => 'Over the SLA for open cases',
         self::SLA_OVERDUE_CASES      => 'Over the SLA for overdue cases',
         self::SLA_DECISION_TIME      => 'Over the SLA for decision time',
+        self::POOL_COOLDOWN          => 'On a continuity-of-care cooldown after a missed deadline',
     ];
 
     /** Statuses that count as an open, non-terminal case. Matches the resolver. */
@@ -81,6 +85,11 @@ final class PoolEligibilityEvaluator
 
         if (! $clinician->is_available) {
             $blocking[] = self::PROVIDER_UNAVAILABLE;
+        }
+
+        // B3: continuity-of-care cooldown applied when a case auto-released.
+        if ($clinician->pool_cooldown_until && $clinician->pool_cooldown_until->isFuture()) {
+            $blocking[] = self::POOL_COOLDOWN;
         }
 
         $openCases = $this->openCaseCount($clinician);
