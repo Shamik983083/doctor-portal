@@ -3,6 +3,11 @@
 @section('title', 'Review Prescription')
 @section('page-title', 'Review Prescription')
 
+@section('page-styles')
+.rx-review-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+@media (max-width:860px) { .rx-review-grid { grid-template-columns:1fr; } }
+@endsection
+
 @section('view')
 <div class="page-head">
     <div class="eyebrow">Clinician · Review</div>
@@ -10,7 +15,7 @@
     <p>Case {{ $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, '') }} · {{ $case->partner?->name ?? '-' }}</p>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+<div class="rx-review-grid">
 
     {{-- Left: prescription summary --}}
     <section class="panel">

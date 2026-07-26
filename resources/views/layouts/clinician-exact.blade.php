@@ -212,6 +212,11 @@
                     <i class="bi bi-check-circle-fill"></i> {{ session('success') }}
                 </div>
             @endif
+            @if(session('info'))
+                <div style="margin:1rem 1.5rem 0;padding:.75rem 1rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;color:#1e40af;font-size:.875rem;display:flex;align-items:center;gap:.5rem;">
+                    <i class="bi bi-info-circle-fill"></i> {{ session('info') }}
+                </div>
+            @endif
             {{-- 'warning' had no block here. The pool refusal path depends on it
                  reaching the doctor: "you asked for 20 and got nothing, here is
                  why" is flashed as a warning, and without this it was rendered

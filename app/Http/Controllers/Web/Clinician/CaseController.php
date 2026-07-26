@@ -383,6 +383,7 @@ class CaseController extends Controller
             'questionnaireResponses.answers',
             'casePrescriptions.clinician.user',
             'casePrescriptions.medications',
+            'casePrescriptions.diagnosesCodes',
         ])->where('uuid', $uuid)->firstOrFail();
 
         // LAW 4: licensure gates viewing, not only assignment.

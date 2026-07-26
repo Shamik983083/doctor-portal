@@ -121,28 +121,49 @@
             @endforelse
         </div>
 
-        {{-- Prescriptions --}}
+        {{-- Prescriptions — only confirmed ones; drafts are in-progress --}}
         <div class="case-pane" data-pane="prescriptions" hidden>
-            @forelse($case->casePrescriptions->sortByDesc('prescribed_at') as $rx)
+            @php $confirmedRx = $case->casePrescriptions->where('review_status', '!=', 'draft')->sortByDesc('prescribed_at'); @endphp
+            @forelse($confirmedRx as $rx)
             <section class="panel" style="margin-bottom:12px">
-                <div class="panel-heading"><div><h2>Prescription</h2><p>by {{ $rx->clinician->full_name ?? '-' }} · {{ $rx->prescribed_at->format('M d, Y H:i') }}</p></div></div>
+                <div class="panel-heading">
+                    <div><h2>Prescription</h2><p>by {{ $rx->clinician->full_name ?? '-' }} · {{ $rx->prescribed_at->format('M d, Y H:i') }}</p></div>
+                    <span class="pill green">Confirmed</span>
+                </div>
                 <div style="padding:0 20px 16px">
-                    <dl class="rx-meta">
-                        <div><dt>Diagnoses</dt><dd style="white-space:pre-line">{{ $rx->diagnoses }}</dd></div>
-                        @if($rx->directions)<div><dt>Directions</dt><dd style="white-space:pre-line">{{ $rx->directions }}</dd></div>@endif
-                        @if($rx->medical_necessity)<div><dt>Medical necessity</dt><dd style="white-space:pre-line">{{ $rx->medical_necessity }}</dd></div>@endif
-                    </dl>
+                    <div class="subheading" style="margin:12px 0 6px">Diagnoses</div>
+                    @if($rx->diagnosesCodes->isNotEmpty())
+                        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
+                            @foreach($rx->diagnosesCodes->sortBy('sort_order') as $d)
+                                <span style="display:inline-flex;align-items:center;gap:4px;background:var(--blue-soft,#e8f0fe);color:var(--blue,#1a56db);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:500">
+                                    {{ $d->icd_code }} <span style="font-weight:400;color:var(--muted)">{{ $d->description }}</span>
+                                </span>
+                            @endforeach
+                        </div>
+                    @elseif($rx->diagnoses)
+                        <p style="font-size:13px;margin-bottom:12px;color:var(--ink)">{{ $rx->diagnoses }}</p>
+                    @else
+                        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">No diagnoses recorded.</p>
+                    @endif
+
+                    @if($rx->medical_necessity)
+                        <div class="subheading" style="margin-bottom:4px">Medical necessity</div>
+                        <p style="font-size:13px;margin-bottom:12px">{{ $rx->medical_necessity }}</p>
+                    @endif
+
                     @if($rx->medications->count())
-                    <div class="subheading" style="margin:12px 0 8px">Medications</div>
+                    <div class="subheading" style="margin:0 0 8px">Medications</div>
                     @foreach($rx->medications as $med)
                     <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px">
-                        <strong>{{ $med->name }}</strong>
-                        @if($med->compound_formula)<div style="color:var(--muted);font-size:12px;margin:2px 0 6px">{{ $med->compound_formula }}</div>@endif
-                        <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:13px">
-                            @if($med->refills !== null)<span><span style="color:var(--muted)">Refills:</span> {{ $med->refills }}</span>@endif
-                            @if($med->quantity !== null)<span><span style="color:var(--muted)">Qty:</span> {{ $med->quantity }}</span>@endif
-                            @if($med->days_supply !== null)<span><span style="color:var(--muted)">Days supply:</span> {{ $med->days_supply }}</span>@endif
-                            @if($med->dispense_unit)<span><span style="color:var(--muted)">Unit:</span> {{ $med->dispense_unit }}</span>@endif
+                        <strong style="font-size:14px">{{ $med->name }}</strong>
+                        @if($med->compound_formula)<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">{{ $med->compound_formula }}</div>@endif
+                        @if($med->sig)<div style="font-size:13px;margin:4px 0"><strong style="color:var(--muted)">SIG:</strong> {{ $med->sig }}</div>@endif
+                        <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-top:4px">
+                            @if($med->refills !== null)<span>Refills: {{ $med->refills }}</span>@endif
+                            @if($med->quantity !== null)<span>Qty: {{ $med->quantity }}</span>@endif
+                            @if($med->days_supply !== null)<span>Days supply: {{ $med->days_supply }}</span>@endif
+                            @if($med->dispense_unit)<span>Unit: {{ $med->dispense_unit }}</span>@endif
+                            @if(!empty($med->dosing['months']))<span>Dosing: {{ implode(' → ', $med->dosing['months']) }}</span>@endif
                         </div>
                     </div>
                     @endforeach
@@ -150,8 +171,17 @@
                 </div>
             </section>
             @empty
-            <div class="stub"><strong>No prescription yet</strong>No prescription has been submitted for this case.</div>
+            <div class="stub"><strong>No prescription yet</strong>No prescription has been confirmed for this case.</div>
             @endforelse
+
+            @php $draftRx = $case->casePrescriptions->where('review_status', 'draft'); @endphp
+            @if($draftRx->isNotEmpty() && $case->status === 'assigned')
+            <div style="margin-top:8px;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;display:flex;align-items:center;gap:10px">
+                <i class="bi bi-clock-history" style="color:#c2410c"></i>
+                <div style="flex:1;font-size:13px;color:#7c2d12">Draft prescription pending review.</div>
+                <a class="button-primary" style="padding:5px 12px;font-size:12px" href="{{ route('clinician.cases.prescribe.review', $case->uuid) }}">Review draft</a>
+            </div>
+            @endif
         </div>
 
         {{-- Questionnaires --}}

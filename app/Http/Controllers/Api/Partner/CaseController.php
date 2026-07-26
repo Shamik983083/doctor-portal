@@ -384,7 +384,7 @@ class CaseController extends Controller
     public function show(Request $request, string $id)
     {
         $case = $this->partner($request)->cases()
-            ->with(['patient', 'clinician.user', 'caseOfferings.offering', 'caseQuestions', 'diseases', 'orders', 'clinicalNotes', 'tags', 'casePrescription.medications'])
+            ->with(['patient', 'clinician.user', 'caseOfferings.offering', 'caseQuestions', 'diseases', 'orders', 'clinicalNotes', 'tags', 'casePrescription.medications', 'casePrescription.diagnosesCodes'])
             ->where('uuid', $id)->firstOrFail();
 
         return response()->json($case);

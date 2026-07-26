@@ -410,26 +410,37 @@ def webhook():
 <div id="ev-prescription-written" class="card mb-3 section-anchor border-success">
 <div class="card-header py-2 d-flex align-items-center gap-2 bg-success bg-opacity-10">
     <span class="event-badge" style="background:#d1fae5;border-color:#6ee7b7;color:#065f46">prescription_written</span>
-    <span class="text-muted small">Fired when a clinician submits a prescription — includes full medication details</span>
+    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, SIG, and full medication details</span>
 </div>
 <div class="card-body">
+<p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is now a structured array of ICD-10-CM codes (auto-populated from the patient's intake), and each medication includes a <code>sig</code> field with the resolved dispensing instructions for this partner.</p>
 <pre id="code-ev-rx">{
   "case_id":         "9d2f1c3e-...",
   "external_id":     "order-wl-20240701-001",   // your reference ID
   "patient_id":      "a1b2c3d4-...",
   "clinician_name":  "Dr. Sarah Johnson, MD",
   "clinician_npi":   "1234567890",
-  "diagnoses":       "Obesity (E66.9), Hypertension (I10)",
+
+  // Structured ICD-10-CM codes (Phase 2+). Always an array.
+  // Falls back to a plain string on legacy prescriptions written before Phase 2.
+  "diagnoses": [
+    { "code": "E66.01", "description": "Morbid (severe) obesity due to excess calories" },
+    { "code": "Z68.41", "description": "Body mass index (BMI) 40.0-44.9, adult" }
+  ],
+
   "meds_prescribed": [
     {
       "name":                "Semaglutide",
       "compound_formula":    "Semaglutide 0.5mg/mL in bacteriostatic water",
+      // sig: resolved dispensing instructions — partner-specific override when set,
+      //      otherwise the offering's default SIG. null when not configured.
+      "sig":                 "Inject 0.25 mg subcutaneously once weekly for the first 4 weeks",
       "refills":             "3",
       "quantity":            "1",
       "days_supply":         "30",
       "dispense_unit":       "vial",
       "days_until_dispense": 7,
-      "dosing":              {
+      "dosing": {
         "medication": "Semaglutide",
         "frequency":  "Once weekly",
         "term":       "3M",
@@ -437,15 +448,30 @@ def webhook():
       }
     }
   ],
-  "timestamp":       1751540001
+  "timestamp": 1751540001
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-rx')">Copy</button>
+
+<div class="alert alert-info mt-3 mb-2 small">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>Handling <code>diagnoses</code>:</strong> Check the type before using — post-Phase 2 prescriptions send an <strong>array</strong> of <code>{ code, description }</code> objects; legacy prescriptions send a plain comma-separated <strong>string</strong>. Guard accordingly:
+    <pre style="background:#f8fafc;color:#1f2937;border:1px solid #e2e8f0;border-radius:6px;padding:.5rem .75rem;font-size:.8rem;margin-top:.4rem;overflow-x:auto">// PHP example
+if (is_array($payload['diagnoses'])) {
+    foreach ($payload['diagnoses'] as $d) {
+        // $d['code'], $d['description']
+    }
+} else {
+    // legacy comma-joined string: "E66.9, I10"
+    $codes = explode(',', $payload['diagnoses']);
+}</pre>
+</div>
+
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
     <span class="text-muted" style="font-size:.75rem">— full prescription data is in the payload above; call this only for additional case context</span>
 </div>
-<p class="mt-2 mb-0 small text-muted">This event fires alongside <code>case_approved</code> and <code>case_completed</code> whenever a prescription form is submitted. All three events fire in quick succession — listen for <code>case_completed</code> as the final confirmation.</p>
+<p class="mt-2 mb-0 small text-muted">This event fires alongside <code>case_approved</code> and <code>case_completed</code> whenever a prescription is confirmed through the review step. All three events fire in quick succession — listen for <code>case_completed</code> as the final confirmation.</p>
 </div>
 </div>
 

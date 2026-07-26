@@ -291,6 +291,7 @@ class PatientCase extends Model
     public function events() { return $this->hasMany(CaseEvent::class, 'case_id'); }
     public function questionnaireResponses() { return $this->hasMany(QuestionnaireResponse::class, 'case_id'); }
     public function casePrescriptions()      { return $this->hasMany(CasePrescription::class, 'case_id'); }
+    public function casePrescription()       { return $this->hasOne(CasePrescription::class, 'case_id')->where('review_status', '!=', 'draft')->latestOfMany('prescribed_at'); }
 
     public function isInStatus(string $status): bool { return $this->status === $status; }
     public function canTransitionTo(string $status): bool { return in_array($status, $this->getAllowedTransitions()); }
