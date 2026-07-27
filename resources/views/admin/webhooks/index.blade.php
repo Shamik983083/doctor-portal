@@ -6,7 +6,13 @@
 @section('content')
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h6 class="mb-0">Delivery Log</h6>
+        <div class="d-flex align-items-center gap-2">
+            <h6 class="mb-0">Delivery Log</h6>
+            <span id="live-indicator" class="badge bg-success d-none" style="font-size:.7rem">
+                <span class="spinner-grow spinner-grow-sm me-1" style="width:.5rem;height:.5rem"></span>
+                Live · refreshing in <span id="live-countdown">5</span>s
+            </span>
+        </div>
         <form class="d-flex gap-2 flex-wrap" method="GET">
             <select name="partner_id" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
                 <option value="">All Partners</option>
@@ -155,6 +161,7 @@ $whDeliveryData = $deliveries->getCollection()->map(fn($d) => [
 @section('scripts')
 <script>
 (function () {
+    // ── Modal data ────────────────────────────────────────────────────────
     const raw  = document.getElementById('wh-delivery-data');
     const list = raw ? JSON.parse(raw.textContent) : [];
     const map  = {};
@@ -167,15 +174,42 @@ $whDeliveryData = $deliveries->getCollection()->map(fn($d) => [
 
         document.getElementById('modalEventType').textContent = d.event || btn.dataset.event || '';
 
-        // Payload is a JS object — pretty-print it directly (no HTML entity issues)
         document.getElementById('modalPayload').textContent =
             d.payload ? JSON.stringify(d.payload, null, 2) : '';
 
-        // Response may be JSON or plain text; try to pretty-print, else show raw
         var resp = d.response || '';
         try { resp = JSON.stringify(JSON.parse(resp), null, 2); } catch (_) {}
         document.getElementById('modalResponse').textContent = resp;
     });
+
+    // ── Live auto-refresh ─────────────────────────────────────────────────
+    // Check if any row has a status that is still in-flight
+    var activeStatuses = ['pending', 'retrying'];
+    var rows = document.querySelectorAll('table tbody tr');
+    var hasActive = false;
+    rows.forEach(function (row) {
+        var badge = row.querySelector('.badge');
+        if (badge && activeStatuses.indexOf(badge.textContent.trim().toLowerCase()) !== -1) {
+            hasActive = true;
+        }
+    });
+
+    if (hasActive) {
+        var indicator  = document.getElementById('live-indicator');
+        var countdown  = document.getElementById('live-countdown');
+        var seconds    = 5;
+        indicator.classList.remove('d-none');
+
+        var timer = setInterval(function () {
+            seconds--;
+            countdown.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(timer);
+                // Preserve current query string so filters stay active
+                window.location.reload();
+            }
+        }, 1000);
+    }
 })();
 </script>
 @endsection
