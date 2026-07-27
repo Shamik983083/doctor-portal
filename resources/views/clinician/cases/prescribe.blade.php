@@ -103,6 +103,60 @@
                     <div><dt>ID verified</dt><dd>{{ $idv ? 'Yes' : 'No' }}</dd></div>
                 </dl>
 
+                {{-- Prior visit panel (refill cases only) --}}
+                @if($case->isRefillRequest())
+                    @if($priorCase)
+                        <details class="prior-visit-prescribe" open style="margin-bottom:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+                            <summary style="padding:10px 14px;cursor:pointer;background:var(--blue-bg);display:flex;align-items:center;gap:9px;list-style:none;font-size:12px;font-weight:700">
+                                <span style="flex:1">Prior visit</span>
+                                <span class="pill" style="font-size:10px">Refill</span>
+                                @if($priorCase->completed_at)<span style="color:var(--muted);font-weight:500">{{ $priorCase->completed_at->format('M j, Y') }}</span>@endif
+                                @if($priorCase->clinician?->user?->name)<span style="color:var(--muted);font-weight:500">Dr. {{ $priorCase->clinician->user->name }}</span>@endif
+                            </summary>
+                            <div style="padding:12px 14px;font-size:12px">
+                                <div class="subheading" style="font-size:10px">Prescribed</div>
+                                @if($priorCase->casePrescription?->medications->isNotEmpty())
+                                    @foreach($priorCase->casePrescription->medications as $pm)
+                                        <div style="padding:4px 0;border-bottom:1px solid var(--line)">
+                                            <strong>{{ $pm->name }}</strong>
+                                            @if($pm->sig)<span style="color:var(--muted)"> · {{ $pm->sig }}</span>@endif
+                                            @if(is_array($pm->dosing) && count(array_filter($pm->dosing)))<span style="color:var(--muted)"> · {{ collect($pm->dosing)->filter()->implode(' → ') }}</span>@endif
+                                            @if($pm->refills !== null)<span style="color:var(--soft-muted);font-size:11px"> Refills: {{ $pm->refills }}</span>@endif
+                                        </div>
+                                    @endforeach
+                                @else
+                                    <p class="ai-honesty" style="margin:4px 0">No medications recorded.</p>
+                                @endif
+
+                                @if($priorCase->caseQuestions->filter(fn($q) => filled($q->question))->isNotEmpty())
+                                    <div class="subheading" style="font-size:10px;margin-top:10px">Prior intake answers</div>
+                                    <div class="qa-sheet" style="margin-top:0">
+                                        @foreach($priorCase->caseQuestions->filter(fn($q) => filled($q->question))->take(8) as $cq)
+                                            <div class="qa"><dt>{{ $cq->question }}</dt><dd>{{ $cq->answer ?: '—' }}</dd></div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                @php $priorNote = $priorCase->clinicalNotes->first(); @endphp
+                                @if($priorNote?->note)
+                                    <div class="subheading" style="font-size:10px;margin-top:10px">Clinical note</div>
+                                    <p style="white-space:pre-wrap;margin:4px 0;color:var(--ink)">{{ \Illuminate\Support\Str::limit($priorNote->note, 400) }}</p>
+                                @endif
+
+                                <a href="{{ route('clinician.cases.show', $priorCase->uuid) }}" target="_blank"
+                                   style="display:inline-block;margin-top:10px;color:var(--accent)">
+                                    View full prior case →
+                                </a>
+                            </div>
+                        </details>
+                    @else
+                        <div style="margin-bottom:14px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--blue-bg);font-size:12px">
+                            <span class="pill" style="font-size:10px;margin-right:6px">Refill</span>
+                            <span style="color:var(--muted)">No prior completed case found for this patient with this partner.</span>
+                        </div>
+                    @endif
+                @endif
+
                 <div class="flags-panel {{ $case->triage === 'green' ? 'clean' : '' }}">
                     <p class="flags-title">{{ $ci['protocolVersion'] ?? 'Triage' }}: {{ $findingFlags }} flag(s), triage {{ ucfirst($case->triage ?? 'unclassified') }}</p>
                     <div class="flags-grid">

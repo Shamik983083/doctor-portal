@@ -131,6 +131,17 @@ class CaseController extends Controller
             $aiSummary = $bullets;
         }
 
+        // Prior-visit map for refill cases on this page: uuid → priorCase.
+        // At most one query per refill case (paginator max 20). Used by the
+        // quick-review panel and _review-grid to show the prior visit panel.
+        $priorCasesMap = [];
+        $cases->getCollection()->filter(fn($c) => $c->isRefillRequest())->each(function ($rc) use (&$priorCasesMap) {
+            $prior = PatientCase::priorCompletedCase($rc);
+            if ($prior) {
+                $priorCasesMap[$rc->uuid] = $prior;
+            }
+        });
+
         $heldCases   = $cases->getCollection()->filter(fn($c) => $c->hold_status || $c->status === 'support')->values();
         $messages    = \App\Models\Message::with(['patient', 'case'])
             ->where('direction', 'inbound')
@@ -150,7 +161,7 @@ class CaseController extends Controller
         return view('clinician.cases.queue', compact(
             'cases', 'clinician', 'triageMetrics',
             'topCase', 'intake', 'aiSummary',
-            'heldCases', 'messages', 'reasonCodes'
+            'heldCases', 'messages', 'reasonCodes', 'priorCasesMap'
         ));
     }
 
@@ -203,7 +214,15 @@ class CaseController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('clinician.cases.my-cases', compact('cases', 'clinician', 'counts', 'tab'));
+        $priorCasesMap = [];
+        $cases->getCollection()->filter(fn($c) => $c->isRefillRequest())->each(function ($rc) use (&$priorCasesMap) {
+            $prior = PatientCase::priorCompletedCase($rc);
+            if ($prior) {
+                $priorCasesMap[$rc->uuid] = $prior;
+            }
+        });
+
+        return view('clinician.cases.my-cases', compact('cases', 'clinician', 'counts', 'tab', 'priorCasesMap'));
     }
 
     /**
@@ -247,7 +266,15 @@ class CaseController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('clinician.cases.refills', compact('cases', 'clinician'));
+        $priorCasesMap = [];
+        $cases->getCollection()->each(function ($rc) use (&$priorCasesMap) {
+            $prior = PatientCase::priorCompletedCase($rc);
+            if ($prior) {
+                $priorCasesMap[$rc->uuid] = $prior;
+            }
+        });
+
+        return view('clinician.cases.refills', compact('cases', 'clinician', 'priorCasesMap'));
     }
 
     /**
@@ -466,7 +493,12 @@ class CaseController extends Controller
         // C9: auto-populate ICD-10 suggestions from the case's clinical intake
         $icd10Suggestions = Icd10Ruleset::for($case);
 
-        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions'));
+        // Prior-visit panel: load the most recent completed case for this patient
+        // (same partner) so the provider can reference past prescription + intake.
+        // Only runs for refill cases; null-safe to never crash if no prior exists.
+        $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
+
+        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions', 'priorCase'));
     }
 
     public function prescribe(Request $request, string $uuid)

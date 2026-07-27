@@ -358,6 +358,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/', [AdminOfferingCategoryController::class, 'index'])->name('index');
         Route::post('/', [AdminOfferingCategoryController::class, 'store'])->name('store');
         Route::patch('/{category}/toggle', [AdminOfferingCategoryController::class, 'toggleStatus'])->name('toggle');
+        Route::patch('/{category}/check-in', [AdminOfferingCategoryController::class, 'updateCheckIn'])->name('update-check-in');
         Route::delete('/{category}', [AdminOfferingCategoryController::class, 'destroy'])->name('destroy');
     });
 });

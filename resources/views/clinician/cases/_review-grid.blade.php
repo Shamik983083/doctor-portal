@@ -12,6 +12,7 @@
     $eyebrow = $eyebrow ?? 'Provider review queue';
     $title = $title ?? 'Fast review, full context one click away';
     $sub = $sub ?? 'Highest-attention cases surface first. Triage is a review-priority signal, not a clinical decision.';
+    $priorCasesMap = $priorCasesMap ?? [];
 
     $usStates = [
         'AL'=>'Alabama','AK'=>'Alaska','AZ'=>'Arizona','AR'=>'Arkansas','CA'=>'California',
@@ -161,7 +162,7 @@
      data is built once below and embedded as JSON; the panel renders the top
      case server-side and JS re-renders it when a row is clicked. --}}
 @php
-    $buildCard = function ($case) use ($expandState) {
+    $buildCard = function ($case) use ($expandState, $priorCasesMap) {
         $clin = $case->queueClinical();
         $ci   = $case->clinical_intake ?? [];
 
@@ -208,6 +209,36 @@
             }
         }
 
+        // Prior visit data for refill cases (prior case is pre-loaded in the
+        // controller to avoid N+1 — one query per refill case on the page).
+        $isRefill = $case->isRefillRequest();
+        $prior    = $priorCasesMap[$case->uuid] ?? null;
+        $priorData = null;
+        if ($isRefill && $prior) {
+            $priorMeds = $prior->casePrescription?->medications?->map(fn($m) => [
+                'name'    => $m->name,
+                'sig'     => $m->sig ?? null,
+                'dosing'  => is_array($m->dosing) ? collect($m->dosing)->filter()->implode(' → ') : null,
+                'refills' => $m->refills,
+            ])->values()->all() ?? [];
+
+            $priorIntake = $prior->caseQuestions
+                ->filter(fn($q) => filled($q->question))
+                ->map(fn($q) => ['q' => $q->question, 'a' => $q->answer ?: '—'])
+                ->values()->all();
+
+            $priorNote = $prior->clinicalNotes->first()?->note ?? null;
+
+            $priorData = [
+                'clinician' => $prior->clinician?->user?->name ?? null,
+                'date'      => $prior->completed_at?->format('M j, Y') ?? null,
+                'meds'      => $priorMeds,
+                'intake'    => array_slice($priorIntake, 0, 6),
+                'note'      => $priorNote ? \Illuminate\Support\Str::limit($priorNote, 300) : null,
+                'url'       => route('clinician.cases.show', $prior->uuid),
+            ];
+        }
+
         return [
             'id'       => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
             'name'     => $case->patient?->full_name ?? 'Unknown',
@@ -224,6 +255,8 @@
             'hold'     => (bool) $case->hold_status,
             'state'    => $expandState($case->patient_state ?? $case->patient?->state ?? null),
             'collab'   => $case->patient?->collaboratingClinician?->full_name ?? null,
+            'isRefill' => $isRefill,
+            'prior'    => $priorData,
             'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
             'reviewUrl'  => route('clinician.cases.prescribe.form', $case->uuid) . '?modal=1',
             'showUrl'    => route('clinician.cases.show', $case->uuid),
@@ -298,10 +331,58 @@
             var triageLabel = d.triage ? d.triage.charAt(0).toUpperCase() + d.triage.slice(1) : '';
             var protocol = (d.protocol ? esc(d.protocol) + ' · ' : '') + 'classification ' + esc(triageLabel);
 
+            // Prior visit section (refill cases only)
+            var priorHtml = '';
+            if (d.isRefill) {
+                if (d.prior) {
+                    var pm = d.prior;
+                    var medItems = '';
+                    if (pm.meds && pm.meds.length) {
+                        pm.meds.forEach(function (m) {
+                            medItems += '<div style="padding:5px 0;border-bottom:1px solid var(--line)">'
+                                + '<span style="font-weight:680;font-size:13px">' + esc(m.name) + '</span>';
+                            if (m.sig)    medItems += ' <span style="color:var(--muted);font-size:12px">· ' + esc(m.sig) + '</span>';
+                            if (m.dosing) medItems += ' <span style="color:var(--muted);font-size:12px">· ' + esc(m.dosing) + '</span>';
+                            if (m.refills != null) medItems += ' <span style="color:var(--soft-muted);font-size:11px">Refills: ' + esc(String(m.refills)) + '</span>';
+                            medItems += '</div>';
+                        });
+                    } else {
+                        medItems = '<p class="ai-honesty">No medications recorded.</p>';
+                    }
+
+                    var intakeItems = '';
+                    if (pm.intake && pm.intake.length) {
+                        pm.intake.forEach(function (r) {
+                            intakeItems += '<div class="qa"><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
+                        });
+                    }
+
+                    priorHtml = '<details style="margin-top:16px;border:1px solid var(--line);border-radius:14px;overflow:hidden">'
+                        + '<summary style="padding:12px 16px;cursor:pointer;background:var(--blue-bg);display:flex;align-items:center;gap:10px;list-style:none;font-weight:700;font-size:13px">'
+                        + '<span style="flex:1">Prior visit</span>'
+                        + '<span class="pill" style="font-size:10px">Refill</span>'
+                        + (pm.date ? '<span style="color:var(--muted);font-size:12px;font-weight:500">' + esc(pm.date) + '</span>' : '')
+                        + (pm.clinician ? '<span style="color:var(--muted);font-size:12px;font-weight:500">Dr. ' + esc(pm.clinician) + '</span>' : '')
+                        + '</summary>'
+                        + '<div style="padding:14px 16px">'
+                        + '<div class="subheading">Prescribed</div>'
+                        + medItems
+                        + (intakeItems ? '<div class="subheading" style="margin-top:12px">Prior intake answers</div><div class="qa-sheet" style="margin-top:0">' + intakeItems + '</div>' : '')
+                        + (pm.note ? '<div class="subheading" style="margin-top:12px">Clinical note</div><p style="font-size:12px;color:var(--ink);white-space:pre-wrap;margin:4px 0">' + esc(pm.note) + '</p>' : '')
+                        + '<a href="' + esc(pm.url) + '" style="display:inline-block;margin-top:10px;font-size:12px;color:var(--accent)">View full prior case →</a>'
+                        + '</div></details>';
+                } else {
+                    priorHtml = '<div style="margin-top:12px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--blue-bg)">'
+                        + '<span class="subheading" style="margin:0">Refill</span> '
+                        + '<span class="ai-honesty" style="display:inline;font-size:12px">No prior completed case found for this patient with this partner.</span>'
+                        + '</div>';
+                }
+            }
+
             panel.innerHTML =
                 '<div class="panel-heading"><div>'
                 + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
-                + '<h2>' + esc(d.name) + '</h2>'
+                + '<h2>' + esc(d.name) + (d.isRefill ? ' <span class="pill" style="font-size:10px;vertical-align:middle">Refill</span>' : '') + '</h2>'
                 + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state ? ' · ' + esc(d.state) : '') + '</p></div>'
                 + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
                 + '<span class="pill ' + esc(d.tone) + '">' + esc(d.label) + '</span></div></div>'
@@ -321,7 +402,8 @@
                 + '<a class="button-secondary full-width" href="' + esc(d.showUrl) + '">Show Full Profile</a>'
                 + '<a class="button-secondary full-width" href="' + esc(d.msgUrl) + '">Send Message</a>'
                 + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a></div>'
-                + '</div>';
+                + '</div>'
+                + priorHtml;
         }
 
         grid.querySelectorAll('tbody tr[data-row]').forEach(function (tr) {

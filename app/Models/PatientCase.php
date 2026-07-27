@@ -293,6 +293,37 @@ class PatientCase extends Model
     public function casePrescriptions()      { return $this->hasMany(CasePrescription::class, 'case_id'); }
     public function casePrescription()       { return $this->hasOne(CasePrescription::class, 'case_id')->where('review_status', '!=', 'draft')->latestOfMany('prescribed_at'); }
 
+    /**
+     * The most recent completed case for the same patient + partner that produced
+     * a prescription. Returns null if no such case exists.
+     *
+     * Shared by ContinuityResolver (routing) and the prior-visit panel shown to
+     * clinicians on refill cases. Eager-loads everything the panel needs so callers
+     * do not trigger N+1 queries.
+     */
+    public static function priorCompletedCase(self $case): ?self
+    {
+        if (! $case->patient_id) {
+            return null;
+        }
+
+        return self::with([
+                'clinician.user',
+                'casePrescription.medications',
+                'caseQuestions',
+                'clinicalNotes' => fn ($q) => $q->orderByDesc('created_at')->limit(1),
+            ])
+            ->where('patient_id', $case->patient_id)
+            ->where('partner_id', $case->partner_id)
+            ->where('id', '!=', $case->id)
+            ->where('status', self::STATUS_COMPLETED)
+            ->whereNotNull('clinician_id')
+            ->whereHas('casePrescriptions')
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->first();
+    }
+
     public function isInStatus(string $status): bool { return $this->status === $status; }
     public function canTransitionTo(string $status): bool { return in_array($status, $this->getAllowedTransitions()); }
 

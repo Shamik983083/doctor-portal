@@ -38,6 +38,7 @@ class QuestionnaireController extends Controller
             'description'                       => 'nullable|string',
             'partner_id'                        => 'nullable|exists:partners,id',
             'mode'                              => 'nullable|in:single,multi',
+            'purpose'                           => 'nullable|in:clinical,check_in,demographic',
             'linked_questionnaire_id'           => 'nullable|integer|exists:questionnaires,id',
             'questions'                         => 'nullable|array',
             'questions.*.question'              => 'required|string|max:5000',

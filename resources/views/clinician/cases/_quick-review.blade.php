@@ -80,3 +80,54 @@
         <a class="button-danger full-width" href="{{ $d['showUrl'] }}">Reject</a>
     </div>
 </div>
+
+{{-- 4. Prior visit panel — only for refill cases, full-width below the 3-column grid --}}
+@if(!empty($d['isRefill']))
+    @if(!empty($d['prior']))
+        @php $pm = $d['prior']; @endphp
+        <details style="margin-top:16px;border:1px solid var(--line);border-radius:14px;overflow:hidden">
+            <summary style="padding:12px 16px;cursor:pointer;background:var(--blue-bg);display:flex;align-items:center;gap:10px;list-style:none;font-weight:700;font-size:13px">
+                <span style="flex:1">Prior visit</span>
+                <span class="pill" style="font-size:10px">Refill</span>
+                @if(!empty($pm['date']))<span style="color:var(--muted);font-size:12px;font-weight:500">{{ $pm['date'] }}</span>@endif
+                @if(!empty($pm['clinician']))<span style="color:var(--muted);font-size:12px;font-weight:500">Dr. {{ $pm['clinician'] }}</span>@endif
+            </summary>
+            <div style="padding:14px 16px">
+                <div class="subheading">Prescribed</div>
+                @if(!empty($pm['meds']))
+                    @foreach($pm['meds'] as $med)
+                        <div style="padding:5px 0;border-bottom:1px solid var(--line)">
+                            <span style="font-weight:680;font-size:13px">{{ $med['name'] }}</span>
+                            @if(!empty($med['sig']))<span style="color:var(--muted);font-size:12px"> · {{ $med['sig'] }}</span>@endif
+                            @if(!empty($med['dosing']))<span style="color:var(--muted);font-size:12px"> · {{ $med['dosing'] }}</span>@endif
+                            @if(isset($med['refills']))<span style="color:var(--soft-muted);font-size:11px"> Refills: {{ $med['refills'] }}</span>@endif
+                        </div>
+                    @endforeach
+                @else
+                    <p class="ai-honesty">No medications recorded.</p>
+                @endif
+
+                @if(!empty($pm['intake']))
+                    <div class="subheading" style="margin-top:12px">Prior intake answers</div>
+                    <div class="qa-sheet" style="margin-top:0">
+                        @foreach($pm['intake'] as $row)
+                            <div class="qa"><dt>{{ $row['q'] }}</dt><dd>{{ $row['a'] }}</dd></div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @if(!empty($pm['note']))
+                    <div class="subheading" style="margin-top:12px">Clinical note</div>
+                    <p style="font-size:12px;color:var(--ink);white-space:pre-wrap;margin:4px 0">{{ $pm['note'] }}</p>
+                @endif
+
+                <a href="{{ $pm['url'] }}" style="display:inline-block;margin-top:10px;font-size:12px;color:var(--accent)">View full prior case →</a>
+            </div>
+        </details>
+    @else
+        <div style="margin-top:12px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--blue-bg);font-size:13px">
+            <span class="pill" style="font-size:10px;margin-right:6px">Refill</span>
+            <span class="ai-honesty" style="display:inline">No prior completed case found for this patient with this partner.</span>
+        </div>
+    @endif
+@endif

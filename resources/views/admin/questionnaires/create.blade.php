@@ -66,10 +66,11 @@
                 <div class="mb-3">
                     <label class="form-label fw-semibold small">Purpose</label>
                     <select name="purpose" class="form-select form-select-sm">
-                        <option value="clinical"     {{ old('purpose', 'clinical') === 'clinical'     ? 'selected' : '' }}>Clinical (shown in offering dropdown)</option>
+                        <option value="clinical"     {{ old('purpose', 'clinical') === 'clinical'     ? 'selected' : '' }}>Clinical (initial intake — shown in offering dropdown)</option>
+                        <option value="check_in"     {{ old('purpose') === 'check_in'     ? 'selected' : '' }}>Check-in (refill visit — assigned on category or per-offering)</option>
                         <option value="demographic"  {{ old('purpose') === 'demographic'  ? 'selected' : '' }}>Demographic (patient data — excluded from offerings)</option>
                     </select>
-                    <div class="form-text">Demographic forms are excluded from the offering questionnaire picker.</div>
+                    <div class="form-text">Check-in forms are used for refill cases instead of the initial intake when configured on a category or offering.</div>
                 </div>
                 <div class="mb-3">
                     <div class="form-check form-switch">

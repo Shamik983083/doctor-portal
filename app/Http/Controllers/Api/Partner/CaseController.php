@@ -11,6 +11,7 @@ use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireQuestion;
 use App\Models\QuestionnaireResponse;
 use App\Services\CaseStateMachine;
+use App\Services\CheckInQuestionnaireResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -129,7 +130,8 @@ class CaseController extends Controller
             $data['questionnaire_responses'] = $this->buildResponsesFromOfferings(
                 $data['answers'],
                 $data['offerings'] ?? [],
-                $partner
+                $partner,
+                (bool) ($data['is_refill'] ?? false)
             );
         } elseif (!empty($data['questionnaire_responses'])) {
             $expanded = [];
@@ -526,27 +528,66 @@ class CaseController extends Controller
      * each slug against the questionnaires attached to the submitted offerings.
      * Returns the same structure the downstream pipeline expects, with
      * question_id already set and answers already split by questionnaire.
+     *
+     * For refill cases ($isRefill = true) check-in questionnaires are indexed
+     * first so their slugs win over clinical ones. If no check-in questionnaire
+     * is configured anywhere, the clinical questionnaire is used as a fallback —
+     * refills never break.
      */
-    private function buildResponsesFromOfferings(array $rawAnswers, array $offeringsData, Partner $partner): array
+    private function buildResponsesFromOfferings(array $rawAnswers, array $offeringsData, Partner $partner, bool $isRefill = false): array
     {
         if (empty($rawAnswers) || empty($offeringsData)) return [];
 
         $offeringUuids = array_column($offeringsData, 'offering_id');
 
+        $eagerLoads = [
+            'questionnaires.questions'                     => fn($q) => $q->where('is_active', true),
+            'questionnaires.linkedQuestionnaire.questions' => fn($q) => $q->where('is_active', true),
+        ];
+
+        // For refill cases, also load the category's check-in questionnaire and
+        // its questions so we can prioritise check-in slugs over clinical ones.
+        if ($isRefill) {
+            $eagerLoads['category.checkInQuestionnaire.questions'] = fn($q) => $q->where('is_active', true);
+        }
+
         $offerings = $partner->accessibleOfferings()
             ->whereIn('offerings.uuid', $offeringUuids)
-            ->with([
-                'questionnaires.questions'                     => fn($q) => $q->where('is_active', true),
-                'questionnaires.linkedQuestionnaire.questions' => fn($q) => $q->where('is_active', true),
-            ])
+            ->with($eagerLoads)
             ->get();
 
         $slugToQuestion    = []; // slug => QuestionnaireQuestion
         $idToQuestionnaire = []; // question_id => Questionnaire
         $seenIds           = [];
 
+        // Pass 1 (refill only): index check-in questionnaire questions first so
+        // they win when a slug exists in both the check-in and clinical forms.
+        if ($isRefill) {
+            foreach ($offerings as $offering) {
+                // Per-offering check-in (highest priority)
+                foreach ($offering->questionnaires->where('purpose', 'check_in') as $questionnaire) {
+                    if (! $questionnaire->is_active || in_array($questionnaire->id, $seenIds)) continue;
+                    $seenIds[] = $questionnaire->id;
+                    foreach ($questionnaire->questions as $q) {
+                        if ($q->slug) $slugToQuestion[$q->slug] = $q;
+                        $idToQuestionnaire[$q->id] = $questionnaire;
+                    }
+                }
+                // Category default check-in
+                $catQ = $offering->category?->checkInQuestionnaire;
+                if ($catQ && $catQ->is_active && ! in_array($catQ->id, $seenIds)) {
+                    $seenIds[] = $catQ->id;
+                    foreach ($catQ->questions as $q) {
+                        if ($q->slug) $slugToQuestion[$q->slug] = $q;
+                        $idToQuestionnaire[$q->id] = $catQ;
+                    }
+                }
+            }
+        }
+
+        // Pass 2: index clinical questionnaires (always; serves as fallback for refills)
         foreach ($offerings as $offering) {
-            foreach ($offering->questionnaires as $questionnaire) {
+            foreach ($offering->questionnaires->where('purpose', '!=', 'check_in') as $questionnaire) {
                 // Index linked questionnaire questions first (e.g. Standard Intake 1)
                 $linked = $questionnaire->linkedQuestionnaire;
                 if ($linked && !in_array($linked->id, $seenIds)) {

@@ -133,20 +133,9 @@ final class ContinuityResolver
      */
     private function previousCase(PatientCase $case): ?PatientCase
     {
-        if (! $case->patient_id) {
-            return null;
-        }
-
-        return PatientCase::with('clinician')
-            ->where('patient_id', $case->patient_id)
-            ->where('partner_id', $case->partner_id)
-            ->where('id', '!=', $case->id)
-            ->where('status', PatientCase::STATUS_COMPLETED)
-            ->whereNotNull('clinician_id')
-            ->whereHas('casePrescriptions')
-            ->orderByDesc('completed_at')
-            ->orderByDesc('id')
-            ->first();
+        $prior = PatientCase::priorCompletedCase($case);
+        $prior?->loadMissing('clinician');
+        return $prior;
     }
 
     /**
