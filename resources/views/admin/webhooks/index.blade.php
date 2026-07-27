@@ -123,14 +123,15 @@
 </div>
 
 {{-- Delivery data embedded as JSON to avoid HTML-encoding issues with quotes and newlines --}}
-<script id="wh-delivery-data" type="application/json">
-@json($deliveries->getCollection()->map(fn($d) => [
+@php
+$whDeliveryData = $deliveries->getCollection()->map(fn($d) => [
     'uuid'     => $d->uuid,
     'event'    => $d->event_type,
     'payload'  => $d->payload,
     'response' => $d->response_body,
-]))
-</script>
+])->values()->toArray();
+@endphp
+<script id="wh-delivery-data" type="application/json">{!! json_encode($whDeliveryData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}</script>
 
 {{-- Payload / Response Modal --}}
 <div class="modal fade" id="payloadModal" tabindex="-1">
