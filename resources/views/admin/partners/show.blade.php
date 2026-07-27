@@ -84,21 +84,8 @@
                         <small class="text-muted">Send this as <code>client_secret</code> in token requests.</small>
                     </div>
 
-                    {{-- Webhook Secret --}}
-                    <div class="mb-3">
-                        <label class="form-label small text-muted fw-semibold mb-1">Webhook Signing Secret</label>
-                        <div class="input-group input-group-sm">
-                            <input type="password" class="form-control font-monospace bg-light"
-                                   id="webhookSecret" value="{{ $partner->webhook_secret }}" readonly>
-                            <button class="btn btn-outline-secondary" onclick="toggleWebhook()" title="Show/Hide" id="webhookToggleBtn">
-                                <i class="bi bi-eye" id="webhookEyeIcon"></i>
-                            </button>
-                            <button class="btn btn-outline-secondary" onclick="copyField('webhookSecret')" title="Copy">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                        </div>
-                        <small class="text-muted">Legacy partner-level secret (fallback only). Each webhook has its own signing secret shown below.</small>
-                    </div>
+                    {{-- partner.webhook_secret is a legacy field never reached in signing
+                         (webhook.secret always takes priority). Hidden to avoid confusion. --}}
 
                     {{-- Token endpoint --}}
                     <div class="mb-3">
@@ -379,16 +366,5 @@ function toggleSecret() {
     }
 }
 
-function toggleWebhook() {
-    const el = document.getElementById('webhookSecret');
-    const icon = document.getElementById('webhookEyeIcon');
-    if (el.type === 'password') {
-        el.type = 'text';
-        icon.className = 'bi bi-eye-slash';
-    } else {
-        el.type = 'password';
-        icon.className = 'bi bi-eye';
-    }
-}
 </script>
 @endsection
