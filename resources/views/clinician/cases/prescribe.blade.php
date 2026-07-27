@@ -327,7 +327,17 @@
             zofran:      ['4 mg', '8 mg'],
             nad:         ['100 mg', '200 mg']
         };
-        var TERMS = [{ v: '1M', label: '1 month', n: 1 }, { v: '3M', label: '3 months', n: 3 }, { v: '4M', label: '4 months', n: 4 }];
+        var TERMS = [
+            { v: '1M',  label: '1 month',   n: 1  },
+            { v: '3M',  label: '3 months',  n: 3  },
+            { v: '4M',  label: '4 months',  n: 4  },
+            { v: '6M',  label: '6 months',  n: 6  },
+            { v: '12M', label: '12 months', n: 12 },
+        ];
+        // Map month_frequency integer → term code for pre-filling the duration dropdown.
+        // Falls back to '3M' when frequency is null (legacy cases) or unmapped.
+        var FREQ_TO_TERM = { 1: '1M', 3: '3M', 4: '4M', 6: '6M', 12: '12M' };
+        var defaultTerm  = FREQ_TO_TERM[{{ $requestedMonthFrequency ?? 'null' }}] || '3M';
         var FREQUENCIES = ['Weekly', 'Every 2 weeks', 'Daily', 'As needed'];
         var REFILLS = ['0', '1', '2', '3', '5', '11'];
 
@@ -409,7 +419,7 @@
                 + '<div class="field"><label>Medication <span class="req">*</span></label>'
                 + '<select data-f="med" name="medications[' + i + '][offering_id]">' + offeringOptions(offeringId) + '</select></div>'
                 + '<div class="field"><label>Duration <span class="req">*</span></label>'
-                + '<select data-f="term" name="medications[' + i + '][term]">' + optionList(TERMS, '3M') + '</select></div>'
+                + '<select data-f="term" name="medications[' + i + '][term]">' + optionList(TERMS, defaultTerm) + '</select></div>'
                 + '</div>'
                 + '<div class="field-row">'
                 + '<div class="field"><label>Administration frequency <span class="req">*</span></label>'

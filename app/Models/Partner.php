@@ -60,4 +60,5 @@ class Partner extends Model
     public function orders() { return $this->hasMany(Order::class); }
     public function tags() { return $this->hasMany(Tag::class); }
     public function questionnaires() { return $this->hasMany(Questionnaire::class); }
+    public function productPlans()   { return $this->hasMany(PartnerProductPlan::class); }
 }

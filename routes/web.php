@@ -9,6 +9,7 @@ use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Web\Admin\CaseController as AdminCaseController;
 use App\Http\Controllers\Web\Admin\PatientController as AdminPatientController;
 use App\Http\Controllers\Web\Admin\PartnerController as AdminPartnerController;
+use App\Http\Controllers\Web\Admin\PartnerProductPlanController as AdminPartnerProductPlanController;
 use App\Http\Controllers\Web\Admin\ClinicianController as AdminClinicianController;
 use App\Http\Controllers\Web\Admin\OfferingController as AdminOfferingController;
 use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCategoryController;
@@ -165,6 +166,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::patch('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'updateWebhook'])->name('webhooks.update');
         Route::delete('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'destroyWebhook'])->name('webhooks.destroy');
         Route::delete('/{id}', [AdminPartnerController::class, 'destroy'])->name('destroy');
+        // Product plans (one-to-many product_key ↔ offering mapping)
+        Route::get('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'index'])->name('product-plans.index');
+        Route::post('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'store'])->name('product-plans.store');
+        Route::delete('/{id}/product-plans/{planId}', [AdminPartnerProductPlanController::class, 'destroy'])->name('product-plans.destroy');
     });
 
     // Clinicians

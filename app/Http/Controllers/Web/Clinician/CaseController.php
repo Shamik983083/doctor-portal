@@ -498,7 +498,11 @@ class CaseController extends Controller
         // Only runs for refill cases; null-safe to never crash if no prior exists.
         $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
 
-        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions', 'priorCase'));
+        // Pass the requested month_frequency (from the first case offering) so the
+        // prescribe form can pre-select the matching duration dropdown entry.
+        $requestedMonthFrequency = $case->caseOfferings->first()?->month_frequency;
+
+        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions', 'priorCase', 'requestedMonthFrequency'));
     }
 
     public function prescribe(Request $request, string $uuid)
@@ -696,6 +700,7 @@ class CaseController extends Controller
         }
 
         // C8: include SIG per medication; C9: send structured codes
+        $case->loadMissing('caseOfferings.offering');
         $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
             'case_id'         => $case->uuid,
             'external_id'     => $case->external_id,
@@ -716,6 +721,11 @@ class CaseController extends Controller
                 'dispense_unit'       => $m->dispense_unit,
                 'days_until_dispense' => $m->days_until_dispense,
                 'dosing'              => $m->dosing,
+            ])->toArray(),
+            'offerings'       => $case->caseOfferings->map(fn ($co) => [
+                'offering_id'     => $co->offering?->uuid,
+                'product_key'     => $co->product_key,
+                'month_frequency' => $co->month_frequency,
             ])->toArray(),
             'timestamp' => now()->timestamp,
         ]);
@@ -1351,6 +1361,7 @@ class CaseController extends Controller
                     ]);
                 }
 
+                $case->loadMissing('caseOfferings.offering');
                 $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
                     'case_id'         => $case->uuid,
                     'external_id'     => $case->external_id,
@@ -1368,6 +1379,11 @@ class CaseController extends Controller
                         'dispense_unit'       => $m->dispense_unit,
                         'days_until_dispense' => $m->days_until_dispense,
                         'dosing'              => $m->dosing,
+                    ])->toArray(),
+                    'offerings'       => $case->caseOfferings->map(fn ($co) => [
+                        'offering_id'     => $co->offering?->uuid,
+                        'product_key'     => $co->product_key,
+                        'month_frequency' => $co->month_frequency,
                     ])->toArray(),
                     'timestamp'       => now()->timestamp,
                 ]);

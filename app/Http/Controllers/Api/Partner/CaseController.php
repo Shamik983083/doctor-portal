@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\PatientCase;
 use App\Models\Partner;
+use App\Models\PartnerProductPlan;
 use App\Models\Questionnaire;
 use App\Models\PatientFile;
 use App\Models\QuestionnaireAnswer;
@@ -102,7 +103,9 @@ class CaseController extends Controller
             'clinical_intake.summary'                         => 'nullable|array',
             'clinical_intake.sourceAnswers'                   => 'nullable|array',
             'offerings'                                       => 'nullable|array',
-            'offerings.*.offering_id'                         => 'string',
+            'offerings.*.offering_id'                         => 'nullable|string',
+            'offerings.*.product_key'                         => 'nullable|string|max:120',
+            'offerings.*.month_frequency'                     => 'nullable|integer|min:1|max:24',
             'offerings.*.quantity'                            => 'integer|min:1',
             // Simplified flat answers (new path — questionnaire derived from offering)
             'answers'                                         => 'nullable|array',
@@ -119,6 +122,83 @@ class CaseController extends Controller
 
         $partner     = $this->partner($request);
         $patientData = $data['patient'];
+
+        // ── Pre-resolve offerings (Path A + Path B) ───────────────────────────
+        // Done before questionnaire resolution so buildResponsesFromOfferings
+        // always receives a valid offering UUID regardless of which path was used.
+        //
+        // Path A (legacy): offering_id sent directly — unchanged behaviour.
+        // Path B (new):    product_key + month_frequency → portal looks up the
+        //                  partner_product_plans table and resolves to offering_id.
+        //
+        // $resolvedOfferings[idx] = Offering — reused by the transaction block so
+        // we never query the same offering twice in one request.
+        $effectiveState   = $data['patient_state'] ?? $patientData['state'] ?? null;
+        $resolvedOfferings = [];
+
+        if (!empty($data['offerings'])) {
+            foreach ($data['offerings'] as $idx => $offeringData) {
+                $offering = null;
+
+                // Path B: product_key + month_frequency → plan lookup
+                if (!empty($offeringData['product_key']) && !empty($offeringData['month_frequency'])) {
+                    $plan = PartnerProductPlan::where('partner_id', $partner->id)
+                        ->where('product_key', $offeringData['product_key'])
+                        ->where('month_frequency', (int) $offeringData['month_frequency'])
+                        ->first();
+
+                    if (!$plan) {
+                        return response()->json([
+                            'message' => "No product plan found for product_key \"{$offeringData['product_key']}\" with month_frequency {$offeringData['month_frequency']}.",
+                            'errors'  => ['offerings' => ["Product plan not found: product_key \"{$offeringData['product_key']}\", month_frequency {$offeringData['month_frequency']}."]],
+                        ], 422);
+                    }
+
+                    $offering = $partner->accessibleOfferings()
+                        ->where('offerings.id', $plan->offering_id)
+                        ->first();
+
+                    if (!$offering) {
+                        return response()->json([
+                            'message' => "Offering for product plan \"{$offeringData['product_key']}\" (month_frequency {$offeringData['month_frequency']}) is not accessible for this partner.",
+                            'errors'  => ['offerings' => ["Offering not accessible for this partner."]],
+                        ], 422);
+                    }
+
+                    // Inject UUID so buildResponsesFromOfferings can find questionnaires
+                    $data['offerings'][$idx]['offering_id'] = $offering->uuid;
+                }
+                // Path A (legacy): direct offering_id
+                elseif (!empty($offeringData['offering_id'])) {
+                    $offering = $partner->accessibleOfferings()
+                        ->where('offerings.uuid', $offeringData['offering_id'])
+                        ->first();
+                }
+
+                if (!$offering) {
+                    continue; // unresolved — silently skip (mirrors prior behaviour for unknown UUIDs)
+                }
+
+                // State availability gate
+                if ($effectiveState && !$offering->isAvailableInState($effectiveState)) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."]],
+                    ], 422);
+                }
+
+                // Category gate (unroutable without a category)
+                if ($offering->category_id === null) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" has no product category configured and cannot be routed. Contact the platform administrator.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" has no product category configured."]],
+                    ], 422);
+                }
+
+                $resolvedOfferings[$idx] = $offering;
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         // ── Resolve questionnaire responses ───────────────────────────────────
         // Path A (new): flat top-level `answers` array — derive questionnaires
@@ -184,36 +264,6 @@ class CaseController extends Controller
         unset($data['answers']);
         // ─────────────────────────────────────────────────────────────────────
 
-        // ── Offering state availability check ────────────────────────────────
-        // Reject before touching the DB if any requested offering is not
-        // available in the patient's state, or has no category (which makes it
-        // unroutable — better to fail fast here than land silently in exceptions).
-        $effectiveState = $data['patient_state'] ?? $patientData['state'] ?? null;
-        if (!empty($data['offerings'])) {
-            foreach ($data['offerings'] as $offeringData) {
-                $offering = $partner->accessibleOfferings()
-                    ->where('offerings.uuid', $offeringData['offering_id'])
-                    ->first();
-                if ($offering && $effectiveState && !$offering->isAvailableInState($effectiveState)) {
-                    return response()->json([
-                        'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
-                        'errors'  => [
-                            'offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."],
-                        ],
-                    ], 422);
-                }
-                if ($offering && $offering->category_id === null) {
-                    return response()->json([
-                        'message' => "Offering \"{$offering->name}\" has no product category configured and cannot be routed. Contact the platform administrator.",
-                        'errors'  => [
-                            'offerings' => ["Offering \"{$offering->name}\" has no product category configured."],
-                        ],
-                    ], 422);
-                }
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────────
-
         // Deduplicate patient by external_id then email
         $patient = null;
         if (!empty($patientData['external_id'])) {
@@ -246,18 +296,18 @@ class CaseController extends Controller
                 'status'        => PatientCase::STATUS_CREATED,
             ]);
 
-            // Attach offerings
+            // Attach offerings — use pre-resolved map; no extra queries
             $attachedOfferingsIds = [];
             if (!empty($data['offerings'])) {
-                foreach ($data['offerings'] as $offeringData) {
-                    $offering = $partner->accessibleOfferings()
-                        ->where('offerings.uuid', $offeringData['offering_id'])
-                        ->first();
+                foreach ($data['offerings'] as $idx => $offeringData) {
+                    $offering = $resolvedOfferings[$idx] ?? null;
                     if ($offering) {
                         $case->caseOfferings()->create([
-                            'offering_id' => $offering->id,
-                            'quantity'    => $offeringData['quantity'] ?? 1,
-                            'price'       => $offeringData['price'] ?? $offering->price,
+                            'offering_id'     => $offering->id,
+                            'quantity'        => $offeringData['quantity'] ?? 1,
+                            'price'           => $offeringData['price'] ?? $offering->price,
+                            'month_frequency' => isset($offeringData['month_frequency']) ? (int) $offeringData['month_frequency'] : null,
+                            'product_key'     => $offeringData['product_key'] ?? null,
                         ]);
                         $attachedOfferingsIds[] = $offering->id;
                     }

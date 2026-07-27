@@ -34,9 +34,12 @@
                     <tr><th class="text-muted">Created</th><td>{{ $partner->created_at->format('M d, Y') }}</td></tr>
                 </table>
             </div>
-            <div class="card-footer d-flex gap-2">
+            <div class="card-footer d-flex gap-2 flex-wrap">
                 <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-outline-primary btn-sm flex-fill">
                     <i class="bi bi-pencil me-1"></i>Edit
+                </a>
+                <a href="{{ route('admin.partners.product-plans.index', $partner->id) }}" class="btn btn-outline-secondary btn-sm flex-fill">
+                    <i class="bi bi-grid me-1"></i>Product Plans
                 </a>
                 <form method="POST" action="{{ route('admin.partners.destroy', $partner->id) }}" onsubmit="return confirm('Are you sure you want to delete this partner? This cannot be undone.')" class="d-inline flex-fill">
                     @csrf

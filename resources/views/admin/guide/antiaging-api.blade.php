@@ -142,6 +142,8 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <li><a class="toc-link text-decoration-none" href="#auth">Authentication</a></li>
     <li><a class="toc-link text-decoration-none" href="#discover">Discover Question Slugs</a></li>
     <li><a class="toc-link text-decoration-none" href="#create">Create Case (Full Payload)</a></li>
+    <li><a class="toc-link text-decoration-none" href="#refill">Refill / Check-in Cases</a></li>
+    <li><a class="toc-link text-decoration-none" href="#product-plans">Product Plans (one-to-many)</a></li>
     <li><a class="toc-link text-decoration-none" href="#questions">Question Reference</a></li>
     <li><a class="toc-link text-decoration-none" href="#errors">Error Responses</a></li>
     <li><a class="toc-link text-decoration-none" href="#db">What Gets Created in DB</a></li>
@@ -302,11 +304,14 @@ Content-Type: application/json
   "visit_type":     "antiaging",
   "is_chargeable":  true,
   "hold_status":    false,
-  "is_refill":      false,         // true = check-in — re-routes to prior doctor, counts as check-in not first visit
+  "is_refill":      false,         // true = refill/check-in visit — see "Refill / Check-in Cases" section below
   "metadata":       { "source": "patient-portal" },  // optional free-form object, stored verbatim on the case
 
   "offerings": [
+    // Option A (legacy — no changes needed): direct offering UUID
     { "offering_id": "YOUR_AA_OFFERING_UUID", "quantity": 1 }
+    // Option B (new): product_key + month_frequency — portal resolves internally
+    // { "product_key": "your-product-key", "month_frequency": 3, "quantity": 1 }
   ],
 
   "answers": [{{ $payloadAnswers }}
@@ -345,6 +350,168 @@ Content-Type: application/json
     Any answer whose value would <strong>disqualify</strong> the patient still creates the case — the doctor sees a disqualification flag.
     The system silently ignores answers for untriggered conditions.
 </div>
+</div>
+</div>
+
+{{-- ── REFILL / CHECK-IN CASES ─────────────────────────── --}}
+<div id="refill" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold">
+    <i class="bi bi-arrow-repeat me-2 text-warning"></i>Refill / Check-in Cases
+</div>
+<div class="card-body">
+
+<p class="mb-3">Set <code>"is_refill": true</code> when a patient is returning for a follow-up visit on a program they have already completed. The platform handles three things automatically — no extra endpoints or webhooks required.</p>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="p-3 bg-light rounded border h-100">
+            <div class="fw-semibold mb-1"><i class="bi bi-person-check me-1 text-primary"></i>Routing continuity</div>
+            <p class="small mb-0 text-muted">The case is routed to the same clinician who handled the patient's most recent completed visit for this partner and program category. Normal routing rules apply as a fallback.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 bg-light rounded border h-100">
+            <div class="fw-semibold mb-1"><i class="bi bi-clipboard2-check me-1 text-success"></i>Check-in questionnaire</div>
+            <p class="small mb-0 text-muted">The platform resolves which questionnaire to map the submitted <code>answers</code> slugs against, in priority order:</p>
+            <ol class="small mb-0 mt-1 ps-3 text-muted">
+                <li>Per-offering <code>check_in</code> questionnaire</li>
+                <li>Category-level default check-in questionnaire</li>
+                <li>Initial intake questionnaire (always-available fallback)</li>
+            </ol>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 bg-light rounded border h-100">
+            <div class="fw-semibold mb-1"><i class="bi bi-card-list me-1 text-info"></i>Prior visit panel</div>
+            <p class="small mb-0 text-muted">The reviewing clinician sees a collapsible panel alongside the case showing the patient's prior prescription, intake answers, and clinical note — no extra API calls needed from your side.</p>
+        </div>
+    </div>
+</div>
+
+<h6 class="fw-semibold mb-2">What slugs to send in <code>answers</code></h6>
+<p class="small mb-2">You always POST to the same <code>/api/partner/cases</code> endpoint with the same structure. Which slugs to use depends on whether an admin has configured a dedicated check-in questionnaire:</p>
+
+<div class="table-responsive">
+<table class="table table-sm table-bordered small mb-0">
+<thead class="table-light">
+<tr><th style="width:40%">Scenario</th><th>Slugs to send in <code>answers</code></th></tr>
+</thead>
+<tbody>
+<tr>
+    <td><strong>No check-in questionnaire configured</strong> (most common initially)</td>
+    <td>Use the same initial intake slugs you already send for first visits. The platform falls back to the initial intake questionnaire automatically — nothing breaks.</td>
+</tr>
+<tr>
+    <td><strong>Admin has configured a check-in questionnaire</strong> on the category or offering</td>
+    <td>GET that questionnaire by its UUID to discover its slugs, then include those in <code>answers</code>. You may also include initial intake slugs — the platform stores what it can match and silently ignores the rest.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="alert alert-success border-0 small mt-3 mb-0 py-2">
+    <i class="bi bi-check-circle me-1"></i>
+    <strong>No breaking changes.</strong> Omitting <code>is_refill</code> or sending <code>false</code> behaves exactly as before. Existing integrations require no updates unless you want to start submitting refill cases.
+</div>
+
+</div>
+</div>
+
+{{-- ── PRODUCT PLANS (one-to-many offering mapping) ────────── --}}
+<div id="product-plans" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold">
+    <i class="bi bi-grid me-2 text-secondary"></i>Product Plans — One-to-Many Offering Mapping
+</div>
+<div class="card-body">
+
+<p class="mb-3">
+    By default, partners send a portal <code>offering_id</code> UUID directly in the <code>offerings</code> array
+    (Option A — legacy, always supported). The <strong>Product Plans</strong> feature is an alternative that lets you
+    use your own stable <code>product_key</code> identifiers and a <code>month_frequency</code> integer — the portal
+    resolves to the correct offering internally. One product key can map to multiple offerings (one per duration).
+</p>
+
+<h6 class="fw-semibold mb-2">Option A — Legacy (no changes required)</h6>
+<pre class="mb-3">"offerings": [
+  { "offering_id": "YOUR_AA_OFFERING_UUID", "month_frequency": 3, "quantity": 1 }
+]
+// month_frequency is optional here — add it if you want the prescribe form
+// duration pre-filled, but you can omit it and the form defaults to 3M.</pre>
+
+<h6 class="fw-semibold mb-2">Option B — Product Plans (new)</h6>
+<pre class="mb-3">"offerings": [
+  { "product_key": "aa-program", "month_frequency": 3, "quantity": 1 }
+]
+// No offering_id needed. The portal looks up the plan you configured
+// in Admin → Partners → Product Plans and resolves to the offering.</pre>
+
+<div class="alert alert-warning border-0 small py-2 mb-3">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Setup required (Option B only):</strong> Admin must configure at least one Product Plan row
+    in Admin → Partners → <em>Product Plans</em> for this partner before Option B calls will succeed.
+    Missing plans return <code>422 Product plan not found</code>.
+</div>
+
+<h6 class="fw-semibold mb-2">Error responses (Option B)</h6>
+<div class="table-responsive mb-3">
+<table class="table table-sm table-bordered small mb-0">
+<thead class="table-light"><tr><th>Status</th><th>Condition</th><th>Message</th></tr></thead>
+<tbody>
+<tr><td><code>422</code></td><td>No plan row found for this partner + product_key + month_frequency</td><td><code>No product plan found for product_key "…" with month_frequency …</code></td></tr>
+<tr><td><code>422</code></td><td>Plan exists but offering is not accessible for this partner</td><td><code>Offering not accessible for this partner.</code></td></tr>
+<tr><td><code>422</code></td><td>Resolved offering unavailable in patient state</td><td><code>Offering "…" is not available in state …</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h6 class="fw-semibold mb-2"><code>prescription_written</code> Webhook — Full Payload Shape</h6>
+<p class="small mb-2">Fired when the clinician confirms the prescription. The <code>offerings</code> array echoes back
+whatever was submitted — <code>product_key</code> is <code>null</code> when Option A was used.</p>
+<pre id="code-webhook-rx-aa">{
+  "case_id":        "case-uuid",
+  "external_id":    "your-order-id",
+  "patient_id":     "patient-uuid",
+  "clinician_name": "Dr. Jane Smith",
+  "clinician_npi":  "1234567890",
+  "diagnoses": [
+    { "code": "Z13.88", "description": "Encounter for screening for disorder due to exposure to contaminants" }
+  ],
+  "meds_prescribed": [
+    {
+      "name":                "NAD+",
+      "compound_formula":    "…",
+      "sig":                 "Inject 0.5 mL subcutaneously weekly",
+      "refills":             "1",
+      "quantity":            "3",
+      "days_supply":         "90",
+      "dispense_unit":       "mL",
+      "days_until_dispense": 0,
+      "dosing": {
+        "medication": "NAD+",
+        "frequency":  "Weekly",
+        "term":       "3M",         ← clinician's selected term (1M / 3M / 6M / 12M)
+        "months":     ["100 mg", "100 mg", "200 mg"]
+      }
+    }
+  ],
+  "offerings": [
+    {
+      "offering_id":    "portal-offering-uuid",   ← always present
+      "product_key":    "aa-program",              ← null if Option A used without product_key
+      "month_frequency": 3                          ← null if not submitted
+    }
+  ],
+  "timestamp": 1722000000
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-webhook-rx-aa')">Copy</button>
+
+<div class="alert alert-success border-0 small mt-3 mb-0 py-2">
+    <i class="bi bi-check-circle me-1"></i>
+    <strong>VRIO CRM order flow:</strong> Use <code>offerings[0].product_key</code> (your identifier) +
+    <code>meds_prescribed[0].dosing.term</code> (the clinician's selected duration) to place the order.
+    Both are present together in every <code>prescription_written</code> event when Option B is used.
+</div>
+
 </div>
 </div>
 
@@ -612,7 +779,8 @@ Content-Type: application/json
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Obtain <code>client_id</code>, <code>client_secret</code>, and your <strong>Offering UUID(s)</strong> from the admin — Partner → Offerings (shown once approved)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs — no questionnaire UUID required. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> as required fields in the <code>patient</code> block</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> (legacy) <em>or</em> <code>offerings[].product_key + month_frequency</code> (new — see Product Plans section) + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> in the <code>patient</code> block</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Read <code>prescription_written</code> webhook: use <code>offerings[0].product_key</code> + <code>meds_prescribed[0].dosing.term</code> to place the VRIO CRM order</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Include <code>patient.id_verified_status</code> = <code>"verified"</code> (or <code>"failed"</code> / <code>"pending"</code>) with your Vouched result at case creation time. If Vouched completes asynchronously, push it later via <code>PATCH /api/partner/patients/{uuid}</code> — open cases re-triage automatically</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Only send conditional answers when the parent condition was met — omit <code>aa_primary_reason_other</code>, <code>aa_current_symptoms_other</code>, <code>aa_prior_treatment_reactions</code>, and <code>aa_prior_treatment_reaction_details</code> unless triggered</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
