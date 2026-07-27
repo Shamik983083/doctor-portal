@@ -21,7 +21,6 @@ use App\Http\Controllers\Web\Admin\NotificationController as AdminNotificationCo
 use App\Http\Controllers\Web\Clinician\NotificationController as ClinicianNotificationController;
 use App\Http\Controllers\Web\Partner\NotificationController as PartnerNotificationController;
 use App\Http\Controllers\Web\Form\QuestionnaireFormController;
-use App\Http\Controllers\Web\MaPortalController;
 use App\Http\Controllers\Web\Partner\DashboardController as PartnerDashboard;
 use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingController;
 use App\Http\Controllers\Web\Partner\PatientController as PartnerPatientController;
@@ -48,33 +47,13 @@ Route::prefix('forms')->name('forms.')->group(function () {
     Route::post('/{uuid}', [QuestionnaireFormController::class, 'submit'])->name('submit');
 });
 
-/*
- * MA-Portal role-view showcase.
- *
- * WAS `auth` ONLY, WITH NO ROLE GATE. Defensible when these were static
- * mockups, but MaPortalController reads real records: practitioner() loads open
- * cases with patient demographics, recorded intake answers, clinical notes and
- * messages; superAdmin() lists every user in the install with email and roles.
- * Behind `auth` alone, a PARTNER login (an external storefront operator) could
- * read all of it by typing the URL.
- *
- * Each route is now gated to the tier whose surface it previews, mirroring the
- * real portals below. The bare /ma-portal redirect stays on `auth` only because
- * it just forwards; the destination enforces its own gate.
- */
-Route::prefix('ma-portal')->middleware(['auth'])->name('ma-portal.')->group(function () {
-    Route::get('/', fn () => redirect()->route('ma-portal.practitioner'));
-
-    Route::get('/practitioner', [MaPortalController::class, 'practitioner'])
-        ->middleware('role:clinician|admin|super_admin')->name('practitioner');
-
-    Route::get('/admin', [MaPortalController::class, 'admin'])
-        ->middleware('role:admin|super_admin')->name('admin');
-
-    // Global user roster and cross-tenant view. Super admin only, matching the
-    // real admin.admins screens.
-    Route::get('/super-admin', [MaPortalController::class, 'superAdmin'])
-        ->middleware('role:super_admin')->name('super-admin');
+// /ma-portal was a read-only showcase retired in favour of the real portals.
+// 301s keep stale bookmarks working until the next release.
+Route::middleware(['auth'])->group(function () {
+    Route::permanentRedirect('/ma-portal', '/admin/dashboard');
+    Route::permanentRedirect('/ma-portal/practitioner', '/clinician/dashboard');
+    Route::permanentRedirect('/ma-portal/admin', '/admin/dashboard');
+    Route::permanentRedirect('/ma-portal/super-admin', '/admin/dashboard');
 });
 
 // Clinician Portal
