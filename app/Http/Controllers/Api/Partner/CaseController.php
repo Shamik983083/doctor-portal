@@ -184,19 +184,27 @@ class CaseController extends Controller
 
         // ── Offering state availability check ────────────────────────────────
         // Reject before touching the DB if any requested offering is not
-        // available in the patient's state. patient_state wins over patient.state
-        // because the API caller may override it for telehealth visit purposes.
+        // available in the patient's state, or has no category (which makes it
+        // unroutable — better to fail fast here than land silently in exceptions).
         $effectiveState = $data['patient_state'] ?? $patientData['state'] ?? null;
-        if ($effectiveState && !empty($data['offerings'])) {
+        if (!empty($data['offerings'])) {
             foreach ($data['offerings'] as $offeringData) {
                 $offering = $partner->accessibleOfferings()
                     ->where('offerings.uuid', $offeringData['offering_id'])
                     ->first();
-                if ($offering && !$offering->isAvailableInState($effectiveState)) {
+                if ($offering && $effectiveState && !$offering->isAvailableInState($effectiveState)) {
                     return response()->json([
                         'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
                         'errors'  => [
                             'offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."],
+                        ],
+                    ], 422);
+                }
+                if ($offering && $offering->category_id === null) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" has no product category configured and cannot be routed. Contact the platform administrator.",
+                        'errors'  => [
+                            'offerings' => ["Offering \"{$offering->name}\" has no product category configured."],
                         ],
                     ], 422);
                 }
