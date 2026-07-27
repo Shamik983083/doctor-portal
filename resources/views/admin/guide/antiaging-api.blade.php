@@ -428,7 +428,9 @@ Content-Type: application/json
     By default, partners send a portal <code>offering_id</code> UUID directly in the <code>offerings</code> array
     (Option A — legacy, always supported). The <strong>Product Plans</strong> feature is an alternative that lets you
     use your own stable <code>product_key</code> identifiers and a <code>month_frequency</code> integer — the portal
-    resolves to the correct offering internally. One product key can map to multiple offerings (one per duration).
+    resolves to the correct offerings internally. One <code>product_key + month_frequency</code> submission fans out
+    to <strong>all</strong> plan rows configured for that combination — multiple offerings are attached to the case
+    simultaneously (e.g. NAD+ 1000mg and a companion compound all at once from a single <code>product_key</code> call).
 </p>
 
 <h6 class="fw-semibold mb-2">Option A — Legacy (no changes required)</h6>
@@ -458,15 +460,19 @@ Content-Type: application/json
 <thead class="table-light"><tr><th>Status</th><th>Condition</th><th>Message</th></tr></thead>
 <tbody>
 <tr><td><code>422</code></td><td>No plan row found for this partner + product_key + month_frequency</td><td><code>No product plan found for product_key "…" with month_frequency …</code></td></tr>
-<tr><td><code>422</code></td><td>Plan exists but offering is not accessible for this partner</td><td><code>Offering not accessible for this partner.</code></td></tr>
-<tr><td><code>422</code></td><td>Resolved offering unavailable in patient state</td><td><code>Offering "…" is not available in state …</code></td></tr>
+<tr><td><code>422</code></td><td>Plan rows exist but all resolved offerings are inaccessible for this partner</td><td><code>All plan offerings for "…" (NM) are inaccessible for this partner.</code></td></tr>
+<tr><td><code>422</code></td><td>A resolved offering is unavailable in the patient's state</td><td><code>Offering "…" is not available in state …</code></td></tr>
 </tbody>
 </table>
 </div>
 
 <h6 class="fw-semibold mb-2"><code>prescription_written</code> Webhook — Full Payload Shape</h6>
-<p class="small mb-2">Fired when the clinician confirms the prescription. The <code>offerings</code> array echoes back
-whatever was submitted — <code>product_key</code> is <code>null</code> when Option A was used.</p>
+<p class="small mb-2">
+    Fired when the clinician confirms the prescription. The <code>offerings</code> array echoes back every offering
+    attached to the case — when Option B is used, this may contain <strong>multiple items</strong> (one per plan row
+    that was resolved from the submitted <code>product_key + month_frequency</code>).
+    <code>product_key</code> is <code>null</code> on items that came from Option A.
+</p>
 <pre id="code-webhook-rx-aa">{
   "case_id":        "case-uuid",
   "external_id":    "your-order-id",
@@ -495,10 +501,16 @@ whatever was submitted — <code>product_key</code> is <code>null</code> when Op
     }
   ],
   "offerings": [
+    ← Option B fan-out: one entry per resolved plan row (may be multiple)
     {
-      "offering_id":    "portal-offering-uuid",   ← always present
-      "product_key":    "aa-program",              ← null if Option A used without product_key
-      "month_frequency": 3                          ← null if not submitted
+      "offering_id":     "uuid-nad-1000",    ← always present
+      "product_key":     "nad",              ← null if Option A used without product_key
+      "month_frequency": 3                   ← null if not submitted
+    },
+    {
+      "offering_id":     "uuid-companion",
+      "product_key":     "nad",
+      "month_frequency": 3
     }
   ],
   "timestamp": 1722000000
@@ -507,9 +519,9 @@ whatever was submitted — <code>product_key</code> is <code>null</code> when Op
 
 <div class="alert alert-success border-0 small mt-3 mb-0 py-2">
     <i class="bi bi-check-circle me-1"></i>
-    <strong>VRIO CRM order flow:</strong> Use <code>offerings[0].product_key</code> (your identifier) +
-    <code>meds_prescribed[0].dosing.term</code> (the clinician's selected duration) to place the order.
-    Both are present together in every <code>prescription_written</code> event when Option B is used.
+    <strong>VRIO CRM order flow:</strong> Iterate <code>offerings[]</code> — each item's <code>product_key</code>
+    (your identifier) combined with <code>meds_prescribed[0].dosing.term</code> (the clinician's selected duration)
+    identifies the VRIO SKU to order. When Option B fans out to multiple offerings, place one CRM order per item.
 </div>
 
 </div>
@@ -780,7 +792,7 @@ Content-Type: application/json
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> (legacy) <em>or</em> <code>offerings[].product_key + month_frequency</code> (new — see Product Plans section) + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> in the <code>patient</code> block</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Read <code>prescription_written</code> webhook: use <code>offerings[0].product_key</code> + <code>meds_prescribed[0].dosing.term</code> to place the VRIO CRM order</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Read <code>prescription_written</code> webhook: iterate <code>offerings[]</code> — each item's <code>product_key</code> + <code>meds_prescribed[0].dosing.term</code> identifies the VRIO SKU; place one CRM order per offering when Option B fans out to multiple</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Include <code>patient.id_verified_status</code> = <code>"verified"</code> (or <code>"failed"</code> / <code>"pending"</code>) with your Vouched result at case creation time. If Vouched completes asynchronously, push it later via <code>PATCH /api/partner/patients/{uuid}</code> — open cases re-triage automatically</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Only send conditional answers when the parent condition was met — omit <code>aa_primary_reason_other</code>, <code>aa_current_symptoms_other</code>, <code>aa_prior_treatment_reactions</code>, and <code>aa_prior_treatment_reaction_details</code> unless triggered</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Offering;
 use App\Models\Partner;
 use App\Models\PartnerProductPlan;
 use Illuminate\Http\Request;
@@ -54,15 +53,17 @@ class PartnerProductPlanController extends Controller
             return back()->withErrors(['offering_id' => 'That offering is not accessible for this partner.'])->withInput();
         }
 
-        // Check for duplicate (partner + product_key + month_frequency must be unique)
-        $exists = PartnerProductPlan::where('partner_id', $partner->id)
+        // Prevent the exact same offering being added twice for the same key+frequency.
+        // Different offerings at the same key+frequency are allowed (fan-out).
+        $exactDuplicate = PartnerProductPlan::where('partner_id', $partner->id)
             ->where('product_key', $data['product_key'])
             ->where('month_frequency', $data['month_frequency'])
+            ->where('offering_id', $data['offering_id'])
             ->exists();
 
-        if ($exists) {
+        if ($exactDuplicate) {
             return back()->withErrors([
-                'product_key' => "A plan for product_key \"{$data['product_key']}\" with month_frequency {$data['month_frequency']} already exists.",
+                'offering_id' => "This offering is already mapped to \"{$data['product_key']}\" ({$data['month_frequency']}M).",
             ])->withInput();
         }
 
