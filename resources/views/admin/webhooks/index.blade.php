@@ -90,8 +90,7 @@
                                 @if($delivery->response_body)
                                 <button type="button" class="btn btn-sm btn-outline-secondary py-0"
                                         data-bs-toggle="modal" data-bs-target="#payloadModal"
-                                        data-payload="{{ e(json_encode($delivery->payload, JSON_PRETTY_PRINT)) }}"
-                                        data-response="{{ e($delivery->response_body) }}"
+                                        data-uuid="{{ $delivery->uuid }}"
                                         data-event="{{ $delivery->event_type }}">
                                     <i class="bi bi-eye"></i>
                                 </button>
@@ -123,6 +122,16 @@
     @endif
 </div>
 
+{{-- Delivery data embedded as JSON to avoid HTML-encoding issues with quotes and newlines --}}
+<script id="wh-delivery-data" type="application/json">
+@json($deliveries->getCollection()->map(fn($d) => [
+    'uuid'     => $d->uuid,
+    'event'    => $d->event_type,
+    'payload'  => $d->payload,
+    'response' => $d->response_body,
+]))
+</script>
+
 {{-- Payload / Response Modal --}}
 <div class="modal fade" id="payloadModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -144,11 +153,28 @@
 
 @section('scripts')
 <script>
-document.getElementById('payloadModal').addEventListener('show.bs.modal', function (e) {
-    const btn = e.relatedTarget;
-    document.getElementById('modalEventType').textContent = btn.dataset.event;
-    document.getElementById('modalPayload').textContent   = btn.dataset.payload;
-    document.getElementById('modalResponse').textContent  = btn.dataset.response;
-});
+(function () {
+    const raw  = document.getElementById('wh-delivery-data');
+    const list = raw ? JSON.parse(raw.textContent) : [];
+    const map  = {};
+    list.forEach(function (d) { map[d.uuid] = d; });
+
+    document.getElementById('payloadModal').addEventListener('show.bs.modal', function (e) {
+        const btn  = e.relatedTarget;
+        const uuid = btn.dataset.uuid;
+        const d    = map[uuid] || {};
+
+        document.getElementById('modalEventType').textContent = d.event || btn.dataset.event || '';
+
+        // Payload is a JS object — pretty-print it directly (no HTML entity issues)
+        document.getElementById('modalPayload').textContent =
+            d.payload ? JSON.stringify(d.payload, null, 2) : '';
+
+        // Response may be JSON or plain text; try to pretty-print, else show raw
+        var resp = d.response || '';
+        try { resp = JSON.stringify(JSON.parse(resp), null, 2); } catch (_) {}
+        document.getElementById('modalResponse').textContent = resp;
+    });
+})();
 </script>
 @endsection

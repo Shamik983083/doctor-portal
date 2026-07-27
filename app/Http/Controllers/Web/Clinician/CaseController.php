@@ -58,6 +58,7 @@ class CaseController extends Controller
             ])
             ->withCount(['messages as unread_messages_count' => fn ($q) => $q->where('direction', 'inbound')->where('is_read', false),
             ])
+            ->when(!$request->filled('status'), fn ($q) => $q->whereNotIn('status', [PatientCase::STATUS_COMPLETED, PatientCase::STATUS_CANCELLED]))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->when($request->filled('state'), fn ($q) => $q->where(
                 fn ($q) => $q->where('patient_state', $request->state)
