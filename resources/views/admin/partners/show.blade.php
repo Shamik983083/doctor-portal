@@ -41,6 +41,9 @@
                 <a href="{{ route('admin.partners.product-plans.index', $partner->id) }}" class="btn btn-outline-secondary btn-sm flex-fill">
                     <i class="bi bi-grid me-1"></i>Product Plans
                 </a>
+                <a href="{{ route('admin.guide.webhooks', ['partner_id' => $partner->id]) }}" class="btn btn-outline-secondary btn-sm flex-fill">
+                    <i class="bi bi-broadcast-pin me-1"></i>Webhook Guide
+                </a>
                 <form method="POST" action="{{ route('admin.partners.destroy', $partner->id) }}" onsubmit="return confirm('Are you sure you want to delete this partner? This cannot be undone.')" class="d-inline flex-fill">
                     @csrf
                     @method('DELETE')

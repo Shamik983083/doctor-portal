@@ -271,7 +271,20 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 
     // Developer Guide
     Route::get('/guide/messaging', fn() => view('admin.guide.messaging'))->name('guide.messaging');
-    Route::get('/guide/webhooks', fn() => view('admin.guide.webhooks'))->name('guide.webhooks');
+    Route::get('/guide/webhooks', function (\Illuminate\Http\Request $request) {
+        $partner    = null;
+        $webhookUrl = 'https://your-site.com/webhooks/medaxis';
+
+        if ($partnerId = $request->input('partner_id')) {
+            $partner = \App\Models\Partner::find((int) $partnerId);
+            $first   = $partner?->webhooks()->where('status', 'active')->first();
+            if ($first) {
+                $webhookUrl = $first->url;
+            }
+        }
+
+        return view('admin.guide.webhooks', compact('partner', 'webhookUrl'));
+    })->name('guide.webhooks');
     Route::get('/guide/glp-api', function () {
         $questionnaire = \App\Models\Questionnaire::with([
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),

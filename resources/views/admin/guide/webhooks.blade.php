@@ -5,6 +5,22 @@
 @section('content')
 @php $base = rtrim(config('app.url'), '/'); @endphp
 
+@if($partner ?? null)
+<div class="alert alert-info d-flex align-items-center gap-2 mb-3 py-2">
+    <i class="bi bi-building me-1"></i>
+    <span>
+        Showing examples for <strong>{{ $partner->name }}</strong>.
+        @php $activeHooks = $partner->webhooks()->where('status','active')->count(); @endphp
+        @if($activeHooks)
+            {{ $activeHooks }} active webhook{{ $activeHooks !== 1 ? 's' : '' }} registered — example URL pre-filled below.
+        @else
+            No active webhooks registered yet — placeholder URL shown.
+        @endif
+    </span>
+    <a href="{{ route('admin.guide.webhooks') }}" class="btn btn-sm btn-outline-secondary ms-auto">Clear context</a>
+</div>
+@endif
+
 <style>
 pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3rem; font-size:.82rem; overflow-x:auto; position:relative }
 .copy-btn { position:absolute; top:.5rem; right:.6rem; font-size:.7rem; padding:2px 8px; opacity:.7 }
@@ -106,7 +122,7 @@ Authorization: Bearer &lt;access_token&gt;
 Content-Type: application/json
 
 {
-  "url":        "https://your-site.com/webhooks/medaxis",
+  "url":        "{{ $webhookUrl ?? 'https://your-site.com/webhooks/medaxis' }}",
   "event_type": null,          // null = receive ALL events; or pass a single event name string
   "status":     "active"
 }</pre>
@@ -115,7 +131,7 @@ Content-Type: application/json
 <p class="mt-3 mb-1"><strong>Success 201</strong></p>
 <pre id="code-register-resp">{
   "id":         "webhook-uuid",
-  "url":        "https://your-site.com/webhooks/medaxis",
+  "url":        "{{ $webhookUrl ?? 'https://your-site.com/webhooks/medaxis' }}",
   "event_type": null,
   "secret":     "AbCdEfGhIjKlMnOpQrStUvWxYz123456",  // auto-generated — save this, shown only once
   "status":     "active",
