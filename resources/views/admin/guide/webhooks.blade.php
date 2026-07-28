@@ -309,10 +309,14 @@ def webhook():
   "timestamp":  1751539200
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-created')">Copy</button>
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>Pushed to your server.</strong> The payload confirms the new <code>case_id</code> and <code>patient_id</code>. Use these to link the case in your system. GET is optional — only needed if you want full patient details or the offering list at creation time.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— fetch full case details including patient and offerings</span>
+    <span class="text-muted" style="font-size:.75rem">— optional: fetch full patient record and offering details</span>
 </div>
 </div>
 </div>
@@ -332,10 +336,14 @@ def webhook():
   "timestamp":  1751539201
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-waiting')">Copy</button>
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>Pushed to your server.</strong> This event is informational — the payload confirms the case is now in the clinician queue. No action is required. GET is optional.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— confirm case status; no action required on this event</span>
+    <span class="text-muted" style="font-size:.75rem">— optional: confirm queue position or fetch full case details</span>
 </div>
 </div>
 </div>
@@ -355,6 +363,10 @@ def webhook():
   "timestamp":  1751539260
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-assigned')">Copy</button>
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Clinician details are NOT in this payload.</strong> The payload only confirms the status change. To display the clinician's name, NPI, and credentials to your patient, call GET after receiving this event.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
@@ -380,7 +392,11 @@ def webhook():
   "timestamp":        1751539800
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-support')">Copy</button>
-<div class="alert alert-info mt-3 mb-2 small">
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>Pushed to your server.</strong> Both <code>support_note</code> and <code>escalation_target</code> are in the payload above — no pull needed to surface the escalation to your team. GET is optional (for full case context only).
+</div>
+<div class="alert alert-info mt-0 mb-2 small">
     <i class="bi bi-info-circle me-1"></i>
     <strong><code>escalation_target</code></strong> tells you who the clinician needs a response from:
     <ul class="mb-0 mt-1">
@@ -525,10 +541,14 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":  1751540100
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-processing')">Copy</button>
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>Pushed to your server.</strong> The payload confirms the case has entered fulfilment. GET is optional — use it only if you need order or tracking details at this point (a separate <code>tracking_number_changed</code> event fires when tracking is assigned).
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— fetch current order and tracking details</span>
+    <span class="text-muted" style="font-size:.75rem">— optional: fetch current order and tracking details</span>
 </div>
 </div>
 </div>
@@ -548,10 +568,14 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":  1751599200
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-completed')">Copy</button>
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>Pushed to your server.</strong> Completion is confirmed in the payload. If you already handled <code>prescription_written</code>, you have all the clinical data — this event is the final signal to close the case in your system. GET is optional (for audit logs only).
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— fetch final case record for your own records or audit log</span>
+    <span class="text-muted" style="font-size:.75rem">— optional: fetch final case record for your own audit log</span>
 </div>
 </div>
 </div>
@@ -571,6 +595,10 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":  1751540500
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-cancelled')">Copy</button>
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong><code>cancellation_reason</code> is NOT in this payload.</strong> The payload only confirms the case was cancelled. To display or log why it was cancelled, call GET to read the <code>cancellation_reason</code> field from the case record.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
@@ -591,10 +619,14 @@ if (is_array($payload['diagnoses'])) {
   "timestamp": 1751541000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-note')">Copy</button>
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Note content is NOT in this payload (PHI exclusion).</strong> The payload is intentionally minimal — only the <code>case_id</code> is sent. Call GET to retrieve the clinical note body. This is a required pull for this event.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— note content is not in the payload (PHI); retrieve from the case response</span>
+    <span class="text-muted" style="font-size:.75rem">— retrieve the clinical note content</span>
 </div>
 </div>
 </div>
@@ -612,6 +644,10 @@ if (is_array($payload['diagnoses'])) {
   "timestamp": 1751541300
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-msg')">Copy</button>
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Message body is NOT in this payload.</strong> The payload identifies who sent a message and to which case, but the body is excluded. Call GET to retrieve the message text and display it to the patient. This is a required pull for this event.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
@@ -633,10 +669,14 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":  1751541400
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-msg')">Copy</button>
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Message body is NOT in this payload.</strong> The <code>message_id</code> confirms delivery, but the body is excluded. Call GET to retrieve the full message text for display or logging. This is a required pull if you need the content.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
-    <span class="text-muted" style="font-size:.75rem">— confirm delivery and view full message thread</span>
+    <span class="text-muted" style="font-size:.75rem">— retrieve the full message body and thread</span>
 </div>
 </div>
 </div>
@@ -655,14 +695,18 @@ if (is_array($payload['diagnoses'])) {
   "timestamp": 1751599000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-order')">Copy</button>
-<div class="alert alert-warning mt-2 mb-2 small">
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>Pushed to your server.</strong> The new <code>order_id</code> and <code>status</code> are in the payload — update your order record directly. GET is optional.
+</div>
+<div class="alert alert-warning mt-0 mb-2 small">
     <i class="bi bi-exclamation-triangle me-1"></i>
     <code>case_id</code> is present when triggered by a status update but <strong>omitted</strong> when triggered by a cancel action. Always guard for its absence before using it.
 </div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— fetch order list and current fulfillment status</span>
+    <span class="text-muted" style="font-size:.75rem">— optional: fetch full order list and fulfillment status</span>
 </div>
 </div>
 </div>
@@ -680,10 +724,14 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":       1751599100
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-tracking')">Copy</button>
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>No pull needed.</strong> The <code>tracking_number</code> is in the payload — display it directly to the patient without any API call. GET is optional (for the full order record only).
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— tracking number is in the payload above; call this for the full order record if needed</span>
+    <span class="text-muted" style="font-size:.75rem">— optional: fetch the full order record if needed</span>
 </div>
 </div>
 </div>
@@ -700,7 +748,11 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":  1751599300
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-modified')">Copy</button>
-<div class="alert alert-info mt-3 mb-0 small">
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Updated fields are NOT listed in this payload.</strong> Only the <code>patient_id</code> is sent. To see what changed (e.g. updated <code>id_verified_status</code>), call GET to read the current patient record.
+</div>
+<div class="alert alert-info mt-0 mb-0 small">
     <i class="bi bi-shield-check me-1"></i>
     <strong>Vouched / async IDV:</strong> The most common reason to call <code>PATCH /api/partner/patients/{uuid}</code> is to push a Vouched identity-verification result after it resolves. Send <code>{ "id_verified_status": "verified", "id_verified_at": "…" }</code> — the portal immediately re-classifies all open cases for that patient and this <code>patient_modified</code> event fires as confirmation.
     Accepted values for <code>id_verified_status</code>: <code>verified</code> (triage unaffected), <code>pending</code> (Yellow triage), <code>failed</code> (Red hard stop).
@@ -725,6 +777,10 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":  1751599350
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-created')">Copy</button>
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Full patient data is NOT in this payload.</strong> Only the <code>patient_id</code> is sent as a reference. Call GET to retrieve the full patient record and link it to your system.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/patients/{patient_id}</code>
@@ -745,7 +801,11 @@ if (is_array($payload['diagnoses'])) {
   "timestamp":  1751599400
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-patient-deleted')">Copy</button>
-<div class="alert alert-info mt-2 mb-0 small">
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>No pull needed.</strong> The payload confirms the deletion. The record is soft-deleted and no longer accessible via the API — any GET call will return 404. Mark this patient as inactive in your system.
+</div>
+<div class="alert alert-info mt-0 mb-0 small">
     <i class="bi bi-info-circle me-1"></i>
     The patient record is <strong>soft-deleted</strong> — it is no longer accessible via the API but data is retained for audit purposes. Any open cases for this patient should be considered stale.
 </div>
