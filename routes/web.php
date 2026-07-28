@@ -316,6 +316,9 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     // Audit Log — read-only record of all admin-initiated model changes
     Route::get('/audit-log', [AdminAuditLogController::class, 'index'])->name('audit-log.index');
 
+    // All-users roster — one place to see every user across all roles
+    Route::get('/users', [\App\Http\Controllers\Web\Admin\UserRosterController::class, 'index'])->name('users.index');
+
     // Triage Rule Set — per-questionnaire disqualifier rules
     Route::prefix('triage-rules')->name('triage-rules.')->group(function () {
         Route::get('/', [AdminTriageRuleController::class, 'index'])->name('index');

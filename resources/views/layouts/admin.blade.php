@@ -9,7 +9,7 @@
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*');
-    $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*');
+    $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*', 'admin.users.*');
 @endphp
 
 <div class="mt-1 pb-3">
@@ -214,7 +214,11 @@
     </button>
     <div class="collapse {{ $superActive ? 'show' : '' }}" id="snav-super">
 
-        <a class="nav-link {{ request()->routeIs('admin.admins.*') ? 'active' : '' }}"
+        <a class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}"
+           href="{{ route('admin.users.index') }}">
+            <i class="bi bi-people"></i> All Users
+        </a>
+        <a class="nav-link sub {{ request()->routeIs('admin.admins.*') ? 'active' : '' }}"
            href="{{ route('admin.admins.index') }}">
             <i class="bi bi-shield-lock"></i> Admin Users
         </a>
