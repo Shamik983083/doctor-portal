@@ -64,10 +64,11 @@ class LoginController extends Controller
     private function redirectAfterLogin(): string
     {
         $user = Auth::user();
-        if ($user->hasRole('super_admin')) return '/admin/dashboard';
-        if ($user->hasRole('admin'))       return '/admin/dashboard';
-        if ($user->hasRole('clinician'))   return '/clinician/dashboard';
-        if ($user->hasRole('partner'))     return '/partner/dashboard';
+        if ($user->hasRole('super_admin'))   return '/admin/dashboard';
+        if ($user->hasRole('admin'))         return '/admin/dashboard';
+        if ($user->hasRole('clinician'))     return '/clinician/dashboard';
+        if ($user->hasRole('partner'))       return '/partner/dashboard';
+        if ($user->hasRole('support_staff')) return '/support/dashboard';
         return '/login';
     }
 }

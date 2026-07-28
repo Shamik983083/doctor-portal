@@ -28,6 +28,8 @@ use App\Http\Controllers\Web\Partner\OfferingController as PartnerOfferingContro
 use App\Http\Controllers\Web\Partner\PatientController as PartnerPatientController;
 use App\Http\Controllers\Web\Partner\CaseController as PartnerCaseController;
 use App\Http\Controllers\Web\Partner\CredentialController as PartnerCredentialController;
+use App\Http\Controllers\Web\Support\DashboardController as SupportDashboard;
+use App\Http\Controllers\Web\Support\CaseController as SupportCaseController;
 use Illuminate\Support\Facades\Route;
 
 // Auth
@@ -430,4 +432,17 @@ Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])
     Route::post('/webhooks', [PartnerCredentialController::class, 'storeWebhook'])->name('webhooks.store');
     Route::patch('/webhooks/{id}', [PartnerCredentialController::class, 'updateWebhook'])->name('webhooks.update');
     Route::delete('/webhooks/{id}', [PartnerCredentialController::class, 'destroyWebhook'])->name('webhooks.destroy');
+});
+
+// Support Staff Portal
+Route::prefix('support')->middleware(['auth', 'role:support_staff'])->name('support.')->group(function () {
+    Route::get('/dashboard', [SupportDashboard::class, 'index'])->name('dashboard');
+
+    Route::prefix('cases')->name('cases.')->group(function () {
+        Route::get('/', [SupportCaseController::class, 'index'])->name('index');
+        // Named literal before /{uuid} so 'search' is never read as a uuid
+        Route::get('/{uuid}', [SupportCaseController::class, 'show'])->name('show');
+        Route::post('/{uuid}/messages', [SupportCaseController::class, 'sendMessage'])->name('messages.store');
+        Route::post('/{uuid}/escalate', [SupportCaseController::class, 'escalate'])->name('escalate');
+    });
 });

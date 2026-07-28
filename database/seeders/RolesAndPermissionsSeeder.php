@@ -87,5 +87,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'view orders',
             'manage webhooks',
         ]);
+
+        /*
+         * Support staff triage the support queue: they see cases in the support
+         * state, communicate with patients, and escalate to a clinician. They
+         * cannot prescribe, cannot touch routing, and cannot see or manage the
+         * platform configuration.
+         *
+         * Intentionally separate from the syncPermissions blocks above: re-running
+         * this seeder must not accidentally demote admin/clinician permissions
+         * while adding this new role.
+         */
+        $supportStaffRole = Role::firstOrCreate(['name' => 'support_staff']);
+        $supportStaffRole->syncPermissions([
+            'view cases', 'view patients', 'send messages',
+        ]);
     }
 }
