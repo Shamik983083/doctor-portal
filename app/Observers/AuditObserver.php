@@ -5,8 +5,12 @@ namespace App\Observers;
 use App\Models\AuditLog;
 use App\Models\Clinician;
 use App\Models\Offering;
+use App\Models\OfferingCategory;
 use App\Models\Partner;
 use App\Models\PatientCase;
+use App\Models\Setting;
+use App\Models\SlaPolicy;
+use App\Models\StateVisitRequirement;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -153,12 +157,16 @@ class AuditObserver
     private function resolveLabel(Model $model): string
     {
         return match (true) {
-            $model instanceof PatientCase => 'Case ' . ($model->uuid ?? "#{$model->id}"),
-            $model instanceof Clinician   => $model->user?->name ?? "Clinician #{$model->id}",
-            $model instanceof Partner     => $model->name ?? "Partner #{$model->id}",
-            $model instanceof User        => trim("{$model->name} ({$model->email})"),
-            $model instanceof Offering    => $model->name ?? "Offering #{$model->id}",
-            default                       => class_basename($model) . " #{$model->id}",
+            $model instanceof PatientCase          => 'Case ' . ($model->uuid ?? "#{$model->id}"),
+            $model instanceof Clinician            => $model->user?->name ?? "Clinician #{$model->id}",
+            $model instanceof Partner              => $model->name ?? "Partner #{$model->id}",
+            $model instanceof User                 => trim("{$model->name} ({$model->email})"),
+            $model instanceof Offering             => $model->name ?? "Offering #{$model->id}",
+            $model instanceof OfferingCategory     => $model->name ?? "Category #{$model->id}",
+            $model instanceof Setting              => $model->label ?? $model->key ?? "Setting #{$model->id}",
+            $model instanceof StateVisitRequirement=> "State rule #{$model->id}",
+            $model instanceof SlaPolicy            => $model->name ?? "SlaPolicy #{$model->id}",
+            default                                => class_basename($model) . " #{$model->id}",
         };
     }
 

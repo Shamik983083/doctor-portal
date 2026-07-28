@@ -70,6 +70,10 @@ class AuditLog extends Model
 
     public static function auditableTypes(): array
     {
-        return ['PatientCase', 'Clinician', 'Partner', 'User', 'Offering'];
+        return [
+            'PatientCase', 'Clinician', 'Partner', 'User', 'Offering',
+            'OfferingCategory', 'Setting', 'StateVisitRequirement',
+            'SlaPolicy', 'RoutingPolicy',
+        ];
     }
 }
