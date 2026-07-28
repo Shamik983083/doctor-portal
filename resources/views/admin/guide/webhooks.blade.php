@@ -426,7 +426,7 @@ def webhook():
 <div id="ev-prescription-written" class="card mb-3 section-anchor border-success">
 <div class="card-header py-2 d-flex align-items-center gap-2 bg-success bg-opacity-10">
     <span class="event-badge" style="background:#d1fae5;border-color:#6ee7b7;color:#065f46">prescription_written</span>
-    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, SIG, and full medication details</span>
+    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, SIG, full medication details, and the <code>offerings</code> array with <code>product_key</code> and <code>month_frequency</code></span>
 </div>
 <div class="card-body">
 <p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is now a structured array of ICD-10-CM codes (auto-populated from the patient's intake), and each medication includes a <code>sig</code> field with the resolved dispensing instructions for this partner.</p>
@@ -464,6 +464,17 @@ def webhook():
       }
     }
   ],
+
+  // One entry per offering on the case. Use product_key to map back to your
+  // catalogue entry and month_frequency to identify the billing cycle.
+  "offerings": [
+    {
+      "offering_id":     "b3f8e1a2-...",   // MEDAXIS offering UUID
+      "product_key":     "glp1-monthly",   // your product identifier
+      "month_frequency": 1                 // billing cycle in months
+    }
+  ],
+
   "timestamp": 1751540001
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-rx')">Copy</button>
