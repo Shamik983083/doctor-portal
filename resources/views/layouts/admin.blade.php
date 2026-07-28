@@ -197,7 +197,7 @@
         </a>
         <a class="nav-link {{ request()->routeIs('admin.routing.sla') ? 'active' : '' }}"
            href="{{ route('admin.routing.sla') }}">
-            <i class="bi bi-speedometer2"></i> Doctor SLA
+            <i class="bi bi-speedometer2"></i> Provider Pull SLA
         </a>
 
     </div>

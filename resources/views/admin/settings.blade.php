@@ -16,8 +16,8 @@
                     <i class="bi bi-clock-history" style="color:#4361ee;font-size:1rem;"></i>
                 </div>
                 <div>
-                    <h6 class="mb-0 fw-semibold">SLA Configuration</h6>
-                    <p class="text-muted mb-0" style="font-size:.72rem;">Service Level Agreement deadlines for case processing</p>
+                    <h6 class="mb-0 fw-semibold">Case SLA Targets</h6>
+                    <p class="text-muted mb-0" style="font-size:.72rem;">House deadlines for case pickup, review, and end-to-end completion</p>
                 </div>
             </div>
             <div class="card-body p-4">
@@ -106,7 +106,7 @@
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom py-3">
-                <h6 class="mb-0 fw-semibold">How SLA Works</h6>
+                <h6 class="mb-0 fw-semibold">How Case SLA Targets Work</h6>
             </div>
             <div class="card-body p-4">
 

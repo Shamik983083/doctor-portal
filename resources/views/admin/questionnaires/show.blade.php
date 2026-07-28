@@ -34,6 +34,7 @@ $typeMap = [
     <a href="{{ route('admin.questionnaires.index') }}" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
     </a>
+    @unless(auth()->user()->isDoctorAdmin())
     <div class="d-flex gap-2">
         <a href="{{ route('admin.questionnaires.edit', $questionnaire->id) }}" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-pencil me-1"></i>Edit
@@ -44,6 +45,7 @@ $typeMap = [
             <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
         </form>
     </div>
+    @endunless
 </div>
 
 

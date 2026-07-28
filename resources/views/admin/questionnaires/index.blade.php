@@ -25,9 +25,11 @@
                     <a href="{{ route('admin.questionnaires.index') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
                 @endif
             </form>
+            @unless(auth()->user()->isDoctorAdmin())
             <a href="{{ route('admin.questionnaires.create') }}" class="btn btn-sm btn-primary">
                 <i class="bi bi-plus-lg me-1"></i>New Questionnaire
             </a>
+            @endunless
         </div>
     </div>
 
@@ -76,12 +78,14 @@
                         <td class="text-end">
                             <div class="d-flex gap-1 justify-content-end">
                                 <a href="{{ route('admin.questionnaires.show', $q->id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                                @unless(auth()->user()->isDoctorAdmin())
                                 <a href="{{ route('admin.questionnaires.edit', $q->id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
                                 <form method="POST" action="{{ route('admin.questionnaires.destroy', $q->id) }}"
                                       onsubmit="return confirm('Delete this questionnaire?')">
                                     @csrf @method('DELETE')
                                     <button class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
+                                @endunless
                             </div>
                         </td>
                     </tr>

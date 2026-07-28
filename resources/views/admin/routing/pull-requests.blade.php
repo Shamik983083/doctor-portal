@@ -20,7 +20,7 @@
         </p>
     </div>
     <div>
-        <a href="{{ route('admin.routing.sla') }}" class="btn btn-outline-secondary btn-sm">SLA settings</a>
+        <a href="{{ route('admin.routing.sla') }}" class="btn btn-outline-secondary btn-sm">Provider Pull SLA</a>
         <a href="{{ route('admin.routing.exceptions') }}" class="btn btn-outline-secondary btn-sm">Exceptions</a>
     </div>
 </div>

@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'SLA Settings')
+@section('title', 'Provider Pull SLA')
 
 @section('content')
 {{--
@@ -15,7 +15,7 @@
 --}}
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
-        <h4 class="fw-semibold mb-1">SLA Settings</h4>
+        <h4 class="fw-semibold mb-1">Provider Pull SLA</h4>
         <p class="text-muted small mb-0">
             Your standard for the doctors you are over. It applies when one of them asks the pool for
             more cases while behind on the work they already hold.
@@ -29,7 +29,7 @@
     case being assigned to them, and never blocks a check-in going back to the doctor who treated
     that patient before. Care routes; requests for more of it are what get held.
     <div class="mt-2">
-        Not to be confused with <a href="{{ route('admin.settings') }}">SLA Settings</a>, which are the
+        Not to be confused with <a href="{{ route('admin.settings') }}">Case SLA Targets</a>, which are the
         house targets for how fast a case should be picked up and reviewed. Those measure cases. This
         measures a doctor, and only when they ask for more.
     </div>
@@ -37,7 +37,7 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h6 class="fw-semibold mb-3">Your SLA</h6>
+        <h6 class="fw-semibold mb-3">Your Provider Pull SLA</h6>
 
         <form method="POST" action="{{ route('admin.routing.sla.store') }}">
             @csrf
@@ -131,7 +131,7 @@
 
 @if($policies->count() > 1 || (auth()->user()?->isSuperAdmin() && $policies->isNotEmpty()))
 <div class="card">
-    <div class="card-header bg-white fw-semibold">All SLA policies</div>
+    <div class="card-header bg-white fw-semibold">All Provider Pull SLA policies</div>
     <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
             <thead class="table-light">

@@ -202,14 +202,20 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     });
 
     // Questionnaires
+    // READ open to both admin tiers; WRITE restricted to super_admin (Doctor Admin is view-only).
+    // GET /create must be registered before GET /{id} so the literal "create" is not captured as an id.
     Route::prefix('questionnaires')->name('questionnaires.')->group(function () {
         Route::get('/', [AdminQuestionnaireController::class, 'index'])->name('index');
-        Route::get('/create', [AdminQuestionnaireController::class, 'create'])->name('create');
-        Route::post('/', [AdminQuestionnaireController::class, 'store'])->name('store');
+        Route::get('/create', [AdminQuestionnaireController::class, 'create'])
+            ->middleware('role:super_admin')->name('create');
         Route::get('/{id}', [AdminQuestionnaireController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [AdminQuestionnaireController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [AdminQuestionnaireController::class, 'update'])->name('update');
-        Route::delete('/{id}', [AdminQuestionnaireController::class, 'destroy'])->name('destroy');
+
+        Route::middleware('role:super_admin')->group(function () {
+            Route::post('/', [AdminQuestionnaireController::class, 'store'])->name('store');
+            Route::get('/{id}/edit', [AdminQuestionnaireController::class, 'edit'])->name('edit');
+            Route::put('/{id}', [AdminQuestionnaireController::class, 'update'])->name('update');
+            Route::delete('/{id}', [AdminQuestionnaireController::class, 'destroy'])->name('destroy');
+        });
     });
 
     // Offerings
