@@ -436,7 +436,7 @@ def webhook():
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-approved')">Copy</button>
 <div class="alert alert-success mt-3 mb-2 small">
     <i class="bi bi-broadcast me-1"></i>
-    <strong>No pull needed for prescriptions.</strong> When the clinician approves via the Prescribe form, a <strong><code>prescription_written</code></strong> event fires immediately after — the full medication list, diagnoses, NPI, and <code>offerings</code> are in that payload. You do <strong>not</strong> need to call our API to get prescription data.
+    <strong>No pull needed for prescriptions.</strong> When the clinician approves via the Prescribe form, a <strong><code>prescription_written</code></strong> event fires immediately after — the full medication list, diagnoses, NPI, <code>product_key</code>, and <code>month_frequency</code> are all inside each medication object in that payload. You do <strong>not</strong> need to call our API to get prescription data.
 </div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
@@ -450,7 +450,7 @@ def webhook():
 <div id="ev-prescription-written" class="card mb-3 section-anchor border-success">
 <div class="card-header py-2 d-flex align-items-center gap-2 bg-success bg-opacity-10">
     <span class="event-badge" style="background:#d1fae5;border-color:#6ee7b7;color:#065f46">prescription_written</span>
-    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, SIG, full medication details, and the <code>offerings</code> array with <code>product_key</code> and <code>month_frequency</code></span>
+    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, SIG, full medication details with <code>offering_id</code>, <code>product_key</code>, and <code>month_frequency</code> per medication</span>
 </div>
 <div class="card-body">
 <p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is now a structured array of ICD-10-CM codes (auto-populated from the patient's intake), and each medication includes a <code>sig</code> field with the resolved dispensing instructions for this partner.</p>
@@ -471,6 +471,9 @@ def webhook():
   "meds_prescribed": [
     {
       "name":                "Semaglutide",
+      "offering_id":         "b3f8e1a2-...",   // MEDAXIS offering UUID
+      "product_key":         "glp1-monthly",   // your product identifier — use to map to your catalogue
+      "month_frequency":     1,                // billing cycle in months
       "compound_formula":    "Semaglutide 0.5mg/mL in bacteriostatic water",
       // sig: resolved dispensing instructions — partner-specific override when set,
       //      otherwise the offering's default SIG. null when not configured.
@@ -486,16 +489,6 @@ def webhook():
         "term":       "3M",
         "months":     ["0.25 mg", "0.5 mg", "1.0 mg"]
       }
-    }
-  ],
-
-  // One entry per offering on the case. Use product_key to map back to your
-  // catalogue entry and month_frequency to identify the billing cycle.
-  "offerings": [
-    {
-      "offering_id":     "b3f8e1a2-...",   // MEDAXIS offering UUID
-      "product_key":     "glp1-monthly",   // your product identifier
-      "month_frequency": 1                 // billing cycle in months
     }
   ],
 
@@ -822,7 +815,7 @@ if (is_array($payload['diagnoses'])) {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Endpoint must be <strong>HTTPS</strong> and publicly reachable; respond with <code>200</code> within 10 seconds</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify <code>X-Webhook-Signature</code> on <strong>every</strong> incoming request using a constant-time comparison</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Route by <code>X-Event-Type</code> header — do not rely solely on payload fields to identify the event</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — read <code>offerings[].product_key</code> and <code>month_frequency</code> to map back to your catalogue</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> now includes <code>offering_id</code>, <code>product_key</code>, and <code>month_frequency</code> directly; use <code>product_key</code> to map each medication back to your catalogue</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and respond via API or portal</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>message_created</code></strong> — check <code>sender</code>: <code>clinician</code> = doctor message, <code>support</code> = support team message</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Make your handler <strong>idempotent</strong> — the same event may be delivered more than once on retry</li>
