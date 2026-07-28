@@ -8,12 +8,16 @@ use App\Models\Clinician;
 use App\Models\Message;
 use App\Models\PatientCase;
 use App\Services\CaseStateMachine;
+use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class CaseController extends Controller
 {
-    public function __construct(private CaseStateMachine $stateMachine) {}
+    public function __construct(
+        private CaseStateMachine  $stateMachine,
+        private WebhookDispatcher $webhooks,
+    ) {}
 
     public function index(Request $request)
     {
@@ -74,6 +78,12 @@ class CaseController extends Controller
         } catch (\Throwable $e) {
             Log::warning('Reverb broadcast failed for support message '.$message->id.': '.$e->getMessage());
         }
+
+        $this->webhooks->dispatch($case->partner_id, 'message_created', [
+            'case_id'   => $case->uuid,
+            'sender'    => 'support',
+            'timestamp' => now()->timestamp,
+        ]);
 
         return back()->with('success', 'Message sent.');
     }

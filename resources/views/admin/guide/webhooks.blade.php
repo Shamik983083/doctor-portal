@@ -368,7 +368,7 @@ def webhook():
   "status":           "support",
   "visit_type":       "asynchronous",
   "escalation_target": "support",       // who the escalation is directed at (see below)
-  "escalation_reason": "Need lab confirmation before prescribing",  // omitted when blank
+  "support_note":     "Need lab confirmation before prescribing",   // omitted when blank
   "timestamp":        1751539800
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-support')">Copy</button>
@@ -385,7 +385,7 @@ def webhook():
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— read the <code>support_note</code> the clinician left</span>
+    <span class="text-muted" style="font-size:.75rem">— <code>support_note</code> is also in the payload above; call this for full case context</span>
 </div>
 <div class="endpoint-row mt-1">
     <span class="method-pill method-post">POST</span>
@@ -595,12 +595,12 @@ if (is_array($payload['diagnoses'])) {
 <div id="ev-message-created" class="card mb-3 section-anchor">
 <div class="card-header py-2 d-flex align-items-center gap-2">
     <span class="event-badge">message_created</span>
-    <span class="text-muted small">Clinician sent a message to the patient/partner on this case</span>
+    <span class="text-muted small">A portal user sent a message to the patient — <code>sender</code> identifies who</span>
 </div>
 <div class="card-body">
 <pre id="code-ev-msg">{
   "case_id":   "9d2f1c3e-...",
-  "sender":    "clinician",
+  "sender":    "clinician",   // "clinician" or "support"
   "timestamp": 1751541300
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-msg')">Copy</button>
@@ -754,8 +754,9 @@ if (is_array($payload['diagnoses'])) {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Endpoint must be <strong>HTTPS</strong> and publicly reachable; respond with <code>200</code> within 10 seconds</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify <code>X-Webhook-Signature</code> on <strong>every</strong> incoming request using a constant-time comparison</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Route by <code>X-Event-Type</code> header — do not rely solely on payload fields to identify the event</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> to get clinician name, NPI, and medication list</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — fetch the <code>support_note</code> and notify your team; respond via API or portal</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — read <code>offerings[].product_key</code> and <code>month_frequency</code> to map back to your catalogue</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and respond via API or portal</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>message_created</code></strong> — check <code>sender</code>: <code>clinician</code> = doctor message, <code>support</code> = support team message</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Make your handler <strong>idempotent</strong> — the same event may be delivered more than once on retry</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Return <code>200</code> immediately, then process asynchronously — do not do heavy work before responding</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Push Vouched IDV results via <code>PATCH /api/partner/patients/{uuid}</code> with <code>id_verified_status</code> = <code>verified</code> / <code>failed</code> / <code>pending</code> — you will receive a <code>patient_modified</code> event as confirmation and open cases re-triage automatically</li>

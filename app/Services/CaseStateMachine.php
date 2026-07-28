@@ -227,8 +227,11 @@ class CaseStateMachine
 
         if ($status === PatientCase::STATUS_SUPPORT) {
             $payload['escalation_target'] = $case->escalation_target;
-            if ($case->escalation_reason) {
-                $payload['escalation_reason'] = $case->escalation_reason;
+            // support_note is the populated field; escalation_reason was planned
+            // but never wired — fall back so partners always get the note.
+            $note = $case->support_note ?: $case->escalation_reason;
+            if ($note) {
+                $payload['support_note'] = $note;
             }
         }
 
