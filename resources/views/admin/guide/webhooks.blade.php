@@ -283,6 +283,14 @@ def webhook():
 <div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">5</span>All Events</div>
 <div class="card-body pb-0">
 <p class="mb-3 small text-muted">Use the <code>X-Event-Type</code> header to route each delivery to the correct handler. All timestamps are Unix seconds (UTC).</p>
+
+<div class="alert alert-primary border-0 mb-3 small">
+    <strong><i class="bi bi-arrow-left-right me-1"></i>Push vs Pull — understand the two directions:</strong>
+    <ul class="mb-0 mt-2">
+        <li><strong>MEDAXIS → Your server (push):</strong> We POST webhook events to your registered URL (<code>{{ $webhookUrl ?? 'https://your-site.com/webhooks/medaxis' }}</code>). The payload contains everything you need — <strong>no polling required</strong>. For prescription events, the full medication list, diagnoses, and offerings are in the payload itself.</li>
+        <li class="mt-1"><strong>Your server → MEDAXIS (pull):</strong> The <code>GET {{ $base }}/api/partner/…</code> endpoints shown below are <strong>optional fallbacks</strong> — use them only if you need additional context not in the payload, or to re-fetch data after a missed delivery.</li>
+    </ul>
+</div>
 </div>
 </div>
 
@@ -410,14 +418,14 @@ def webhook():
   "timestamp":  1751540000
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-approved')">Copy</button>
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-broadcast me-1"></i>
+    <strong>No pull needed for prescriptions.</strong> When the clinician approves via the Prescribe form, a <strong><code>prescription_written</code></strong> event fires immediately after — the full medication list, diagnoses, NPI, and <code>offerings</code> are in that payload. You do <strong>not</strong> need to call our API to get prescription data.
+</div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— fetch full case and prescription details</span>
-</div>
-<div class="alert alert-info mt-2 mb-0 small">
-    <i class="bi bi-info-circle me-1"></i>
-    When the clinician approves <em>via the Prescribe form</em>, you also receive a separate <strong><code>prescription_written</code></strong> event (see below) which includes the full medication list, doctor name, and NPI. Listen for that event for prescription details.
+    <span class="text-muted" style="font-size:.75rem">— optional: fetch full case record if you need additional context beyond the payload</span>
 </div>
 </div>
 </div>
