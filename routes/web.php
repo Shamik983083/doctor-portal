@@ -183,6 +183,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         // B4: Doctor Admin bulk case reassignment by provider
         Route::get('/bulk-reassign',  [AdminClinicianController::class, 'bulkReassign'])->name('bulk-reassign');
         Route::post('/bulk-reassign', [AdminClinicianController::class, 'bulkReassignSubmit'])->name('bulk-reassign.submit');
+        // DA3: Provider workload overview
+        Route::get('/workload', [AdminClinicianController::class, 'workload'])->name('workload');
         // Priority management · must be before /{id} wildcard
         Route::get('/priority', [AdminClinicianController::class, 'priorityIndex'])->name('priority');
         Route::patch('/reorder', [AdminClinicianController::class, 'reorder'])->name('reorder');

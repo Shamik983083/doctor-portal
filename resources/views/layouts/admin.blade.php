@@ -52,9 +52,13 @@
             <i class="bi bi-building"></i> Partners
         </a>
         @endrole
-        <a class="nav-link {{ request()->routeIs('admin.clinicians.*') && !request()->routeIs('admin.clinicians.priority') && !request()->routeIs('admin.clinicians.bulk-reassign*') ? 'active' : '' }}"
+        <a class="nav-link {{ request()->routeIs('admin.clinicians.*') && !request()->routeIs('admin.clinicians.priority') && !request()->routeIs('admin.clinicians.bulk-reassign*') && !request()->routeIs('admin.clinicians.workload') ? 'active' : '' }}"
            href="{{ route('admin.clinicians.index') }}">
             <i class="bi bi-person-badge"></i> Clinicians
+        </a>
+        <a class="nav-link sub {{ request()->routeIs('admin.clinicians.workload') ? 'active' : '' }}"
+           href="{{ route('admin.clinicians.workload') }}">
+            <i class="bi bi-bar-chart-steps"></i> Provider Workload
         </a>
         <a class="nav-link sub {{ request()->routeIs('admin.clinicians.priority') ? 'active' : '' }}"
            href="{{ route('admin.clinicians.priority') }}">

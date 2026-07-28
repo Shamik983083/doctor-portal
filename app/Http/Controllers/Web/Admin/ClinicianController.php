@@ -240,6 +240,61 @@ class ClinicianController extends Controller
     }
 
     /**
+     * DA3: Provider workload — active case counts across all doctors in scope,
+     * grouped by status, with capacity bars and a quick "Reassign" entry point.
+     */
+    public function workload(Request $request)
+    {
+        $user = $request->user();
+
+        $clinicians = Clinician::visibleTo($user)
+            ->with('user')
+            ->get();
+
+        $clinicianIds = $clinicians->pluck('id');
+
+        // One query: active case counts per clinician per status
+        $countRows = PatientCase::whereIn('clinician_id', $clinicianIds)
+            ->whereIn('status', [
+                PatientCase::STATUS_WAITING,
+                PatientCase::STATUS_ASSIGNED,
+                PatientCase::STATUS_SUPPORT,
+                PatientCase::STATUS_APPROVED,
+                PatientCase::STATUS_PROCESSING,
+            ])
+            ->selectRaw('clinician_id, status, COUNT(*) as count')
+            ->groupBy('clinician_id', 'status')
+            ->get();
+
+        // Map: clinician_id => [status => count]. Initialise every ID so
+        // doctors with zero active cases still appear in the table.
+        $byStatus = [];
+        foreach ($clinicianIds as $id) {
+            $byStatus[$id] = [];
+        }
+        foreach ($countRows as $row) {
+            $byStatus[$row->clinician_id][$row->status] = (int) $row->count;
+        }
+
+        // Completed today (status transitions happen via updated_at on completed rows)
+        $completedToday = PatientCase::whereIn('clinician_id', $clinicianIds)
+            ->where('status', PatientCase::STATUS_COMPLETED)
+            ->whereDate('updated_at', today())
+            ->selectRaw('clinician_id, COUNT(*) as cnt')
+            ->groupBy('clinician_id')
+            ->pluck('cnt', 'clinician_id');
+
+        // Sort: heaviest load at the top so overloaded doctors are immediately visible
+        $clinicians = $clinicians->sortByDesc(function ($c) use ($byStatus) {
+            return array_sum($byStatus[$c->id] ?? []);
+        })->values();
+
+        return view('admin.clinicians.workload', compact(
+            'clinicians', 'byStatus', 'completedToday', 'user'
+        ));
+    }
+
+    /**
      * B4: Bulk-reassign open cases from one clinician to another.
      *
      * Only shows clinicians this admin is over.  The "from" clinician is
