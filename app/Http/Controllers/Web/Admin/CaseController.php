@@ -87,7 +87,7 @@ class CaseController extends Controller
                 'patient', 'partner', 'clinician.user',
                 'diseases',
                 'clinicalNotes.clinician.user',
-                'orders.pharmacy', 'messages', 'files', 'events',
+                'orders.pharmacy', 'messages.user', 'files', 'events',
                 'questionnaireResponses.questionnaire',
                 'questionnaireResponses.answers',
                 'casePrescriptions.clinician.user',

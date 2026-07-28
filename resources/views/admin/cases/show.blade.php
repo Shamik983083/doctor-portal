@@ -14,6 +14,18 @@
         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete Case</button>
     </form>
 </div>
+@if(session('success'))
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+    <i class="bi bi-check-circle me-1"></i>{{ session('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
+@if(session('error'))
+<div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+    <i class="bi bi-exclamation-circle me-1"></i>{{ session('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
 <div class="row g-4">
 
     {{-- Left sidebar --}}
@@ -514,6 +526,55 @@
                     @endforeach
                 </div>
                 @endif
+
+                {{-- Internal: Message Clinician --}}
+                <div class="d-flex align-items-center gap-2 mt-4 mb-3">
+                    <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                    <span style="font-size:.66rem;color:#9b6dff;white-space:nowrap;font-weight:700;letter-spacing:.07em;text-transform:uppercase;">
+                        <i class="bi bi-shield-lock me-1"></i>Internal Channel
+                    </span>
+                    <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                </div>
+
+                @if($case->clinician_id)
+                <div class="rounded-3 p-3" style="background:#f8f0ff;border:1px solid rgba(111,66,193,.2);">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fw-semibold" style="font-size:.82rem;color:#6f42c1;">
+                            <i class="bi bi-chat-square-text me-1"></i>Message Clinician
+                        </span>
+                        <span class="text-muted" style="font-size:.72rem;">
+                            To: <strong>{{ $case->clinician->full_name }}</strong>
+                            &middot; not visible to patient
+                        </span>
+                    </div>
+                    <form method="POST" action="{{ route('admin.messages.send') }}">
+                        @csrf
+                        <input type="hidden" name="case_uuid" value="{{ $case->uuid }}">
+                        <div class="mb-2">
+                            <textarea name="body" rows="3" required maxlength="5000"
+                                      class="form-control form-control-sm"
+                                      placeholder="Write an internal note to the clinician…"
+                                      style="resize:vertical;border-color:rgba(111,66,193,.3);"></textarea>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span class="text-muted" style="font-size:.7rem;">
+                                <i class="bi bi-eye-slash me-1"></i>Only visible to you and the clinician
+                            </span>
+                            <button type="submit" class="btn btn-sm px-3"
+                                    style="background:#6f42c1;color:#fff;border:none;">
+                                <i class="bi bi-send me-1"></i>Send Message
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                @else
+                <div class="rounded-3 px-3 py-2 d-flex align-items-center gap-2"
+                     style="background:#f8f9fa;border:1px solid #e9ecef;font-size:.8rem;">
+                    <i class="bi bi-person-x text-muted"></i>
+                    <span class="text-muted">No clinician assigned — assign one from the left panel to enable internal messaging.</span>
+                </div>
+                @endif
+
             </div>
 
             {{-- Files --}}
