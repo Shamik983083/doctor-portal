@@ -386,6 +386,12 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::delete('/{id}',  [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'destroy'])->name('destroy');
     });
 
+    // Per-partner dashboard — operational view scoped to visibleTo(); open to both admin tiers
+    Route::prefix('partner-dashboard')->name('partner-dashboard.')->group(function () {
+        Route::get('/',    [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'index'])->name('index');
+        Route::get('/{id}',[\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'show'])->name('show');
+    });
+
     // Offering Categories
     Route::prefix('categories')->name('categories.')->group(function () {
         Route::get('/', [AdminOfferingCategoryController::class, 'index'])->name('index');

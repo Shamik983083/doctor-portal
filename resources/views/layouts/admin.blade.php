@@ -5,7 +5,7 @@
     $mgmtActive  = request()->routeIs(
         'admin.cases.*', 'admin.patients.*', 'admin.partners.*',
         'admin.clinicians.*', 'admin.offerings.*', 'admin.categories.*',
-        'admin.questionnaires.*', 'admin.questions.*'
+        'admin.questionnaires.*', 'admin.questions.*', 'admin.partner-dashboard.*'
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*');
@@ -34,6 +34,10 @@
         <a class="nav-link {{ request()->routeIs('admin.cases.*') ? 'active' : '' }}"
            href="{{ route('admin.cases.index') }}">
             <i class="bi bi-folder2-open"></i> Cases
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.partner-dashboard.*') ? 'active' : '' }}"
+           href="{{ route('admin.partner-dashboard.index') }}">
+            <i class="bi bi-building-check"></i> Partner Dashboard
         </a>
         <a class="nav-link {{ request()->routeIs('admin.patients.*') ? 'active' : '' }}"
            href="{{ route('admin.patients.index') }}">
