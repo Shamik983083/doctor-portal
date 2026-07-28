@@ -152,6 +152,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::delete('/{uuid}', [AdminCaseController::class, 'destroy'])->name('destroy');
     });
 
+    // DA2: Escalations — all cases currently in 'support' status, visible to this admin.
+    // Available to both admin tiers; visibleTo() scoping is enforced inside the controller.
+    Route::get('/escalations', [\App\Http\Controllers\Web\Admin\EscalationController::class, 'index'])->name('escalations.index');
+
     // Partners (Super Admin only). Storefronts carry their own Healthie
     // credentials, so this is an integration surface, not an operational one.
     // Devin msg 2117: "All API integrations etc should be a super admin function."

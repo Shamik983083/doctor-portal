@@ -5,7 +5,8 @@
     $mgmtActive  = request()->routeIs(
         'admin.cases.*', 'admin.patients.*', 'admin.partners.*',
         'admin.clinicians.*', 'admin.offerings.*', 'admin.categories.*',
-        'admin.questionnaires.*', 'admin.questions.*', 'admin.partner-dashboard.*'
+        'admin.questionnaires.*', 'admin.questions.*', 'admin.partner-dashboard.*',
+        'admin.escalations.*'
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*');
@@ -34,6 +35,14 @@
         <a class="nav-link {{ request()->routeIs('admin.cases.*') ? 'active' : '' }}"
            href="{{ route('admin.cases.index') }}">
             <i class="bi bi-folder2-open"></i> Cases
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.escalations.*') ? 'active' : '' }}"
+           href="{{ route('admin.escalations.index') }}">
+            <i class="bi bi-exclamation-triangle"></i> Escalations
+            @php $openEscalationCount = \App\Models\PatientCase::visibleTo(auth()->user())->where('status', 'support')->count(); @endphp
+            @if($openEscalationCount > 0)
+                <span class="badge bg-warning text-dark ms-auto" style="font-size:.6rem;">{{ $openEscalationCount }}</span>
+            @endif
         </a>
         <a class="nav-link {{ request()->routeIs('admin.partner-dashboard.*') ? 'active' : '' }}"
            href="{{ route('admin.partner-dashboard.index') }}">
