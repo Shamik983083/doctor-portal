@@ -217,7 +217,9 @@ $typeMap = [
             <div class="text-center text-muted py-5">
                 <i class="bi bi-ui-checks fs-2 d-block mb-2 opacity-25"></i>
                 No questions yet.
+                @unless(auth()->user()->isDoctorAdmin())
                 <a href="{{ route('admin.questionnaires.edit', $questionnaire->id) }}">Add some</a>.
+                @endunless
             </div>
             @endforelse
         </div>

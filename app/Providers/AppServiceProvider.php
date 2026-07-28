@@ -9,8 +9,13 @@ use App\Contracts\SmsAdapter;
 use App\Models\Clinician;
 use App\Models\Message;
 use App\Models\Offering;
+use App\Models\OfferingCategory;
 use App\Models\Partner;
 use App\Models\PatientCase;
+use App\Models\RoutingPolicy;
+use App\Models\Setting;
+use App\Models\SlaPolicy;
+use App\Models\StateVisitRequirement;
 use App\Models\User;
 use App\Observers\AuditObserver;
 use App\Services\Karen\MockKarenService;
@@ -75,6 +80,13 @@ class AppServiceProvider extends ServiceProvider
         Partner::observe(AuditObserver::class);
         User::observe(AuditObserver::class);
         Offering::observe(AuditObserver::class);
+        // Config-tier models — every change to these affects clinical behaviour
+        // for all cases, so they warrant an audit entry from day one.
+        OfferingCategory::observe(AuditObserver::class);
+        Setting::observe(AuditObserver::class);
+        StateVisitRequirement::observe(AuditObserver::class);
+        SlaPolicy::observe(AuditObserver::class);
+        RoutingPolicy::observe(AuditObserver::class);
     }
 
     /**
@@ -87,7 +99,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function composeClinicianSidebar(): void
     {
-        View::composer(['layouts.clinician', 'layouts.clinician-exact'], function ($view) {
+        View::composer('layouts.clinician-exact', function ($view) {
             $clinician = Auth::user()?->clinician;
 
             // No clinician record (an admin on the shared clinician routes):

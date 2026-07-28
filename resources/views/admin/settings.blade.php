@@ -8,7 +8,6 @@
 <div class="row g-4">
     <div class="col-lg-7">
 
-        {{-- SLA Settings --}}
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom py-3 d-flex align-items-center gap-2">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -17,7 +16,11 @@
                 </div>
                 <div>
                     <h6 class="mb-0 fw-semibold">Case SLA Targets</h6>
-                    <p class="text-muted mb-0" style="font-size:.72rem;">House deadlines for case pickup, review, and end-to-end completion</p>
+                    <p class="text-muted mb-0" style="font-size:.72rem;">
+                        House deadlines for case pickup, review, and end-to-end completion.
+                        Not to be confused with <a href="{{ route('admin.routing.sla') }}" class="text-muted">Provider Pull SLA</a>,
+                        which gates whether a provider may pull more cases from the pool.
+                    </p>
                 </div>
             </div>
             <div class="card-body p-4">

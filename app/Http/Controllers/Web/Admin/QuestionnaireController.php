@@ -11,6 +11,28 @@ class QuestionnaireController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
+
+        if ($user->isDoctorAdmin()) {
+            // Doctor Admin is read-only and scoped to context — show all questionnaires
+            // grouped by offering category so they can understand what each category uses.
+            $all = Questionnaire::with(['partner', 'offerings.category'])
+                ->withCount('questions')
+                ->orderBy('name')
+                ->get();
+
+            $grouped = $all->groupBy(
+                fn($q) => $q->offerings->first()?->category?->name ?? 'General'
+            )->sortKeys();
+
+            return view('admin.questionnaires.index', [
+                'isDoctorAdmin'  => true,
+                'grouped'        => $grouped,
+                'questionnaires' => null,
+                'partners'       => collect(),
+            ]);
+        }
+
         $questionnaires = Questionnaire::with('partner')
             ->withCount('questions')
             ->when($request->input('partner_id'), fn($q, $id) => $q->where('partner_id', $id))
@@ -22,7 +44,12 @@ class QuestionnaireController extends Controller
 
         $partners = Partner::orderBy('name')->get(['id', 'name']);
 
-        return view('admin.questionnaires.index', compact('questionnaires', 'partners'));
+        return view('admin.questionnaires.index', [
+            'isDoctorAdmin'  => false,
+            'grouped'        => null,
+            'questionnaires' => $questionnaires,
+            'partners'       => $partners,
+        ]);
     }
 
     public function create()
