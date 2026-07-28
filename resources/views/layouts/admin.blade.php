@@ -9,7 +9,7 @@
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*');
-    $superActive = request()->routeIs('admin.admins.*');
+    $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*');
 @endphp
 
 <div class="mt-1 pb-3">
@@ -217,6 +217,10 @@
         <a class="nav-link {{ request()->routeIs('admin.admins.*') ? 'active' : '' }}"
            href="{{ route('admin.admins.index') }}">
             <i class="bi bi-shield-lock"></i> Admin Users
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.audit-log.*') ? 'active' : '' }}"
+           href="{{ route('admin.audit-log.index') }}">
+            <i class="bi bi-journal-text"></i> Audit Log
         </a>
 
     </div>

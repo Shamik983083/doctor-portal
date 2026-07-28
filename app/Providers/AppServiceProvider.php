@@ -6,8 +6,13 @@ use App\Adapters\Sms\MockSmsAdapter;
 use App\Adapters\Sms\TwilioSmsAdapter;
 use App\Contracts\KarenInterface;
 use App\Contracts\SmsAdapter;
+use App\Models\Clinician;
 use App\Models\Message;
+use App\Models\Offering;
+use App\Models\Partner;
 use App\Models\PatientCase;
+use App\Models\User;
+use App\Observers\AuditObserver;
 use App\Services\Karen\MockKarenService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
@@ -59,7 +64,17 @@ class AppServiceProvider extends ServiceProvider
 
         require base_path('routes/channels.php');
 
+        $this->registerAuditObservers();
         $this->composeClinicianSidebar();
+    }
+
+    private function registerAuditObservers(): void
+    {
+        PatientCase::observe(AuditObserver::class);
+        Clinician::observe(AuditObserver::class);
+        Partner::observe(AuditObserver::class);
+        User::observe(AuditObserver::class);
+        Offering::observe(AuditObserver::class);
     }
 
     /**

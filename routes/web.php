@@ -16,6 +16,7 @@ use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCa
 use App\Http\Controllers\Web\Admin\QuestionnaireController as AdminQuestionnaireController;
 use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController;
 use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeliveryController;
+use App\Http\Controllers\Web\Admin\AuditLogController as AdminAuditLogController;
 use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Web\Admin\TriageRuleController as AdminTriageRuleController;
 use App\Http\Controllers\Web\Admin\NotificationController as AdminNotificationController;
@@ -293,9 +294,12 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::post('/{uuid}/resend',[AdminWebhookDeliveryController::class, 'resend'])->name('resend');
     });
 
-    // SLA Settings
+    // Case SLA Targets
     Route::get('/settings',  [AdminSettingsController::class, 'index'])->name('settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
+
+    // Audit Log — read-only record of all admin-initiated model changes
+    Route::get('/audit-log', [AdminAuditLogController::class, 'index'])->name('audit-log.index');
 
     // Triage Rule Set — per-questionnaire disqualifier rules
     Route::prefix('triage-rules')->name('triage-rules.')->group(function () {
