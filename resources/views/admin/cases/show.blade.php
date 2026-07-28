@@ -400,22 +400,32 @@
                         $msgDate   = $msg->created_at->format('Y-m-d');
                         $isClinic  = $msg->sender_type === 'clinician';
                         $isPatient = $msg->sender_type === 'patient';
+                        $isAdmin   = $msg->sender_type === 'admin';
 
                         if ($isClinic) {
                             $avatarBg  = '#4361ee';
                             $avatarTxt = '#fff';
                             $avatarStr = $initials($clinicianName);
                             $name      = $clinicianName;
+                            $alignRight = false;
+                        } elseif ($isAdmin) {
+                            $avatarBg  = '#6f42c1';
+                            $avatarTxt = '#fff';
+                            $avatarStr = $initials($msg->user?->name ?? 'Admin');
+                            $name      = $msg->user?->name ?? 'Admin';
+                            $alignRight = true;
                         } elseif ($isPatient) {
                             $avatarBg  = '#2dc653';
                             $avatarTxt = '#fff';
                             $avatarStr = $initials($patientName);
                             $name      = $patientName;
+                            $alignRight = false;
                         } else {
                             $avatarBg  = '#6c757d';
                             $avatarTxt = '#fff';
                             $avatarStr = 'SY';
                             $name      = 'System';
+                            $alignRight = false;
                         }
                     @endphp
 
@@ -432,7 +442,7 @@
                     @endif
 
                     {{-- Message row --}}
-                    <div class="d-flex align-items-end gap-2 mb-3 {{ $isClinic ? 'flex-row-reverse' : '' }}">
+                    <div class="d-flex align-items-end gap-2 mb-3 {{ $alignRight ? 'flex-row-reverse' : '' }}">
 
                         {{-- Avatar --}}
                         <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold"
@@ -444,9 +454,12 @@
                         {{-- Bubble + meta --}}
                         <div style="max-width:68%;">
                             {{-- Name + time --}}
-                            <div class="d-flex align-items-baseline gap-1 mb-1 {{ $isClinic ? 'justify-content-end' : '' }}">
+                            <div class="d-flex align-items-baseline gap-1 mb-1 {{ $alignRight ? 'justify-content-end' : '' }}">
                                 <span style="font-size:.72rem;font-weight:600;color:#495057;">{{ $name }}</span>
                                 <span style="font-size:.67rem;color:#adb5bd;">{{ $msg->created_at->format('H:i') }}</span>
+                                @if($isAdmin)
+                                    <span style="font-size:.62rem;color:#6f42c1;font-weight:500;">internal</span>
+                                @endif
                                 @if($isPatient)
                                     @if($msg->is_read)
                                         <i class="bi bi-check2-all" style="font-size:.72rem;color:#4361ee;"
@@ -459,7 +472,14 @@
                             </div>
 
                             {{-- Bubble --}}
-                            @if($isClinic)
+                            @if($isAdmin)
+                            <div style="background:#6f42c1;color:#fff;padding:10px 14px;
+                                        border-radius:14px 3px 14px 14px;
+                                        font-size:.875rem;line-height:1.5;word-break:break-word;
+                                        box-shadow:0 2px 8px rgba(111,66,193,.2);">
+                                {{ $msg->body }}
+                            </div>
+                            @elseif($isClinic)
                             <div style="background:#4361ee;color:#fff;padding:10px 14px;
                                         border-radius:16px 4px 16px 16px;
                                         font-size:.875rem;line-height:1.5;word-break:break-word;
@@ -482,9 +502,9 @@
                             </div>
                             @endif
 
-                            {{-- Channel badge --}}
-                            @if($msg->channel && $msg->channel !== 'portal')
-                            <div class="mt-1 {{ $isClinic ? 'text-end' : '' }}"
+                            {{-- Channel badge (skip 'portal' and 'internal' — already labelled above) --}}
+                            @if($msg->channel && !in_array($msg->channel, ['portal','internal']))
+                            <div class="mt-1 {{ $alignRight ? 'text-end' : '' }}"
                                  style="font-size:.65rem;color:#adb5bd;">
                                 via {{ $msg->channel }}
                             </div>

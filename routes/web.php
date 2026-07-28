@@ -156,6 +156,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     // Available to both admin tiers; visibleTo() scoping is enforced inside the controller.
     Route::get('/escalations', [\App\Http\Controllers\Web\Admin\EscalationController::class, 'index'])->name('escalations.index');
 
+    // DA4: Admin messaging — patient conversations (read) + internal provider channel (read+write).
+    Route::get('/messages', [\App\Http\Controllers\Web\Admin\MessagesController::class, 'index'])->name('messages.index');
+    Route::post('/messages/send', [\App\Http\Controllers\Web\Admin\MessagesController::class, 'sendInternal'])->name('messages.send');
+
     // Partners (Super Admin only). Storefronts carry their own Healthie
     // credentials, so this is an integration surface, not an operational one.
     // Devin msg 2117: "All API integrations etc should be a super admin function."

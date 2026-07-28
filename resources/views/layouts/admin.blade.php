@@ -6,7 +6,7 @@
         'admin.cases.*', 'admin.patients.*', 'admin.partners.*',
         'admin.clinicians.*', 'admin.offerings.*', 'admin.categories.*',
         'admin.questionnaires.*', 'admin.questions.*', 'admin.partner-dashboard.*',
-        'admin.escalations.*'
+        'admin.escalations.*', 'admin.messages.*'
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*');
@@ -42,6 +42,18 @@
             @php $openEscalationCount = \App\Models\PatientCase::visibleTo(auth()->user())->where('status', 'support')->count(); @endphp
             @if($openEscalationCount > 0)
                 <span class="badge bg-warning text-dark ms-auto" style="font-size:.6rem;">{{ $openEscalationCount }}</span>
+            @endif
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.messages.*') ? 'active' : '' }}"
+           href="{{ route('admin.messages.index') }}">
+            <i class="bi bi-chat-square-text"></i> Messages
+            @php
+                $adminMsgUnread = \App\Models\Message::whereIn('case_id',
+                    \App\Models\PatientCase::visibleTo(auth()->user())->select('id')
+                )->where('channel', 'portal')->where('direction', 'inbound')->where('is_read', false)->count();
+            @endphp
+            @if($adminMsgUnread > 0)
+                <span class="badge bg-primary ms-auto" style="font-size:.6rem;">{{ $adminMsgUnread }}</span>
             @endif
         </a>
         <a class="nav-link {{ request()->routeIs('admin.partner-dashboard.*') ? 'active' : '' }}"

@@ -335,12 +335,26 @@
                      data-poll-url="{{ route('clinician.cases.messages.poll', $case->uuid) }}">
                     @php $lastSide = null; @endphp
                     @forelse($case->messages->sortBy('created_at') as $msg)
-                        @php $side = $msg->sender_type === 'clinician' ? 'me' : 'them'; @endphp
+                        @php
+                            $side       = $msg->sender_type === 'clinician' ? 'me' : 'them';
+                            $isAdminMsg = $msg->sender_type === 'admin';
+                        @endphp
                         @if($side !== $lastSide)
-                            <div class="chat-time" data-date="{{ $msg->created_at->format('Y-m-d') }}">{{ $msg->created_at->format('M j, g:i A') }}</div>
+                            <div class="chat-time" data-date="{{ $msg->created_at->format('Y-m-d') }}">
+                                @if($isAdminMsg)<span style="font-size:.7em;opacity:.7;">Admin · </span>@endif
+                                {{ $msg->created_at->format('M j, g:i A') }}
+                            </div>
                             @php $lastSide = $side; @endphp
                         @endif
-                        <div class="bubble-row {{ $side }}"><div class="bubble {{ $side }}">{{ $msg->body }}</div></div>
+                        <div class="bubble-row {{ $side }}">
+                            <div class="bubble {{ $side }}"
+                             style="{{ $isAdminMsg ? 'background:rgba(111,66,193,.12);border:1px solid rgba(111,66,193,.25);' : '' }}">
+                                @if($isAdminMsg)
+                                    <span style="display:block;font-size:.65em;font-weight:600;color:#6f42c1;margin-bottom:3px;opacity:.85;">Admin (internal)</span>
+                                @endif
+                                {{ $msg->body }}
+                            </div>
+                        </div>
                     @empty
                         <div class="chat-time" id="clinThreadEmpty">No messages on this case yet. Send the first one below.</div>
                     @endforelse

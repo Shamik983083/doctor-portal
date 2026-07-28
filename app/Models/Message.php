@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class Message extends Model
 {
     protected $fillable = [
-        'uuid', 'case_id', 'patient_id', 'clinician_id', 'partner_id',
+        'uuid', 'case_id', 'patient_id', 'clinician_id', 'partner_id', 'user_id',
         'direction', 'channel', 'sender_type', 'body',
         'is_read', 'read_at', 'attachments',
     ];
@@ -29,4 +29,5 @@ class Message extends Model
     public function patient() { return $this->belongsTo(Patient::class); }
     public function clinician() { return $this->belongsTo(Clinician::class); }
     public function partner() { return $this->belongsTo(Partner::class); }
+    public function user() { return $this->belongsTo(\App\Models\User::class); }
 }
