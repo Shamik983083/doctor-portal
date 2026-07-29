@@ -36,7 +36,7 @@
             with a divider, not blended. Consents are collapsed to a name that
             opens the full text, with the answer shown as a pill.
         */
-        .qa-sheet { margin-top: 10px; }
+        .qa-sheet { margin-top: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px; }
         .qa-sheet .qa { align-items: start; }
         .qa-sheet summary { cursor: pointer; font-weight: 680; color: var(--ink); list-style: revert; }
         .qa-sheet .consent-full { color: var(--muted); font-size: 12px; line-height: 1.55; margin-top: 6px; }
