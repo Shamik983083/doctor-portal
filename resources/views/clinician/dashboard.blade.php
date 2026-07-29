@@ -263,7 +263,7 @@
             <h6 class="mb-0 fw-semibold">My Active Cases</h6>
             <p class="text-muted mb-0" style="font-size:.72rem;">Cases currently assigned or approved &mdash; showing up to 10</p>
         </div>
-        <a href="{{ route('clinician.queue') }}" class="btn btn-sm btn-outline-primary">View Queue</a>
+        <a href="{{ route('clinician.queue') }}?mine=1" class="btn btn-sm btn-outline-primary">View Queue</a>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">

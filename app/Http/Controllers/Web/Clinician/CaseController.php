@@ -68,6 +68,7 @@ class CaseController extends Controller
             ))
             ->when($request->filled('partner_id'), fn($q) => $q->where('partner_id', $request->partner_id))
             ->when($request->filled('triage'), fn($q) => $q->where('triage', $request->triage))
+            ->when($request->boolean('mine') && $clinician, fn($q) => $q->where('clinician_id', $clinician->id))
             ->orderByRaw("FIELD(triage, 'red', 'yellow', 'green') DESC")
             ->orderBy('created_at')
             ->paginate(20)
