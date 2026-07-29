@@ -483,8 +483,9 @@ class CaseController extends Controller
             ->first();
 
         if ($draft) {
-            return redirect()
-                ->route('clinician.cases.prescribe.review', $case->uuid)
+            $target = route('clinician.cases.prescribe.review', $case->uuid)
+                . (request()->boolean('modal') ? '?modal=1' : '');
+            return redirect($target)
                 ->with('info', 'A draft prescription is waiting for your review.');
         }
 
@@ -782,7 +783,9 @@ class CaseController extends Controller
             ->where('review_status', CasePrescription::REVIEW_DRAFT)
             ->delete();
 
-        return redirect()->route('clinician.cases.prescribe.form', $uuid)
+        $target = route('clinician.cases.prescribe.form', $uuid)
+            . (request()->boolean('modal') ? '?modal=1' : '');
+        return redirect($target)
             ->with('info', 'Draft discarded. Start a new prescription below.');
     }
 

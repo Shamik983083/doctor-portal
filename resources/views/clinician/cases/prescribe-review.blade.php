@@ -1,4 +1,4 @@
-@extends('layouts.clinician-exact')
+@extends(request()->boolean('modal') ? 'layouts.bare' : 'layouts.clinician-exact')
 
 @section('title', 'Review Prescription')
 @section('page-title', 'Review Prescription')
@@ -84,9 +84,14 @@
                 </div>
 
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)">
-                    <a href="{{ route('clinician.cases.prescribe.discard', $case->uuid) }}"
-                       onclick="return confirm('Discard this draft and return to the prescribe form?')"
-                       class="button-secondary">Discard draft</a>
+                    <div style="display:flex;gap:8px">
+                        @if(request()->boolean('modal'))
+                            <button type="button" class="button-secondary" onclick="parent.postMessage('close-review','*')">Cancel</button>
+                        @endif
+                        <a href="{{ route('clinician.cases.prescribe.discard', $case->uuid) }}{{ request()->boolean('modal') ? '?modal=1' : '' }}"
+                           onclick="return confirm('Discard this draft and return to the prescribe form?')"
+                           class="button-secondary">Discard draft</a>
+                    </div>
                     <button type="submit" class="button-primary">Confirm &amp; approve</button>
                 </div>
             </form>
