@@ -336,8 +336,9 @@ class CaseController extends Controller
             ->map(fn ($group) => $group->first());
 
         // The conversation open in the right pane (Devin msg 2294): the one named
-        // in ?case=, else the most recent. Its full thread is loaded and its
-        // inbound messages are marked read now that the provider is looking.
+        // in ?case=, else the most recent. Thread loaded; mark-as-read is deferred
+        // to a JS fetch() once the conversation is visually focused, so the sidebar
+        // badge reflects the true unread count at page render time.
         $selected = null;
         $thread = collect();
         if ($cases->isNotEmpty()) {
@@ -348,13 +349,30 @@ class CaseController extends Controller
 
             $selected->loadMissing('patient', 'partner');
             $thread = $selected->messages()->orderBy('created_at')->get();
-
-            $selected->messages()
-                ->where('direction', 'inbound')->where('is_read', false)
-                ->update(['is_read' => true, 'read_at' => now()]);
         }
 
         return view('clinician.messages.index', compact('cases', 'clinician', 'latest', 'selected', 'thread'));
+    }
+
+    /**
+     * Mark all unread inbound messages in a conversation as read.
+     * Called via fetch() from the messages inbox JS once the thread is visually
+     * focused — keeps the sidebar badge accurate at page render time.
+     */
+    public function markConversationRead(string $uuid): \Illuminate\Http\JsonResponse
+    {
+        $clinician = Auth::user()->clinician;
+
+        $case = PatientCase::where('uuid', $uuid)
+            ->where('clinician_id', $clinician->id)
+            ->firstOrFail();
+
+        $updated = $case->messages()
+            ->where('direction', 'inbound')
+            ->where('is_read', false)
+            ->update(['is_read' => true, 'read_at' => now()]);
+
+        return response()->json(['marked_read' => $updated]);
     }
 
     /**

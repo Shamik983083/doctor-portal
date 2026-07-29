@@ -117,6 +117,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
     // the design preview. Lives OUTSIDE the cases/{uuid} group so "messages" is
     // never captured as a case uuid.
     Route::get('/messages', [ClinicianCaseController::class, 'messagesInbox'])->name('messages.index');
+    Route::post('/messages/{uuid}/read', [ClinicianCaseController::class, 'markConversationRead'])->name('messages.read');
 
     Route::get('/notifications', [ClinicianNotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{id}/read', [ClinicianNotificationController::class, 'markRead'])->name('notifications.read');

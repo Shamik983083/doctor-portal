@@ -197,6 +197,52 @@
         }
     }
 
+    // ── Mark conversation as read via AJAX ──────────────────────────
+    // Called when a conversation becomes visually focused (on load for the
+    // initially selected thread, and on row click before navigating). This
+    // keeps the sidebar badge accurate at page render time — the server no
+    // longer marks messages read during the page request itself.
+    function markRead(caseUuid, rowEl) {
+        fetch('{{ url("clinician/messages") }}/' + caseUuid + '/read', {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+        })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+            if (!data || !data.marked_read) return;
+            // Remove the unread badge from the row in the left panel
+            var row = rowEl || (msgList ? msgList.querySelector('.msg-row[data-uuid="' + caseUuid + '"]') : null);
+            if (row) {
+                var badge = row.querySelector('.msg-unread');
+                if (badge) badge.remove();
+            }
+            // Decrement the global sidebar badge
+            var globalBadge = document.getElementById('msgBadge');
+            if (globalBadge) {
+                var current = parseInt(globalBadge.textContent, 10) || 0;
+                var next = Math.max(0, current - data.marked_read);
+                globalBadge.textContent = next;
+                globalBadge.classList.toggle('zero', next === 0);
+            }
+        })
+        .catch(function () {});
+    }
+
+    // Mark the initially selected conversation as read on page load
+    if (selectedUuid) {
+        markRead(selectedUuid, null);
+    }
+
+    // Intercept conversation row clicks: mark the target read before navigating
+    if (msgList) {
+        msgList.addEventListener('click', function (e) {
+            var row = e.target.closest('.msg-row');
+            if (!row || !row.dataset.uuid || row.dataset.uuid === selectedUuid) return;
+            // Fire and forget — navigation proceeds immediately after
+            markRead(row.dataset.uuid, row);
+        });
+    }
+
     // Echo is initialised globally by the layout; subscribe to page-specific events here.
     if (window.Echo) {
         window.Echo.private('provider-inbox').listen('.NewPatientMessage', function (e) {
