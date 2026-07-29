@@ -166,6 +166,34 @@
         $clin = $case->queueClinical();
         $ci   = $case->clinical_intake ?? [];
 
+        // Derive summary bullets from basic clinical fields when the partner
+        // omitted the pre-computed summary array (API cases without storefront
+        // intake processing). Falls through to the existing $ci['summary'] when
+        // that is present, so storefront cases are unaffected.
+        $derivedSummary = [];
+        if (empty($ci['summary'])) {
+            $hasClinical = ($clin['term'] !== '-' || $clin['dose'] !== '-' || $clin['plan'] !== '-');
+            if ($hasClinical) {
+                $reg = 'Requested regimen:';
+                if ($clin['term'] !== '-') $reg .= ' ' . $clin['term'] . ' term';
+                if ($clin['dose'] !== '-') $reg .= ($clin['term'] !== '-' ? ', dose ' : ' dose ') . $clin['dose'];
+                if ($clin['plan'] !== '-') $reg .= ', plan ' . $clin['plan'];
+                $derivedSummary[] = rtrim($reg, ', ') . '.';
+            }
+            if ($clin['onGlp'] !== '-') {
+                $derivedSummary[] = 'Currently on GLP-1 therapy: ' . (strtoupper($clin['onGlp']) === 'Y' ? 'yes' : 'no') . '.';
+            }
+            if ($clin['allergy'] !== '-') {
+                $allergyFlag = strtoupper($clin['allergy']) === 'Y'
+                    ? 'yes' . ($clin['allergyDetail'] ? ' — ' . $clin['allergyDetail'] : '')
+                    : 'no';
+                $derivedSummary[] = 'Concerning allergies flagged: ' . $allergyFlag . '.';
+            }
+            if ($clin['zofran'] !== '-') {
+                $derivedSummary[] = 'Standard Zofran included: ' . (strtoupper($clin['zofran']) === 'Y' ? 'yes' : 'no') . '.';
+            }
+        }
+
         if ($case->triage === 'red') { $tone='red'; $label='Blocked'; }
         elseif ($case->hold_status || $case->status === 'support') { $tone='red'; $label='Blocked'; }
         elseif ($case->triage === 'yellow') { $tone='yellow'; $label='Review'; }
@@ -248,7 +276,7 @@
             'triage'   => $case->triage ?? 'unclassified',
             'tone'     => $tone,
             'label'    => $label,
-            'summary'  => collect($ci['summary'] ?? [])->map(fn($l) => is_array($l) ? ($l[0] ?? '') : $l)->filter()->values(),
+            'summary'  => collect($ci['summary'] ?? $derivedSummary)->map(fn($l) => is_array($l) ? ($l[0] ?? '') : $l)->filter()->values(),
             'findings' => collect($ci['findings'] ?? [])->map(fn($f) => is_array($f) ? ['tone' => $f[0] ?? 'neutral', 'text' => $f[1] ?? ''] : ['tone' => 'neutral', 'text' => $f])->values(),
             'protocol' => $ci['protocolVersion'] ?? null,
             'source'   => $source,
