@@ -325,7 +325,18 @@ Content-Type: application/json
     "allergy":         "N",             // allergy flag: "Y" | "N"
     "allergyDetail":   null,            // required when allergy = "Y"
     "video":           "not required",  // "not required" | "required" | "Clear"
-    "protocolVersion": "AA protocol v1"
+    "protocolVersion": "AA protocol v1",
+
+    // ── sourceAnswers — drives the "View source answers" panel in the clinician UI ─
+    // Optional. A flat key/value map of any intake Q&A your system collects.
+    // Keys are camelCase; the clinician sees them as title-case labels
+    // ("primaryReason" → "Primary Reason"). If omitted, the portal falls back to
+    // displaying the submitted answers[] Q&A pairs instead.
+    "sourceAnswers": {
+      "primaryReason":        "Energy and vitality",
+      "currentSymptoms":      "Fatigue, brain fog",
+      "priorHormoneTherapy":  "No"
+    }
   },
 
   "answers": [{{ $payloadAnswers }}

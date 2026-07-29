@@ -371,7 +371,20 @@ Content-Type: application/json
     "allergyDetail":   null,             // required when allergy = "Y"
     "zofran":          "N",              // anti-nausea rider: "Y" | "N"
     "video":           "not required",   // "not required" | "required" | "Clear"
-    "protocolVersion": "GLP-1 protocol v8"
+    "protocolVersion": "GLP-1 protocol v8",
+
+    // ── sourceAnswers — drives the "View source answers" panel in the clinician UI ─
+    // Optional. A flat key/value map of any intake Q&A your system collects.
+    // Keys are camelCase; the clinician sees them as title-case labels
+    // ("productPick" → "Product Pick"). If omitted, the portal falls back to
+    // displaying the submitted answers[] Q&A pairs instead.
+    "sourceAnswers": {
+      "productPick":                  "semaglutide",
+      "glp1Allergies":                "No known allergies",
+      "currentGlucoseMedications":    "None",
+      "weightLossMedications":        "None",
+      "gastricBypass6Months":         "No"
+    }
   },
 
   "answers": [{{ $payloadAnswers }}
