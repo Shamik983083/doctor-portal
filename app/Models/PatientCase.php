@@ -146,20 +146,20 @@ class PatientCase extends Model
         $ci = $this->clinical_intake ?? [];
         $dash = '-';
 
-        $offeringName = optional($this->caseOfferings->first()?->offering)->name;
+        $offerings = $this->caseOfferings->pluck('offering.name')->filter()->values();
 
         $val = fn ($k, $fallback = null) => (isset($ci[$k]) && $ci[$k] !== '' && $ci[$k] !== null)
             ? $ci[$k]
             : $fallback;
 
         return [
-            'product'       => $val('product', $offeringName ?? $dash),
+            'product'       => $val('product', $offerings->get(0) ?? $dash),
             'dose'          => $val('dose', $dash),
             'term'          => $val('term', $dash),
             'plan'          => $val('plan', $dash),
-            'med2'          => $val('med2', $dash),
-            'med3'          => $val('med3', $dash),
-            'med4'          => $val('med4', $dash),
+            'med2'          => $val('med2', $offerings->get(1) ?? $dash),
+            'med3'          => $val('med3', $offerings->get(2) ?? $dash),
+            'med4'          => $val('med4', $offerings->get(3) ?? $dash),
             'onGlp'         => $val('onGlp', $dash),
             'zofran'        => $val('zofran', $dash),
             'allergy'       => $val('allergy', $dash),
