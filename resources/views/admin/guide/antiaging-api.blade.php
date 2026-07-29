@@ -301,7 +301,7 @@ Content-Type: application/json
   },
   "patient_state":  "TX",
   "external_id":    "order-aa-20240701-001",
-  "visit_type":     "antiaging",
+  "visit_type":     "asynchronous",  // "asynchronous" (standard) | "synchronous" (video required)
   "is_chargeable":  true,
   "hold_status":    false,
   "is_refill":      false,         // true = refill/check-in visit — see "Refill / Check-in Cases" section below
@@ -311,8 +311,22 @@ Content-Type: application/json
     // Option A (legacy — no changes needed): direct offering UUID
     { "offering_id": "YOUR_AA_OFFERING_UUID", "quantity": 1 }
     // Option B (new): product_key + month_frequency — portal resolves internally
-    // { "product_key": "your-product-key", "month_frequency": 3, "quantity": 1 }
+    // { "product_key": "anti-aging", "month_frequency": 3, "quantity": 1 }
   ],
+
+  // ── clinical_intake — populates the clinician's left-panel review fields ───────
+  // Without this block every field on the Review & Approve screen shows "—".
+  // All fields are optional strings; send only what your intake collects.
+  "clinical_intake": {
+    "term":            "3M",              // requested duration: "1M" | "3M" | "4M" | "6M" | "12M"
+    "dose":            "0.5 mg",         // requested starting dose
+    "plan":            "Starter",        // protocol plan e.g. "Starter" | "Maintenance"
+    "onGlp":           "N",             // currently on GLP-1: "Y" | "N" (if applicable)
+    "allergy":         "N",             // allergy flag: "Y" | "N"
+    "allergyDetail":   null,            // required when allergy = "Y"
+    "video":           "not required",  // "not required" | "required" | "Clear"
+    "protocolVersion": "AA protocol v1"
+  },
 
   "answers": [{{ $payloadAnswers }}
 
