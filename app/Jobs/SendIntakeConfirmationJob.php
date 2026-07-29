@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Events\CaseMessageSent;
 use App\Models\Message;
 use App\Models\PatientCase;
 use App\Services\AiAssistService;
+use App\Services\WebhookDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -33,7 +35,7 @@ class SendIntakeConfirmationJob implements ShouldQueue
 
     public function __construct(private readonly int $caseId) {}
 
-    public function handle(AiAssistService $aiAssist): void
+    public function handle(AiAssistService $aiAssist, WebhookDispatcher $webhooks): void
     {
         $case = PatientCase::with(['patient', 'partner', 'clinician.user', 'caseOfferings.offering'])
             ->find($this->caseId);
@@ -55,7 +57,7 @@ class SendIntakeConfirmationJob implements ShouldQueue
 
         $body = $this->compose($case, $aiAssist);
 
-        Message::create([
+        $message = Message::create([
             'case_id'      => $case->id,
             'patient_id'   => $case->patient_id,
             'partner_id'   => $case->partner_id,
@@ -63,6 +65,25 @@ class SendIntakeConfirmationJob implements ShouldQueue
             'channel'      => 'portal',
             'sender_type'  => 'system',
             'body'         => $body,
+        ]);
+
+        // Push to the patient portal via Reverb so the message appears immediately
+        // without requiring a manual clinician message to trigger a refresh.
+        try {
+            broadcast(new CaseMessageSent($message));
+        } catch (\Throwable $e) {
+            Log::warning('A1: Reverb broadcast failed for intake confirmation.', [
+                'case_id'    => $case->id,
+                'message_id' => $message->id,
+                'error'      => $e->getMessage(),
+            ]);
+        }
+
+        // Fire the partner webhook so the tenant portal can notify the patient.
+        $webhooks->dispatch($case->partner_id, 'message_created', [
+            'case_id'   => $case->uuid,
+            'sender'    => 'system',
+            'timestamp' => now()->timestamp,
         ]);
     }
 
