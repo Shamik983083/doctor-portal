@@ -499,13 +499,22 @@ class CaseController extends Controller
         $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
 
         // Pass the requested month_frequency so the prescribe form can pre-select the
-        // duration dropdown. Falls back to parsing the legacy string frequency field
-        // ("12 month" → 12) for cases submitted before the integer column existed.
+        // duration dropdown.
+        // Fallback chain (first non-null wins):
+        //   1. case_offerings.month_frequency (integer, set by the partner API)
+        //   2. case_offerings.frequency string ("12 month" → 12, legacy field)
+        //   3. clinical_intake.term ("12M" → 12, tenant's intake payload)
         $requestedMonthFrequency = $case->caseOfferings->first()?->month_frequency;
         if ($requestedMonthFrequency === null) {
             $freqStr = $case->caseOfferings->first()?->frequency ?? '';
             if (preg_match('/\b(\d+)\b/', $freqStr, $freqMatch)) {
                 $requestedMonthFrequency = (int) $freqMatch[1];
+            }
+        }
+        if ($requestedMonthFrequency === null) {
+            $clinTerm = $case->clinical_intake['term'] ?? '';
+            if (is_string($clinTerm) && preg_match('/\b(\d+)\b/', $clinTerm, $termMatch)) {
+                $requestedMonthFrequency = (int) $termMatch[1];
             }
         }
 
