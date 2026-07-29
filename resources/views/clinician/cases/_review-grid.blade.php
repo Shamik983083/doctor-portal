@@ -220,9 +220,15 @@
         };
 
         $source = [];
-        if ($case->relationLoaded('caseQuestions') && $case->caseQuestions->isNotEmpty()) {
-            foreach ($case->caseQuestions as $cq) {
-                if (filled($cq->question)) { $source[] = $srcRow($cq->question, $cq->answer, $cq->type); }
+        // Only use caseQuestions when they actually carry answers — question-only
+        // records (e.g. API cases where the storefront stores answers separately in
+        // questionnaireResponses) must not block the richer questionnaire data.
+        $cqWithAnswers = $case->relationLoaded('caseQuestions')
+            ? $case->caseQuestions->filter(fn($cq) => filled($cq->question) && filled($cq->answer))
+            : collect();
+        if ($cqWithAnswers->isNotEmpty()) {
+            foreach ($cqWithAnswers as $cq) {
+                $source[] = $srcRow($cq->question, $cq->answer, $cq->type);
             }
         } elseif ($case->relationLoaded('questionnaireResponses') && $case->questionnaireResponses->isNotEmpty()) {
             foreach ($case->questionnaireResponses as $resp) {

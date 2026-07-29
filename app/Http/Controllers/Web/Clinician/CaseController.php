@@ -99,8 +99,8 @@ class CaseController extends Controller
         $intake = collect();
         if ($topCase) {
             $fromQuestions = $topCase->caseQuestions
-                ->map(fn($q) => ['q' => $q->question, 'a' => $q->answer])
-                ->filter(fn($r) => filled($r['q']));
+                ->filter(fn($q) => filled($q->question) && filled($q->answer))
+                ->map(fn($q) => ['q' => $q->question, 'a' => $q->answer]);
             $intake = $fromQuestions->isNotEmpty()
                 ? $fromQuestions->values()
                 : $topCase->questionnaireResponses->flatMap->answers
