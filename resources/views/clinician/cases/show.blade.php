@@ -107,7 +107,7 @@
 
         {{-- Offerings --}}
         <div class="case-pane" data-pane="offerings">
-            @forelse($case->caseOfferings as $co)
+            @forelse($case->caseOfferings->take(1) as $co)
             <section class="panel" style="margin-bottom:10px"><div style="padding:14px 18px">
                 <div style="display:flex;justify-content:space-between;gap:12px">
                     <div><strong>{{ $co->offering->name }}</strong><div style="color:var(--muted);font-size:12px">{{ ucfirst($co->offering->type ?? '') }} · Qty: {{ $co->quantity }}</div></div>
