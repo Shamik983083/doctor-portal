@@ -298,9 +298,6 @@
                         <td>
                             @if($case->caseOfferings->isNotEmpty())
                                 <span class="badge bg-light text-dark border" style="font-size:.7rem;">{{ $case->caseOfferings->first()->offering->name ?? 'Unknown' }}</span>
-                                @if($case->caseOfferings->count() > 1)
-                                    <span class="text-muted" style="font-size:.7rem;">+{{ $case->caseOfferings->count() - 1 }} more</span>
-                                @endif
                             @endif
                         </td>
                         <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>
