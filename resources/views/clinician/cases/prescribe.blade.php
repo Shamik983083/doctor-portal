@@ -541,9 +541,10 @@
             });
         }
 
-        // Pre-load a row for each medication the case actually requested; if none,
-        // start with one empty row so there is always something to fill.
-        if (REQUESTED && REQUESTED.length) { REQUESTED.forEach(function (id) { addRow(id); }); }
+        // Pre-load ONE row for the first requested offering. When product_key fans
+        // out to multiple variants (e.g. three semaglutide SKUs), only the first
+        // is shown — the doctor can add the others via "+ Add medication".
+        if (REQUESTED && REQUESTED.length) { addRow(REQUESTED[0]); }
         else { addRow(''); }
 
         refresh();

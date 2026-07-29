@@ -498,9 +498,16 @@ class CaseController extends Controller
         // Only runs for refill cases; null-safe to never crash if no prior exists.
         $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
 
-        // Pass the requested month_frequency (from the first case offering) so the
-        // prescribe form can pre-select the matching duration dropdown entry.
+        // Pass the requested month_frequency so the prescribe form can pre-select the
+        // duration dropdown. Falls back to parsing the legacy string frequency field
+        // ("12 month" → 12) for cases submitted before the integer column existed.
         $requestedMonthFrequency = $case->caseOfferings->first()?->month_frequency;
+        if ($requestedMonthFrequency === null) {
+            $freqStr = $case->caseOfferings->first()?->frequency ?? '';
+            if (preg_match('/\b(\d+)\b/', $freqStr, $freqMatch)) {
+                $requestedMonthFrequency = (int) $freqMatch[1];
+            }
+        }
 
         return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions', 'priorCase', 'requestedMonthFrequency'));
     }
