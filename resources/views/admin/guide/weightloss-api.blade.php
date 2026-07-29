@@ -344,7 +344,7 @@ Content-Type: application/json
   },
   "patient_state":  "TX",
   "external_id":    "order-wl-20240701-001",
-  "visit_type":     "weightloss",
+  "visit_type":     "asynchronous",  // "asynchronous" (standard GLP-1) | "synchronous" (video required)
   "is_chargeable":  true,
   "hold_status":    false,
   "is_refill":      false,         // true = refill/check-in visit — see "Refill / Check-in Cases" section below
@@ -354,8 +354,25 @@ Content-Type: application/json
     // Option A (legacy — no changes needed): direct offering UUID
     { "offering_id": "YOUR_MWL_OFFERING_UUID", "quantity": 1 }
     // Option B (new): product_key + month_frequency — portal resolves internally
-    // { "product_key": "your-product-key", "month_frequency": 3, "quantity": 1 }
+    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1 }
   ],
+
+  // ── clinical_intake — populates the clinician's left-panel review fields ───────
+  // Without this block every field on the Review & Approve screen shows "—".
+  // All fields are optional strings; send only what your intake collects.
+  "clinical_intake": {
+    "term":            "3M",              // requested duration: "1M" | "3M" | "4M" | "6M" | "12M"
+                                          // must match month_frequency (e.g. 12 → "12M") for
+                                          // the prescription form duration dropdown to auto-select
+    "dose":            "L1 · 2.5 mg",    // requested starting dose
+    "plan":            "Titration",       // protocol plan: "Titration" | "Starter" | "Maintenance"
+    "onGlp":           "N",              // currently on GLP-1: "Y" | "N"
+    "allergy":         "N",              // GLP-1 allergy: "Y" | "N"
+    "allergyDetail":   null,             // required when allergy = "Y"
+    "zofran":          "N",              // anti-nausea rider: "Y" | "N"
+    "video":           "not required",   // "not required" | "required" | "Clear"
+    "protocolVersion": "GLP-1 protocol v8"
+  },
 
   "answers": [{{ $payloadAnswers }}
 
