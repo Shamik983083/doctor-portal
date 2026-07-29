@@ -104,9 +104,12 @@
                                 @endif
                             </td>
                             <td>
-                                @foreach($case->caseOfferings->take(2) as $co)
-                                    <span class="ma-pill neutral">{{ $co->offering?->name ?? '?' }}</span>
-                                @endforeach
+                                @if($case->caseOfferings->isNotEmpty())
+                                    <span class="ma-pill neutral">{{ $case->caseOfferings->first()->offering?->name ?? '?' }}</span>
+                                    @if($case->caseOfferings->count() > 1)
+                                        <span class="text-muted small">+{{ $case->caseOfferings->count() - 1 }} more</span>
+                                    @endif
+                                @endif
                             </td>
                             <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>
                             <td>
