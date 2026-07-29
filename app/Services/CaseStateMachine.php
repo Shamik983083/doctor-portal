@@ -279,7 +279,7 @@ class CaseStateMachine
             // Dispatched after notifications so a notification failure cannot
             // prevent the patient message from being queued.
             try {
-                SendIntakeConfirmationJob::dispatch($case->id)->onQueue('default');
+                SendIntakeConfirmationJob::dispatch($case->id)->onQueue('default')->delay(10);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('A1: intake confirmation dispatch failed: ' . $e->getMessage());
             }
