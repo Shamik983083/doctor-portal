@@ -30,21 +30,7 @@
         </ul>
         <p class="ai-honesty">{{ config('ai.enabled') && config('ai.baa_confirmed') ? 'AI model draft. Statements are composed from the recorded intake answers and model output. The draft never approves, prescribes, or sends anything.' : 'Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.' }}</p>
 
-        @if(!empty($d['source']))
-            <button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers ({{ count($d['source']) }})</button>
-            <div class="qa-sheet" id="sourceAnswers" hidden>
-                @foreach($d['source'] as $row)
-                    @if($row['consent'])
-                        <div class="qa consent">
-                            <dt><details><summary>{{ $row['name'] }}</summary><div class="consent-full">{{ $row['q'] }}</div></details></dt>
-                            <dd><span class="pill {{ $row['agreed'] ? 'green' : 'red' }}">{{ $row['agreed'] ? 'Agreed' : $row['a'] }}</span></dd>
-                        </div>
-                    @else
-                        <div class="qa"><dt>{{ $row['q'] }}</dt><dd>{{ $row['a'] }}</dd></div>
-                    @endif
-                @endforeach
-            </div>
-        @else
+        @if(empty($d['source']))
             <p class="ai-honesty">No intake answers were passed for this case yet.</p>
         @endif
     </div>
@@ -81,7 +67,26 @@
     </div>
 </div>
 
-{{-- 4. Prior visit panel — only for refill cases, full-width below the 3-column grid --}}
+{{-- 4. Source answers — full-width below the 3-column grid so expanding never breaks the layout --}}
+@if(!empty($d['source']))
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+        <button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers ({{ count($d['source']) }})</button>
+        <div class="qa-sheet" id="sourceAnswers" hidden>
+            @foreach($d['source'] as $row)
+                @if($row['consent'])
+                    <div class="qa consent">
+                        <dt><details><summary>{{ $row['name'] }}</summary><div class="consent-full">{{ $row['q'] }}</div></details></dt>
+                        <dd><span class="pill {{ $row['agreed'] ? 'green' : 'red' }}">{{ $row['agreed'] ? 'Agreed' : $row['a'] }}</span></dd>
+                    </div>
+                @else
+                    <div class="qa"><dt>{{ $row['q'] }}</dt><dd>{{ $row['a'] }}</dd></div>
+                @endif
+            @endforeach
+        </div>
+    </div>
+@endif
+
+{{-- 5. Prior visit panel — only for refill cases, full-width below the 3-column grid --}}
 @if(!empty($d['isRefill']))
     @if(!empty($d['prior']))
         @php $pm = $d['prior']; @endphp

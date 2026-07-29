@@ -349,8 +349,14 @@
                 ? d.findings.map(function (f) { return '<li><span class="finding-dot ' + esc(f.tone) + '"></span> ' + esc(f.text) + '</li>'; }).join('')
                 : '<li><span class="finding-dot neutral"></span> No findings recorded from intake yet.</li>';
 
-            var source = (d.source && d.source.length)
-                ? '<button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers (' + d.source.length + ')</button>'
+            // Source answers render below the 3-column grid (not inside col1) so they
+            // cannot distort grid row height and push the Provider Actions column off-screen.
+            var col1NoSource = (!d.source || !d.source.length)
+                ? '<p class="ai-honesty">No intake answers were passed for this case yet.</p>'
+                : '';
+            var sourceSection = (d.source && d.source.length)
+                ? '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">'
+                  + '<button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers (' + d.source.length + ')</button>'
                   + '<div class="qa-sheet" id="sourceAnswers" hidden>' + d.source.map(function (r) {
                     if (r.consent) {
                         return '<div class="qa consent"><dt><details><summary>' + esc(r.name)
@@ -358,8 +364,8 @@
                             + '<dd><span class="pill ' + (r.agreed ? 'green' : 'red') + '">' + esc(r.agreed ? 'Agreed' : r.a) + '</span></dd></div>';
                     }
                     return '<div class="qa"><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
-                  }).join('') + '</div>'
-                : '<p class="ai-honesty">No intake answers were passed for this case yet.</p>';
+                  }).join('') + '</div></div>'
+                : '';
 
             var holds = d.hold
                 ? '<ul class="holds-list"><li><code class="audit-verb">WORKFLOW_HOLD_ACTIVE</code></li></ul>'
@@ -428,7 +434,7 @@
                 + '<div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>'
                 + '<ul class="summary-list">' + summary + '</ul>'
                 + '<p class="ai-honesty">' + AI_HONESTY_TEXT + '</p>'
-                + source + '</div>'
+                + col1NoSource + '</div>'
                 + '<div><div class="subheading">Triage and findings</div>'
                 + '<p class="protocol-version">' + protocol + '</p>'
                 + '<ul class="finding-list">' + findings + '</ul>'
@@ -440,6 +446,7 @@
                 + '<a class="button-secondary full-width" href="' + esc(d.msgUrl) + '">Send Message</a>'
                 + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a></div>'
                 + '</div>'
+                + sourceSection
                 + priorHtml;
         }
 
