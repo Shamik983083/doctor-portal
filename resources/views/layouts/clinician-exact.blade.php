@@ -38,9 +38,7 @@
         */
         .qa-sheet { margin-top: 10px; }
         .qa-sheet .qa { align-items: start; }
-        .qa-sheet summary { cursor: pointer; font-weight: 680; color: var(--ink); list-style: revert; }
-        .qa-sheet .consent-full { display: none; color: var(--muted); font-size: 12px; line-height: 1.55; margin-top: 6px; overflow-wrap: break-word; word-break: break-word; }
-        .qa-sheet details[open] .consent-full { display: block; }
+        .qa-sheet .qa dd { overflow-wrap: break-word; word-break: break-word; }
 
         /* Bootstrap badge-status overrides for clinical screens */
         .badge-status-waiting    { background:#4361ee; color:#fff; }

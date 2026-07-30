@@ -350,9 +350,7 @@
                   + '<button type="button" class="button-secondary" id="srcToggle" aria-expanded="false">View source answers (' + d.source.length + ')</button>'
                   + '<div class="qa-sheet" id="sourceAnswers" hidden>' + d.source.map(function (r) {
                     if (r.consent) {
-                        return '<div class="qa consent"><dt><details><summary>' + esc(r.name)
-                            + '</summary><div class="consent-full">' + esc(r.q) + '</div></details></dt>'
-                            + '<dd><span class="pill ' + (r.agreed ? 'green' : 'red') + '">' + esc(r.agreed ? 'Agreed' : r.a) + '</span></dd></div>';
+                        return '<div class="qa"><dt>' + esc(r.name) + '</dt><dd>' + esc(r.q) + '</dd></div>';
                     }
                     return '<div class="qa"><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
                   }).join('') + '</div></div>'
