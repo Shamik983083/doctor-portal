@@ -220,28 +220,19 @@
         };
 
         $source = [];
-        // clinical_intake.sourceAnswers takes priority — structured key/value pairs
-        // from the partner API. Fall back to questionnaire data only when absent.
-        if (!empty($ci['sourceAnswers'])) {
-            foreach ($ci['sourceAnswers'] as $k => $v) {
-                $source[] = $srcRow(\Illuminate\Support\Str::headline($k), $v);
+        // Show questionnaire Q&A only — caseQuestions first, then questionnaireResponses.
+        // clinical_intake.sourceAnswers is intentionally excluded from this panel.
+        $cqWithAnswers = $case->relationLoaded('caseQuestions')
+            ? $case->caseQuestions->filter(fn($cq) => filled($cq->question) && filled($cq->answer))
+            : collect();
+        if ($cqWithAnswers->isNotEmpty()) {
+            foreach ($cqWithAnswers as $cq) {
+                $source[] = $srcRow($cq->question, $cq->answer, $cq->type);
             }
-        }
-        if (empty($source)) {
-            // Only use caseQuestions when they carry actual answers — question-only
-            // records (API cases) must not block the richer questionnaireResponses data.
-            $cqWithAnswers = $case->relationLoaded('caseQuestions')
-                ? $case->caseQuestions->filter(fn($cq) => filled($cq->question) && filled($cq->answer))
-                : collect();
-            if ($cqWithAnswers->isNotEmpty()) {
-                foreach ($cqWithAnswers as $cq) {
-                    $source[] = $srcRow($cq->question, $cq->answer, $cq->type);
-                }
-            } elseif ($case->relationLoaded('questionnaireResponses') && $case->questionnaireResponses->isNotEmpty()) {
-                foreach ($case->questionnaireResponses as $resp) {
-                    foreach ($resp->answers as $ans) {
-                        if (filled($ans->question_text)) { $source[] = $srcRow($ans->question_text, $ans->answer); }
-                    }
+        } elseif ($case->relationLoaded('questionnaireResponses') && $case->questionnaireResponses->isNotEmpty()) {
+            foreach ($case->questionnaireResponses as $resp) {
+                foreach ($resp->answers as $ans) {
+                    if (filled($ans->question_text)) { $source[] = $srcRow($ans->question_text, $ans->answer); }
                 }
             }
         }
