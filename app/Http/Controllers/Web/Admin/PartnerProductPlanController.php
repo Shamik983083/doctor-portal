@@ -30,7 +30,11 @@ class PartnerProductPlanController extends Controller
             ->orderBy('offerings.name')
             ->get(['offerings.id', 'offerings.name', 'offerings.internal_name']);
 
-        return view('admin.partners.product-plans', compact('partner', 'grouped', 'accessibleOfferings'));
+        $otherPartners = Partner::where('id', '!=', $partner->id)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('admin.partners.product-plans', compact('partner', 'grouped', 'accessibleOfferings', 'otherPartners'));
     }
 
     public function store(Request $request, int $partnerId)
@@ -87,5 +91,90 @@ class PartnerProductPlanController extends Controller
         $plan->delete();
 
         return back()->with('success', "Plan {$label} deleted. Existing cases are unaffected — they retain their product_key snapshot.");
+    }
+
+    public function copy(Request $request, int $partnerId)
+    {
+        $dest = Partner::findOrFail($partnerId);
+
+        $request->validate([
+            'source_partner_id' => 'required|integer|exists:partners,id',
+        ]);
+
+        $sourceId = (int) $request->input('source_partner_id');
+
+        // Cannot copy from self.
+        if ($sourceId === $dest->id) {
+            return back()->with('error', 'Source and destination partner must be different.');
+        }
+
+        $source = Partner::findOrFail($sourceId);
+
+        $sourcePlans = PartnerProductPlan::where('partner_id', $source->id)
+            ->with('offering')
+            ->get();
+
+        if ($sourcePlans->isEmpty()) {
+            return back()->with('error', "\"{$source->name}\" has no product plans to copy.");
+        }
+
+        // Build a set of offering IDs accessible to the destination partner.
+        $accessibleOfferingIds = $dest->accessibleOfferings()
+            ->where('offerings.is_active', true)
+            ->pluck('offerings.id')
+            ->flip(); // use as a lookup set
+
+        // Build existing destination plans as a set to detect exact duplicates.
+        $existingKeys = PartnerProductPlan::where('partner_id', $dest->id)
+            ->get(['product_key', 'month_frequency', 'offering_id'])
+            ->map(fn($p) => "{$p->product_key}|{$p->month_frequency}|{$p->offering_id}")
+            ->flip();
+
+        $copied   = 0;
+        $skippedAccess    = 0;
+        $skippedDuplicate = 0;
+        $now = now();
+
+        foreach ($sourcePlans as $plan) {
+            // Skip if offering is inactive or not accessible to destination.
+            if (!$accessibleOfferingIds->has($plan->offering_id)) {
+                $skippedAccess++;
+                continue;
+            }
+
+            // Skip exact duplicates (same key + frequency + offering already exists).
+            $key = "{$plan->product_key}|{$plan->month_frequency}|{$plan->offering_id}";
+            if ($existingKeys->has($key)) {
+                $skippedDuplicate++;
+                continue;
+            }
+
+            PartnerProductPlan::create([
+                'partner_id'      => $dest->id,
+                'product_key'     => $plan->product_key,
+                'offering_id'     => $plan->offering_id,
+                'month_frequency' => $plan->month_frequency,
+                'label'           => $plan->label,
+            ]);
+
+            $copied++;
+        }
+
+        if ($copied === 0) {
+            $reason = $skippedDuplicate > 0
+                ? 'all plans already exist on this partner'
+                : 'no plans from that partner are accessible to this partner';
+            return back()->with('error', "Nothing copied — {$reason}.");
+        }
+
+        $msg = "Copied {$copied} plan(s) from \"{$source->name}\".";
+        if ($skippedDuplicate > 0) {
+            $msg .= " {$skippedDuplicate} skipped (already exist).";
+        }
+        if ($skippedAccess > 0) {
+            $msg .= " {$skippedAccess} skipped (offering not accessible to this partner).";
+        }
+
+        return back()->with('success', $msg);
     }
 }

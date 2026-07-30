@@ -106,7 +106,14 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Configured Plans</h6>
-                <span class="badge bg-secondary">{{ $grouped->sum(fn($g) => $g->count()) }} variant(s)</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary">{{ $grouped->sum(fn($g) => $g->count()) }} variant(s)</span>
+                    @if($otherPartners->isNotEmpty())
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#copyPlansModal">
+                            <i class="bi bi-copy me-1"></i>Copy from partner
+                        </button>
+                    @endif
+                </div>
             </div>
             <div class="card-body p-0">
                 @if($grouped->isEmpty())
@@ -175,4 +182,53 @@
     </div>
 
 </div>
+
+{{-- Copy plans modal --}}
+@if($otherPartners->isNotEmpty())
+<div class="modal fade" id="copyPlansModal" tabindex="-1" aria-labelledby="copyPlansModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="copyPlansModalLabel">
+                    <i class="bi bi-copy me-2"></i>Copy plans from another partner
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ route('admin.partners.product-plans.copy', $partner->id) }}">
+                @csrf
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Select a source partner. All their product plans will be copied to
+                        <strong>{{ $partner->name }}</strong>, with the following rules:
+                    </p>
+                    <ul class="small text-muted mb-3">
+                        <li>Plans that <strong>already exist</strong> on this partner are skipped.</li>
+                        <li>Plans whose offering is <strong>not accessible</strong> to this partner are skipped.</li>
+                        <li>Existing plans on this partner are <strong>never removed</strong>.</li>
+                    </ul>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Source partner <span class="text-danger">*</span></label>
+                        <select name="source_partner_id" class="form-select" required>
+                            <option value="">— Select a partner —</option>
+                            @foreach($otherPartners as $p)
+                                <option value="{{ $p->id }}">{{ $p->name }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Only partners that have at least one configured plan will yield results.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"
+                            onclick="return confirm('Copy all eligible plans from the selected partner to {{ addslashes($partner->name) }}?')">
+                        <i class="bi bi-copy me-1"></i>Copy plans
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
 @endsection

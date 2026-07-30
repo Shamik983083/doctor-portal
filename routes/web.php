@@ -181,6 +181,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         // Product plans (one-to-many product_key ↔ offering mapping)
         Route::get('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'index'])->name('product-plans.index');
         Route::post('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'store'])->name('product-plans.store');
+        Route::post('/{id}/product-plans/copy', [AdminPartnerProductPlanController::class, 'copy'])->name('product-plans.copy');
         Route::delete('/{id}/product-plans/{planId}', [AdminPartnerProductPlanController::class, 'destroy'])->name('product-plans.destroy');
     });
 
