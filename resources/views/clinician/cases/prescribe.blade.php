@@ -70,6 +70,7 @@
 @endif
 
 <form method="POST" action="{{ route('clinician.cases.prescribe', $case->uuid) }}" id="reviewForm">
+        @if(request()->boolean('modal'))<input type="hidden" name="modal" value="1">@endif
     @csrf
 
     <section class="panel">
