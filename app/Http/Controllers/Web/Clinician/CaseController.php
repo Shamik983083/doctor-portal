@@ -666,7 +666,9 @@ class CaseController extends Controller
         });
 
         // C12: redirect to review page — approve()/complete()/webhook fire on confirmation.
-        return redirect()->route('clinician.cases.prescribe.review', $case->uuid);
+        $reviewUrl = route('clinician.cases.prescribe.review', $case->uuid)
+            . (request()->boolean('modal') ? '?modal=1' : '');
+        return redirect($reviewUrl);
     }
 
     // C12: show the draft prescription for review before the provider confirms.

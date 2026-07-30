@@ -73,12 +73,12 @@
                 <div class="note-block">
                     <div class="note-head">
                         <div>
-                            <div class="subheading">Charting note</div>
+                            <div class="subheading">Charting note <span class="req">*</span></div>
                             <span class="pill neutral">AI draft · provider edits and signs</span>
                         </div>
                         <button type="button" class="button-secondary" id="genNote">Draft with AI</button>
                     </div>
-                    <textarea name="charting_note" class="note-area" id="noteArea" rows="8"
+                    <textarea name="charting_note" class="note-area" id="noteArea" rows="8" required
                         placeholder="Review the prescription summary, then draft a charting note with AI or write your own. Your note is saved as an internal record."></textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
                 </div>
