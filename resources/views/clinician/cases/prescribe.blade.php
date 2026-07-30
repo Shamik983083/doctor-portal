@@ -187,11 +187,11 @@
 
                 <div class="note-block">
                     <div class="note-head">
-                        <div><div class="subheading">Internal clinical note <span style="font-size:11px;font-weight:400;color:var(--muted)">(private · not sent to patient or partner)</span></div>
+                        <div><div class="subheading">Internal clinical note <span class="req">*</span> <span style="font-size:11px;font-weight:400;color:var(--muted)">(private · not sent to patient or partner)</span></div>
                         <span class="pill neutral">AI draft · provider edits and signs</span></div>
                         <button type="button" class="button-secondary" id="genNote">Draft with AI</button>
                     </div>
-                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write your clinical rationale here. This is an internal note — it will not be visible to the patient or the partner.">{{ old('directions') }}</textarea>
+                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write your clinical rationale here. This is an internal note — it will not be visible to the patient or the partner." required>{{ old('directions') }}</textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
 
                     {{-- C9: ICD-10 structured code editor — sits above Medical Necessity --}}
@@ -209,8 +209,8 @@
                         <p class="ai-honesty" style="margin-top:4px">Codes are auto-populated from the patient's intake. You can remove, edit, or add codes before confirming.</p>
                     </div>
 
-                    <div class="field" style="margin-top:10px"><label>Medical necessity</label>
-                        <textarea name="medical_necessity" class="note-area" rows="2" placeholder="Justify medical necessity for the prescribed medications.">{{ old('medical_necessity', $medicalNecessityPreset ?? '') }}</textarea>
+                    <div class="field" style="margin-top:10px"><label>Medical necessity <span class="req">*</span></label>
+                        <textarea name="medical_necessity" class="note-area" rows="2" placeholder="Justify medical necessity for the prescribed medications." required>{{ old('medical_necessity', $medicalNecessityPreset ?? '') }}</textarea>
                     </div>
                 </div>
             </div>
