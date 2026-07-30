@@ -172,24 +172,9 @@
                 </div>
             </div>
 
-            {{-- Right: diagnosis, medications, note --}}
+            {{-- Right: medications, note, diagnoses, medical necessity --}}
             <div class="modal-right">
-                {{-- C9: ICD-10 structured code editor --}}
-                <div class="field">
-                    <label>ICD-10 Diagnoses <span class="req">*</span>
-                        <span class="pill neutral" style="margin-left:6px">Auto-populated · edit as needed</span>
-                    </label>
-                    <div id="icdEditor" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;padding:8px;border:1px solid var(--line);border-radius:8px;min-height:44px;background:var(--surface)"></div>
-                    <div style="display:flex;gap:8px;margin-top:8px">
-                        <input id="icdCodeInput" type="text" placeholder="Code e.g. E66.01" style="flex:0 0 120px;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-                        <input id="icdDescInput" type="text" placeholder="Description" style="flex:1;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-                        <button type="button" id="icdAddBtn" class="button-secondary">Add code</button>
-                    </div>
-                    <div id="icdHiddens"></div>
-                    <p class="ai-honesty" style="margin-top:4px">Codes are auto-populated from the patient's intake. You can remove, edit, or add codes before confirming.</p>
-                </div>
-
-                <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
                     <div class="subheading" style="margin:0">Medications</div>
                     <button type="button" class="button-secondary" id="addMed">+ Add medication</button>
                 </div>
@@ -208,6 +193,22 @@
                     </div>
                     <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write your clinical rationale here. This is an internal note — it will not be visible to the patient or the partner.">{{ old('directions') }}</textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
+
+                    {{-- C9: ICD-10 structured code editor — sits above Medical Necessity --}}
+                    <div class="field" style="margin-top:10px">
+                        <label>ICD-10 Diagnoses <span class="req">*</span>
+                            <span class="pill neutral" style="margin-left:6px">Auto-populated · edit as needed</span>
+                        </label>
+                        <div id="icdEditor" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;padding:8px;border:1px solid var(--line);border-radius:8px;min-height:44px;background:var(--surface)"></div>
+                        <div style="display:flex;gap:8px;margin-top:8px">
+                            <input id="icdCodeInput" type="text" placeholder="Code e.g. E66.01" style="flex:0 0 120px;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+                            <input id="icdDescInput" type="text" placeholder="Description" style="flex:1;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+                            <button type="button" id="icdAddBtn" class="button-secondary">Add code</button>
+                        </div>
+                        <div id="icdHiddens"></div>
+                        <p class="ai-honesty" style="margin-top:4px">Codes are auto-populated from the patient's intake. You can remove, edit, or add codes before confirming.</p>
+                    </div>
+
                     <div class="field" style="margin-top:10px"><label>Medical necessity</label>
                         <textarea name="medical_necessity" class="note-area" rows="2" placeholder="Justify medical necessity for the prescribed medications.">{{ old('medical_necessity', $medicalNecessityPreset ?? '') }}</textarea>
                     </div>
