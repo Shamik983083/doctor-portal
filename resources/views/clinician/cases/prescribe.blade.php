@@ -358,6 +358,13 @@
             return null;
         }
         function monthsIn(term) { var t = TERMS.filter(function (x) { return x.v === term; })[0]; return t ? t.n : 1; }
+        // Number of dosing-level dropdowns to render per term:
+        // 1M → 1, 3M → 4, everything else → 3.
+        function dosingCount(term) {
+            if (term === '1M') return 1;
+            if (term === '3M') return 4;
+            return 3;
+        }
 
         function offeringOptions(selId) {
             return '<option value="">Select medication</option>' + OFFERINGS.map(function (o) {
@@ -384,10 +391,11 @@
             var levels   = (offering && offering.levels && offering.levels.length) ? offering.levels : null;
             var fam      = levels ? null : family(offering ? offering.name : '');
 
+            var slots = dosingCount(term);
             var head = '<div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
                 + '<span class="months-note">' + n + ' month term, one dose per month</span></div>';
             var cells = '';
-            for (var m = 0; m < n; m++) {
+            for (var m = 0; m < slots; m++) {
                 var control;
                 if (levels) {
                     var opts = '<option value="">Select level</option>'
