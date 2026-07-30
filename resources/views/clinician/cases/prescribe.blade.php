@@ -403,12 +403,12 @@
                             return '<option value="' + esc(lvl.label) + '">'
                                 + esc(lvl.label) + ' · ' + esc(lvl.formula) + '</option>';
                         }).join('');
-                    control = '<select name="medications[' + i + '][months][]">' + opts + '</select>';
+                    control = '<select name="medications[' + i + '][months][]" required>' + opts + '</select>';
                 } else if (fam) {
-                    control = '<select name="medications[' + i + '][months][]"><option value="">Dose</option>'
+                    control = '<select name="medications[' + i + '][months][]" required><option value="">Dose</option>'
                         + optionList(CATALOG[fam], '') + '</select>';
                 } else {
-                    control = '<input type="text" name="medications[' + i + '][months][]" placeholder="Dose">';
+                    control = '<input type="text" name="medications[' + i + '][months][]" placeholder="Dose" required>';
                 }
                 cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + '</div>';
             }
@@ -426,15 +426,15 @@
                 + '<button type="button" class="button-secondary" data-f="remove" style="padding:4px 10px">Remove</button></div>'
                 + '<div class="field-row">'
                 + '<div class="field"><label>Medication <span class="req">*</span></label>'
-                + '<select data-f="med" name="medications[' + i + '][offering_id]">' + offeringOptions(offeringId) + '</select></div>'
+                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>' + offeringOptions(offeringId) + '</select></div>'
                 + '<div class="field"><label>Duration <span class="req">*</span></label>'
-                + '<select data-f="term" name="medications[' + i + '][term]">' + optionList(TERMS, defaultTerm) + '</select></div>'
+                + '<select data-f="term" name="medications[' + i + '][term]" required>' + optionList(TERMS, defaultTerm) + '</select></div>'
                 + '</div>'
                 + '<div class="field-row">'
                 + '<div class="field"><label>Administration frequency <span class="req">*</span></label>'
-                + '<select name="medications[' + i + '][frequency]">' + optionList(FREQUENCIES, 'Weekly') + '</select></div>'
+                + '<select name="medications[' + i + '][frequency]" required>' + optionList(FREQUENCIES, 'Weekly') + '</select></div>'
                 + '<div class="field"><label>Refills <span class="req">*</span></label>'
-                + '<select name="medications[' + i + '][refills]">' + optionList(REFILLS, '0') + '</select></div>'
+                + '<select name="medications[' + i + '][refills]" required>' + optionList(REFILLS, '0') + '</select></div>'
                 + '</div>'
                 + '<div data-f="months"></div>'
                 + '<input type="hidden" data-f="name" name="medications[' + i + '][name]" value="">'
