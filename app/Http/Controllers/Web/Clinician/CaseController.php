@@ -506,7 +506,7 @@ class CaseController extends Controller
             ->orderBy('offerings.name')
             ->get(['offerings.id', 'offerings.name', 'offerings.internal_name', 'offerings.compound_formula',
                 'offerings.refills', 'offerings.quantity', 'offerings.days_supply', 'offerings.dispense_unit',
-                'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels']);
+                'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels', 'offerings.sig']);
 
         $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
 
@@ -565,6 +565,8 @@ class CaseController extends Controller
             'medications.*.term'                => 'nullable|string|max:20',
             'medications.*.months'              => 'nullable|array',
             'medications.*.months.*'            => 'nullable|string|max:60',
+            'medications.*.sigs'                => 'nullable|array',
+            'medications.*.sigs.*'              => 'nullable|string|max:500',
         ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
@@ -623,6 +625,13 @@ class CaseController extends Controller
 
             foreach ($request->input('medications', []) as $med) {
                 $months = array_values(array_filter($med['months'] ?? [], fn ($m) => filled($m)));
+                // Per-month SIG overrides submitted alongside each dose slot.
+                // Preserve only non-empty values; null the whole array when all are blank
+                // so old prescriptions without sigs are unaffected.
+                $rawSigs = $med['sigs'] ?? [];
+                $sigs = array_values(array_map(fn ($s) => trim((string) $s), $rawSigs));
+                $sigsHaveContent = collect($sigs)->contains(fn ($s) => $s !== '');
+
                 $dosing = null;
                 if (filled($med['frequency'] ?? null) || filled($med['term'] ?? null) || $months !== []) {
                     $dosing = [
@@ -630,6 +639,7 @@ class CaseController extends Controller
                         'frequency'  => $med['frequency'] ?? null,
                         'term'       => $med['term'] ?? null,
                         'months'     => $months,
+                        'sigs'       => $sigsHaveContent ? $sigs : null,
                     ];
                 }
 

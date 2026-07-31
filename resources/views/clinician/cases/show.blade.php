@@ -163,7 +163,19 @@
                             @if($med->quantity !== null)<span>Qty: {{ $med->quantity }}</span>@endif
                             @if($med->days_supply !== null)<span>Days supply: {{ $med->days_supply }}</span>@endif
                             @if($med->dispense_unit)<span>Unit: {{ $med->dispense_unit }}</span>@endif
-                            @if(!empty($med->dosing['months']))<span>Dosing: {{ implode(' → ', $med->dosing['months']) }}</span>@endif
+                            @if(!empty($med->dosing['months']))
+                            <div style="margin-top:4px;display:flex;flex-direction:column;gap:2px">
+                                @foreach($med->dosing['months'] as $mi => $dose)
+                                    <div style="display:flex;align-items:baseline;gap:6px;font-size:12px">
+                                        <span style="font-weight:700;color:var(--accent-ink);min-width:24px;font-size:11px">M{{ $mi + 1 }}</span>
+                                        <span>{{ $dose }}</span>
+                                        @if(!empty($med->dosing['sigs'][$mi]))
+                                            <span style="color:var(--muted)">— {{ $med->dosing['sigs'][$mi] }}</span>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                         </div>
                     </div>
                     @endforeach

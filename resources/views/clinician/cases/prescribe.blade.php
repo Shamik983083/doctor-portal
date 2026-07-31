@@ -30,6 +30,9 @@
         'days_supply' => $o->days_supply, 'dispense_unit' => $o->dispense_unit,
         'compound_formula' => $o->compound_formula,
         'levels' => $o->levels ?? [],
+        // Effective SIG: use partner-level sig_override from the pivot when set,
+        // otherwise fall back to the global offering sig.
+        'sig' => (($o->pivot->sig_override ?? '') !== '') ? $o->pivot->sig_override : ($o->sig ?? ''),
     ])->values();
 
     $requestedIds = $case->caseOfferings->pluck('offering.id')->filter()->values();
@@ -388,13 +391,14 @@
             var wrap   = row.querySelector('[data-f="months"]');
 
             // Prefer offering-specific levels; fall back to family CATALOG; then free text.
-            var offering = OFFERINGS.filter(function (x) { return String(x.id) === String(medSel.value); })[0];
-            var levels   = (offering && offering.levels && offering.levels.length) ? offering.levels : null;
-            var fam      = levels ? null : family(offering ? offering.name : '');
+            var offering   = OFFERINGS.filter(function (x) { return String(x.id) === String(medSel.value); })[0];
+            var levels     = (offering && offering.levels && offering.levels.length) ? offering.levels : null;
+            var fam        = levels ? null : family(offering ? offering.name : '');
+            var defaultSig = (offering && offering.sig) ? offering.sig : '';
 
             var slots = dosingCount(term);
             var head = '<div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
-                + '<span class="months-note">' + n + ' month term, one dose per month</span></div>';
+                + '<span class="months-note">' + n + ' month term · ' + slots + ' level' + (slots > 1 ? 's' : '') + '</span></div>';
             var cells = '';
             for (var m = 0; m < slots; m++) {
                 var control;
@@ -411,7 +415,13 @@
                 } else {
                     control = '<input type="text" name="medications[' + i + '][months][]" placeholder="Dose" required>';
                 }
-                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + '</div>';
+                var sigInput = '<input type="text"'
+                    + ' name="medications[' + i + '][sigs][]"'
+                    + ' value="' + esc(defaultSig) + '"'
+                    + ' placeholder="SIG / instructions"'
+                    + ' style="margin-top:5px;width:100%;font-size:11px;padding:4px 7px;'
+                    + 'border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);">';
+                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + '</div>';
             }
             wrap.innerHTML = '<div class="months">' + head + '<div class="months-grid">' + cells + '</div></div>';
         }

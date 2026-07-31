@@ -50,8 +50,16 @@
                         @if($med->dispense_unit)<span>Unit: {{ $med->dispense_unit }}</span>@endif
                     </div>
                     @if(!empty($med->dosing['months']))
-                        <div style="font-size:12px;color:var(--muted);margin-top:4px">
-                            Dosing: {{ implode(' → ', $med->dosing['months']) }}
+                        <div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">
+                            @foreach($med->dosing['months'] as $mi => $dose)
+                                <div style="display:flex;align-items:baseline;gap:8px;font-size:12px">
+                                    <span style="font-weight:700;color:var(--accent-ink);min-width:26px;font-size:11px">M{{ $mi + 1 }}</span>
+                                    <span style="color:var(--ink)">{{ $dose }}</span>
+                                    @if(!empty($med->dosing['sigs'][$mi]))
+                                        <span style="color:var(--muted)">— {{ $med->dosing['sigs'][$mi] }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
                         </div>
                     @endif
                 </div>
