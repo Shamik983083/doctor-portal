@@ -370,7 +370,7 @@ The portal sends a `POST` to your URL with `Content-Type: application/json` for 
 | `case_cancelled` | Case cancelled (by any party) |
 | `case_support` | Case escalated to support |
 | `prescription_written` | Clinician writes a prescription — includes full medication list, ICD-10 codes, NPI, and per-level SIG instructions in `dosing.sigs[]` |
-| `clinical_note_added` | Clinician adds an internal note |
+| `clinical_note_added` | Clinician saves a charting note (type: `charting`, private — not visible to patient or partner) |
 | `message_created` | Clinician sends a patient message |
 | `patient_message_received` | Patient sends a message through the portal |
 | `patient_created` | New patient record created |

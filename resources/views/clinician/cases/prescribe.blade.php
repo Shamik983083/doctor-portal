@@ -191,11 +191,11 @@
 
                 <div class="note-block">
                     <div class="note-head">
-                        <div><div class="subheading">Internal clinical note <span class="req">*</span> <span style="font-size:11px;font-weight:400;color:var(--muted)">(private · not sent to patient or partner)</span></div>
+                        <div><div class="subheading">Charting note <span class="req">*</span> <span style="font-size:11px;font-weight:400;color:var(--muted)">(private · not sent to patient or partner)</span></div>
                         <span class="pill neutral">AI draft · provider edits and signs</span></div>
                         <button type="button" class="button-secondary" id="genNote">Draft with AI</button>
                     </div>
-                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write your clinical rationale here. This is an internal note — it will not be visible to the patient or the partner." required>{{ old('directions') }}</textarea>
+                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write your clinical rationale here. This charting note is private — it will not be visible to the patient or the partner." required>{{ old('directions') }}</textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
 
                     {{-- C9: ICD-10 structured code editor — sits above Medical Necessity --}}

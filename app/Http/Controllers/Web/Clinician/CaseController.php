@@ -661,12 +661,12 @@ class CaseController extends Controller
                 ]);
             }
 
-            // C8: internal clinical note (provider's directions) → ClinicalNote, not directions column.
+            // C8: charting note (provider's clinical rationale) → ClinicalNote, not directions column.
             if ($request->filled('directions')) {
                 ClinicalNote::create([
                     'case_id'      => $case->id,
                     'clinician_id' => $clinician->id,
-                    'type'         => 'internal',
+                    'type'         => 'charting',
                     'note'         => $request->input('directions'),
                     'is_private'   => true,
                 ]);
@@ -721,12 +721,12 @@ class CaseController extends Controller
                 'charting_note' => $request->input('charting_note'),
             ]);
 
-            // C12: persist the charting note as a proper ClinicalNote on confirmation.
+            // C12: persist the charting note as a ClinicalNote on confirmation.
             if ($request->filled('charting_note')) {
                 ClinicalNote::create([
                     'case_id'      => $case->id,
                     'clinician_id' => $clinician->id,
-                    'type'         => 'internal',
+                    'type'         => 'charting',
                     'note'         => $request->input('charting_note'),
                     'is_private'   => true,
                 ]);
