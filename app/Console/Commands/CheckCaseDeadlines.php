@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\CaseEvent;
 use App\Models\PatientCase;
+use App\Notifications\CaseDeadlineExceeded;
 use App\Notifications\CaseDeadlineWarning;
 use App\Services\CaseStateMachine;
 use Illuminate\Console\Command;
@@ -62,7 +64,7 @@ class CheckCaseDeadlines extends Command
         PatientCase::whereNotNull('completion_deadline_at')
             ->where('completion_deadline_at', '<', now())
             ->whereIn('status', $openStatuses)
-            ->with(['clinician'])
+            ->with(['clinician.user', 'clinician.admins'])
             ->each(function (PatientCase $case) use ($stateMachine) {
                 try {
                     $clinician = $case->clinician;
@@ -84,6 +86,22 @@ class CheckCaseDeadlines extends Command
                         $cooldownHours = (int) config('routing.deadline_cooldown_hours', 4);
                         $clinician->updateQuietly(['pool_cooldown_until' => now()->addHours($cooldownHours)]);
                     }
+
+                    CaseEvent::create([
+                        'case_id'    => $case->id,
+                        'event_type' => 'deadline_exceeded',
+                        'actor_type' => 'system',
+                        'actor_id'   => null,
+                        'notes'      => 'Completion deadline passed; case auto-released to waiting queue.',
+                    ]);
+
+                    $notification = new CaseDeadlineExceeded($case, $clinician);
+
+                    if ($clinician?->user) {
+                        $clinician->user->notify($notification);
+                    }
+
+                    $clinician?->admins?->each(fn ($admin) => $admin->notify($notification));
 
                     Log::info('B3: case auto-released past deadline', [
                         'case_id'      => $case->id,
