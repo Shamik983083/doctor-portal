@@ -367,11 +367,11 @@ The portal sends a `POST` to your URL with `Content-Type: application/json` for 
 | `case_approved` | Clinician approves the case |
 | `case_processing` | Prescription is being processed |
 | `case_completed` | Case fully completed |
-| `case_cancelled` | Case cancelled (by any party) |
+| `case_cancelled` | Case cancelled (by any party — clinician decline, partner cancel, or admin). When a clinician declines a case, **two webhooks fire in sequence**: `case_cancelled` then `message_created` (carrying the rejection message sent to the patient). |
 | `case_support` | Case escalated to support |
 | `prescription_written` | Clinician writes a prescription — includes full medication list, ICD-10 codes, NPI, and per-level SIG instructions in `dosing.sigs[]` |
 | `clinical_note_added` | Clinician saves a charting note (type: `charting`, private — not visible to patient or partner) |
-| `message_created` | Clinician sends a patient message |
+| `message_created` | Clinician sends a patient message. When `reason` is `case_declined`, the message is the clinician-authored rejection notice sent to the patient after a case decline. |
 | `patient_message_received` | Patient sends a message through the portal |
 | `patient_created` | New patient record created |
 | `patient_modified` | Patient record updated |
@@ -413,6 +413,19 @@ The `prescription_written` payload additionally includes:
   }]
 }
 ```
+
+The `message_created` payload additionally includes:
+```json
+{
+  "case_id":   "...",
+  "sender":    "clinician",
+  "body":      "The full text of the message sent to the patient.",
+  "reason":    "case_declined",
+  "timestamp": 1234567890
+}
+```
+
+`reason` is only present for system-triggered messages (e.g. `case_declined`). It is absent for regular clinician-to-patient messages.
 
 **`sig` vs `dosing.sigs[]`**
 

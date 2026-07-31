@@ -974,7 +974,7 @@ class CaseController extends Controller
             'note'         => $request->reason,
         ]);
 
-        Message::create([
+        $message = Message::create([
             'case_id'      => $case->id,
             'patient_id'   => $case->patient_id,
             'clinician_id' => $clinician->id,
@@ -983,6 +983,16 @@ class CaseController extends Controller
             'channel'      => 'portal',
             'sender_type'  => 'clinician',
             'body'         => $request->message_body,
+        ]);
+
+        // Notify partner: case_cancelled fires automatically from the state machine above.
+        // message_created must be dispatched separately so partners can read the rejection body.
+        $this->webhooks->dispatch($case->partner_id, 'message_created', [
+            'case_id'   => $case->uuid,
+            'sender'    => 'clinician',
+            'body'      => $request->message_body,
+            'reason'    => 'case_declined',
+            'timestamp' => now()->timestamp,
         ]);
 
         return redirect()->route('clinician.queue')->with('success', 'Case declined and patient notified.');
