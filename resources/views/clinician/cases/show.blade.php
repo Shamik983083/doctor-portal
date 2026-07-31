@@ -34,6 +34,7 @@
         @endif
         @if($case->status === 'assigned')
         <a class="button-primary" href="{{ route('clinician.cases.prescribe.form', $case->uuid) }}" data-review-url="{{ route('clinician.cases.prescribe.form', $case->uuid) }}?modal=1">Approve &amp; prescribe</a>
+        <button type="button" class="button-secondary" data-open-modal="doctorAdminModal">Escalate to Doctor Admin</button>
         <button type="button" class="button-secondary" data-open-modal="supportModal">Escalate to support</button>
         <button type="button" class="button-danger" data-open-modal="cancelModal">Decline</button>
         @endif
@@ -457,6 +458,18 @@
 </div>
 
 {{-- Escalate / Decline modals (vanilla .modal-back overlays) --}}
+<div class="modal-back" id="doctorAdminModal" hidden>
+    <div class="modal" style="width:min(520px,94vw);padding:0">
+        <form method="POST" action="{{ route('clinician.cases.doctor-admin-escalate', $case->uuid) }}">@csrf
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)"><strong>Escalate to Doctor Admin</strong><button type="button" class="icon-btn" data-close-modal>&times;</button></div>
+            <div style="padding:16px 18px">
+                <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Flags this case for your supervising Doctor Admin. The case moves to support status and your Doctor Admin is notified immediately.</p>
+                <div class="field"><label>Reason <span class="req">*</span></label><textarea name="reason" class="note-area" rows="4" required placeholder="Describe what you need from your Doctor Admin."></textarea></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line)"><button type="button" class="button-secondary" data-close-modal>Cancel</button><button class="button-primary">Escalate</button></div>
+        </form>
+    </div>
+</div>
 <div class="modal-back" id="supportModal" hidden>
     <div class="modal" style="width:min(520px,94vw);padding:0">
         <form method="POST" action="{{ route('clinician.cases.support', $case->uuid) }}">@csrf

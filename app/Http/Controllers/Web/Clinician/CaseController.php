@@ -13,6 +13,7 @@ use App\Services\Icd10Ruleset;
 use App\Models\PatientCase;
 use App\Models\PatientFile;
 use App\Models\User;
+use App\Notifications\CaseEscalatedToDoctorAdmin;
 use App\Notifications\NewCaseMessage;
 use App\Services\AiAssistService;
 use App\Services\CaseStateMachine;
@@ -1012,6 +1013,35 @@ class CaseController extends Controller
         ]);
 
         return back()->with('success', 'Case escalated to support. Partner has been notified.');
+    }
+
+    public function escalateToDoctorAdmin(Request $request, string $uuid)
+    {
+        $request->validate(['reason' => 'required|string|max:1000']);
+
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+
+        $this->assertLicensedForCase($case);
+        $clinician = Auth::user()->clinician;
+
+        $this->stateMachine->escalateToDoctorAdmin($case, $request->input('reason'));
+
+        ClinicalNote::create([
+            'case_id'      => $case->id,
+            'clinician_id' => $clinician->id,
+            'type'         => 'general',
+            'note'         => 'Escalated to Doctor Admin: ' . $request->input('reason'),
+        ]);
+
+        try {
+            $clinician->admins->each(
+                fn ($admin) => $admin->notify(new CaseEscalatedToDoctorAdmin($case, $request->input('reason')))
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Doctor Admin escalation notification failed: ' . $e->getMessage());
+        }
+
+        return back()->with('success', 'Case escalated to Doctor Admin.');
     }
 
     public function pollMessages(Request $request, string $uuid)
