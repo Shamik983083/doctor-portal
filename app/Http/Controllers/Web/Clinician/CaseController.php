@@ -915,24 +915,77 @@ class CaseController extends Controller
 
     public function cancel(Request $request, string $uuid)
     {
-        $request->validate(['reason' => 'required|string']);
+        $request->validate(['reason' => 'required|string|max:2000']);
+
+        $case = PatientCase::with(['patient', 'caseOfferings.offering', 'partner'])->where('uuid', $uuid)->firstOrFail();
+
+        // LAW 4: licensure gates every action, not only auto-routing.
+        $this->assertLicensedForCase($case);
+
+        // A9: Generate patient-facing rejection draft, then redirect to review screen
+        // before the case is actually cancelled — provider must confirm the message first.
+        $draft = $this->aiAssist->draftRejectionMessage($case, $request->reason);
+
+        session()->flash('reject_draft_text',   $draft['text']);
+        session()->flash('reject_draft_notice', $draft['notice']);
+        session()->flash('reject_reason',       $request->reason);
+
+        return redirect()->route('clinician.cases.reject-draft', $case->uuid);
+    }
+
+    public function rejectDraft(string $uuid)
+    {
+        $case = PatientCase::with(['patient', 'partner', 'caseOfferings.offering'])
+            ->where('uuid', $uuid)->firstOrFail();
+
+        $this->assertLicensedForCase($case);
+
+        // Guard: only reachable via the cancel flow redirect (session must carry the draft).
+        if (! session()->has('reject_draft_text')) {
+            return redirect()->route('clinician.cases.show', $uuid)
+                ->with('error', 'Rejection session expired. Please try again.');
+        }
+
+        $draftText   = session('reject_draft_text');
+        $draftNotice = session('reject_draft_notice');
+        $reason      = session('reject_reason');
+
+        return view('clinician.cases.reject-draft', compact('case', 'draftText', 'draftNotice', 'reason'));
+    }
+
+    public function rejectConfirm(Request $request, string $uuid)
+    {
+        $request->validate([
+            'message_body' => 'required|string|max:5000',
+            'reason'       => 'required|string|max:2000',
+        ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
 
-        // LAW 4: licensure gates every action, not only auto-routing.
         $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
         $this->stateMachine->cancel($case, $request->reason, $clinician->id, 'clinician');
 
         ClinicalNote::create([
-            'case_id' => $case->id,
+            'case_id'      => $case->id,
             'clinician_id' => $clinician->id,
-            'type' => 'cancellation',
-            'note' => $request->reason,
+            'type'         => 'cancellation',
+            'note'         => $request->reason,
         ]);
 
-        return redirect()->route('clinician.queue')->with('success', 'Case declined.');
+        Message::create([
+            'case_id'      => $case->id,
+            'patient_id'   => $case->patient_id,
+            'clinician_id' => $clinician->id,
+            'partner_id'   => $case->partner_id,
+            'direction'    => 'outbound',
+            'channel'      => 'portal',
+            'sender_type'  => 'clinician',
+            'body'         => $request->message_body,
+        ]);
+
+        return redirect()->route('clinician.queue')->with('success', 'Case declined and patient notified.');
     }
 
     public function addNote(Request $request, string $uuid)

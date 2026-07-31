@@ -50,6 +50,31 @@ class AiAssistService
     }
 
     /**
+     * Draft a patient-facing rejection message explaining why the case was declined.
+     * Uses the rejection_reason context. Always produces a grounded fallback.
+     */
+    public function draftRejectionMessage(PatientCase $case, string $reason): array
+    {
+        $patient  = $case->patient;
+        $clin     = $case->queueClinical();
+        $product  = $clin['product'] ?? null;
+        $productText = ($product && $product !== '-') ? " for {$product}" : '';
+
+        $fallback = "After a thorough clinical review, the prescription request{$productText} cannot be approved at this time. "
+            . "The submitted information does not meet the clinical criteria required to safely prescribe the requested medication. "
+            . "Please consult with a licensed healthcare provider for alternative treatment options.";
+
+        $lines   = ['CASE CONTEXT'];
+        $lines[] = 'Decline reason: ' . $reason;
+        if ($patient?->age)    { $lines[] = 'Age: ' . $patient->age; }
+        if ($patient?->gender) { $lines[] = 'Sex: ' . $patient->gender; }
+        if ($patient?->bmi)    { $lines[] = 'BMI: ' . $patient->bmi; }
+        if ($product && $product !== '-') { $lines[] = 'Requested product: ' . $product; }
+
+        return $this->run('rejection_reason', implode("\n", $lines), $fallback);
+    }
+
+    /**
      * Draft a reply to a patient in a case thread.
      */
     public function draftPatientReply(PatientCase $case, string $steer = ''): array

@@ -98,6 +98,8 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
         Route::post('/{uuid}/draft-note', [ClinicianCaseController::class, 'draftNote'])->name('draft-note');
         Route::post('/{uuid}/draft-rejection', [ClinicianCaseController::class, 'draftRejection'])->name('draft-rejection');
         Route::post('/{uuid}/cancel', [ClinicianCaseController::class, 'cancel'])->name('cancel');
+        Route::get('/{uuid}/reject-draft', [ClinicianCaseController::class, 'rejectDraft'])->name('reject-draft');
+        Route::post('/{uuid}/reject-confirm', [ClinicianCaseController::class, 'rejectConfirm'])->name('reject-confirm');
         Route::post('/{uuid}/support', [ClinicianCaseController::class, 'escalateToSupport'])->name('support');
         Route::post('/{uuid}/doctor-admin-escalate', [ClinicianCaseController::class, 'escalateToDoctorAdmin'])->name('doctor-admin-escalate');
         Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
