@@ -450,10 +450,10 @@ def webhook():
 <div id="ev-prescription-written" class="card mb-3 section-anchor border-success">
 <div class="card-header py-2 d-flex align-items-center gap-2 bg-success bg-opacity-10">
     <span class="event-badge" style="background:#d1fae5;border-color:#6ee7b7;color:#065f46">prescription_written</span>
-    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, SIG, full medication details with <code>offering_id</code>, <code>product_key</code>, and <code>month_frequency</code> per medication</span>
+    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, full medication details with <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, and per-month SIG instructions inside <code>dosing.sigs[]</code></span>
 </div>
 <div class="card-body">
-<p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is now a structured array of ICD-10-CM codes (auto-populated from the patient's intake), and each medication includes a <code>sig</code> field with the resolved dispensing instructions for this partner.</p>
+<p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is a structured array of ICD-10-CM codes and each medication includes both a flat <code>sig</code> (offering default, resolved per partner) and per-month <code>dosing.sigs[]</code> overrides set by the clinician at prescription time.</p>
 <pre id="code-ev-rx">{
   "case_id":         "9d2f1c3e-...",
   "external_id":     "order-wl-20240701-001",   // your reference ID
@@ -473,21 +473,39 @@ def webhook():
       "name":                "Semaglutide",
       "offering_id":         "b3f8e1a2-...",   // MEDAXIS offering UUID
       "product_key":         "glp1-monthly",   // your product identifier — use to map to your catalogue
-      "month_frequency":     1,                // billing cycle in months
+      "month_frequency":     3,                // billing cycle in months
       "compound_formula":    "Semaglutide 0.5mg/mL in bacteriostatic water",
-      // sig: resolved dispensing instructions — partner-specific override when set,
-      //      otherwise the offering's default SIG. null when not configured.
-      "sig":                 "Inject 0.25 mg subcutaneously once weekly for the first 4 weeks",
+
+      // sig: offering-level default — partner-specific override when configured,
+      //      otherwise the global offering SIG. null when not set.
+      //      Use dosing.sigs[] for the clinician's per-level instruction overrides.
+      "sig":                 "Inject subcutaneously once weekly",
+
       "refills":             "3",
       "quantity":            "1",
       "days_supply":         "30",
       "dispense_unit":       "vial",
       "days_until_dispense": 7,
+
       "dosing": {
         "medication": "Semaglutide",
         "frequency":  "Once weekly",
         "term":       "3M",
-        "months":     ["0.25 mg", "0.5 mg", "1.0 mg"]
+
+        // months[]: one entry per dose level (L1→L2→L3→L4 for a 3M term).
+        // Count follows the portal rule: 1M→1 level, 3M→4 levels, all others→3 levels.
+        "months": ["0.25 mg", "0.5 mg", "1.0 mg", "1.5 mg"],
+
+        // sigs[]: per-level SIG instructions set by the clinician at prescription time.
+        // Parallel to months[] — sigs[0] is the instruction for months[0], etc.
+        // null (or absent) when the clinician left all SIG fields unchanged.
+        // Individual entries may be empty string "" when only some levels were overridden.
+        "sigs": [
+          "Inject 0.25 mg subcutaneously once weekly for the first month",
+          "Inject 0.5 mg subcutaneously once weekly",
+          "Inject 1.0 mg subcutaneously once weekly",
+          "Inject 1.5 mg subcutaneously once weekly"
+        ]
       }
     }
   ],
@@ -507,6 +525,23 @@ if (is_array($payload['diagnoses'])) {
 } else {
     // legacy comma-joined string: "E66.9, I10"
     $codes = explode(',', $payload['diagnoses']);
+}</pre>
+</div>
+
+<div class="alert alert-info mt-0 mb-2 small">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>Using <code>dosing.sigs[]</code> for per-level dispensing instructions:</strong>
+    <code>dosing.sigs</code> is an array parallel to <code>dosing.months</code> — index 0 is the SIG for dose level M1, index 1 for M2, and so on. Use these to populate per-shipment dispensing labels or pharmacy instructions.
+    <ul class="mb-1 mt-2">
+        <li><code>dosing.sigs</code> is <code>null</code> when the clinician left all SIG fields at their defaults — fall back to the top-level <code>sig</code> field in that case.</li>
+        <li>Individual entries may be an empty string <code>""</code> when only some levels were overridden — guard each entry before using it.</li>
+        <li>The top-level <code>sig</code> field is always present (offering default, resolved per partner) and is safe to use as a fallback for the entire prescription.</li>
+    </ul>
+    <pre style="background:#f8fafc;color:#1f2937;border:1px solid #e2e8f0;border-radius:6px;padding:.5rem .75rem;font-size:.8rem;margin-top:.4rem;overflow-x:auto">// PHP — resolve the SIG for a given dose level
+function sigForLevel(array $med, int $levelIndex): string {
+    $perLevel = $med['dosing']['sigs'][$levelIndex] ?? '';
+    if ($perLevel !== '') return $perLevel;
+    return $med['sig'] ?? '';   // offering default fallback
 }</pre>
 </div>
 
@@ -815,7 +850,7 @@ if (is_array($payload['diagnoses'])) {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Endpoint must be <strong>HTTPS</strong> and publicly reachable; respond with <code>200</code> within 10 seconds</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify <code>X-Webhook-Signature</code> on <strong>every</strong> incoming request using a constant-time comparison</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Route by <code>X-Event-Type</code> header — do not rely solely on payload fields to identify the event</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> now includes <code>offering_id</code>, <code>product_key</code>, and <code>month_frequency</code> directly; use <code>product_key</code> to map each medication back to your catalogue</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> includes <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, a flat <code>sig</code> (offering default), and per-level <code>dosing.sigs[]</code> overrides; use <code>sigForLevel(med, index)</code> pattern — prefer <code>dosing.sigs[i]</code> when non-empty, fall back to <code>sig</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and respond via API or portal</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>message_created</code></strong> — check <code>sender</code>: <code>clinician</code> = doctor message, <code>support</code> = support team message</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Make your handler <strong>idempotent</strong> — the same event may be delivered more than once on retry</li>

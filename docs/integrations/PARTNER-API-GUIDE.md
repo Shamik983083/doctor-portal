@@ -369,7 +369,7 @@ The portal sends a `POST` to your URL with `Content-Type: application/json` for 
 | `case_completed` | Case fully completed |
 | `case_cancelled` | Case cancelled (by any party) |
 | `case_support` | Case escalated to support |
-| `prescription_written` | Clinician writes a prescription — includes full medication list, ICD-10 codes, NPI |
+| `prescription_written` | Clinician writes a prescription — includes full medication list, ICD-10 codes, NPI, and per-level SIG instructions in `dosing.sigs[]` |
 | `clinical_note_added` | Clinician adds an internal note |
 | `message_created` | Clinician sends a patient message |
 | `patient_message_received` | Patient sends a message through the portal |
@@ -391,18 +391,37 @@ The `prescription_written` payload additionally includes:
   "meds_prescribed": [{
     "name":                "Semaglutide Tablet (SNAC)",
     "product_key":         "semaglutide",
-    "month_frequency":     12,
+    "month_frequency":     3,
     "compound_formula":    "...",
-    "sig":                 "...",
+    "sig":                 "Inject subcutaneously once weekly",
     "refills":             "0",
     "quantity":            "1",
     "days_supply":         "30",
     "dispense_unit":       "vial",
     "days_until_dispense": 0,
-    "dosing":              { "frequency": "Weekly", "term": "12M", "months": ["L1 · 2.5 mg", ...] }
+    "dosing": {
+      "frequency": "Weekly",
+      "term":      "3M",
+      "months":    ["0.25 mg", "0.5 mg", "1.0 mg", "1.5 mg"],
+      "sigs": [
+        "Inject 0.25 mg subcutaneously once weekly",
+        "Inject 0.5 mg subcutaneously once weekly",
+        "Inject 1.0 mg subcutaneously once weekly",
+        "Inject 1.5 mg subcutaneously once weekly"
+      ]
+    }
   }]
 }
 ```
+
+**`sig` vs `dosing.sigs[]`**
+
+| Field | What it is | When to use |
+|-------|-----------|-------------|
+| `sig` | Offering-level default, resolved per partner (override → global fallback). Always present. | Safe fallback for the whole prescription |
+| `dosing.sigs[]` | Per-level clinician overrides, parallel to `dosing.months[]`. `null` when unchanged. | Per-shipment dispensing labels / pharmacy instructions |
+
+Resolution rule: for dose level `i`, use `dosing.sigs[i]` when non-empty, otherwise fall back to `sig`.
 
 ---
 
