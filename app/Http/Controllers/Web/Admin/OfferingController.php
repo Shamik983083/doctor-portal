@@ -233,7 +233,7 @@ class OfferingController extends Controller
             'refills'                 => 'required|integer|min:0',
             'quantity'                => 'required|numeric|min:0',
             'days_supply'             => 'nullable|integer|min:0',
-            'dispense_unit'           => 'required|string|max:100',
+            'dispense_unit'           => 'nullable|string|max:100',
             'days_until_dispense'     => 'nullable|integer|min:0',
             'directions'              => 'required|string',
             'pharmacy_type'           => 'required|in:boothwyn,curexa,custom',
@@ -252,6 +252,22 @@ class OfferingController extends Controller
         $data['is_active']               = $request->boolean('is_active');
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
         $data['category_id']             = $request->input('category_id') ?: null;
+
+        // Merge per-level SIG instructions into the levels JSON column.
+        $currentLevels = $offering->levels;
+        if (!empty($currentLevels) && is_array($currentLevels)) {
+            $levelsSigs = $request->input('levels_sigs', []);
+            $updatedLevels = [];
+            foreach ($currentLevels as $idx => $level) {
+                $level['sig'] = trim((string) ($levelsSigs[$idx] ?? ''));
+                $updatedLevels[] = $level;
+            }
+            $data['levels'] = $updatedLevels;
+            $data['sig']    = null;
+        } else {
+            $rawSig = trim((string) $request->input('sig', ''));
+            $data['sig'] = $rawSig !== '' ? $rawSig : null;
+        }
 
         $offering->update($data);
 

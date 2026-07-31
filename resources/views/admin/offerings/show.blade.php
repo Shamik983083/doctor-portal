@@ -339,31 +339,20 @@
                     </div>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Refills <span class="text-danger">*</span></label>
                             <input type="number" name="refills" min="0" class="form-control"
                                    value="{{ old('refills', $offering->refills) }}" placeholder="0" required>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
                             <input type="number" name="quantity" min="0" step="0.01" class="form-control"
                                    value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00" required>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
                             <input type="number" name="days_supply" min="0" class="form-control"
                                    value="{{ old('days_supply', $offering->days_supply) }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Dispense Unit <span class="text-danger">*</span></label>
-                            <input type="text" name="dispense_unit" class="form-control"
-                                   value="{{ old('dispense_unit', $offering->dispense_unit) }}"
-                                   placeholder="e.g. Each, Vial, mL" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Days Until Dispense <span class="text-muted fw-normal">(opt)</span></label>
-                            <input type="number" name="days_until_dispense" min="0" class="form-control"
-                                   value="{{ old('days_until_dispense', $offering->days_until_dispense) }}">
                         </div>
                     </div>
 
@@ -373,6 +362,45 @@
                                   placeholder="e.g. First Week: Inject 20 units once daily, Monday–Friday…" required>{{ old('directions', $offering->directions) }}</textarea>
                         <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
                     </div>
+
+                    {{-- SIG instructions: per-level when offering has levels, global otherwise --}}
+                    @if(!empty($offering->levels))
+                        @php $offeringLevels = $offering->levels; @endphp
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                SIG Instructions by Level
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"
+                                      style="font-size:.65rem;font-weight:600">{{ count($offeringLevels) }} levels</span>
+                            </label>
+                            <p class="form-text mb-2">
+                                Enter patient-facing SIG instructions for each dosing level. When a clinician selects a level in the prescribe form, the corresponding SIG will auto-fill.
+                            </p>
+                            <div class="d-flex flex-column gap-2">
+                                @foreach($offeringLevels as $idx => $level)
+                                <div class="d-flex align-items-center gap-3 p-2 rounded border"
+                                     style="background:var(--bs-gray-100,#f8f9fa)">
+                                    <div style="min-width:160px;flex-shrink:0">
+                                        <div class="fw-bold text-primary" style="font-size:.875rem">{{ $level['label'] ?? 'Level '.($idx+1) }}</div>
+                                        <div class="text-muted" style="font-size:.75rem">{{ $level['formula'] ?? '' }}</div>
+                                    </div>
+                                    <input type="text"
+                                           name="levels_sigs[{{ $idx }}]"
+                                           class="form-control form-control-sm"
+                                           value="{{ old('levels_sigs.'.$idx, $level['sig'] ?? '') }}"
+                                           placeholder="e.g. Inject 0.25 mL subcutaneously once weekly">
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @else
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">SIG <span class="text-muted fw-normal">(opt)</span></label>
+                            <input type="text" name="sig" class="form-control"
+                                   value="{{ old('sig', $offering->sig) }}"
+                                   placeholder="e.g. Take 1 capsule orally once daily">
+                            <div class="form-text">Default patient-facing SIG instructions for this offering.</div>
+                        </div>
+                    @endif
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">

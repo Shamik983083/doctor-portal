@@ -403,12 +403,12 @@
             for (var m = 0; m < slots; m++) {
                 var control;
                 if (levels) {
-                    var opts = '<option value="">Select level</option>'
+                    var opts = '<option value="" data-sig="">Select level</option>'
                         + levels.map(function (lvl) {
-                            return '<option value="' + esc(lvl.label) + '">'
+                            return '<option value="' + esc(lvl.label) + '" data-sig="' + esc(lvl.sig || '') + '">'
                                 + esc(lvl.label) + ' · ' + esc(lvl.formula) + '</option>';
                         }).join('');
-                    control = '<select name="medications[' + i + '][months][]" required>' + opts + '</select>';
+                    control = '<select name="medications[' + i + '][months][]" required class="level-select">' + opts + '</select>';
                 } else if (fam) {
                     control = '<select name="medications[' + i + '][months][]" required><option value="">Dose</option>'
                         + optionList(CATALOG[fam], '') + '</select>';
@@ -419,11 +419,24 @@
                     + ' name="medications[' + i + '][sigs][]"'
                     + ' value="' + esc(defaultSig) + '"'
                     + ' placeholder="SIG / instructions"'
+                    + ' required'
                     + ' style="margin-top:5px;width:100%;font-size:11px;padding:4px 7px;'
                     + 'border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);">';
                 cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + '</div>';
             }
             wrap.innerHTML = '<div class="months">' + head + '<div class="months-grid">' + cells + '</div></div>';
+
+            // Wire level→SIG auto-fill after DOM is set
+            if (levels) {
+                wrap.querySelectorAll('.level-select').forEach(function (sel) {
+                    sel.addEventListener('change', function () {
+                        var opt = this.options[this.selectedIndex];
+                        var sig = opt ? (opt.getAttribute('data-sig') || '') : '';
+                        var sigInp = this.parentElement.querySelector('input[name$="[sigs][]"]');
+                        if (sigInp) sigInp.value = sig;
+                    });
+                });
+            }
         }
 
         function addRow(offeringId) {
