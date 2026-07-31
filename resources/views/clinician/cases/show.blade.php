@@ -336,21 +336,20 @@
                     @php $lastSide = null; @endphp
                     @forelse($case->messages->sortBy('created_at') as $msg)
                         @php
-                            $side       = $msg->sender_type === 'clinician' ? 'me' : 'them';
                             $isAdminMsg = $msg->sender_type === 'admin';
+                            $side = in_array($msg->sender_type, ['clinician', 'admin']) ? 'me' : 'them';
                         @endphp
                         @if($side !== $lastSide)
                             <div class="chat-time" data-date="{{ $msg->created_at->format('Y-m-d') }}">
-                                @if($isAdminMsg)<span style="font-size:.7em;opacity:.7;">Admin · </span>@endif
                                 {{ $msg->created_at->format('M j, g:i A') }}
                             </div>
                             @php $lastSide = $side; @endphp
                         @endif
                         <div class="bubble-row {{ $side }}">
                             <div class="bubble {{ $side }}"
-                             style="{{ $isAdminMsg ? 'background:rgba(111,66,193,.12);border:1px solid rgba(111,66,193,.25);' : '' }}">
+                                 @if($isAdminMsg) style="background:#6f42c1;" @endif>
                                 @if($isAdminMsg)
-                                    <span style="display:block;font-size:.65em;font-weight:600;color:#6f42c1;margin-bottom:3px;opacity:.85;">Admin (internal)</span>
+                                    <span style="display:block;font-size:.65em;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:3px;letter-spacing:.02em;">SYSTEM</span>
                                 @endif
                                 {{ $msg->body }}
                             </div>
@@ -615,8 +614,11 @@
     function scrollToBottom() { thread.scrollTop = thread.scrollHeight; }
     function esc(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
     function buildBubble(msg) {
-        var side = msg.sender_type === 'clinician' ? 'me' : 'them';
-        return '<div class="bubble-row ' + side + '"><div class="bubble ' + side + '">' + esc(msg.body) + '</div></div>';
+        var isAdmin = msg.sender_type === 'admin';
+        var side    = (msg.sender_type === 'clinician' || isAdmin) ? 'me' : 'them';
+        var style   = isAdmin ? ' style="background:#6f42c1"' : '';
+        var label   = isAdmin ? '<span style="display:block;font-size:.65em;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:3px;letter-spacing:.02em">SYSTEM</span>' : '';
+        return '<div class="bubble-row ' + side + '"><div class="bubble ' + side + '"' + style + '>' + label + esc(msg.body) + '</div></div>';
     }
     function appendMessage(msg) {
         var empty = document.getElementById('clinThreadEmpty'); if (empty) empty.remove();
