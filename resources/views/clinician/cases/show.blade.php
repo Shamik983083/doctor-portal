@@ -336,8 +336,8 @@
                     @php $lastSide = null; @endphp
                     @forelse($case->messages->sortBy('created_at') as $msg)
                         @php
-                            $isAdminMsg = $msg->sender_type === 'admin';
-                            $side = in_array($msg->sender_type, ['clinician', 'admin']) ? 'me' : 'them';
+                            $side      = ($msg->direction === 'outbound') ? 'me' : 'them';
+                            $isSystem  = in_array($msg->sender_type, ['system', 'admin']);
                         @endphp
                         @if($side !== $lastSide)
                             <div class="chat-time" data-date="{{ $msg->created_at->format('Y-m-d') }}">
@@ -347,8 +347,8 @@
                         @endif
                         <div class="bubble-row {{ $side }}">
                             <div class="bubble {{ $side }}"
-                                 @if($isAdminMsg) style="background:#6f42c1;" @endif>
-                                @if($isAdminMsg)
+                                 @if($isSystem) style="background:#6f42c1;" @endif>
+                                @if($isSystem)
                                     <span style="display:block;font-size:.65em;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:3px;letter-spacing:.02em;">SYSTEM</span>
                                 @endif
                                 {{ $msg->body }}
@@ -614,10 +614,10 @@
     function scrollToBottom() { thread.scrollTop = thread.scrollHeight; }
     function esc(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
     function buildBubble(msg) {
-        var isAdmin = msg.sender_type === 'admin';
-        var side    = (msg.sender_type === 'clinician' || isAdmin) ? 'me' : 'them';
-        var style   = isAdmin ? ' style="background:#6f42c1"' : '';
-        var label   = isAdmin ? '<span style="display:block;font-size:.65em;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:3px;letter-spacing:.02em">SYSTEM</span>' : '';
+        var isSystem = (msg.sender_type === 'system' || msg.sender_type === 'admin');
+        var side     = (msg.direction === 'outbound') ? 'me' : 'them';
+        var style    = isSystem ? ' style="background:#6f42c1"' : '';
+        var label    = isSystem ? '<span style="display:block;font-size:.65em;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:3px;letter-spacing:.02em">SYSTEM</span>' : '';
         return '<div class="bubble-row ' + side + '"><div class="bubble ' + side + '"' + style + '>' + label + esc(msg.body) + '</div></div>';
     }
     function appendMessage(msg) {
