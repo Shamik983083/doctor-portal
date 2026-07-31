@@ -279,11 +279,15 @@
             'summary'  => collect($ci['summary'] ?? $derivedSummary)->map(fn($l) => is_array($l) ? ($l[0] ?? '') : $l)->filter()->values(),
             'findings' => collect($ci['findings'] ?? [])->map(fn($f) => is_array($f) ? ['tone' => $f[0] ?? 'neutral', 'text' => $f[1] ?? ''] : ['tone' => 'neutral', 'text' => $f])->values(),
             'protocol' => $ci['protocolVersion'] ?? null,
-            'source'   => $source,
-            'hold'     => (bool) $case->hold_status,
-            'state'    => $expandState($case->patient_state ?? $case->patient?->state ?? null),
-            'collab'   => $case->patient?->collaboratingClinician?->full_name ?? null,
-            'isRefill' => $isRefill,
+            'source'      => $source,
+            'hold'        => (bool) $case->hold_status,
+            'state'       => $expandState($case->patient_state ?? $case->patient?->state ?? null),
+            'collab'      => $case->patient?->collaboratingClinician?->full_name ?? null,
+            'gender'      => $case->patient?->gender ?? null,
+            'age'         => $case->patient?->age ?? null,
+            'bmi'         => is_numeric($case->patient?->bmi) ? (float) $case->patient->bmi : null,
+            'id_verified' => $case->patient?->id_verified_status ?? null,
+            'isRefill'    => $isRefill,
             'prior'    => $priorData,
             'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
             'reviewUrl'  => route('clinician.cases.prescribe.form', $case->uuid) . '?modal=1',
@@ -411,10 +415,22 @@
                 }
             }
 
+            // Build demographic chip row (C5)
+            var demoChipParts = [];
+            if (d.gender) demoChipParts.push('<span class="demo-chip">' + esc(d.gender.charAt(0).toUpperCase() + d.gender.slice(1)) + '</span>');
+            if (d.age != null) demoChipParts.push('<span class="demo-chip">' + esc(String(d.age)) + ' yrs</span>');
+            if (d.bmi != null) demoChipParts.push('<span class="demo-chip">BMI ' + Number(d.bmi).toFixed(1) + '</span>');
+            if (d.state) demoChipParts.push('<span class="demo-chip">' + esc(d.state) + '</span>');
+            var idVerified = d.id_verified ? d.id_verified.toLowerCase() : '';
+            demoChipParts.push('<span class="demo-chip ' + (idVerified === 'verified' ? 'chip-verified' : 'chip-unverified') + '">'
+                + (idVerified === 'verified' ? 'ID Verified' : 'ID Unverified') + '</span>');
+            var demoChipsHtml = '<div class="demo-chips">' + demoChipParts.join('') + '</div>';
+
             panel.innerHTML =
                 '<div class="panel-heading"><div>'
                 + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
                 + '<h2>' + esc(d.name) + (d.isRefill ? ' <span class="pill" style="font-size:10px;vertical-align:middle">Refill</span>' : '') + '</h2>'
+                + demoChipsHtml
                 + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state ? ' · ' + esc(d.state) : '') + '</p></div>'
                 + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
                 + '<span class="pill ' + esc(d.tone) + '">' + esc(d.label) + '</span></div></div>'

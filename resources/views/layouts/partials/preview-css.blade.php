@@ -403,6 +403,10 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 
 .quick-review{padding:20px;margin-top:16px}
 .quick-pills{display:flex;gap:6px}
+.demo-chips{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 6px}
+.demo-chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:650;background:var(--blue-bg,#eef4ff);color:var(--soft-muted);border:1px solid rgba(37,99,235,.1)}
+.demo-chip.chip-verified{background:var(--green-bg);color:var(--green);border-color:transparent}
+.demo-chip.chip-unverified{background:var(--yellow-bg);color:var(--yellow);border-color:transparent}
 .quick-review-grid{display:grid;grid-template-columns:1.25fr 1.15fr .75fr;gap:20px}
 .subheading{color:var(--soft-muted);font-size:11px;font-weight:770;letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
 .finding-list{list-style:none;padding:0;margin:0;display:grid;gap:11px;font-size:13px}

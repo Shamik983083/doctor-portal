@@ -8,6 +8,14 @@
     <div>
         <div class="eyebrow">Quick review · {{ $d['id'] }}</div>
         <h2>{{ $d['name'] }}</h2>
+        <div class="demo-chips">
+            @if(!empty($d['gender']))<span class="demo-chip">{{ ucfirst($d['gender']) }}</span>@endif
+            @if(isset($d['age']) && $d['age'] !== null)<span class="demo-chip">{{ $d['age'] }} yrs</span>@endif
+            @if(isset($d['bmi']) && $d['bmi'] !== null)<span class="demo-chip">BMI {{ number_format((float)$d['bmi'], 1) }}</span>@endif
+            @if(!empty($d['state']))<span class="demo-chip">{{ $d['state'] }}</span>@endif
+            @php $idStatus = strtolower($d['id_verified'] ?? ''); @endphp
+            <span class="demo-chip {{ $idStatus === 'verified' ? 'chip-verified' : 'chip-unverified' }}">{{ $idStatus === 'verified' ? 'ID Verified' : 'ID Unverified' }}</span>
+        </div>
         <p>{{ $d['company'] }} · Request {{ $d['term'] }} · {{ $d['dose'] }}{{ !empty($d['state']) ? ' · ' . $d['state'] : '' }}</p>
     </div>
     <div class="quick-pills">
