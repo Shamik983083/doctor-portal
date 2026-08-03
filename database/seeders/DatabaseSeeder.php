@@ -16,6 +16,9 @@ class DatabaseSeeder extends Seeder
             IntakeQuestionnairesSeeder::class,
             OfferIntakeQuestionnairesSeeder::class,
             DemoDataSeeder::class,
+            GlpOfferingsSeeder::class,
+            AttachQuestionnairesToOfferingsSeeder::class,
+            PartnerProductPlanSeeder::class,
         ]);
     }
 }
