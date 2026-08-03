@@ -68,10 +68,14 @@
     {{-- 3. Provider actions (link to the real case flows) --}}
     <div>
         <div class="subheading">Provider actions</div>
-        <a class="button-primary full-width" href="{{ $d['approveUrl'] }}" data-review-url="{{ $d['reviewUrl'] }}">Review and approve</a>
+        @unless(in_array($d['status'] ?? '', ['approved', 'completed', 'cancelled']))
+            <a class="button-primary full-width" href="{{ $d['approveUrl'] }}" data-review-url="{{ $d['reviewUrl'] }}">Review and approve</a>
+        @endunless
         <a class="button-secondary full-width" href="{{ $d['showUrl'] }}">Show Full Profile</a>
         <a class="button-secondary full-width" href="{{ $d['msgUrl'] }}">Send Message</a>
-        <a class="button-danger full-width" href="{{ $d['showUrl'] }}">Reject</a>
+        @unless(in_array($d['status'] ?? '', ['approved', 'completed', 'cancelled']))
+            <a class="button-danger full-width" href="{{ $d['showUrl'] }}">Reject</a>
+        @endunless
     </div>
 </div>
 

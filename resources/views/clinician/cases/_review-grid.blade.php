@@ -289,6 +289,7 @@
             'id_verified' => $case->patient?->id_verified_status ?? null,
             'isRefill'    => $isRefill,
             'prior'    => $priorData,
+            'status'     => $case->status,
             'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
             'reviewUrl'  => route('clinician.cases.prescribe.form', $case->uuid) . '?modal=1',
             'showUrl'    => route('clinician.cases.show', $case->uuid),
@@ -459,10 +460,13 @@
                 + (d.collab ? '<p class="ai-honesty" style="margin-top:8px"><strong>Collaborating:</strong> ' + esc(d.collab) + '</p>' : '')
                 + '<div class="subheading holds-heading">Active workflow holds</div>' + holds + '</div>'
                 + '<div><div class="subheading">Provider actions</div>'
-                + '<a class="button-primary full-width" href="' + esc(d.approveUrl) + '" data-review-url="' + esc(d.reviewUrl) + '">Review and approve</a>'
+                + ((['approved','completed','cancelled'].indexOf(d.status) === -1)
+                    ? '<a class="button-primary full-width" href="' + esc(d.approveUrl) + '" data-review-url="' + esc(d.reviewUrl) + '">Review and approve</a>'
+                      + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a>'
+                    : '')
                 + '<a class="button-secondary full-width" href="' + esc(d.showUrl) + '">Show Full Profile</a>'
                 + '<a class="button-secondary full-width" href="' + esc(d.msgUrl) + '">Send Message</a>'
-                + '<a class="button-danger full-width" href="' + esc(d.showUrl) + '">Reject</a></div>'
+                + '</div>'
                 + '</div>'
                 + sourceSection
                 + priorHtml;
