@@ -159,7 +159,7 @@ class CaseController extends Controller
         $tab         = $request->get('tab', 'active');
 
         $activeStatuses    = ['assigned', 'support', 'processing'];
-        $completedStatuses = ['approved'];
+        $completedStatuses = ['approved', 'completed'];
         $cancelledStatuses = ['cancelled'];
 
         // Same eager loads as the queue, so My Cases can render the identical
