@@ -12,18 +12,18 @@ class EscalationController extends Controller
     {
         $user = $request->user();
 
-        // Two tabs:
-        //   directed — escalation_target = 'doctor_admin' (needs admin review)
-        //   all      — every status=support case in the admin's scope
-        $tab = in_array($request->input('tab'), ['directed', 'all']) ? $request->input('tab') : 'directed';
+        // Three tabs:
+        //   directed         — escalation_target = 'doctor_admin' (needs admin review)
+        //   client_response  — escalation_target = 'client_response' (awaiting patient/partner reply)
+        //   all              — every status=support case in the admin's scope
+        $validTabs = ['directed', 'client_response', 'all'];
+        $tab = in_array($request->input('tab'), $validTabs, true) ? $request->input('tab') : 'directed';
 
         $cases = PatientCase::visibleTo($user)
             ->where('status', PatientCase::STATUS_SUPPORT)
             ->with(['patient', 'clinician.user', 'partner', 'caseOfferings.offering'])
-            ->when(
-                $tab === 'directed',
-                fn ($q) => $q->where('escalation_target', PatientCase::ESCALATION_DOCTOR_ADMIN)
-            )
+            ->when($tab === 'directed',        fn ($q) => $q->where('escalation_target', PatientCase::ESCALATION_DOCTOR_ADMIN))
+            ->when($tab === 'client_response', fn ($q) => $q->where('escalation_target', PatientCase::ESCALATION_CLIENT_RESPONSE))
             // Oldest escalation first — longest-waiting cases at the top.
             // support_at may be null on cases escalated before the column existed;
             // fall back to created_at so those still sort predictably.
@@ -31,19 +31,22 @@ class EscalationController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        // Tab badge counts (two cheap queries; not computed from the paginated result
-        // so the counts survive pagination and tab-switching without another page load).
-        $directedCount = PatientCase::visibleTo($user)
+        // Tab badge counts — cheap dedicated queries so counts survive pagination.
+        $directedCount       = PatientCase::visibleTo($user)
             ->where('status', PatientCase::STATUS_SUPPORT)
             ->where('escalation_target', PatientCase::ESCALATION_DOCTOR_ADMIN)
+            ->count();
+
+        $clientResponseCount = PatientCase::visibleTo($user)
+            ->where('status', PatientCase::STATUS_SUPPORT)
+            ->where('escalation_target', PatientCase::ESCALATION_CLIENT_RESPONSE)
             ->count();
 
         $allCount = PatientCase::visibleTo($user)
             ->where('status', PatientCase::STATUS_SUPPORT)
             ->count();
 
-        // Type breakdown for the "All" tab summary strip.
-        // COALESCE handles rows where escalation_target is NULL (pre-migration data).
+        // Type breakdown for the summary strip (COALESCE handles pre-migration NULLs).
         $byTarget = PatientCase::visibleTo($user)
             ->where('status', PatientCase::STATUS_SUPPORT)
             ->selectRaw("COALESCE(escalation_target, 'unknown') as target, COUNT(*) as cnt")
@@ -51,7 +54,7 @@ class EscalationController extends Controller
             ->pluck('cnt', 'target');
 
         return view('admin.escalations.index', compact(
-            'cases', 'tab', 'directedCount', 'allCount', 'byTarget', 'user'
+            'cases', 'tab', 'directedCount', 'clientResponseCount', 'allCount', 'byTarget', 'user'
         ));
     }
 }

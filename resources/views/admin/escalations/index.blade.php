@@ -52,6 +52,16 @@
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link {{ $tab === 'client_response' ? 'active' : '' }}"
+           href="{{ route('admin.escalations.index', ['tab' => 'client_response']) }}">
+            <i class="bi bi-chat-dots me-1"></i>
+            Client Response Pending
+            @if($clientResponseCount > 0)
+                <span class="badge bg-info text-dark ms-1" style="font-size:.6rem;">{{ $clientResponseCount }}</span>
+            @endif
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link {{ $tab === 'all' ? 'active' : '' }}"
            href="{{ route('admin.escalations.index', ['tab' => 'all']) }}">
             <i class="bi bi-list-check me-1"></i>
@@ -81,6 +91,8 @@
                         </div>
                     @endif
                 @endif
+            @elseif($tab === 'client_response')
+                No cases are currently waiting on a client or patient response.
             @else
                 {{-- All tab is empty --}}
                 @if($user->isSuperAdmin())
@@ -189,6 +201,7 @@
 {{-- Help text at the bottom --}}
 <div class="text-muted small mt-3">
     <strong>Directed to Admin</strong> — cases where a clinician has explicitly escalated for physician-admin review (complex clinical decisions, coverage questions).
+    <strong>Client Response Pending</strong> — cases on hold awaiting a reply from the patient or partner.
     <strong>All</strong> — every case currently paused in escalation, including general support and client-response holds.
     To resolve an escalation, open the case and assign or reassign it.
 </div>

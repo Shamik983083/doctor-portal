@@ -11,16 +11,20 @@ use RuntimeException;
  *
  * Talks to the Responses API. Two modes, decided by config:
  *
- *  1. STORED PROMPT (`ai.openai.prompt_id` set) · the "GPT agent / skill set we
- *     set up" case. The prompt, its tools and its style live on the OpenAI side
- *     and are versioned there; this app just references the id and sends the
- *     case material as input. Instruction sets in this app are then a fallback
- *     rather than the source of truth, and the response records which prompt
- *     version answered so a note can be traced back to the exact instructions.
+ *  1. STORED PROMPT (`prompt_id` set) · the "GPT agent / skill set we set up"
+ *     case. The prompt, its tools and its style live on the OpenAI side and are
+ *     versioned there; this app just references the id and sends the case material
+ *     as input.
  *
  *  2. INLINE INSTRUCTIONS (no prompt id) · the instruction set stored in this
  *     app is sent as `instructions`. This is the mode the admin screen drives,
  *     and it is the one that lets the product be re-taught without a deploy.
+ *
+ * E-b: the constructor now accepts an optional integration config array. When
+ * provided (by `AiAssistManager::resolveForContext()`), it overrides the legacy
+ * `config('ai.openai.*')` keys, allowing each integration to have its own API
+ * key, model, and base URI. When omitted the adapter falls back to the global
+ * `ai.openai` block, keeping the existing `resolve()` path unchanged.
  *
  * PHI POSTURE: `store` defaults to false so the provider retains nothing. This
  * is a request-level control and it does NOT substitute for the BAA; the gate in
@@ -29,29 +33,31 @@ use RuntimeException;
  */
 class OpenAiAdapter implements AiAssistAdapter
 {
+    public function __construct(private array $cfg = []) {}
+
     public function key(): string { return 'openai'; }
 
     public function draft(array $prompt): array
     {
-        $key = config('ai.openai.api_key');
+        $key = $this->c('api_key');
         if (empty($key)) {
-            throw new RuntimeException('OPENAI_API_KEY is not set, so the openai adapter cannot be used.');
+            throw new RuntimeException('OpenAI API key is not set for this integration.');
         }
 
         $body = [
-            'store' => (bool) config('ai.openai.store', false),
+            'store' => (bool) $this->c('store', false),
             'input' => $prompt['input'] ?? '',
         ];
 
-        $promptId = $prompt['prompt_id'] ?? config('ai.openai.prompt_id');
+        $promptId = $prompt['prompt_id'] ?? $this->c('prompt_id');
 
         if (! empty($promptId)) {
             $body['prompt'] = array_filter([
                 'id'      => $promptId,
-                'version' => config('ai.openai.prompt_version'),
+                'version' => $this->c('prompt_version'),
             ]);
         } else {
-            $body['model']        = config('ai.openai.model');
+            $body['model']        = $this->c('model');
             $body['instructions'] = $prompt['instructions'] ?? '';
         }
 
@@ -64,7 +70,7 @@ class OpenAiAdapter implements AiAssistAdapter
          * carries its own tool configuration on the OpenAI side, and attaching
          * here as well would override what was configured there.
          */
-        $vectorStoreIds = config('ai.openai.vector_store_ids', []);
+        $vectorStoreIds = $this->c('vector_store_ids', []);
 
         if (empty($promptId) && ! empty($vectorStoreIds)) {
             $body['tools'] = [[
@@ -75,9 +81,9 @@ class OpenAiAdapter implements AiAssistAdapter
 
         try {
             $response = Http::withToken($key)
-                ->timeout((int) config('ai.openai.timeout', 30))
+                ->timeout((int) $this->c('timeout', 30))
                 ->acceptJson()
-                ->post(rtrim((string) config('ai.openai.base_uri'), '/') . '/responses', $body);
+                ->post(rtrim((string) $this->c('base_uri', 'https://api.openai.com/v1'), '/') . '/responses', $body);
         } catch (\Throwable $e) {
             // Deliberately does not include the request body: it is PHI.
             Log::warning('AI assist request failed to complete', [
@@ -122,6 +128,18 @@ class OpenAiAdapter implements AiAssistAdapter
             'model' => $json['model'] ?? null,
             'usage' => $json['usage'] ?? null,
         ];
+    }
+
+    /**
+     * Read from the injected integration config, falling back to the legacy
+     * `ai.openai.*` config key. This lets the adapter work identically whether
+     * constructed with an integration config (E-b path) or without (legacy path).
+     */
+    private function c(string $key, mixed $default = null): mixed
+    {
+        return array_key_exists($key, $this->cfg)
+            ? $this->cfg[$key]
+            : config('ai.openai.' . $key, $default);
     }
 
     /**

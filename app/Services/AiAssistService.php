@@ -116,17 +116,17 @@ class AiAssistService
             ];
         }
 
-        if (! $this->manager->liveDraftingEnabled()) {
+        if (! $this->manager->liveDraftingEnabledForContext($context)) {
             return [
                 'text'   => $fallback,
                 'source' => 'local',
                 'model'  => null,
-                'notice' => $this->manager->disabledReason(),
+                'notice' => $this->manager->disabledReasonForContext($context),
             ];
         }
 
         try {
-            $result = $this->manager->resolve()->draft([
+            $result = $this->manager->resolveForContext($context)->draft([
                 'context'      => $context,
                 'instructions' => $set->toPromptInstructions(),
                 'input'        => $input,

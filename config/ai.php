@@ -104,4 +104,68 @@ return [
         'case_summary'       => 'AI case summary for the quick review panel',
         'rejection_reason'   => 'AI-assisted draft reason when declining a case',
     ],
+
+    /*
+     * E-b: Two-integration keyed registry.
+     *
+     * Each context routes through one named integration. Today both are `clinical`
+     * (existing OpenAI path) and `operations` (Karen, initially mock). Adding a
+     * third integration later is additive — register it here and map contexts to it.
+     *
+     * Env-var strategy: new CLINICAL_* / OPERATIONS_* keys are preferred; the
+     * existing OPENAI_* / AI_ASSIST_* vars remain the fallback so no .env file
+     * needs to change before this rolls out.
+     */
+    'integrations' => [
+
+        // Clinical path: PHI-carrying contexts (notes, messages, summaries).
+        // Gate is per-integration — clinical can be live while operations stays mock.
+        'clinical' => [
+            'adapter'       => env('CLINICAL_AI_ADAPTER',       env('AI_ASSIST_ADAPTER', 'mock')),
+            'enabled'       => (bool) env('CLINICAL_AI_ENABLED',         env('AI_ASSIST_ENABLED', false)),
+            'baa_confirmed' => (bool) env('CLINICAL_AI_BAA_CONFIRMED',    env('AI_ASSIST_BAA_CONFIRMED', false)),
+            'api_key'       => env('CLINICAL_OPENAI_API_KEY',   env('OPENAI_API_KEY')),
+            'base_uri'      => env('CLINICAL_OPENAI_BASE_URI',  env('OPENAI_BASE_URI', 'https://api.openai.com/v1')),
+            'model'         => env('CLINICAL_OPENAI_MODEL',     env('OPENAI_MODEL', 'gpt-4.1')),
+            'prompt_id'     => env('CLINICAL_OPENAI_PROMPT_ID',     env('OPENAI_PROMPT_ID')),
+            'prompt_version'=> env('CLINICAL_OPENAI_PROMPT_VERSION', env('OPENAI_PROMPT_VERSION')),
+            'vector_store_ids' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('CLINICAL_OPENAI_VECTOR_STORE_IDS', env('OPENAI_VECTOR_STORE_IDS', '')))
+            ))),
+            'store'         => env('CLINICAL_OPENAI_STORE',   env('OPENAI_STORE', false)),
+            'timeout'       => (int) env('CLINICAL_OPENAI_TIMEOUT', env('OPENAI_TIMEOUT', 30)),
+        ],
+
+        // Operations path: non-PHI operational messaging (Karen intake confirmation).
+        // Separate integration so it can use a different model/key and be gated independently.
+        'operations' => [
+            'adapter'       => env('OPERATIONS_AI_ADAPTER', 'mock'),
+            'enabled'       => (bool) env('OPERATIONS_AI_ENABLED', false),
+            'baa_confirmed' => (bool) env('OPERATIONS_AI_BAA_CONFIRMED', false),
+            'api_key'       => env('OPERATIONS_OPENAI_API_KEY'),
+            'base_uri'      => env('OPERATIONS_OPENAI_BASE_URI', 'https://api.openai.com/v1'),
+            'model'         => env('OPERATIONS_OPENAI_MODEL', 'gpt-4.1'),
+            'prompt_id'     => env('OPERATIONS_OPENAI_PROMPT_ID'),
+            'prompt_version'=> env('OPERATIONS_OPENAI_PROMPT_VERSION'),
+            'vector_store_ids' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('OPERATIONS_OPENAI_VECTOR_STORE_IDS', ''))
+            ))),
+            'store'         => env('OPERATIONS_OPENAI_STORE', false),
+            'timeout'       => (int) env('OPERATIONS_OPENAI_TIMEOUT', 30),
+        ],
+    ],
+
+    /*
+     * Which integration each context routes through. Kept separate from `contexts`
+     * so the label map stays a flat string→string for all existing callers.
+     */
+    'context_integrations' => [
+        'clinical_note'      => 'clinical',
+        'patient_message'    => 'clinical',
+        'storefront_message' => 'clinical',
+        'case_summary'       => 'clinical',
+        'rejection_reason'   => 'clinical',
+    ],
 ];
