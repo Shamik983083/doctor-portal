@@ -123,6 +123,10 @@ class AiAssistManager
      * Returns [$adapterKey, $integrationConfig] for the named context.
      * Falls back to the global adapter/config so a missing integration key
      * degrades gracefully rather than crashing.
+     *
+     * SA5-b: DB settings (stored via Setting::set()) override the env-level
+     * enabled/baa_confirmed flags so the admin screen can toggle them live
+     * without a deploy.
      */
     private function integrationFor(string $context): array
     {
@@ -137,6 +141,12 @@ class AiAssistManager
                 'baa_confirmed' => config('ai.baa_confirmed', false),
             ];
         }
+
+        // DB overrides — null means "not set in DB, use config as-is".
+        $dbEnabled = \App\Models\Setting::get("ai.integrations.{$integrationKey}.enabled");
+        $dbBaa     = \App\Models\Setting::get("ai.integrations.{$integrationKey}.baa_confirmed");
+        if ($dbEnabled !== null) { $cfg['enabled']       = (bool) $dbEnabled; }
+        if ($dbBaa     !== null) { $cfg['baa_confirmed'] = (bool) $dbBaa; }
 
         $adapter = $cfg['adapter'] ?? config('ai.adapter', 'mock');
 

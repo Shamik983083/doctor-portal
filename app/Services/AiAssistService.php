@@ -75,6 +75,61 @@ class AiAssistService
     }
 
     /**
+     * Draft a concise bullet summary of the case for the quick-review panel.
+     * Uses the case_summary AI context. Always produces a grounded fallback.
+     */
+    public function draftCaseSummary(PatientCase $case): array
+    {
+        $patient = $case->patient;
+
+        $cqAnswers = $case->relationLoaded('caseQuestions')
+            ? $case->caseQuestions->filter(fn($q) => filled($q->question) && filled($q->answer))
+            : collect();
+
+        // Fallback bullets — same data the controller built deterministically before C5b.
+        $fallbackLines = [];
+        $triage = $case->triage ?? 'unclassified';
+        $fallbackLines[] = 'Triage: ' . ucfirst($triage) . '.';
+        if ($patient) {
+            $demo = array_filter([
+                $patient->gender ? ucfirst($patient->gender) : null,
+                $patient->age    ? $patient->age . ' yrs'   : null,
+                $patient->bmi    ? 'BMI ' . number_format((float) $patient->bmi, 1) : null,
+            ]);
+            if ($demo) { $fallbackLines[] = 'Patient: ' . implode(', ', $demo) . '.'; }
+            $idStatus = strtolower($patient->id_verified_status ?? '');
+            $fallbackLines[] = 'Identity: ' . ($idStatus === 'verified' ? 'verified' : 'not verified') . '.';
+        }
+        $reasons = $this->triageReasons($case);
+        if ($reasons) { $fallbackLines[] = 'Triage signals: ' . implode('; ', $reasons) . '.'; }
+        foreach ($cqAnswers->take(4) as $q) {
+            $fallbackLines[] = $q->question . ': ' . \Illuminate\Support\Str::limit((string) $q->answer, 80);
+        }
+
+        $fallback = implode("\n", $fallbackLines);
+
+        // Input sent to the model — structured whitelist, never a raw model dump.
+        $inputLines = ['CASE OVERVIEW'];
+        $inputLines[] = 'Triage: ' . $triage;
+        if ($patient) {
+            if ($patient->age)    { $inputLines[] = 'Age: '  . $patient->age; }
+            if ($patient->gender) { $inputLines[] = 'Sex: '  . $patient->gender; }
+            if ($patient->bmi)    { $inputLines[] = 'BMI: '  . $patient->bmi; }
+            $inputLines[] = 'Identity verified: ' . ($patient->id_verified_status ?? 'not recorded');
+        }
+        if ($reasons) { $inputLines[] = 'Triage signals: ' . implode('; ', $reasons); }
+        if ($cqAnswers->isNotEmpty()) {
+            $inputLines[] = '';
+            $inputLines[] = 'INTAKE ANSWERS (relevant subset)';
+            foreach ($cqAnswers->take(8) as $q) {
+                $inputLines[] = '- ' . trim((string) $q->question) . ': ' . trim((string) $q->answer);
+            }
+        }
+
+        return $this->run('case_summary', implode("\n", $inputLines), $fallback);
+    }
+
+    /**
      * Draft a reply to a patient in a case thread.
      */
     public function draftPatientReply(PatientCase $case, string $steer = ''): array

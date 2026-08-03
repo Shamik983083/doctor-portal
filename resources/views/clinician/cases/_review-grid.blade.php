@@ -298,7 +298,20 @@
 
     $caseData = [];
     foreach ($cases as $case) { $caseData[$case->uuid] = $buildCard($case); }
-    $topCard = $cases->first() ? $caseData[$cases->first()->uuid] : null;
+
+    // C5b: override the top case summary with AI-drafted bullets when the model ran.
+    $firstCase = $cases->first();
+    if ($firstCase && isset($aiSummary) && is_array($aiSummary) && ($aiSummary['source'] ?? '') === 'model') {
+        $aiBullets = collect(explode("\n", $aiSummary['text'] ?? ''))
+            ->map(fn($l) => trim($l))
+            ->filter()
+            ->values();
+        if ($aiBullets->isNotEmpty()) {
+            $caseData[$firstCase->uuid]['summary'] = $aiBullets;
+        }
+    }
+
+    $topCard = $firstCase ? $caseData[$firstCase->uuid] : null;
 @endphp
 
 @if($topCard)
@@ -312,7 +325,7 @@
 @endif
 
 @php
-    $aiHonestyText = (config('ai.enabled') && config('ai.baa_confirmed'))
+    $aiHonestyText = (isset($aiSummary) && ($aiSummary['source'] ?? 'local') === 'model')
         ? 'AI model draft. Statements are composed from the recorded intake answers and model output. The draft never approves, prescribes, or sends anything.'
         : 'Deterministic placeholder, no model ran. Statements are composed only from the recorded intake answers. The draft never approves, prescribes, or sends anything.';
 @endphp

@@ -365,6 +365,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     // AI Instruction Sets — super admin controls which instructions guide each AI draft context
     Route::prefix('ai')->name('ai.')->group(function () {
         Route::get('/',                                 [AdminAiController::class, 'index'])->name('index');
+        Route::get('/settings',                         [AdminAiController::class, 'settings'])->name('settings');
+        Route::post('/settings/{integration}',          [AdminAiController::class, 'updateSettings'])->name('settings.update');
         Route::get('/{context}/edit',                   [AdminAiController::class, 'edit'])->name('edit');
         Route::post('/{context}',                       [AdminAiController::class, 'update'])->name('update');
         Route::post('/{context}/examples',              [AdminAiController::class, 'storeExample'])->name('examples.store');

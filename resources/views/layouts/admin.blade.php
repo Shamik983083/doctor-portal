@@ -188,9 +188,13 @@
            href="{{ route('admin.routing.visit-requirements') }}">
             <i class="bi bi-camera-video"></i> State Visit Rules
         </a>
-        <a class="nav-link {{ request()->routeIs('admin.ai.*') ? 'active' : '' }}"
+        <a class="nav-link {{ request()->routeIs('admin.ai.index', 'admin.ai.edit', 'admin.ai.update', 'admin.ai.examples.*') ? 'active' : '' }}"
            href="{{ route('admin.ai.index') }}">
             <i class="bi bi-robot"></i> AI Instructions
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.ai.settings*') ? 'active' : '' }}"
+           href="{{ route('admin.ai.settings') }}">
+            <i class="bi bi-sliders"></i> AI Settings
         </a>
 
     </div>

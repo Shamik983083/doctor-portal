@@ -110,27 +110,13 @@ class CaseController extends Controller
                     ->filter(fn($r) => filled($r['q']))->values();
         }
 
-        $aiSummary = [];
+        $aiSummary = null;
         if ($topCase) {
-            $bullets = ['Triage classification: ' . $topCase->triageLabel() . ' · ' . $topCase->triageMeaning()];
-            $p = $topCase->patient;
-            if ($p) {
-                $demo = array_filter([
-                    $p->gender ? ucfirst($p->gender) : null,
-                    $p->age    ? $p->age . ' yrs'   : null,
-                    !is_null($p->bmi) ? 'BMI ' . number_format((float) $p->bmi, 1) : null,
-                ]);
-                if ($demo) { $bullets[] = 'Patient: ' . implode(' · ', $demo) . '.'; }
-                $bullets[] = 'Identity verification: ' . (strtolower($p->id_verified_status ?? '') === 'verified' ? 'verified.' : 'not verified.');
+            try {
+                $aiSummary = $this->aiAssist->draftCaseSummary($topCase);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::debug('AI case summary skipped', ['error' => $e->getMessage()]);
             }
-            $offerings = $topCase->caseOfferings->map(fn($co) => optional($co->offering)->name)->filter()->implode(', ');
-            if ($offerings) { $bullets[] = 'Requested offerings: ' . $offerings . '.'; }
-            $reasons = collect($topCase->triage_reasons ?? []);
-            if ($reasons->isNotEmpty()) { $bullets[] = 'Triage signals: ' . $reasons->take(3)->implode('; ') . '.'; }
-            foreach (collect($intake)->take(4) as $a) {
-                $bullets[] = $a['q'] . ': ' . \Illuminate\Support\Str::limit((string) $a['a'], 80);
-            }
-            $aiSummary = $bullets;
         }
 
         // Prior-visit map for refill cases on this page: uuid → priorCase.
