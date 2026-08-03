@@ -9,7 +9,7 @@
         'admin.escalations.*', 'admin.messages.*'
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
-    $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*');
+    $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*', 'admin.ai.*');
     $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*', 'admin.users.*');
 @endphp
 
@@ -187,6 +187,10 @@
         <a class="nav-link {{ request()->routeIs('admin.routing.visit-requirements*') ? 'active' : '' }}"
            href="{{ route('admin.routing.visit-requirements') }}">
             <i class="bi bi-camera-video"></i> State Visit Rules
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.ai.*') ? 'active' : '' }}"
+           href="{{ route('admin.ai.index') }}">
+            <i class="bi bi-robot"></i> AI Instructions
         </a>
 
     </div>

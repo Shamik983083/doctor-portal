@@ -19,6 +19,7 @@ use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeli
 use App\Http\Controllers\Web\Admin\AuditLogController as AdminAuditLogController;
 use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Web\Admin\TriageRuleController as AdminTriageRuleController;
+use App\Http\Controllers\Web\Admin\AiController as AdminAiController;
 use App\Http\Controllers\Web\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Web\Clinician\NotificationController as ClinicianNotificationController;
 use App\Http\Controllers\Web\Partner\NotificationController as PartnerNotificationController;
@@ -359,6 +360,15 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/visit-requirements',  [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'visitRequirements'])->name('visit-requirements');
         Route::post('/visit-requirements', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'storeVisitRequirement'])->name('visit-requirements.store');
         Route::delete('/visit-requirements/{id}', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'destroyVisitRequirement'])->name('visit-requirements.destroy');
+    });
+
+    // AI Instruction Sets — super admin controls which instructions guide each AI draft context
+    Route::prefix('ai')->name('ai.')->group(function () {
+        Route::get('/',                                 [AdminAiController::class, 'index'])->name('index');
+        Route::get('/{context}/edit',                   [AdminAiController::class, 'edit'])->name('edit');
+        Route::post('/{context}',                       [AdminAiController::class, 'update'])->name('update');
+        Route::post('/{context}/examples',              [AdminAiController::class, 'storeExample'])->name('examples.store');
+        Route::delete('/{context}/examples/{example}',  [AdminAiController::class, 'destroyExample'])->name('examples.destroy');
     });
 
     }); // end super-admin-only integration and configuration group
