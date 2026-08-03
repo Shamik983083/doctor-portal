@@ -91,8 +91,8 @@ class StagingPreviewSeeder extends Seeder
          */
         $this->acceptEveryCategory($mine, $notMine);
 
-        $this->cases($partner, $mine, $notMine);
-        $this->messages($partner, $mine);
+        // $this->cases($partner, $mine, $notMine);
+        // $this->messages($partner, $mine);
         $this->routingPolicy($superAdmin);
 
         $this->command->info('Staging preview data seeded. Password for all: ' . self::PASSWORD);
