@@ -519,6 +519,21 @@ class CaseController extends Controller
         // Only runs for refill cases; null-safe to never crash if no prior exists.
         $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
 
+        // 4.3: Check-in answers for the current refill case — the questionnaire
+        // the patient completed for this visit, distinct from the prior-case intake.
+        $checkInResponses = collect();
+        if ($case->isRefillRequest()) {
+            $case->loadMissing([
+                'questionnaireResponses.questionnaire',
+                'questionnaireResponses.answers',
+            ]);
+            $checkInResponses = $case->questionnaireResponses
+                ->filter(fn ($r) => $r->completed_at !== null
+                    && $r->questionnaire?->purpose === 'check_in')
+                ->sortByDesc('completed_at')
+                ->values();
+        }
+
         // Pass the requested month_frequency so the prescribe form can pre-select the
         // duration dropdown.
         // Fallback chain (first non-null wins):
@@ -539,7 +554,7 @@ class CaseController extends Controller
             }
         }
 
-        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions', 'priorCase', 'requestedMonthFrequency'));
+        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions', 'priorCase', 'checkInResponses', 'requestedMonthFrequency'));
     }
 
     public function prescribe(Request $request, string $uuid)

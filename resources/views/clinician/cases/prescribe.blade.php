@@ -107,6 +107,55 @@
                     <div><dt>ID verified</dt><dd>{{ $idv ? 'Yes' : 'No' }}</dd></div>
                 </dl>
 
+                {{-- Check-in answers for the current refill visit --}}
+                @if($case->isRefillRequest() && $checkInResponses->isNotEmpty())
+                    @foreach($checkInResponses as $checkInResp)
+                        @php
+                            $ciAnswers = $checkInResp->answers
+                                ->filter(fn($a) => filled($a->question_text))
+                                ->values();
+                        @endphp
+                        <details class="prior-visit-prescribe" open style="margin-bottom:14px;border:1px solid rgba(23,131,78,.25);border-radius:12px;overflow:hidden">
+                            <summary style="padding:10px 14px;cursor:pointer;background:var(--green-bg);display:flex;align-items:center;gap:9px;list-style:none;font-size:12px;font-weight:700">
+                                <span style="flex:1">Check-in answers</span>
+                                <span class="pill green" style="font-size:10px">This visit</span>
+                                @if($checkInResp->questionnaire?->name)
+                                    <span style="color:var(--muted);font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ $checkInResp->questionnaire->name }}">{{ $checkInResp->questionnaire->name }}</span>
+                                @endif
+                                @if($checkInResp->completed_at)
+                                    <span style="color:var(--muted);font-weight:500">{{ $checkInResp->completed_at->format('M j, Y') }}</span>
+                                @endif
+                            </summary>
+                            <div style="padding:12px 14px;font-size:12px">
+                                @if($checkInResp->is_disqualified)
+                                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:7px 10px;background:var(--red-bg,#fff6f6);border:1px solid rgba(192,57,47,.15);border-radius:7px;font-size:11.5px;color:var(--red,#c0392f);font-weight:600">
+                                        <span>⚠</span>
+                                        <span>Patient was disqualified during this check-in{{ $checkInResp->disqualified_on ? ' — question: ' . $checkInResp->disqualified_on : '' }}.</span>
+                                    </div>
+                                @endif
+
+                                @if($ciAnswers->isNotEmpty())
+                                    <div class="qa-sheet" style="margin-top:0">
+                                        @foreach($ciAnswers as $ans)
+                                            <div class="qa" @if($ans->is_disqualified) style="background:var(--red-bg,#fff6f6);margin:0 -14px;padding:6px 14px" @endif>
+                                                <dt>{{ $ans->question_text }}</dt>
+                                                <dd>
+                                                    {{ filled($ans->answer) ? $ans->answer : '—' }}
+                                                    @if($ans->is_disqualified)
+                                                        <span style="display:inline-block;margin-left:5px;font-size:10px;font-weight:700;color:var(--red,#c0392f);background:var(--red-bg,#fff6f6);padding:1px 5px;border-radius:4px">Disqualified</span>
+                                                    @endif
+                                                </dd>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <p class="ai-honesty" style="margin:4px 0">No answers recorded for this check-in.</p>
+                                @endif
+                            </div>
+                        </details>
+                    @endforeach
+                @endif
+
                 {{-- Prior visit panel (refill cases only) --}}
                 @if($case->isRefillRequest())
                     @if($priorCase)
