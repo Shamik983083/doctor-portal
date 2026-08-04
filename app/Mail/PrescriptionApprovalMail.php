@@ -38,7 +38,7 @@ class PrescriptionApprovalMail extends Mailable implements ShouldQueue
         $partner     = $case->partner;
 
         return new Content(
-            htmlView: 'emails.prescription-approval',
+            view: 'emails.prescription-approval',
             with: [
                 'firstName'     => $patient?->first_name ?? 'there',
                 'messageBody'   => $message->body,
