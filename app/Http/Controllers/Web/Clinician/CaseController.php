@@ -26,7 +26,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use App\Mail\PrescriptionApprovalMail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class CaseController extends Controller
 {
@@ -789,6 +791,19 @@ class CaseController extends Controller
                 'sender'    => 'clinician',
                 'timestamp' => now()->timestamp,
             ]);
+
+            // Email copy to patient — non-fatal, queued, skipped when no address or opt-out.
+            $patient = $case->patient;
+            if ($patient?->email && $patient->email_opt_in) {
+                try {
+                    Mail::to($patient->email)->queue(new PrescriptionApprovalMail($case, $message));
+                } catch (\Throwable $e) {
+                    Log::warning('C12: Prescription approval email failed to queue.', [
+                        'case_id' => $case->id,
+                        'error'   => $e->getMessage(),
+                    ]);
+                }
+            }
         } else {
             Log::warning('C12: prescribeConfirm skipped approval message — case has no patient_id.', [
                 'case_id' => $case->id,
