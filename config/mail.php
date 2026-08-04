@@ -53,7 +53,7 @@ return [
             'transport' => 'smtp',
             'host' => 'smtp.sendgrid.net',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => null,
             'username' => 'apikey',
             'password' => env('SENDGRID_API_KEY'),
             'timeout' => null,
