@@ -130,6 +130,46 @@ class AiAssistService
     }
 
     /**
+     * Draft a patient-facing approval confirmation message after a prescription is written.
+     *
+     * Uses the patient_message context. The steer is purpose-built for the approval
+     * scenario: the provider should not have to explain context they've just worked through.
+     * Always produces a grounded fallback even when AI is disabled or unreachable.
+     */
+    public function draftApprovalMessage(PatientCase $case, $prescription): array
+    {
+        $patient  = $case->patient;
+        $meds     = $prescription->medications->pluck('name')->filter()->implode(', ');
+        $clinName = $case->clinician?->full_name ?? 'your clinician';
+        $partner  = $case->partner?->name ?? 'our clinic';
+
+        $fallback = 'Hi ' . ($patient?->first_name ?? 'there') . ",\n\n"
+            . 'Your prescription' . ($meds ? " for {$meds}" : '') . " has been reviewed and approved by {$clinName}. "
+            . "Our team at {$partner} will now process your order — you can expect to receive shipping details shortly.\n\n"
+            . "If you have any questions in the meantime, please reply to this message.\n\n"
+            . "— The {$partner} Care Team";
+
+        $lines = [
+            'CASE STATUS: approved',
+            "CLINICIAN: {$clinName}",
+            "PARTNER/CLINIC: {$partner}",
+        ];
+
+        if ($meds) {
+            $lines[] = "APPROVED MEDICATIONS: {$meds}";
+        }
+
+        if ($patient?->first_name) {
+            $lines[] = 'PATIENT FIRST NAME: ' . $patient->first_name;
+        }
+
+        $lines[] = '';
+        $lines[] = 'WHAT THE MESSAGE SHOULD DO: Confirm the prescription has been approved and tell the patient what happens next (order processing, shipping). Warm and brief. Do not include doses, clinical detail, or a specific delivery date.';
+
+        return $this->run('patient_message', implode("\n", $lines), $fallback);
+    }
+
+    /**
      * Draft a reply to a patient in a case thread.
      */
     public function draftPatientReply(PatientCase $case, string $steer = ''): array

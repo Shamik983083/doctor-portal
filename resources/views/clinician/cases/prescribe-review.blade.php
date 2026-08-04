@@ -72,12 +72,45 @@
         </div>
     </section>
 
-    {{-- Right: charting note + confirm --}}
-    <section class="panel">
-        <div style="padding:20px">
-            <form method="POST" action="{{ route('clinician.cases.prescribe.confirm', $case->uuid) }}" id="confirmForm">
-                @csrf
+    {{-- Right: patient message + charting note + confirm (one form, two stacked panels) --}}
+    <section>
+        <form method="POST" action="{{ route('clinician.cases.prescribe.confirm', $case->uuid) }}" id="confirmForm">
+            @csrf
 
+            {{-- Patient-facing approval message --}}
+            <div class="panel" style="padding:0;margin-bottom:16px">
+                <div style="padding:16px 20px;border-bottom:1px solid var(--line)">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                        <div>
+                            <div class="subheading" style="margin:0 0 2px">Patient-facing message <span class="req">*</span></div>
+                            <p style="font-size:12px;color:var(--muted);margin:0">Sent to the patient when you confirm. Review and edit before submitting.</p>
+                        </div>
+                        <span class="pill neutral" style="flex-shrink:0">AI draft · you edit and send</span>
+                    </div>
+                    @if(!empty($approvalDraft['notice']))
+                        <p class="ai-honesty" style="margin:10px 0 0">{{ $approvalDraft['notice'] }}</p>
+                    @endif
+                </div>
+
+                <div style="padding:16px 20px">
+                    @error('message_body')
+                        <div style="color:var(--red,#c0392f);font-size:12.5px;margin-bottom:8px">{{ $message }}</div>
+                    @enderror
+                    <textarea
+                        name="message_body"
+                        class="note-area"
+                        rows="8"
+                        required
+                        placeholder="Edit the patient-facing approval message here…"
+                        style="width:100%">{{ old('message_body', $approvalDraft['text']) }}</textarea>
+                    <p class="ai-honesty" style="margin-top:8px">
+                        This message will appear in the patient's portal. Clinical reason and medication detail are recorded internally — do not include specific doses in this message.
+                    </p>
+                </div>
+            </div>
+
+            {{-- Charting note + confirm button --}}
+            <div class="panel" style="padding:20px">
                 <div class="note-block">
                     <div class="note-head">
                         <div>
@@ -102,8 +135,9 @@
                     </div>
                     <button type="submit" class="button-primary">Confirm &amp; approve</button>
                 </div>
-            </form>
-        </div>
+            </div>
+
+        </form>
     </section>
 
 </div>
@@ -123,7 +157,7 @@
             var original = genNote.textContent;
             genNote.textContent = 'Drafting...';
             var token = document.querySelector('meta[name="csrf-token"]');
-            fetch('{{ route('clinician.cases.draft-note', $case->uuid) }}', {
+            fetch("{{ route('clinician.cases.draft-note', $case->uuid) }}", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

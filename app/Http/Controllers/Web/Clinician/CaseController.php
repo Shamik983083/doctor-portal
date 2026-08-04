@@ -698,13 +698,33 @@ class CaseController extends Controller
             ->latest()
             ->firstOrFail();
 
-        return view('clinician.cases.prescribe-review', compact('case', 'prescription'));
+        // C12: draft the patient-facing approval message so the provider can edit it
+        // before confirming. Always non-fatal — the deterministic fallback ensures the
+        // textarea is never empty even when AI is disabled or the model fails.
+        $approvalDraft = ['text' => '', 'source' => 'local', 'notice' => null];
+        try {
+            $approvalDraft = $this->aiAssist->draftApprovalMessage($case, $prescription);
+        } catch (\Throwable $e) {
+            Log::debug('C12: AI approval message draft skipped', ['error' => $e->getMessage()]);
+            // Compose a minimal deterministic fallback so the field is never blank.
+            $meds    = $prescription->medications->pluck('name')->filter()->implode(', ');
+            $partner = $case->partner?->name ?? 'our clinic';
+            $approvalDraft['text'] = 'Hi ' . ($case->patient?->first_name ?? 'there') . ",\n\n"
+                . 'Your prescription' . ($meds ? " for {$meds}" : '') . ' has been approved and is being processed. '
+                . "You can expect shipping details shortly. Please reply here with any questions.\n\n"
+                . "— The {$partner} Care Team";
+        }
+
+        return view('clinician.cases.prescribe-review', compact('case', 'prescription', 'approvalDraft'));
     }
 
-    // C12: provider has reviewed and confirmed — approve(), complete(), fire webhook.
+    // C12: provider has reviewed and confirmed — approve(), complete(), fire webhooks.
     public function prescribeConfirm(Request $request, string $uuid)
     {
-        $request->validate(['charting_note' => 'nullable|string']);
+        $request->validate([
+            'charting_note' => 'nullable|string',
+            'message_body'  => 'required|string|max:5000',
+        ]);
 
         $case = PatientCase::with(['patient', 'partner'])->where('uuid', $uuid)->firstOrFail();
 
@@ -738,6 +758,42 @@ class CaseController extends Controller
         });
 
         $this->stateMachine->complete($case);
+
+        // C12: create the patient-facing approval message the provider just edited
+        // and send it via the portal + webhook. Null-safe on patient_id: if the case
+        // somehow has no patient, we log and skip rather than block the approval.
+        if ($case->patient_id) {
+            $message = Message::create([
+                'case_id'      => $case->id,
+                'patient_id'   => $case->patient_id,
+                'clinician_id' => $clinician->id,
+                'partner_id'   => $case->partner_id,
+                'direction'    => 'outbound',
+                'channel'      => 'portal',
+                'sender_type'  => 'clinician',
+                'body'         => $request->input('message_body'),
+            ]);
+
+            try {
+                broadcast(new CaseMessageSent($message));
+            } catch (\Throwable $e) {
+                Log::warning('C12: Reverb broadcast failed for approval message.', [
+                    'case_id'    => $case->id,
+                    'message_id' => $message->id,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
+
+            $this->webhooks->dispatch($case->partner_id, 'message_created', [
+                'case_id'   => $case->uuid,
+                'sender'    => 'clinician',
+                'timestamp' => now()->timestamp,
+            ]);
+        } else {
+            Log::warning('C12: prescribeConfirm skipped approval message — case has no patient_id.', [
+                'case_id' => $case->id,
+            ]);
+        }
 
         try {
             $document = $this->prescriptionDocuments->generate($case, $prescription);

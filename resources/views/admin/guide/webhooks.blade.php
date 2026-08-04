@@ -663,23 +663,58 @@ function sigForLevel(array $med, int $levelIndex): string {
 <div id="ev-message-created" class="card mb-3 section-anchor">
 <div class="card-header py-2 d-flex align-items-center gap-2">
     <span class="event-badge">message_created</span>
-    <span class="text-muted small">A portal user sent a message to the patient — <code>sender</code> identifies who</span>
+    <span class="text-muted small">A message was sent to the patient — <code>sender</code> identifies the origin; call GET to retrieve the body</span>
 </div>
 <div class="card-body">
+
+<p class="small mb-2"><strong>This event fires in three distinct scenarios:</strong></p>
+<table class="table table-sm table-bordered mb-3" style="font-size:.83rem">
+<thead class="table-light"><tr><th><code>sender</code></th><th>When it fires</th><th>What to do</th></tr></thead>
+<tbody>
+<tr>
+    <td><code>clinician</code></td>
+    <td>Clinician sends a direct message to the patient; or clinician confirms a prescription (approval message sent automatically)</td>
+    <td>Pull messages and display to patient</td>
+</tr>
+<tr>
+    <td><code>system</code></td>
+    <td>System sends an automated intake confirmation when a case is first assigned to a clinician</td>
+    <td>Pull messages and display to patient — patient may not have prompted this message</td>
+</tr>
+<tr>
+    <td><code>support</code></td>
+    <td>Support team sends a message to the patient</td>
+    <td>Pull messages and display to patient</td>
+</tr>
+</tbody>
+</table>
+
+<p class="small text-muted mb-1">Standard payload — all three senders:</p>
 <pre id="code-ev-msg">{
   "case_id":   "9d2f1c3e-...",
-  "sender":    "clinician",   // "clinician" or "support"
+  "sender":    "clinician",   // "clinician" | "system" | "support"
   "timestamp": 1751541300
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-msg')">Copy</button>
+
+<p class="small text-muted mb-1 mt-3">Rejection payload — when a clinician declines a case, <code>reason</code> and <code>body</code> are also present:</p>
+<pre id="code-ev-msg-reject">{
+  "case_id":   "9d2f1c3e-...",
+  "sender":    "clinician",
+  "body":      "Thank you for submitting your request…",   // patient-facing rejection message
+  "reason":    "case_declined",                            // always "case_declined" for rejections
+  "timestamp": 1751541600
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-msg-reject')">Copy</button>
+
 <div class="alert alert-warning mt-3 mb-2 small">
     <i class="bi bi-exclamation-triangle me-1"></i>
-    <strong>Message body is NOT in this payload.</strong> The payload identifies who sent a message and to which case, but the body is excluded. Call GET to retrieve the message text and display it to the patient. This is a required pull for this event.
+    <strong>Message body is NOT in the standard payload.</strong> For all non-rejection messages, the body is excluded — call GET to retrieve the message text. The <code>reason: "case_declined"</code> field is only present on rejection payloads and can be used to route directly to a decline-handling path without a GET call.
 </div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
-    <span class="text-muted" style="font-size:.75rem">— retrieve the full message body and thread</span>
+    <span class="text-muted" style="font-size:.75rem">— retrieve the full message thread; the most recent outbound message is the one just sent</span>
 </div>
 </div>
 </div>
@@ -852,7 +887,7 @@ function sigForLevel(array $med, int $levelIndex): string {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Route by <code>X-Event-Type</code> header — do not rely solely on payload fields to identify the event</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> includes <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, a flat <code>sig</code> (offering default), and per-level <code>dosing.sigs[]</code> overrides; use <code>sigForLevel(med, index)</code> pattern — prefer <code>dosing.sigs[i]</code> when non-empty, fall back to <code>sig</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and respond via API or portal</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>message_created</code></strong> — check <code>sender</code>: <code>clinician</code> = doctor message, <code>support</code> = support team message</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>message_created</code></strong> — check <code>sender</code>: <code>clinician</code> = doctor message or prescription approval message, <code>system</code> = automated intake confirmation, <code>support</code> = support team message; if <code>reason === "case_declined"</code> the body is in the payload directly (rejection path only)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Make your handler <strong>idempotent</strong> — the same event may be delivered more than once on retry</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Return <code>200</code> immediately, then process asynchronously — do not do heavy work before responding</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Push Vouched IDV results via <code>PATCH /api/partner/patients/{uuid}</code> with <code>id_verified_status</code> = <code>verified</code> / <code>failed</code> / <code>pending</code> — you will receive a <code>patient_modified</code> event as confirmation and open cases re-triage automatically</li>
