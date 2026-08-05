@@ -173,7 +173,7 @@
                                         <div style="padding:4px 0;border-bottom:1px solid var(--line)">
                                             <strong>{{ $pm->name }}</strong>
                                             @if($pm->sig)<span style="color:var(--muted)"> · {{ $pm->sig }}</span>@endif
-                                            @if(is_array($pm->dosing) && count(array_filter($pm->dosing)))<span style="color:var(--muted)"> · {{ collect($pm->dosing)->filter()->implode(' → ') }}</span>@endif
+                                            @if(is_array($pm->dosing) && count(array_filter($pm->dosing)))<span style="color:var(--muted)"> · {{ collect($pm->dosing)->filter()->map(fn($d) => is_scalar($d) ? (string) $d : null)->filter()->values()->implode(' → ') }}</span>@endif
                                             @if($pm->refills !== null)<span style="color:var(--soft-muted);font-size:11px"> Refills: {{ $pm->refills }}</span>@endif
                                         </div>
                                     @endforeach

@@ -246,7 +246,7 @@
             $priorMeds = $prior->casePrescription?->medications?->map(fn($m) => [
                 'name'    => $m->name,
                 'sig'     => $m->sig ?? null,
-                'dosing'  => is_array($m->dosing) ? collect($m->dosing)->filter()->implode(' → ') : null,
+                'dosing'  => is_array($m->dosing) ? collect($m->dosing)->filter()->map(fn($d) => is_scalar($d) ? (string) $d : null)->filter()->values()->implode(' → ') : null,
                 'refills' => $m->refills,
             ])->values()->all() ?? [];
 
