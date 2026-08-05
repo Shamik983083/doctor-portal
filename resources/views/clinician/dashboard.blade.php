@@ -43,6 +43,7 @@
 
     {{-- My active --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'active']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #ffc107 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -56,10 +57,12 @@
                 </div>
             </div>
         </div>
+        </a>
     </div>
 
     {{-- Completed this month --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'completed']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #2dc653 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -73,10 +76,12 @@
                 </div>
             </div>
         </div>
+        </a>
     </div>
 
     {{-- SLA status --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'active']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100"
              style="border-left:4px solid {{ $slaBreached > 0 ? '#dc3545' : ($slaAtRisk > 0 ? '#ffc107' : '#2dc653') }} !important;">
             <div class="card-body d-flex align-items-center gap-3">
@@ -100,6 +105,7 @@
                 </div>
             </div>
         </div>
+        </a>
     </div>
 
     {{-- Total Assigned Cases --}}
@@ -123,6 +129,7 @@
 
     {{-- Total Completed Cases --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'completed']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #20c997 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -136,6 +143,7 @@
                 </div>
             </div>
         </div>
+        </a>
     </div>
 
     {{-- E17: New Messages --}}
@@ -159,7 +167,7 @@
 
     {{-- E17: New Cases --}}
     <div class="col-sm-6 col-xl-3">
-        <a href="{{ route('clinician.queue') }}" class="text-decoration-none">
+        <a href="{{ route('clinician.queue', ['status' => 'waiting']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $newCasesCount > 0 ? '#fd7e14' : '#adb5bd' }} !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
