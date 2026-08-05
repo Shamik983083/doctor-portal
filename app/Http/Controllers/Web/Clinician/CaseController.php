@@ -21,6 +21,7 @@ use App\Services\EhrRecordService;
 use App\Services\FileUploadService;
 use App\Services\PharmacyDispatchService;
 use App\Services\PrescriptionDocumentService;
+use App\Contracts\SmsAdapter;
 use App\Services\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +41,7 @@ class CaseController extends Controller
         private PharmacyDispatchService     $pharmacyDispatch,
         private EhrRecordService            $ehrRecords,
         private AiAssistService             $aiAssist,
+        private SmsAdapter                  $sms,
     ) {}
 
     public function queue(Request $request)
@@ -1269,6 +1271,36 @@ class CaseController extends Controller
             );
         } catch (\Throwable $e) {
             Log::warning('Message notification failed: ' . $e->getMessage());
+        }
+
+        // A2: SMS nudge to patient when a clinician sends a portal message.
+        // Guards: patient must exist, have a phone number, and have opted in.
+        // Debounce: skip if an outbound portal message was already sent on this
+        // case within the configured window (default 30 min) to prevent a
+        // chatty thread from spamming the patient.
+        // PHI rule: the body is a fixed generic string — no name, no case data.
+        try {
+            $patient = $case->patient;
+            if ($patient && $patient->phone && $patient->sms_opt_in) {
+                $debounceMinutes = (int) config('sms.debounce_minutes', 30);
+                $lastOutbound = Message::where('case_id', $case->id)
+                    ->where('direction', 'outbound')
+                    ->where('channel', 'portal')
+                    ->where('id', '!=', $message->id)
+                    ->max('created_at');
+
+                $debounced = $lastOutbound
+                    && now()->diffInMinutes(\Carbon\Carbon::parse($lastOutbound)) < $debounceMinutes;
+
+                if (!$debounced) {
+                    $this->sms->send(
+                        $patient->phone,
+                        'You have a new message in your patient portal. Please log in to view and reply.'
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('SMS notification failed for case ' . $case->id . ': ' . $e->getMessage());
         }
 
         if ($request->expectsJson()) {

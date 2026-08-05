@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Support;
 
+use App\Contracts\SmsAdapter;
 use App\Events\CaseMessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\Clinician;
@@ -17,6 +18,7 @@ class CaseController extends Controller
     public function __construct(
         private CaseStateMachine  $stateMachine,
         private WebhookDispatcher $webhooks,
+        private SmsAdapter        $sms,
     ) {}
 
     public function index(Request $request)
@@ -84,6 +86,32 @@ class CaseController extends Controller
             'sender'    => 'support',
             'timestamp' => now()->timestamp,
         ]);
+
+        // A2: SMS nudge to patient when a support agent sends a portal message.
+        // Same guards and debounce as the clinician path — see Clinician\CaseController::sendMessage.
+        try {
+            $patient = $case->patient;
+            if ($patient && $patient->phone && $patient->sms_opt_in) {
+                $debounceMinutes = (int) config('sms.debounce_minutes', 30);
+                $lastOutbound = Message::where('case_id', $case->id)
+                    ->where('direction', 'outbound')
+                    ->where('channel', 'portal')
+                    ->where('id', '!=', $message->id)
+                    ->max('created_at');
+
+                $debounced = $lastOutbound
+                    && now()->diffInMinutes(\Carbon\Carbon::parse($lastOutbound)) < $debounceMinutes;
+
+                if (!$debounced) {
+                    $this->sms->send(
+                        $patient->phone,
+                        'You have a new message in your patient portal. Please log in to view and reply.'
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('SMS notification failed for case ' . $case->id . ': ' . $e->getMessage());
+        }
 
         return back()->with('success', 'Message sent.');
     }
