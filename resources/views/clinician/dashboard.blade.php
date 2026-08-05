@@ -24,7 +24,7 @@
 
     {{-- Queue size --}}
     <div class="col-sm-6 col-xl-3">
-        <a href="{{ route('clinician.queue') }}" class="text-decoration-none">
+        <a href="{{ route('clinician.queue', ['status' => 'waiting']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #4361ee !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
