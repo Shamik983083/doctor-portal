@@ -181,6 +181,7 @@ class CaseController extends Controller
         $base = PatientCase::with([
                 'patient', 'partner', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
+                'casePrescription.medications',
             ])
             ->where('clinician_id', $clinician->id)
             ->withCount(['messages as unread_messages_count' => fn ($q) =>
@@ -263,6 +264,7 @@ class CaseController extends Controller
         $cases = PatientCase::with([
                 'patient', 'partner', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
+                'casePrescription.medications',
             ])
             ->withCount(['messages as unread_messages_count' => fn ($q) =>
                 $q->where('direction', 'inbound')->where('is_read', false)

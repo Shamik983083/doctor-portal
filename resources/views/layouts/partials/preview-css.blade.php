@@ -403,6 +403,14 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 
 .quick-review{padding:20px;margin-top:16px}
 .quick-pills{display:flex;gap:6px}
+.vt-bar{display:flex;align-items:center;gap:6px;margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.vt-btn{padding:4px 12px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:650;cursor:pointer;transition:background .1s,color .1s}
+.vt-btn:hover{background:var(--blue-bg);color:var(--accent-ink)}
+.vt-btn.active{background:var(--blue-bg);color:var(--accent-ink);border-color:transparent}
+.vt-panel{padding-top:4px}
+@media (prefers-color-scheme:dark){.vt-btn{background:var(--surface)}}
+:root[data-theme="dark"] .vt-btn{background:var(--surface)}
+:root[data-theme="light"] .vt-btn{background:#fff}
 .demo-chips{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 6px}
 .demo-chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:650;background:var(--blue-bg,#eef4ff);color:var(--soft-muted);border:1px solid rgba(37,99,235,.1)}
 .demo-chip.chip-verified{background:var(--green-bg);color:var(--green);border-color:transparent}

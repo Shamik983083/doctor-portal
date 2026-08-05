@@ -241,6 +241,20 @@
         // controller to avoid N+1 — one query per refill case on the page).
         $isRefill = $case->isRefillRequest();
         $prior    = $priorCasesMap[$case->uuid] ?? null;
+
+        // Current visit prescription (eager-loaded as casePrescription).
+        $currentRx   = $case->relationLoaded('casePrescription') ? $case->casePrescription : null;
+        $currentMeds = $currentRx?->medications?->map(fn($m) => [
+            'name'    => $m->name,
+            'sig'     => $m->sig ?? null,
+            'dosing'  => is_array($m->dosing) ? collect($m->dosing)->filter()->map(fn($d) => is_scalar($d) ? (string) $d : null)->filter()->values()->implode(' → ') : null,
+            'refills' => $m->refills,
+        ])->values()->all() ?? [];
+        $currentData = $isRefill ? ($currentRx ? [
+            'meds' => $currentMeds,
+            'date' => ($currentRx->prescribed_at ?? $currentRx->created_at)?->format('M j, Y'),
+        ] : null) : null;
+
         $priorData = null;
         if ($isRefill && $prior) {
             $priorMeds = $prior->casePrescription?->medications?->map(fn($m) => [
@@ -288,6 +302,7 @@
             'bmi'         => is_numeric($case->patient?->bmi) ? (float) $case->patient->bmi : null,
             'id_verified' => $case->patient?->id_verified_status ?? null,
             'isRefill'    => $isRefill,
+            'current'  => $currentData,
             'prior'    => $priorData,
             'status'     => $case->status,
             'approveUrl' => route('clinician.cases.prescribe.form', $case->uuid),
@@ -381,52 +396,60 @@
             var triageLabel = d.triage ? d.triage.charAt(0).toUpperCase() + d.triage.slice(1) : '';
             var protocol = (d.protocol ? esc(d.protocol) + ' · ' : '') + 'classification ' + esc(triageLabel);
 
-            // Prior visit section (refill cases only)
-            var priorHtml = '';
+            // Visit history tabs (refill cases only)
+            var visitHtml = '';
             if (d.isRefill) {
-                if (d.prior) {
-                    var pm = d.prior;
-                    var medItems = '';
-                    if (pm.meds && pm.meds.length) {
-                        pm.meds.forEach(function (m) {
-                            medItems += '<div style="padding:5px 0;border-bottom:1px solid var(--line)">'
-                                + '<span style="font-weight:680;font-size:13px">' + esc(m.name) + '</span>';
-                            if (m.sig)    medItems += ' <span style="color:var(--muted);font-size:12px">· ' + esc(m.sig) + '</span>';
-                            if (m.dosing) medItems += ' <span style="color:var(--muted);font-size:12px">· ' + esc(m.dosing) + '</span>';
-                            if (m.refills != null) medItems += ' <span style="color:var(--soft-muted);font-size:11px">Refills: ' + esc(String(m.refills)) + '</span>';
-                            medItems += '</div>';
-                        });
-                    } else {
-                        medItems = '<p class="ai-honesty">No medications recorded.</p>';
-                    }
-
-                    var intakeItems = '';
-                    if (pm.intake && pm.intake.length) {
-                        pm.intake.forEach(function (r) {
-                            intakeItems += '<div class="qa"><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>';
-                        });
-                    }
-
-                    priorHtml = '<details style="margin-top:16px;border:1px solid var(--line);border-radius:14px;overflow:hidden">'
-                        + '<summary style="padding:12px 16px;cursor:pointer;background:var(--blue-bg);display:flex;align-items:center;gap:10px;list-style:none;font-weight:700;font-size:13px">'
-                        + '<span style="flex:1">Prior visit</span>'
-                        + '<span class="pill" style="font-size:10px">Refill</span>'
-                        + (pm.date ? '<span style="color:var(--muted);font-size:12px;font-weight:500">' + esc(pm.date) + '</span>' : '')
-                        + (pm.clinician ? '<span style="color:var(--muted);font-size:12px;font-weight:500">Dr. ' + esc(pm.clinician) + '</span>' : '')
-                        + '</summary>'
-                        + '<div style="padding:14px 16px">'
-                        + '<div class="subheading">Prescribed</div>'
-                        + medItems
-                        + (intakeItems ? '<div class="subheading" style="margin-top:12px">Prior intake answers</div><div class="qa-sheet" style="margin-top:0">' + intakeItems + '</div>' : '')
-                        + (pm.note ? '<div class="subheading" style="margin-top:12px">Clinical note</div><p style="font-size:12px;color:var(--ink);white-space:pre-wrap;margin:4px 0">' + esc(pm.note) + '</p>' : '')
-                        + '<a href="' + esc(pm.url) + '" style="display:inline-block;margin-top:10px;font-size:12px;color:var(--accent)">View full prior case →</a>'
-                        + '</div></details>';
-                } else {
-                    priorHtml = '<div style="margin-top:12px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--blue-bg)">'
-                        + '<span class="subheading" style="margin:0">Refill</span> '
-                        + '<span class="ai-honesty" style="display:inline;font-size:12px">No prior completed case found for this patient with this partner.</span>'
-                        + '</div>';
+                function buildMedList(meds, emptyMsg) {
+                    if (!meds || !meds.length) return '<p class="ai-honesty">' + emptyMsg + '</p>';
+                    return meds.map(function (m) {
+                        var s = '<div style="padding:5px 0;border-bottom:1px solid var(--line)">'
+                            + '<span style="font-weight:680;font-size:13px">' + esc(m.name) + '</span>';
+                        if (m.sig)       s += ' <span style="color:var(--muted);font-size:12px">· ' + esc(m.sig) + '</span>';
+                        if (m.dosing)    s += ' <span style="color:var(--muted);font-size:12px">· ' + esc(m.dosing) + '</span>';
+                        if (m.refills != null) s += ' <span style="color:var(--soft-muted);font-size:11px">Refills: ' + esc(String(m.refills)) + '</span>';
+                        return s + '</div>';
+                    }).join('');
                 }
+
+                var hasCurrent = !!(d.current);
+                var defaultTab = hasCurrent ? 'current' : 'prior';
+
+                // Current visit panel
+                var currentPanel = hasCurrent
+                    ? (d.current.date ? '<p style="font-size:12px;color:var(--muted);margin:0 0 10px">Prescribed ' + esc(d.current.date) + '</p>' : '')
+                      + '<div class="subheading">Prescribed</div>'
+                      + buildMedList(d.current.meds, 'No medications recorded for this visit.')
+                    : '<p class="ai-honesty" style="margin:12px 0">No prescription yet — pending clinician review.</p>';
+
+                // Prior visit panel
+                var pm = d.prior;
+                var priorPanel = pm
+                    ? ((pm.date || pm.clinician)
+                        ? '<p style="font-size:12px;color:var(--muted);margin:0 0 10px">'
+                          + (pm.date ? esc(pm.date) : '') + (pm.clinician ? ' · Dr. ' + esc(pm.clinician) : '') + '</p>'
+                        : '')
+                      + '<div class="subheading">Prescribed</div>'
+                      + buildMedList(pm.meds, 'No medications recorded.')
+                      + (pm.intake && pm.intake.length
+                          ? '<div class="subheading" style="margin-top:12px">Prior intake answers</div>'
+                            + '<div class="qa-sheet" style="margin-top:0">'
+                            + pm.intake.map(function (r) { return '<div class="qa"><dt>' + esc(r.q) + '</dt><dd>' + esc(r.a) + '</dd></div>'; }).join('')
+                            + '</div>'
+                          : '')
+                      + (pm.note ? '<div class="subheading" style="margin-top:12px">Clinical note</div>'
+                          + '<p style="font-size:12px;color:var(--ink);white-space:pre-wrap;margin:4px 0">' + esc(pm.note) + '</p>' : '')
+                      + '<a href="' + esc(pm.url) + '" style="display:inline-block;margin-top:10px;font-size:12px;color:var(--accent)">View full prior case →</a>'
+                    : '<p class="ai-honesty" style="margin:12px 0">No prior completed case found for this patient with this partner.</p>';
+
+                visitHtml = '<div class="visit-history" style="margin-top:16px">'
+                    + '<div class="vt-bar">'
+                    + '<button type="button" class="vt-btn' + (defaultTab === 'current' ? ' active' : '') + '" data-vtab="current">Current visit</button>'
+                    + '<button type="button" class="vt-btn' + (defaultTab === 'prior' ? ' active' : '') + '" data-vtab="prior">Prior visit</button>'
+                    + '<span class="pill" style="font-size:10px;margin-left:auto">Refill</span>'
+                    + '</div>'
+                    + '<div class="vt-panel" data-vtpanel="current"' + (defaultTab !== 'current' ? ' hidden' : '') + '>' + currentPanel + '</div>'
+                    + '<div class="vt-panel" data-vtpanel="prior"'   + (defaultTab !== 'prior'   ? ' hidden' : '') + '>' + priorPanel   + '</div>'
+                    + '</div>';
             }
 
             // Build demographic chip row (C5)
@@ -469,7 +492,7 @@
                 + '</div>'
                 + '</div>'
                 + sourceSection
-                + priorHtml;
+                + visitHtml;
         }
 
         grid.querySelectorAll('tbody tr[data-row]').forEach(function (tr) {
@@ -484,14 +507,29 @@
         });
 
         panel.addEventListener('click', function (e) {
-            var btn = e.target.closest('#srcToggle');
-            if (!btn) return;
-            var box = document.getElementById('sourceAnswers');
-            if (!box) return;
-            var open = box.hasAttribute('hidden');
-            if (open) { box.removeAttribute('hidden'); } else { box.setAttribute('hidden', ''); }
-            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            btn.textContent = (open ? 'Hide source answers' : 'View source answers') + ' (' + box.children.length + ')';
+            // Source answers toggle
+            var srcBtn = e.target.closest('#srcToggle');
+            if (srcBtn) {
+                var box = document.getElementById('sourceAnswers');
+                if (!box) return;
+                var open = box.hasAttribute('hidden');
+                if (open) { box.removeAttribute('hidden'); } else { box.setAttribute('hidden', ''); }
+                srcBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                srcBtn.textContent = (open ? 'Hide source answers' : 'View source answers') + ' (' + box.children.length + ')';
+                return;
+            }
+            // Visit history tab switch
+            var vtBtn = e.target.closest('.vt-btn');
+            if (vtBtn) {
+                var target = vtBtn.getAttribute('data-vtab');
+                var history = vtBtn.closest('.visit-history');
+                if (!history) return;
+                history.querySelectorAll('.vt-btn').forEach(function (b) { b.classList.toggle('active', b === vtBtn); });
+                history.querySelectorAll('.vt-panel').forEach(function (p) {
+                    if (p.getAttribute('data-vtpanel') === target) { p.removeAttribute('hidden'); }
+                    else { p.setAttribute('hidden', ''); }
+                });
+            }
         });
     })();
 </script>
