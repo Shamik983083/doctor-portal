@@ -74,10 +74,6 @@
         <tr>
           <td style="background:#ffffff;padding:32px 32px 0;">
 
-            <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:15px;font-weight:600;color:#0f172a;margin:0 0 20px;">
-              Hi {{ $firstName }},
-            </p>
-
             {{-- Message body with teal left border --}}
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
               <tr>
