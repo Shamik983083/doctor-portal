@@ -104,7 +104,7 @@
 
     {{-- Total Assigned Cases --}}
     <div class="col-sm-6 col-xl-3">
-        <a href="{{ route('clinician.queue', ['status' => 'assigned']) }}" class="text-decoration-none">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'all']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #6f42c1 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
