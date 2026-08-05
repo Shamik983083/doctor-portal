@@ -324,6 +324,20 @@ class PatientCase extends Model
             ->first();
     }
 
+    /**
+     * Human-readable label for the escalation sub-category, or null when none is set.
+     * Used by the clinician case-show screen and the My Escalations sub-filter chips.
+     */
+    public function escalationLabel(): ?string
+    {
+        return match($this->escalation_target) {
+            self::ESCALATION_SUPPORT         => 'Storefront Support',
+            self::ESCALATION_DOCTOR_ADMIN    => 'Doctor Admin',
+            self::ESCALATION_CLIENT_RESPONSE => 'Client Response',
+            default                          => null,
+        };
+    }
+
     public function isInStatus(string $status): bool { return $this->status === $status; }
     public function canTransitionTo(string $status): bool { return in_array($status, $this->getAllowedTransitions()); }
 

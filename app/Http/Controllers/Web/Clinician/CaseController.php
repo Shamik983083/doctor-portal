@@ -160,6 +160,16 @@ class CaseController extends Controller
         $clinician   = Auth::user()->clinician;
         $tab         = $request->get('tab', 'active');
 
+        // D15: sub-filter for the escalations tab — whitelist prevents injection.
+        $validEscalationSubs = [
+            PatientCase::ESCALATION_SUPPORT,
+            PatientCase::ESCALATION_DOCTOR_ADMIN,
+            PatientCase::ESCALATION_CLIENT_RESPONSE,
+        ];
+        $escalationSub = ($tab === 'escalations' && in_array($request->get('escalation_sub'), $validEscalationSubs, true))
+            ? $request->get('escalation_sub')
+            : null;
+
         $activeStatuses    = ['assigned', 'support', 'processing'];
         $completedStatuses = ['approved', 'completed'];
         $cancelledStatuses = ['cancelled'];
@@ -192,9 +202,18 @@ class CaseController extends Controller
             'all'         => (clone $base)->count(),
         ];
 
+        // D15: per-sub-category counts for the escalations tab filter chips.
+        // Always computed so the chip counts stay accurate even when filtered.
+        $escalationCounts = [
+            PatientCase::ESCALATION_SUPPORT         => (clone $base)->where('status', 'support')->where('escalation_target', PatientCase::ESCALATION_SUPPORT)->count(),
+            PatientCase::ESCALATION_DOCTOR_ADMIN    => (clone $base)->where('status', 'support')->where('escalation_target', PatientCase::ESCALATION_DOCTOR_ADMIN)->count(),
+            PatientCase::ESCALATION_CLIENT_RESPONSE => (clone $base)->where('status', 'support')->where('escalation_target', PatientCase::ESCALATION_CLIENT_RESPONSE)->count(),
+        ];
+
         $cases = (clone $base)
             ->when($tab === 'active',      fn ($q) => $q->whereIn('status', $activeStatuses))
-            ->when($tab === 'escalations', fn ($q) => $q->where('status', 'support'))
+            ->when($tab === 'escalations', fn ($q) => $q->where('status', 'support')
+                ->when($escalationSub, fn ($q) => $q->where('escalation_target', $escalationSub)))
             ->when($tab === 'support',     fn ($q) => $q->where('status', 'support')
                 ->whereHas('messages', fn ($q) => $q->where('direction', 'inbound')->where('is_read', false)))
             ->when($tab === 'completed',   fn ($q) => $q->whereIn('status', $completedStatuses))
@@ -212,7 +231,10 @@ class CaseController extends Controller
             }
         });
 
-        return view('clinician.cases.my-cases', compact('cases', 'clinician', 'counts', 'tab', 'priorCasesMap'));
+        return view('clinician.cases.my-cases', compact(
+            'cases', 'clinician', 'counts', 'tab', 'priorCasesMap',
+            'escalationSub', 'escalationCounts',
+        ));
     }
 
     /**

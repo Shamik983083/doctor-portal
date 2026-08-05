@@ -84,6 +84,17 @@
             <div class="panel-heading"><div><h2>Case info</h2></div></div>
             <dl class="rx-meta" style="padding:0 20px 16px">
                 <div><dt>Status</dt><dd><span class="pill {{ in_array($case->status, ['completed','approved','processing']) ? 'green' : (in_array($case->status, ['cancelled']) ? 'red' : ($case->status === 'support' ? 'yellow' : 'neutral')) }}">{{ ucfirst($case->status) }}</span></dd></div>
+                @if($case->escalation_target)
+                <div>
+                    <dt>Escalation</dt>
+                    <dd>
+                        <span class="pill yellow">{{ $case->escalationLabel() }}</span>
+                        @if($case->support_note)
+                        <span style="display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4">{{ \Illuminate\Support\Str::limit($case->support_note, 120) }}</span>
+                        @endif
+                    </dd>
+                </div>
+                @endif
                 @if($case->visit_type)<div><dt>Visit type</dt><dd>{{ $case->visit_type }}</dd></div>@endif
                 <div><dt>Partner</dt><dd>{{ $case->partner?->name }}</dd></div>
                 <div><dt>Clinician</dt><dd>{{ $case->clinician?->full_name ?? '-' }}</dd></div>
