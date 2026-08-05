@@ -268,6 +268,7 @@ class CaseController extends Controller
                 $q->where('direction', 'inbound')->where('is_read', false)
             ])
             ->where('is_refill', true)
+            ->whereNotIn('status', ['approved', 'completed', 'cancelled'])
             ->where(function ($q) use ($clinician, $seenPatientIds) {
                 $q->where('clinician_id', $clinician->id);
                 if ($seenPatientIds->isNotEmpty()) {

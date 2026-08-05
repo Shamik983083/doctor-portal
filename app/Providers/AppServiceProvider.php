@@ -133,6 +133,7 @@ class AppServiceProvider extends ServiceProvider
             $seenPatientIds = PatientCase::where('clinician_id', $clinician->id)
                 ->where('status', 'completed')->pluck('patient_id')->filter()->unique();
             $refills = PatientCase::where('is_refill', true)
+                ->whereNotIn('status', ['approved', 'completed', 'cancelled'])
                 ->where(function ($q) use ($clinician, $seenPatientIds) {
                     $q->where('clinician_id', $clinician->id);
                     if ($seenPatientIds->isNotEmpty()) { $q->orWhereIn('patient_id', $seenPatientIds); }
