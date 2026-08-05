@@ -35,6 +35,29 @@
                 <label class="form-label fw-semibold">Description</label>
                 <textarea name="description" class="form-control" rows="3">{{ old('description', $partner->description) }}</textarea>
             </div>
+            {{-- E19: default collaborating clinician --}}
+            <hr class="my-4">
+            <h6 class="fw-semibold mb-1">Collaborating Clinician Default</h6>
+            <p class="text-muted small mb-3">
+                When a new case arrives from this storefront and the patient has no collaborating
+                clinician set, this clinician is automatically assigned to them. Existing assignments
+                are never overwritten. Leave blank to disable the default.
+            </p>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="collaborating_clinician_id">Default Clinician</label>
+                <select name="collaborating_clinician_id" id="collaborating_clinician_id" class="form-select @error('collaborating_clinician_id') is-invalid @enderror">
+                    <option value="">— None —</option>
+                    @foreach($clinicians as $cl)
+                    <option value="{{ $cl->id }}" {{ (int) old('collaborating_clinician_id', $partner->collaborating_clinician_id) === $cl->id ? 'selected' : '' }}>
+                        {{ $cl->full_name }}
+                    </option>
+                    @endforeach
+                </select>
+                @error('collaborating_clinician_id')
+                <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+
             {{-- Healthie. See docs/integrations/HEALTHIE-SETUP.md --}}
             @php($healthie = $partner->healthieSettings)
             <hr class="my-4">

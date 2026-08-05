@@ -15,6 +15,8 @@ class Partner extends Model
         'uuid', 'name', 'slug', 'email', 'phone', 'website', 'logo',
         'description', 'status', 'webhook_secret', 'settings',
         'oauth_client_id', 'client_id', 'client_secret',
+        // E19: default collaborating clinician copied onto new patients from this storefront
+        'collaborating_clinician_id',
     ];
 
     protected $casts = [
@@ -31,6 +33,8 @@ class Partner extends Model
             $model->webhook_secret = $model->webhook_secret ?? Str::random(32);
         });
     }
+
+    public function collaboratingClinician() { return $this->belongsTo(Clinician::class, 'collaborating_clinician_id'); }
 
     public function users() { return $this->hasMany(User::class); }
     public function patients() { return $this->hasMany(Patient::class); }

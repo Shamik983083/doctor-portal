@@ -306,6 +306,13 @@ class CaseController extends Controller
             $patient->update($patientData);
         }
 
+        // E19: copy the partner's collaborating clinician default onto the patient
+        // if the patient does not already have one. Never overwrites an existing
+        // assignment — the partner default is a first-time convenience, not a rule.
+        if ($partner->collaborating_clinician_id && !$patient->collaborating_clinician_id) {
+            $patient->update(['collaborating_clinician_id' => $partner->collaborating_clinician_id]);
+        }
+
         if (($data['external_id'] ?? null) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
             return response()->json(['message' => 'Case with this external_id already exists.'], 409);
         }

@@ -189,6 +189,14 @@ class QuestionnaireFormController extends Controller
                         ]
                     );
 
+                    // E19: copy the partner's collaborating clinician default onto the
+                    // patient if they do not already have one. One SELECT inside the
+                    // transaction is acceptable; this path runs once per form submit.
+                    $partnerRecord = Partner::find($partnerId);
+                    if ($partnerRecord?->collaborating_clinician_id && !$patient->collaborating_clinician_id) {
+                        $patient->update(['collaborating_clinician_id' => $partnerRecord->collaborating_clinician_id]);
+                    }
+
                     $caseRef = PatientCase::create([
                         'partner_id'    => $partnerId,
                         'patient_id'    => $patient->id,

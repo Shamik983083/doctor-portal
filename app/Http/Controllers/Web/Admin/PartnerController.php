@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Clinician;
 use App\Models\Partner;
 use App\Models\PartnerEhrSetting;
 use App\Models\User;
@@ -160,7 +161,8 @@ class PartnerController extends Controller
     public function edit(int $id)
     {
         $partner = Partner::findOrFail($id);
-        return view('admin.partners.edit', compact('partner'));
+        $clinicians = Clinician::with('user')->orderBy('id')->get();
+        return view('admin.partners.edit', compact('partner', 'clinicians'));
     }
 
     public function update(Request $request, int $id)
@@ -186,6 +188,12 @@ class PartnerController extends Controller
             // storefront live by itself.
             'healthie_is_enabled'        => 'nullable|boolean',
             'healthie_sandbox_validated' => 'nullable|boolean',
+
+            // E19: default collaborating clinician for new patients from this storefront
+            'collaborating_clinician_id' => [
+                'nullable',
+                Rule::exists('clinicians', 'id')->whereNull('deleted_at'),
+            ],
         ]);
 
         $partner->update(collect($data)->reject(fn ($v, $k) => str_starts_with($k, 'healthie_'))->all());
