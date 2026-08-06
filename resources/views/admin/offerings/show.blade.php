@@ -240,7 +240,11 @@
     <div class="col-lg-9">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">@role('super_admin')Edit Offering@else Offering Details @endrole</h6>
+                <h6 class="mb-0">
+                    @role('super_admin')Edit Offering
+                    @else Offering Details
+                    @endrole
+                </h6>
                 <div class="d-flex gap-2">
                     @role('super_admin')
                     <form method="POST" action="{{ route('admin.offerings.destroy', $offering->id) }}"
