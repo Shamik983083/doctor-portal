@@ -309,6 +309,7 @@
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Pharmacy & Integration</h6>
 
+                    {{-- Pharmacy Type, DoseSpot Medication ID, Boothwyn Compound ID commented out — not wired to any live integration yet
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Pharmacy Type <span class="text-danger">*</span></label>
@@ -332,6 +333,7 @@
                                    value="{{ old('boothwyn_compound_id', $offering->boothwyn_compound_id) }}">
                         </div>
                     </div>
+                    --}}
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Prescription &amp; Dispensing</h6>
 

@@ -76,9 +76,11 @@ class OfferingController extends Controller
             'dispense_unit'           => 'required|string|max:100',
             'days_until_dispense'     => 'nullable|integer|min:0',
             'directions'              => 'required|string',
-            'pharmacy_type'           => 'required|in:boothwyn,curexa,custom',
+            // 'pharmacy_type'        => 'required|in:boothwyn,curexa,custom', // not wired to live integration yet
+            'pharmacy_type'           => 'nullable|in:boothwyn,curexa,custom',
             'pharmacy_name'           => 'nullable|string|max:255',
             'pharmacy_notes'          => 'nullable|string',
+            // 'dosespot_medication_id' and 'boothwyn_compound_id' still accepted but not required
             'dosespot_medication_id'  => 'nullable|string|max:100',
             'boothwyn_compound_id'    => 'nullable|string|max:100',
             'available_states'        => 'nullable|array',
@@ -236,7 +238,8 @@ class OfferingController extends Controller
             'dispense_unit'           => 'nullable|string|max:100',
             'days_until_dispense'     => 'nullable|integer|min:0',
             'directions'              => 'required|string',
-            'pharmacy_type'           => 'required|in:boothwyn,curexa,custom',
+            // 'pharmacy_type'        => 'required|in:boothwyn,curexa,custom', // not wired to live integration yet
+            'pharmacy_type'           => 'nullable|in:boothwyn,curexa,custom',
             'pharmacy_name'           => 'nullable|string|max:255',
             'pharmacy_notes'          => 'nullable|string',
             'dosespot_medication_id'  => 'nullable|string|max:100',
