@@ -13,41 +13,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
-/**
- * TEMPORARY STAGING PREVIEW DATA. NOT FOR PRODUCTION. (Devin msg 2234,
- * "We'll need some temp seed data".)
- *
- * WHY THIS IS A SEEDER AND NOT A MIGRATION, WHICH MATTERS.
- * The deploy workflow runs `artisan migrate --force` automatically but never
- * runs seeders. It would therefore have been tempting to put this data in a
- * migration so it lands without anyone logging in. That would be a mistake: the
- * SAME migration set runs on production when this eventually merges to main, so
- * a seeding migration means demo doctors and fake patients appearing in a live
- * clinical system. Migrations describe schema. Fixtures are run on purpose, by a
- * person, on a box they chose. So this needs one deliberate command:
- *
- *     php artisan db:seed --class=Database\\Seeders\\StagingPreviewSeeder
- *
- * WHAT IT EXISTS TO MAKE VISIBLE. Three things that are otherwise invisible or
- * look broken on a fresh staging deploy:
- *
- *  1. THE ADMIN CONSOLE IS EMPTY WITHOUT IT. `admin_clinician` ships with no
- *     backfill, and a Doctor Admin over no doctors sees nothing by design. On a
- *     fresh deploy that is every existing admin, and it reads as "the merge
- *     broke the admin panel". This links them up.
- *  2. THE TWO TIERS ARE INDISTINGUISHABLE WITHOUT IT. One Doctor Admin over one
- *     doctor, a second doctor they are NOT over, so the scoping can actually be
- *     seen rather than taken on trust.
- *  3. THE WAITING-CASE FIX IS UNPROVABLE WITHOUT IT. Unassigned cases are the
- *     whole point of the scopeVisibleTo change; there have to be some.
- *
- * IDEMPOTENT. Every write is firstOrCreate / updateOrCreate / syncWithoutDetaching,
- * so re-running changes nothing. Safe to run twice.
- *
- * PASSWORDS ARE WEAK ON PURPOSE and are listed in docs/STAGING-DEPLOY-RUNBOOK.md.
- * axismd.io staging is demo mode with no real patients. If that ever stops being
- * true, delete this seeder rather than hardening it.
- */
+
 class StagingPreviewSeeder extends Seeder
 {
     private const PASSWORD = 'staging-preview-2026';

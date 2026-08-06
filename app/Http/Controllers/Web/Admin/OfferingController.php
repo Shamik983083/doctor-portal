@@ -73,9 +73,10 @@ class OfferingController extends Controller
             'refills'                 => 'required|integer|min:0',
             'quantity'                => 'required|numeric|min:0',
             'days_supply'             => 'nullable|integer|min:0',
-            'dispense_unit'           => 'required|string|max:100',
+            'dispense_unit'           => 'nullable|string|max:100',
             'days_until_dispense'     => 'nullable|integer|min:0',
             'directions'              => 'required|string',
+            'sig'                     => 'nullable|string',
             // 'pharmacy_type'        => 'required|in:boothwyn,curexa,custom', // not wired to live integration yet
             'pharmacy_type'           => 'nullable|in:boothwyn,curexa,custom',
             'pharmacy_name'           => 'nullable|string|max:255',
