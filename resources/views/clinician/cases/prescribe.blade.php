@@ -630,6 +630,14 @@
         else { addRow(''); }
 
         refresh();
+
+        // Spinner on Approve & submit
+        form.addEventListener('submit', function () {
+            var btn = document.getElementById('submitBtn');
+            if (!btn || btn.classList.contains('btn-loading')) return;
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '<span class="btn-spin"></span>Submitting…';
+        });
     })();
 </script>
 @endsection
