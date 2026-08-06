@@ -518,6 +518,14 @@
                 srcBtn.textContent = (open ? 'Hide source answers' : 'View source answers') + ' (' + box.children.length + ')';
                 return;
             }
+            // Provider action buttons — show inline spinner on click
+            var actBtn = e.target.closest('.button-primary.full-width,.button-secondary.full-width,.button-danger.full-width');
+            if (actBtn && !actBtn.classList.contains('btn-loading')) {
+                var label = actBtn.textContent.trim();
+                actBtn.classList.add('btn-loading');
+                actBtn.innerHTML = '<span class="btn-spin"></span>' + label;
+                return;
+            }
             // Visit history tab switch
             var vtBtn = e.target.closest('.vt-btn');
             if (vtBtn) {

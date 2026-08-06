@@ -527,5 +527,8 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
   .demo-banner{display:none}
   .page-head h1{font-size:24px}
 }
+.btn-loading{pointer-events:none!important;opacity:.7}
+.btn-spin{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:btnspinner .55s linear infinite;vertical-align:middle;margin-right:6px;flex-shrink:0}
+@keyframes btnspinner{to{transform:rotate(360deg)}}
 
 @endverbatim
