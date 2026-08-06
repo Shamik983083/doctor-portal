@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Partner;
 use App\Models\PartnerProductPlan;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PartnerProductPlanController extends Controller
 {
@@ -118,11 +119,32 @@ class PartnerProductPlanController extends Controller
             return back()->with('error', "\"{$source->name}\" has no product plans to copy.");
         }
 
-        // Build a set of offering IDs accessible to the destination partner.
+        // Collect unique active offering IDs referenced by the source plans.
+        $sourceOfferingIds = $sourcePlans
+            ->filter(fn($p) => $p->offering && $p->offering->is_active)
+            ->pluck('offering_id')
+            ->unique()
+            ->values();
+
+        // Grant the destination partner access to any of those offerings it
+        // doesn't already have. The unique(offering_id, partner_id) DB constraint
+        // is the safety net; INSERT IGNORE avoids a race-condition error.
+        $now = now();
+        foreach ($sourceOfferingIds as $offeringId) {
+            DB::table('offering_partner')->insertOrIgnore([
+                'offering_id' => $offeringId,
+                'partner_id'  => $dest->id,
+                'is_active'   => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]);
+        }
+
+        // Refresh accessible set after granting access.
         $accessibleOfferingIds = $dest->accessibleOfferings()
             ->where('offerings.is_active', true)
             ->pluck('offerings.id')
-            ->flip(); // use as a lookup set
+            ->flip();
 
         // Build existing destination plans as a set to detect exact duplicates.
         $existingKeys = PartnerProductPlan::where('partner_id', $dest->id)
@@ -130,16 +152,12 @@ class PartnerProductPlanController extends Controller
             ->map(fn($p) => "{$p->product_key}|{$p->month_frequency}|{$p->offering_id}")
             ->flip();
 
-        $copied   = 0;
-        $skippedAccess    = 0;
+        $copied           = 0;
         $skippedDuplicate = 0;
-        $now = now();
 
         foreach ($sourcePlans as $plan) {
-            // Skip if offering is inactive or not accessible to destination.
             if (!$accessibleOfferingIds->has($plan->offering_id)) {
-                $skippedAccess++;
-                continue;
+                continue; // offering inactive — skip silently
             }
 
             // Skip exact duplicates (same key + frequency + offering already exists).
@@ -163,16 +181,13 @@ class PartnerProductPlanController extends Controller
         if ($copied === 0) {
             $reason = $skippedDuplicate > 0
                 ? 'all plans already exist on this partner'
-                : 'no plans from that partner are accessible to this partner';
+                : 'source partner has no active plans to copy';
             return back()->with('error', "Nothing copied — {$reason}.");
         }
 
         $msg = "Copied {$copied} plan(s) from \"{$source->name}\".";
         if ($skippedDuplicate > 0) {
             $msg .= " {$skippedDuplicate} skipped (already exist).";
-        }
-        if ($skippedAccess > 0) {
-            $msg .= " {$skippedAccess} skipped (offering not accessible to this partner).";
         }
 
         return back()->with('success', $msg);
