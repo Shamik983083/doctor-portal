@@ -30,6 +30,7 @@ class CaseController extends Controller
         $cases = PatientCase::visibleTo($request->user())
             ->with(['patient', 'partner', 'clinician.user', 'caseOfferings.offering'])
             ->when($request->input('status'), fn($q, $s) => $q->where('status', $s))
+            ->when($request->boolean('active'), fn($q) => $q->whereNotIn('status', ['completed', 'cancelled']))
             ->when($request->input('triage'), fn($q, $t) => $q->where('triage', $t))
             ->when($request->input('partner_id'), fn($q, $id) => $q->where('partner_id', $id))
             ->when($request->input('clinician_id'), fn($q, $id) => $q->where('clinician_id', $id))
