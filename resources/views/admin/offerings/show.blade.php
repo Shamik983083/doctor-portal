@@ -307,7 +307,7 @@
                         </div>
                     </div>
 
-                    <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Pharmacy & Integration</h6>
+                    {{-- Pharmacy & Integration heading commented out — no live integration yet --}}
 
                     {{-- Pharmacy Type, DoseSpot Medication ID, Boothwyn Compound ID commented out — not wired to any live integration yet
                     <div class="row g-3 mb-3">
@@ -408,6 +408,7 @@
                         </div>
                     @endif
 
+                    {{-- Pharmacy Name and Pharmacy Notes commented out — no live integration yet
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Pharmacy Name <span class="text-muted fw-normal">(opt)</span></label>
@@ -422,6 +423,7 @@
                         <textarea name="pharmacy_notes" class="form-control" rows="2"
                                   placeholder="e.g. Bill to partner, Ship to Patient">{{ old('pharmacy_notes', $offering->pharmacy_notes) }}</textarea>
                     </div>
+                    --}}
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">
                         State Availability
