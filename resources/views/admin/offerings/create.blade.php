@@ -192,13 +192,45 @@
                         <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">SIG <span class="text-muted fw-normal">(opt)</span></label>
-                        <input type="text" name="sig" class="form-control"
-                               value="{{ old('sig') }}"
-                               placeholder="e.g. Take 1 capsule orally once daily">
-                        <div class="form-text">Default patient-facing SIG instructions for this offering.</div>
+                    <h6 class="text-muted text-uppercase small fw-semibold mb-2 border-bottom pb-2 mt-4">SIG / Dose Levels</h6>
+                    <p class="text-muted small mb-3">Add dosing levels if this offering has multiple dose tiers. Each level requires a label and a SIG instruction. Leave empty if a single global SIG is not needed.</p>
+
+                    <div id="levelsContainer" class="d-flex flex-column gap-2 mb-3">
+                        @if(old('levels'))
+                        @foreach(old('levels') as $li => $lv)
+                        <div class="level-row d-flex align-items-start gap-2 p-3 rounded border bg-light">
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 level-badge mt-1 flex-shrink-0" style="font-size:.72rem;min-width:42px;text-align:center">LVL{{ $li + 1 }}</span>
+                            <div class="flex-grow-1">
+                                <div class="row g-2">
+                                    <div class="col-md-5">
+                                        <input type="text" name="levels[{{ $li }}][label]"
+                                               class="form-control form-control-sm @error('levels.'.$li.'.label') is-invalid @enderror"
+                                               value="{{ $lv['label'] ?? '' }}"
+                                               placeholder="e.g. LVL1 - 1MG (0.25mg/wk)" required>
+                                        @error('levels.'.$li.'.label')<div class="invalid-feedback" style="font-size:.75rem">{{ $message }}</div>@enderror
+                                        <div class="form-text" style="font-size:.7rem">Level label</div>
+                                    </div>
+                                    <div class="col-md-7">
+                                        <input type="text" name="levels[{{ $li }}][sig]"
+                                               class="form-control form-control-sm @error('levels.'.$li.'.sig') is-invalid @enderror"
+                                               value="{{ $lv['sig'] ?? '' }}"
+                                               placeholder="e.g. Inject 0.25 mL subcutaneously once weekly" required>
+                                        @error('levels.'.$li.'.sig')<div class="invalid-feedback" style="font-size:.75rem">{{ $message }}</div>@enderror
+                                        <div class="form-text" style="font-size:.7rem">SIG instruction</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 flex-shrink-0 remove-level-btn" title="Remove level">
+                                <i class="bi bi-x-lg" style="font-size:.75rem"></i>
+                            </button>
+                        </div>
+                        @endforeach
+                        @endif
                     </div>
+
+                    <button type="button" id="addLevelBtn" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-plus-circle me-1"></i>Add Level
+                    </button>
 
                     {{-- Pharmacy Name and Pharmacy Notes commented out — no live integration yet
                     <div class="row g-3 mb-3">
@@ -295,6 +327,7 @@
 
 @section('scripts')
 <script>
+    /* ── State checkboxes ── */
     document.getElementById('selectAll').addEventListener('click', () =>
         document.querySelectorAll('.state-cb').forEach(cb => cb.checked = true));
     document.getElementById('clearAll').addEventListener('click', () =>
@@ -304,6 +337,7 @@
     document.getElementById('clearAllVideo').addEventListener('click', () =>
         document.querySelectorAll('.video-state-cb').forEach(cb => cb.checked = false));
 
+    /* ── Questionnaire toggles ── */
     document.querySelectorAll('.q-check').forEach(function (cb) {
         cb.addEventListener('change', function () {
             var toggle = document.getElementById('qrt_' + this.value);
@@ -318,6 +352,60 @@
         });
     });
 
+    /* ── Dose Levels ── */
+    var levelsContainer = document.getElementById('levelsContainer');
+
+    function renumberLevels() {
+        levelsContainer.querySelectorAll('.level-row').forEach(function (row, i) {
+            row.querySelector('.level-badge').textContent = 'LVL' + (i + 1);
+            row.querySelector('.level-label-input').name  = 'levels[' + i + '][label]';
+            row.querySelector('.level-sig-input').name    = 'levels[' + i + '][sig]';
+        });
+    }
+
+    function buildLevelRow(idx) {
+        var row = document.createElement('div');
+        row.className = 'level-row d-flex align-items-start gap-2 p-3 rounded border';
+        row.style.background = 'var(--bs-gray-100, #f8f9fa)';
+        row.innerHTML =
+            '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 level-badge mt-1 flex-shrink-0" style="font-size:.72rem;min-width:42px;text-align:center">LVL' + (idx + 1) + '</span>' +
+            '<div class="flex-grow-1">' +
+                '<div class="row g-2">' +
+                    '<div class="col-md-5">' +
+                        '<input type="text" name="levels[' + idx + '][label]"' +
+                               ' class="form-control form-control-sm level-label-input"' +
+                               ' placeholder="e.g. LVL1 – 1MG (0.25mg/wk)" required>' +
+                        '<div class="form-text" style="font-size:.7rem">Level label</div>' +
+                    '</div>' +
+                    '<div class="col-md-7">' +
+                        '<input type="text" name="levels[' + idx + '][sig]"' +
+                               ' class="form-control form-control-sm level-sig-input"' +
+                               ' placeholder="e.g. Inject 0.25 mL subcutaneously once weekly" required>' +
+                        '<div class="form-text" style="font-size:.7rem">SIG instruction</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 flex-shrink-0 remove-level-btn" title="Remove level">' +
+                '<i class="bi bi-x-lg" style="font-size:.75rem"></i>' +
+            '</button>';
+        return row;
+    }
+
+    document.getElementById('addLevelBtn').addEventListener('click', function () {
+        var idx = levelsContainer.querySelectorAll('.level-row').length;
+        var row = buildLevelRow(idx);
+        levelsContainer.appendChild(row);
+        row.querySelector('.level-label-input').focus();
+    });
+
+    levelsContainer.addEventListener('click', function (e) {
+        var btn = e.target.closest('.remove-level-btn');
+        if (!btn) return;
+        btn.closest('.level-row').remove();
+        renumberLevels();
+    });
+
+    /* ── Form submit guard ── */
     document.getElementById('createOfferingForm').addEventListener('submit', function (e) {
         var checked = document.querySelectorAll('.q-check:checked').length;
         if (checked === 0 && document.getElementById('questionnaireBox')) {

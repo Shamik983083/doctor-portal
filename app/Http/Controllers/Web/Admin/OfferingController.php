@@ -77,6 +77,9 @@ class OfferingController extends Controller
             'days_until_dispense'     => 'nullable|integer|min:0',
             'directions'              => 'required|string',
             'sig'                     => 'nullable|string',
+            'levels'                  => 'nullable|array',
+            'levels.*.label'          => 'required_with:levels|string|max:255',
+            'levels.*.sig'            => 'required_with:levels|string',
             // 'pharmacy_type'        => 'required|in:boothwyn,curexa,custom', // not wired to live integration yet
             'pharmacy_type'           => 'nullable|in:boothwyn,curexa,custom',
             'pharmacy_name'           => 'nullable|string|max:255',
@@ -97,6 +100,22 @@ class OfferingController extends Controller
         $data['is_active']               = $request->boolean('is_active');
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
         $data['category_id']             = $request->input('category_id') ?: null;
+
+        // Build levels JSON if any were submitted, otherwise null out sig.
+        $rawLevels = array_values(array_filter($request->input('levels', []), fn($l) => trim($l['label'] ?? '') !== ''));
+        if (!empty($rawLevels)) {
+            $data['levels'] = array_map(fn($l) => [
+                'label'   => trim($l['label']),
+                'formula' => '',
+                'sig'     => trim($l['sig'] ?? ''),
+            ], $rawLevels);
+            $data['sig'] = null;
+        } else {
+            $data['levels'] = null;
+            $rawSig = trim((string) $request->input('sig', ''));
+            $data['sig'] = $rawSig !== '' ? $rawSig : null;
+        }
+
         $data['approval_status']         = 'approved';
         $data['approved_by']             = Auth::id();
         $data['approved_at']             = now();
