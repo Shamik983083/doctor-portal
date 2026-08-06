@@ -131,13 +131,11 @@ class PartnerProductPlanController extends Controller
         // is the safety net; INSERT IGNORE avoids a race-condition error.
         $now = now();
         foreach ($sourceOfferingIds as $offeringId) {
-            DB::table('offering_partner')->insertOrIgnore([
-                'offering_id' => $offeringId,
-                'partner_id'  => $dest->id,
-                'is_active'   => true,
-                'created_at'  => $now,
-                'updated_at'  => $now,
-            ]);
+            DB::table('offering_partner')->upsert(
+                [['offering_id' => $offeringId, 'partner_id' => $dest->id, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]],
+                ['offering_id', 'partner_id'],
+                ['is_active', 'updated_at']
+            );
         }
 
         // Refresh accessible set after granting access.
