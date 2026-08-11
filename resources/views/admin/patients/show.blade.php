@@ -102,6 +102,7 @@
         </div>
 
         {{-- Orders summary --}}
+        {{-- @todo un-comment when orders are wired up
         <div class="card">
             <div class="card-header"><h6 class="mb-0"><i class="bi bi-cart me-2"></i>Orders ({{ $patient->orders->count() }})</h6></div>
             @if($patient->orders->count())
@@ -125,6 +126,7 @@
             <div class="card-body"><p class="text-muted small mb-0">No orders yet.</p></div>
             @endif
         </div>
+        --}}
     </div>
 
     {{-- Right: Cases --}}
