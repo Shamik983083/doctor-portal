@@ -8,7 +8,7 @@
         'admin.questionnaires.*', 'admin.questions.*', 'admin.partner-dashboard.*',
         'admin.escalations.*', 'admin.messages.*'
     );
-    $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*');
+    $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*', 'admin.ehr-records.*');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*', 'admin.ai.*');
     $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*', 'admin.users.*');
 @endphp
@@ -149,6 +149,14 @@
             @php $failedWebhooksCount = \App\Models\WebhookDelivery::where('status', 'failed')->count(); @endphp
             @if($failedWebhooksCount > 0)
                 <span class="badge bg-danger ms-auto" style="font-size:.6rem;">{{ $failedWebhooksCount }}</span>
+            @endif
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.ehr-records.*') ? 'active' : '' }}"
+           href="{{ route('admin.ehr-records.index') }}">
+            <i class="bi bi-hospital"></i> EHR Records
+            @php $failedEhrCount = \App\Models\EhrRecord::where('status', \App\Models\EhrRecord::STATUS_FAILED)->count(); @endphp
+            @if($failedEhrCount > 0)
+                <span class="badge bg-danger ms-auto" style="font-size:.6rem;">{{ $failedEhrCount }}</span>
             @endif
         </a>
 

@@ -16,6 +16,7 @@ use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCa
 use App\Http\Controllers\Web\Admin\QuestionnaireController as AdminQuestionnaireController;
 use App\Http\Controllers\Web\Admin\QuestionController as AdminQuestionController;
 use App\Http\Controllers\Web\Admin\WebhookDeliveryController as AdminWebhookDeliveryController;
+use App\Http\Controllers\Web\Admin\EhrRecordController as AdminEhrRecordController;
 use App\Http\Controllers\Web\Admin\AuditLogController as AdminAuditLogController;
 use App\Http\Controllers\Web\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Web\Admin\TriageRuleController as AdminTriageRuleController;
@@ -323,6 +324,13 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     Route::prefix('webhooks')->name('webhooks.')->group(function () {
         Route::get('/',              [AdminWebhookDeliveryController::class, 'index'])->name('index');
         Route::post('/{uuid}/resend',[AdminWebhookDeliveryController::class, 'resend'])->name('resend');
+    });
+
+    // EHR Records — integration surface, super admin only (Devin msg 2117)
+    Route::prefix('ehr-records')->name('ehr-records.')->middleware('role:super_admin')->group(function () {
+        Route::get('/',               [AdminEhrRecordController::class, 'index'])->name('index');
+        Route::get('/{uuid}',         [AdminEhrRecordController::class, 'show'])->name('show');
+        Route::post('/{uuid}/retry',  [AdminEhrRecordController::class, 'retry'])->name('retry');
     });
 
     // Case SLA Targets
