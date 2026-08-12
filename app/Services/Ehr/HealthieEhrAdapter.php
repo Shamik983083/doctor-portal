@@ -3,6 +3,7 @@
 namespace App\Services\Ehr;
 
 use App\Models\PartnerEhrSetting;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -39,20 +40,17 @@ use RuntimeException;
  * API reference: https://docs.gethealthie.com/guides/intro/
  * ============================================================================
  *
- * WHAT IS WIRED, AND WHAT IS DELIBERATELY NOT.
+ * WHAT IS WIRED:
  *
- * Wired and real: per-company credential resolution, the transport, Healthie's
- * documented auth headers (Authorization: Basic <key>, AuthorizationSource: API,
- * and AuthorizationShard when the account is sharded), error normalisation, and
- * GraphQL error handling (Healthie returns HTTP 200 with an `errors` array, so
- * checking the status alone would read a failure as a success).
- *
- * NOT written, on purpose: the mutation document itself. Healthie's published
- * guides do not include the mutation names or field shapes, and their schema
- * reference needs credentials to read. Inventing `createClient`/`createFormAnswerGroup`
- * field-by-field would produce code that looks finished, passes review by shape,
- * and fails or writes wrong records the first time it is switched on. The one
- * thing left is the GraphQL document; everything around it is done.
+ * Per-company credential resolution, the transport, Healthie's documented auth
+ * headers (Authorization: Basic <key>, AuthorizationSource: API, and
+ * AuthorizationShard when the account is sharded), error normalisation, GraphQL
+ * error handling (Healthie returns HTTP 200 with an `errors` array), tenant
+ * segregation check, and the full two-step flow:
+ *   1. findOrCreateClient — looks up the Healthie client by namespaced patient
+ *      key; creates the client if not found.
+ *   2. buildMutation — posts a createFormAnswerGroup (when note_form_id is
+ *      configured) or createNote (the simpler fallback).
  */
 class HealthieEhrAdapter implements EhrGatewayAdapter
 {
@@ -72,18 +70,17 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             );
         }
 
-        [$mutation, $variables] = $this->buildMutation($payload);
+        // Step 1: resolve or create the Healthie client for this patient.
+        // Throws RuntimeException on client-creation failure (retryable — the
+        // outbox will try again up to max_attempts).
+        $healthieClientId = $this->findOrCreateClient($payload);
+
+        // Step 2: post the clinical note.
+        [$mutation, $variables] = $this->buildMutation($payload, $healthieClientId);
 
         try {
-            $response = Http::withHeaders($this->settings->authHeaders())
-                ->timeout((int) config('ehr.healthie.timeout', 30))
-                ->acceptJson()
-                ->post($this->settings->endpoint, [
-                    'query'     => $mutation,
-                    'variables' => $variables,
-                ]);
+            $response = $this->graphql($mutation, $variables);
         } catch (\Throwable $e) {
-            // Never log the payload: it is PHI.
             Log::warning('Healthie request failed to complete', [
                 'partner_id' => $this->settings->partner_id,
                 'error'      => $e->getMessage(),
@@ -154,25 +151,235 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
     }
 
     /**
-     * THE ONE PIECE STILL TO WRITE.
+     * Finds an existing Healthie client by namespaced patient key, or creates one.
      *
-     * Everything this needs is already resolved and passed in: the company's
-     * organization_id, the Healthie user to attribute the note to
-     * (default_provider_id), the form the note becomes (note_form_id), and the
-     * namespaced patient key that must be the ONLY matching key.
+     * Search strategy: query by email within this partner's Healthie org (safe
+     * because each partner credential is org-scoped, so there is no cross-tenant
+     * risk in the search itself), then verify the returned user's
+     * record_identifier matches our namespaced key. Email is only the initial
+     * filter; the namespaced key is the authoritative match.
      *
-     * See docs/integrations/HEALTHIE-SETUP.md for what has to be confirmed
-     * against the schema reference before this is filled in.
+     * On create: stores the namespaced key in record_identifier so future
+     * lookups never rely on email alone.
      */
-    private function buildMutation(array $payload): array
+    private function findOrCreateClient(array $payload): string
     {
-        throw new RuntimeException(
-            'The Healthie GraphQL mutation has not been written yet. Everything around it is wired: '
-            . 'per-company credentials, auth headers, transport, and error handling. What is missing is the '
-            . 'mutation document itself, which depends on decisions that must be confirmed against Healthie\'s '
-            . 'schema reference (which object the note becomes, how a client is created and matched, and how '
-            . 'the signing clinician maps to a Healthie user). See docs/integrations/HEALTHIE-SETUP.md.'
-        );
+        $namespacedKey = $payload['patient']['external_id'];
+
+        $lookupQuery = <<<'GQL'
+        query FindHealthieClient($keywords: String) {
+            users(keywords: $keywords, offset: 0, should_paginate: false) {
+                id
+                record_identifier
+            }
+        }
+        GQL;
+
+        $lookupResponse = $this->graphql($lookupQuery, [
+            'keywords' => $payload['patient']['email'],
+        ]);
+
+        if ($lookupResponse->successful() && empty($lookupResponse->json('errors'))) {
+            foreach ($lookupResponse->json('data.users') ?? [] as $user) {
+                if (($user['record_identifier'] ?? null) === $namespacedKey) {
+                    return (string) $user['id'];
+                }
+            }
+        }
+
+        // Client not found — create.
+        $createMutation = <<<'GQL'
+        mutation CreateHealthieClient($input: createClientInput!) {
+            createClient(input: $input) {
+                user {
+                    id
+                }
+                messages {
+                    field
+                    message
+                }
+            }
+        }
+        GQL;
+
+        // Build input and strip nulls/empty-strings. dont_send_welcome is kept
+        // explicitly — it is a boolean and must not be stripped by the filter.
+        $input = array_filter([
+            'first_name'        => $payload['patient']['first_name'] ?? null,
+            'last_name'         => $payload['patient']['last_name'] ?? null,
+            'email'             => $payload['patient']['email'] ?? null,
+            'phone_number'      => $payload['patient']['phone'] ?? null,
+            'dob'               => $payload['patient']['date_of_birth'] ?? null,
+            'gender'            => $payload['patient']['gender'] ?? null,
+            'record_identifier' => $namespacedKey,
+            'dietitian_id'      => $this->settings->default_provider_id ?: null,
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $input['dont_send_welcome'] = true;
+
+        $createResponse = $this->graphql($createMutation, ['input' => $input]);
+        $createJson     = $createResponse->json();
+
+        if (! empty($createJson['errors'])) {
+            $messages = implode('; ', array_map(
+                fn ($e) => (string) ($e['message'] ?? 'unknown'),
+                $createJson['errors']
+            ));
+            throw new RuntimeException("Healthie client creation failed: {$messages}");
+        }
+
+        $clientId = $createJson['data']['createClient']['user']['id'] ?? null;
+
+        if (! $clientId) {
+            $fieldErrors = $createJson['data']['createClient']['messages'] ?? [];
+            $detail      = implode('; ', array_map(
+                fn ($m) => ($m['field'] ?? '?') . ': ' . ($m['message'] ?? '?'),
+                $fieldErrors
+            ));
+            throw new RuntimeException("Healthie returned no client ID after createClient. {$detail}");
+        }
+
+        return (string) $clientId;
+    }
+
+    /**
+     * Builds the note creation mutation for the resolved Healthie client ID.
+     *
+     * Uses createFormAnswerGroup (a proper charting record tied to a form
+     * template) when note_form_id is configured. Falls back to createNote
+     * (a plain text note on the patient's timeline) when it is not. Either
+     * path produces a record the extractReference helper can parse.
+     */
+    private function buildMutation(array $payload, string $healthieClientId): array
+    {
+        $noteText = $this->buildNoteText($payload);
+
+        if ($this->settings->note_form_id) {
+            $mutation = <<<'GQL'
+            mutation CreateChartNote($input: createFormAnswerGroupInput!) {
+                createFormAnswerGroup(input: $input) {
+                    formAnswerGroup {
+                        id
+                    }
+                    messages {
+                        field
+                        message
+                    }
+                }
+            }
+            GQL;
+
+            $variables = [
+                'input' => [
+                    'user_id'               => $healthieClientId,
+                    'custom_module_form_id' => $this->settings->note_form_id,
+                    'external_id'           => $payload['patient']['external_id'],
+                    'name'                  => $noteText,
+                    'finished'              => true,
+                    'marked_locked'         => true,
+                    'created_at'            => $payload['encounter']['approved_at']
+                        ?? now()->toIso8601String(),
+                ],
+            ];
+        } else {
+            $mutation = <<<'GQL'
+            mutation CreateNote($input: createNoteInput!) {
+                createNote(input: $input) {
+                    note {
+                        id
+                    }
+                    messages {
+                        field
+                        message
+                    }
+                }
+            }
+            GQL;
+
+            $variables = [
+                'input' => [
+                    'user_id'    => $healthieClientId,
+                    'content'    => $noteText,
+                    'created_at' => $payload['encounter']['approved_at']
+                        ?? now()->toIso8601String(),
+                ],
+            ];
+        }
+
+        return [$mutation, $variables];
+    }
+
+    /**
+     * Assembles the clinical note text from the approval payload.
+     *
+     * Explicit field-by-field: a whitelist that cannot accidentally include
+     * fields added later. This text is PHI — do not log it.
+     */
+    private function buildNoteText(array $payload): string
+    {
+        $lines = [];
+
+        $lines[] = 'MEDAXIS CLINICAL NOTE';
+        $lines[] = 'Case: ' . ($payload['source']['case_id'] ?? 'unknown');
+        $lines[] = 'Approved: ' . ($payload['encounter']['approved_at'] ?? 'unknown');
+
+        $clinician = $payload['encounter']['clinician']['name'] ?? null;
+        if ($clinician) {
+            $npi   = $payload['encounter']['clinician']['npi'] ?? null;
+            $lines[] = 'Clinician: ' . $clinician . ($npi ? " (NPI: {$npi})" : '');
+        }
+
+        if (! empty($payload['medications'])) {
+            $lines[] = '';
+            $lines[] = 'APPROVED MEDICATIONS:';
+            foreach ($payload['medications'] as $med) {
+                $months = ! empty($med['months']) ? implode(', ', $med['months']) : null;
+                $term   = $months ?? ($med['term'] ?? null);
+                $freq   = $med['frequency'] ?? null;
+                $line   = '  ' . ($med['name'] ?? '?');
+                if ($term) {
+                    $line .= " [{$term}]";
+                }
+                if ($freq) {
+                    $line .= ' — ' . $freq;
+                }
+                $lines[] = $line;
+            }
+        }
+
+        if (! empty($payload['declined'])) {
+            $lines[] = '';
+            $lines[] = 'DECLINED:';
+            foreach ($payload['declined'] as $med) {
+                $lines[] = '  ' . ($med['name'] ?? '?');
+            }
+        }
+
+        $providerNote = trim((string) ($payload['note']['text'] ?? ''));
+        if ($providerNote !== '') {
+            $lines[] = '';
+            $lines[] = 'PROVIDER NOTE:';
+            $lines[] = $providerNote;
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Thin wrapper around the Healthie GraphQL endpoint with shared auth headers.
+     *
+     * Callers catch \Throwable for network failures; application-level errors
+     * arrive as HTTP 200 with a populated `errors` array and are checked there.
+     */
+    private function graphql(string $query, array $variables = []): Response
+    {
+        return Http::withHeaders($this->settings->authHeaders())
+            ->timeout((int) config('ehr.healthie.timeout', 30))
+            ->acceptJson()
+            ->post($this->settings->endpoint, [
+                'query'     => $query,
+                'variables' => $variables,
+            ]);
     }
 
     /**

@@ -766,7 +766,8 @@ class CaseController extends Controller
             ->latest()
             ->firstOrFail();
 
-        DB::transaction(function () use ($request, $case, $clinician, $prescription) {
+        $clinicalNote = null;
+        DB::transaction(function () use ($request, $case, $clinician, $prescription, &$clinicalNote) {
             $prescription->update([
                 'review_status' => CasePrescription::REVIEW_CONFIRMED,
                 'charting_note' => $request->input('charting_note'),
@@ -774,7 +775,7 @@ class CaseController extends Controller
 
             // C12: persist the charting note as a ClinicalNote on confirmation.
             if ($request->filled('charting_note')) {
-                ClinicalNote::create([
+                $clinicalNote = ClinicalNote::create([
                     'case_id'      => $case->id,
                     'clinician_id' => $clinician->id,
                     'type'         => 'charting',
@@ -842,6 +843,37 @@ class CaseController extends Controller
             $this->pharmacyDispatch->queue($document);
         } catch (\Throwable $e) {
             Log::error('Prescription document/dispatch generation failed', [
+                'case_id' => $case->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
+
+        /*
+         * EHR: push the approved prescription to the partner's EHR.
+         *
+         * Best-effort, identical posture to pharmacy dispatch above: a failure
+         * here must never undo a clinical decision the provider has already made.
+         * With the shipped defaults (EHR_ENABLED=false) this stores a preview row
+         * and nothing leaves the system.
+         *
+         * All medications on the confirmed prescription are "approve" decisions;
+         * there is no explicit decline in the C12 prescribe flow (declining is a
+         * separate rejectConfirm path that does not reach here).
+         */
+        try {
+            $prescription->loadMissing('medications');
+            $ehrDecisions = $prescription->medications->map(fn ($med) => [
+                'name'      => $med->name,
+                'decision'  => 'approve',
+                'term'      => data_get($med->dosing, 'term'),
+                'frequency' => data_get($med->dosing, 'frequency'),
+                'months'    => data_get($med->dosing, 'months') ?? [],
+                'refills'   => $med->refills,
+            ])->toArray();
+
+            $this->ehrRecords->recordApproval($case->fresh(), $clinicalNote, $ehrDecisions);
+        } catch (\Throwable $e) {
+            Log::error('EHR record build/push failed', [
                 'case_id' => $case->id,
                 'error'   => $e->getMessage(),
             ]);
@@ -1665,6 +1697,32 @@ class CaseController extends Controller
                     })->toArray(),
                     'timestamp'       => now()->timestamp,
                 ]);
+
+                /*
+                 * EHR: record each batch approval. No clinical note is created in
+                 * the batch flow (directions are stored on the prescription, not as
+                 * a ClinicalNote), so null is passed for the note. All medications
+                 * are approved decisions — batch has no per-medication decline step.
+                 * Non-fatal: a failure records the error and the batch row still
+                 * reports success, matching the pharmacy dispatch posture above.
+                 */
+                try {
+                    $ehrDecisions = $prescription->medications->map(fn ($med) => [
+                        'name'      => $med->name,
+                        'decision'  => 'approve',
+                        'term'      => data_get($med->dosing, 'term'),
+                        'frequency' => data_get($med->dosing, 'frequency'),
+                        'months'    => data_get($med->dosing, 'months') ?? [],
+                        'refills'   => $med->refills,
+                    ])->toArray();
+
+                    $this->ehrRecords->recordApproval($case->fresh(), null, $ehrDecisions);
+                } catch (\Throwable $e) {
+                    Log::error('EHR record build/push failed (batch)', [
+                        'uuid'  => $uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
 
                 $results[$uuid] = ['success' => true, 'patient' => $case->patient?->full_name ?? 'Patient'];
             } catch (\Throwable $e) {
