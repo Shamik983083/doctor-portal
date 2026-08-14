@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             DemoDataSeeder::class,
             OfferingCategoriesSeeder::class,
             GlpOfferingsSeeder::class,
+            NadOfferingsSeeder::class,
             AttachQuestionnairesToOfferingsSeeder::class,
             PartnerProductPlanSeeder::class,
             SettingsSeeder::class,

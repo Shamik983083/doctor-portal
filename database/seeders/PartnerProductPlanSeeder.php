@@ -17,7 +17,7 @@ use Illuminate\Database\Seeder;
  * IDEMPOTENT — firstOrCreate on (partner_id, product_key, month_frequency,
  * offering_id) so re-running never creates duplicate rows.
  *
- * Depends on: GlpOfferingsSeeder (offerings must exist first).
+ * Depends on: GlpOfferingsSeeder, NadOfferingsSeeder (offerings must exist first).
  */
 class PartnerProductPlanSeeder extends Seeder
 {
@@ -31,6 +31,12 @@ class PartnerProductPlanSeeder extends Seeder
         'tirzepatide' => [
             'Tirzepatide/Cyanocobalamin (B12)',
             'Tirzepatide/Pyridoxine (B6)',
+        ],
+        'nad' => [
+            'NAD+ (Nicotinamide Adenine Dinucleotide)',
+        ],
+        'nad_glutathione' => [
+            'NAD+/Glutathione',
         ],
     ];
 
@@ -52,7 +58,7 @@ class PartnerProductPlanSeeder extends Seeder
 
         $missing = array_diff($allOfferingNames, $offeringMap->keys()->all());
         if ($missing) {
-            $this->command->warn('Some offerings not found (run GlpOfferingsSeeder first): ' . implode(', ', $missing));
+            $this->command->warn('Some offerings not found (run GlpOfferingsSeeder / NadOfferingsSeeder first): ' . implode(', ', $missing));
         }
 
         $created = 0;
