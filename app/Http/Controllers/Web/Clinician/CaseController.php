@@ -616,6 +616,29 @@ class CaseController extends Controller
         $offeringIds = collect($request->input('medications', []))
             ->pluck('offering_id')->filter()->unique()->values()->all();
 
+        // Second-layer category guard: the prescribeForm() dropdown already restricts
+        // to the case's category client-side; this check prevents a direct POST bypass.
+        if ($offeringIds) {
+            $case->loadMissing('caseOfferings.offering');
+            $allowedCategoryIds = $case->caseOfferings
+                ->pluck('offering.category_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($allowedCategoryIds->isNotEmpty()) {
+                $invalid = Offering::whereIn('id', $offeringIds)
+                    ->whereNotIn('category_id', $allowedCategoryIds)
+                    ->count();
+
+                if ($invalid > 0) {
+                    return back()->withErrors([
+                        'medications' => 'The selected medication does not match the intake category for this case.',
+                    ]);
+                }
+            }
+        }
+
         $offeringsMap = Offering::with(['partners' => fn ($q) => $q->where('partners.id', $case->partner_id)])
             ->whereIn('id', $offeringIds)
             ->get()
