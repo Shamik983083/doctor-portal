@@ -46,6 +46,8 @@
             </div>
         </form>
 
+        <div style="height:8px"></div>
+
         @foreach($cases as $c)
             @php($msg = $latest->get($c->id))
             <a class="msg-row {{ $selected && $selected->id === $c->id ? 'active' : '' }}"
