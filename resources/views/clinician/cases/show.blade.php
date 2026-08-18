@@ -472,34 +472,47 @@
 <div class="modal-back" id="doctorAdminModal" hidden>
     <div class="modal" style="width:min(520px,94vw);padding:0">
         <form method="POST" action="{{ route('clinician.cases.doctor-admin-escalate', $case->uuid) }}">@csrf
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)"><strong>Escalate to Doctor Admin</strong><button type="button" class="icon-btn" data-close-modal>&times;</button></div>
-            <div style="padding:16px 18px">
-                <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Flags this case for your supervising Doctor Admin. The case moves to support status and your Doctor Admin is notified immediately.</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0">
+                <strong style="font-size:14px;letter-spacing:-.02em">Escalate to Doctor Admin</strong>
+                <button type="button" data-close-modal aria-label="Close" style="display:grid;place-items:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:17px;cursor:pointer">&times;</button>
+            </div>
+            <div style="padding:18px 20px">
+                <p style="color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55">Flags this case for your supervising Doctor Admin. The case moves to support status and your Doctor Admin is notified immediately.</p>
                 <div class="field"><label>Reason <span class="req">*</span></label><textarea name="reason" class="note-area" rows="4" required placeholder="Describe what you need from your Doctor Admin."></textarea></div>
             </div>
-            <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line)"><button type="button" class="button-secondary" data-close-modal>Cancel</button><button class="button-primary">Escalate</button></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);background:#fbfcfe;border-radius:0 0 20px 20px">
+                <button type="button" class="button-secondary" data-close-modal>Cancel</button><button class="button-primary">Escalate</button>
+            </div>
         </form>
     </div>
 </div>
 <div class="modal-back" id="supportModal" hidden>
     <div class="modal" style="width:min(520px,94vw);padding:0">
         <form method="POST" action="{{ route('clinician.cases.support', $case->uuid) }}">@csrf
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)"><strong>Escalate to support</strong><button type="button" class="icon-btn" data-close-modal>&times;</button></div>
-            <div style="padding:16px 18px">
-                <p style="color:var(--muted);font-size:13px">Moves the case to Support and makes it visible to the partner so they can add information.</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0">
+                <strong style="font-size:14px;letter-spacing:-.02em">Escalate to support</strong>
+                <button type="button" data-close-modal aria-label="Close" style="display:grid;place-items:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:17px;cursor:pointer">&times;</button>
+            </div>
+            <div style="padding:18px 20px">
+                <p style="color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55">Moves the case to Support and makes it visible to the partner so they can add information.</p>
                 <div class="field"><label>Support note <span class="req">*</span></label><textarea name="support_note" class="note-area" rows="4" required placeholder="What is needed from the partner?"></textarea></div>
             </div>
-            <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line)"><button type="button" class="button-secondary" data-close-modal>Cancel</button><button class="button-primary">Escalate</button></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);background:#fbfcfe;border-radius:0 0 20px 20px">
+                <button type="button" class="button-secondary" data-close-modal>Cancel</button><button class="button-primary">Escalate</button>
+            </div>
         </form>
     </div>
 </div>
 <div class="modal-back" id="cancelModal" hidden>
     <div class="modal" style="width:min(520px,94vw);padding:0">
         <form method="POST" action="{{ route('clinician.cases.cancel', $case->uuid) }}">@csrf
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)"><strong>Decline case</strong><button type="button" class="icon-btn" data-close-modal>&times;</button></div>
-            <div style="padding:16px 18px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0">
+                <strong style="font-size:14px;letter-spacing:-.02em">Decline case</strong>
+                <button type="button" data-close-modal aria-label="Close" style="display:grid;place-items:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:17px;cursor:pointer">&times;</button>
+            </div>
+            <div style="padding:18px 20px">
                 <div class="field">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                         <label style="margin:0">Reason <span class="req">*</span></label>
                         <button type="button" id="draftRejectionBtn" class="button-secondary" style="padding:3px 10px;font-size:12px">Draft with AI</button>
                     </div>
@@ -507,7 +520,9 @@
                     <p class="ai-honesty" id="rejectionNotice" hidden style="margin-top:6px"></p>
                 </div>
             </div>
-            <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line)"><button type="button" class="button-secondary" data-close-modal>Go back</button><button class="button-danger">Decline</button></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);background:#fbfcfe;border-radius:0 0 20px 20px">
+                <button type="button" class="button-secondary" data-close-modal>Go back</button><button class="button-danger">Decline</button>
+            </div>
         </form>
     </div>
 </div>
@@ -515,7 +530,7 @@
 {{-- Review-and-approve modal host (same pop-up as the grid) --}}
 <div class="modal-back" id="reviewOverlay" hidden>
     <div class="modal" style="width:min(1080px,94vw);height:88vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)"><strong style="font-size:15px">Review and approve</strong><button type="button" class="icon-btn" id="reviewClose">&times;</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0;flex-shrink:0"><strong style="font-size:15px;letter-spacing:-.02em;color:var(--ink)">Review and approve</strong><button type="button" id="reviewClose" aria-label="Close" style="display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:18px;line-height:1;cursor:pointer" onmouseover="this.style.background='#f4f7fc';this.style.color='var(--ink)'" onmouseout="this.style.background='#fff';this.style.color='var(--muted)'">&times;</button></div>
         <iframe id="reviewFrame" title="Review and approve" style="flex:1;width:100%;border:0"></iframe>
     </div>
 </div>

@@ -588,12 +588,12 @@
      iframe navigating away is the signal to close and refresh the grid. --}}
 <div class="modal-back" id="reviewOverlay" hidden>
     <div class="modal" style="width:min(1080px,94vw);height:88vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0;flex-shrink:0">
             <div style="display:flex;align-items:center;gap:10px;">
-                <strong style="font-size:15px" id="reviewTitle">Review and approve</strong>
-                <span id="batchCounter" style="display:none;font-size:12px;color:var(--muted);background:var(--blue-bg);padding:2px 10px;border-radius:99px;font-weight:600;"></span>
+                <strong style="font-size:15px;letter-spacing:-.02em;color:var(--ink)" id="reviewTitle">Review and approve</strong>
+                <span id="batchCounter" style="display:none;font-size:11.5px;color:var(--accent-ink);background:var(--blue-bg);padding:2px 10px;border-radius:99px;font-weight:680;"></span>
             </div>
-            <button type="button" class="icon-btn" id="reviewClose" aria-label="Close">&times;</button>
+            <button type="button" id="reviewClose" aria-label="Close" style="display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;transition:background .12s,color .12s;flex-shrink:0" onmouseover="this.style.background='#f4f7fc';this.style.color='var(--ink)'" onmouseout="this.style.background='#fff';this.style.color='var(--muted)'">&times;</button>
         </div>
         <iframe id="reviewFrame" title="Review and approve" style="flex:1;width:100%;border:0"></iframe>
     </div>

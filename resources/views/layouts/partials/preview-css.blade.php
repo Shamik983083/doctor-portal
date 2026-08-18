@@ -309,16 +309,38 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .density{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:650;cursor:pointer}
 
 /* --------------------------------------------------- approval / case review */
-.modal-back{position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:60;display:grid;place-items:center;padding:24px}
-/* ONE scrolling surface, not a pane inside a pane (Devin msg 2079). The right
-   column used to have its own scrollbar and cut Administration frequency and
-   Duration off the bottom on a 4-month case. The modal itself is now the only
-   scroller, and the header and footer stay put, so Submit is never scrolled
-   away. The field reflow below is what makes it FIT at 1440x950 so this scroll
-   should not engage at all. */
-.modal{background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(16,24,40,.3);width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:auto}
-.modal-head{display:flex;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;top:0;z-index:3;flex:0 0 auto}
-.modal-head h2{margin:0;font-size:19px;letter-spacing:-.03em}
+/* Overlay: sits above Bootstrap's z-index:1055 and dims + blurs the page */
+.modal-back{
+    position:fixed;inset:0;
+    background:rgba(14,20,36,.52);
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+    z-index:1060;
+    display:grid;place-items:center;
+    padding:20px;
+    animation:modal-fade-in .18s ease;
+}
+@keyframes modal-fade-in{from{opacity:0}to{opacity:1}}
+
+/* Modal box — Bootstrap 5 ships .modal with position:fixed;top:0;left:0;
+   z-index:1055;width:100%;height:100%;display:none which pins the box to the
+   top-left corner and makes it full-screen. We cancel every one of those
+   properties here so the box sits as a grid item inside the centered overlay. */
+.modal{
+    position:relative;top:auto;left:auto; /* cancel Bootstrap position:fixed */
+    z-index:auto;                          /* cancel Bootstrap z-index:1055   */
+    width:min(1100px,100%);height:auto;    /* cancel Bootstrap height:100%    */
+    overflow:auto;
+    display:flex;flex-direction:column;    /* cancel Bootstrap display:none   */
+    background:#fff;
+    border-radius:20px;
+    box-shadow:0 2px 4px rgba(0,0,0,.04),0 12px 40px rgba(14,20,36,.18),0 40px 100px rgba(14,20,36,.22);
+    max-height:92vh;
+    animation:modal-slide-in .22s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes modal-slide-in{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+
+.modal-head{display:flex;align-items:center;gap:16px;padding:18px 24px;border-bottom:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;top:0;z-index:3;flex:0 0 auto;border-radius:20px 20px 0 0}
+.modal-head h2{margin:0;font-size:18px;letter-spacing:-.03em;font-weight:760}
 .modal-who{display:flex;align-items:center;gap:11px}
 .modal-avatar{width:40px;height:40px;border-radius:99px;background:#e7edf8;color:#41537a;display:grid;place-items:center;font-size:13px;font-weight:770;flex:0 0 auto}
 .modal-demo{font-size:13px;font-weight:750}
@@ -328,8 +350,8 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .modal-facts dt{color:var(--muted);margin:0 0 2px}
 .modal-facts dd{margin:0;font-weight:700}
 .modal-body{display:grid;grid-template-columns:.85fr 1.15fr;gap:0;overflow:visible;min-height:0}
-.modal-left{padding:20px;border-right:1px solid var(--line);background:#fcfdff}
-.modal-right{padding:20px;display:grid;gap:14px;align-content:start}
+.modal-left{padding:22px;border-right:1px solid var(--line);background:#fcfdff}
+.modal-right{padding:22px;display:grid;gap:14px;align-content:start}
 .rx-meta{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
 .rx-meta dt{color:var(--muted);font-size:11px;font-weight:760;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px}
 .rx-meta dd{margin:0;font-size:13px;font-weight:650}
@@ -383,7 +405,7 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .months-note{font-size:11.5px;color:var(--soft-muted)}
 .months-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
 .months-grid .field label{font-size:11px;color:var(--accent-ink);font-weight:780}
-.modal-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 22px;border-top:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;bottom:0;z-index:3;flex:0 0 auto}
+.modal-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 24px;border-top:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;bottom:0;z-index:3;flex:0 0 auto;border-radius:0 0 20px 20px}
 .foot-status{font-size:12px;color:var(--muted)}
 .foot-status strong{color:var(--ink)}
 .foot-actions{display:flex;gap:9px;margin-left:auto}
