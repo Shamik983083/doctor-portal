@@ -52,28 +52,81 @@
     </div>
 @endif
 
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="POST" action="{{ route('clinician.pool.request') }}" class="row g-3 align-items-end">
+<div class="card mb-4" style="border-radius:16px;border:1px solid var(--line,#e5e9f0);box-shadow:0 1px 3px rgba(0,0,0,.05),0 6px 20px rgba(14,20,36,.07);overflow:visible">
+    <div style="padding:28px 32px">
+
+        <div style="margin-bottom:20px">
+            <div style="font-size:15px;font-weight:700;color:var(--text,#172033);margin-bottom:4px">How many cases?</div>
+            <div style="font-size:13px;color:var(--soft-muted,#6b7a99)">You'll receive the oldest matching cases from the queue. Up to {{ $maxPerRequest }} per request.</div>
+        </div>
+
+        {{-- Quick-pick presets --}}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px" id="presetRow">
+            @foreach([1, 3, 5, 10] as $p)
+                <button type="button" onclick="pickPreset({{ $p }})"
+                    id="preset-{{ $p }}"
+                    style="padding:7px 18px;border-radius:8px;border:1.5px solid var(--line,#e5e9f0);background:#fff;font-size:13px;font-weight:650;color:var(--text,#172033);cursor:pointer;transition:border-color .15s,background .15s,color .15s"
+                    onmouseover="if(!this.classList.contains('psel'))this.style.borderColor='#248bf5'"
+                    onmouseout="if(!this.classList.contains('psel'))this.style.borderColor='var(--line,#e5e9f0)'">
+                    {{ $p }}
+                </button>
+            @endforeach
+        </div>
+
+        <form method="POST" action="{{ route('clinician.pool.request') }}" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
             @csrf
-            <div class="col-auto">
-                <label class="form-label fw-semibold">How many cases?</label>
-                <input type="number" name="count" class="form-control" min="1"
-                       max="{{ $maxPerRequest }}" value="{{ old('count', 5) }}" required
-                       @disabled($eligibility->isBlocked())>
-                <div class="form-text">Up to {{ $maxPerRequest }} per request.</div>
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-primary" @disabled($eligibility->isBlocked())>Request cases</button>
-            </div>
+            <input type="number" name="count" id="caseCount" min="1"
+                   max="{{ $maxPerRequest }}" value="{{ old('count', 5) }}" required
+                   @disabled($eligibility->isBlocked())
+                   oninput="syncPresets()"
+                   style="width:88px;padding:11px 14px;border:1.5px solid var(--line,#e5e9f0);border-radius:10px;font-size:22px;font-weight:700;text-align:center;color:var(--text,#172033);background:#fff;-moz-appearance:textfield;-webkit-appearance:none;appearance:none;outline:none"
+                   onfocus="this.style.borderColor='#248bf5'"
+                   onblur="this.style.borderColor='var(--line,#e5e9f0)'">
+
+            <button type="submit" @disabled($eligibility->isBlocked())
+                style="padding:12px 28px;background:#248bf5;color:#fff;border:0;border-radius:10px;font-size:14px;font-weight:650;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:opacity .15s"
+                onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+                Request cases
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-left:2px"><path d="M1 7h12M8 3l5 4-5 4" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+
             @if($remainingToday !== null)
-                <div class="col-auto">
-                    <div class="text-muted small">{{ $remainingToday }} left under today's limit.</div>
-                </div>
+                <span style="font-size:12px;color:var(--soft-muted,#6b7a99)">{{ $remainingToday }} left today</span>
             @endif
         </form>
+
     </div>
 </div>
+
+<style>
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.psel { background:#ebf4ff !important; border-color:#248bf5 !important; color:#248bf5 !important; }
+</style>
+<script>
+var PRESETS = [1,3,5,10];
+function pickPreset(v) {
+    document.getElementById('caseCount').value = v;
+    syncPresets();
+}
+function syncPresets() {
+    var val = parseInt(document.getElementById('caseCount').value, 10);
+    PRESETS.forEach(function(p) {
+        var el = document.getElementById('preset-' + p);
+        if (!el) return;
+        if (p === val) {
+            el.classList.add('psel');
+            el.style.borderColor = '#248bf5';
+        } else {
+            el.classList.remove('psel');
+            el.style.borderColor = 'var(--line,#e5e9f0)';
+            el.style.color = 'var(--text,#172033)';
+            el.style.background = '#fff';
+        }
+    });
+}
+syncPresets();
+</script>
 
 <div class="card mb-4">
     <div class="card-body">
