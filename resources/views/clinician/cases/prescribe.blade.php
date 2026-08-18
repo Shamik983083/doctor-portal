@@ -623,10 +623,9 @@
             });
         }
 
-        // Pre-load ONE row for the first requested offering. When product_key fans
-        // out to multiple variants (e.g. three semaglutide SKUs), only the first
-        // is shown — the doctor can add the others via "+ Add medication".
-        if (REQUESTED && REQUESTED.length) { addRow(REQUESTED[0]); }
+        // Pre-load one row per requested offering so every product the patient
+        // ordered appears without the clinician having to add them manually.
+        if (REQUESTED && REQUESTED.length) { REQUESTED.forEach(function (id) { addRow(id); }); }
         else { addRow(''); }
 
         refresh();
