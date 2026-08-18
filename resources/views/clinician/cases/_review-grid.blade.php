@@ -284,6 +284,7 @@
         return [
             'id'       => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
             'name'     => $case->patient?->full_name ?? 'Unknown',
+            'email'    => $case->patient?->email ?? null,
             'company'  => $case->partner?->name ?? '-',
             'term'     => $clin['term'],
             'dose'     => $clin['dose'],
@@ -466,7 +467,7 @@
             panel.innerHTML =
                 '<div class="panel-heading"><div>'
                 + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
-                + '<h2>' + esc(d.name) + (d.isRefill ? ' <span class="pill" style="font-size:10px;vertical-align:middle">Refill</span>' : '') + '</h2>'
+                + '<h2>' + esc(d.name) + (d.email ? ' <span style="font-size:14px;font-weight:500;color:var(--soft-muted,#6b7a99)">(' + esc(d.email) + ')</span>' : '') + (d.isRefill ? ' <span class="pill" style="font-size:10px;vertical-align:middle">Refill</span>' : '') + '</h2>'
                 + demoChipsHtml
                 + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state ? ' · ' + esc(d.state) : '') + '</p></div>'
                 + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
