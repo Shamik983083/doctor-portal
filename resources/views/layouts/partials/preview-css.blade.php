@@ -503,7 +503,7 @@ table.review-grid{width:100%;border-collapse:separate;border-spacing:0;backgroun
 .chat{display:flex;flex-direction:column;overflow:hidden;min-height:520px}
 .chat-head{display:flex;align-items:center;gap:11px;padding:14px 18px;border-bottom:1px solid var(--line);background:rgba(251,252,254,.9)}
 .chat-head strong{display:block;font-size:14px}
-.chat-head span{display:block;color:var(--soft-muted);font-size:11.5px}
+.chat-head span:not(.msg-avatar){display:block;color:var(--soft-muted);font-size:11.5px}
 .chat-scroll{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:3px;background:#fff}
 .chat-time{align-self:center;color:var(--soft-muted);font-size:11px;font-weight:640;margin:12px 0 6px}
 .bubble-row{display:flex;margin-top:2px}
