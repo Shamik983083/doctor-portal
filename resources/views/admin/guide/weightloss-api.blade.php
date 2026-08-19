@@ -361,6 +361,8 @@ Content-Type: application/json
     // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1 }
 
     // Option C — bundle: two or more product_key entries sharing bundle_group.
+    // bundle_group is a free-form string you choose — any two offerings in the
+    // same request that share the same bundle_group value are treated as one bundle.
     // Each component gets its own locked dropdown on the prescribe screen,
     // filtered to that component's drug family only (e.g. semaglutide slot
     // shows only semaglutide offerings; NAD slot shows only NAD offerings).
@@ -593,7 +595,8 @@ Content-Type: application/json
       "month_frequency": 3,                  ← null if not submitted
       "bundle_group":    null                ← null for standalone (Option A / B) submissions
     }
-    // Option C — bundle: two submitted entries sharing bundle_group → two entries here:
+    // Option C — bundle: two submitted entries sharing bundle_group → two entries here
+    // (bundle_group echoes back whatever string you sent — use it to group items in your CRM):
     // { "offering_id": "uuid-snac",   "product_key": "semaglutide", "month_frequency": 3, "bundle_group": "combo-1" },
     // { "offering_id": "uuid-zofran", "product_key": "zofran",      "month_frequency": 1, "bundle_group": "combo-1" }
   ],

@@ -313,6 +313,8 @@ Content-Type: application/json
     // Option B (new): product_key + month_frequency — portal resolves internally
     // { "product_key": "anti-aging", "month_frequency": 3, "quantity": 1 }
     // Option C — bundle: two or more product_key entries sharing bundle_group.
+    // bundle_group is a free-form string you choose — any two offerings in the
+    // same request that share the same bundle_group value are treated as one bundle.
     // { "product_key": "nad",         "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" },
     // { "product_key": "anti-aging",  "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" }
   ],
@@ -536,7 +538,8 @@ Content-Type: application/json
       "month_frequency": 3,                  ← null if not submitted
       "bundle_group":    null                ← null for standalone (Option A / B) submissions
     }
-    // Option C — bundle: two submitted entries sharing bundle_group → two entries here:
+    // Option C — bundle: two submitted entries sharing bundle_group → two entries here
+    // (bundle_group echoes back whatever string you sent — use it to group items in your CRM):
     // { "offering_id": "uuid-nad-1000", "product_key": "nad",        "month_frequency": 3, "bundle_group": "combo-1" },
     // { "offering_id": "uuid-aa",       "product_key": "anti-aging", "month_frequency": 1, "bundle_group": "combo-1" }
   ],
