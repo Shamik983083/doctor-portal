@@ -353,8 +353,20 @@ Content-Type: application/json
   "offerings": [
     // Option A (legacy — no changes needed): direct offering UUID
     { "offering_id": "YOUR_MWL_OFFERING_UUID", "quantity": 1 }
-    // Option B (new): product_key + month_frequency — portal resolves internally
+
+    // Option B — single product: product_key + month_frequency.
+    // The portal resolves to the first matching plan offering.
+    // The clinician's dropdown is pre-filled but they can switch to any
+    // offering in the same drug family.
     // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1 }
+
+    // Option C — bundle: two or more product_key entries sharing bundle_group.
+    // Each component gets its own locked dropdown on the prescribe screen,
+    // filtered to that component's drug family only (e.g. semaglutide slot
+    // shows only semaglutide offerings; NAD slot shows only NAD offerings).
+    // Removing any row on the prescribe screen removes the entire bundle.
+    // { "product_key": "semaglutide",  "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" },
+    // { "product_key": "nad",          "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" }
   ],
 
   // ── clinical_intake — populates the clinician's left-panel review fields ───────

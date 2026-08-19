@@ -312,6 +312,9 @@ Content-Type: application/json
     { "offering_id": "YOUR_AA_OFFERING_UUID", "quantity": 1 }
     // Option B (new): product_key + month_frequency — portal resolves internally
     // { "product_key": "anti-aging", "month_frequency": 3, "quantity": 1 }
+    // Option C — bundle: two or more product_key entries sharing bundle_group.
+    // { "product_key": "nad",         "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" },
+    // { "product_key": "anti-aging",  "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" }
   ],
 
   // ── clinical_intake — populates the clinician's left-panel review fields ───────

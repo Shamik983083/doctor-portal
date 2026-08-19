@@ -10,7 +10,7 @@ class CaseOffering extends Model
 
     protected $fillable = [
         'case_id', 'offering_id', 'status', 'quantity', 'price',
-        'month_frequency', 'product_key',
+        'month_frequency', 'product_key', 'bundle_group',
         'dosage', 'frequency', 'refills', 'clinician_notes', 'metadata',
     ];
 

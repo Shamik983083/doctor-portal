@@ -107,6 +107,7 @@ class CaseController extends Controller
             'offerings.*.product_key'                         => 'nullable|string|max:120',
             'offerings.*.month_frequency'                     => 'nullable|integer|min:1|max:24',
             'offerings.*.quantity'                            => 'integer|min:1',
+            'offerings.*.bundle_group'                        => 'nullable|string|max:100',
             // Simplified flat answers (new path — questionnaire derived from offering)
             'answers'                                         => 'nullable|array',
             'answers.*.slug'                                  => 'required_with:answers|string|max:120',
@@ -144,57 +145,54 @@ class CaseController extends Controller
 
         foreach ($data['offerings'] ?? [] as $offeringData) {
 
-            // Path B: product_key + month_frequency → fan-out to all plan rows
+            // Path B: product_key + month_frequency → first matching plan offering only.
+            // Both bundle and non-bundle use the same resolution: one case_offering row
+            // per submitted entry. The clinician's prescribe form dropdown lets them
+            // switch to any offering in the same drug family.
             if (!empty($offeringData['product_key']) && !empty($offeringData['month_frequency'])) {
-                $plans = PartnerProductPlan::where('partner_id', $partner->id)
+                $plan = PartnerProductPlan::where('partner_id', $partner->id)
                     ->where('product_key', $offeringData['product_key'])
                     ->where('month_frequency', (int) $offeringData['month_frequency'])
-                    ->get();
+                    ->first();
 
-                if ($plans->isEmpty()) {
+                if (!$plan) {
                     return response()->json([
                         'message' => "No product plan found for product_key \"{$offeringData['product_key']}\" with month_frequency {$offeringData['month_frequency']}.",
                         'errors'  => ['offerings' => ["Product plan not found: product_key \"{$offeringData['product_key']}\", month_frequency {$offeringData['month_frequency']}."]],
                     ], 422);
                 }
 
-                $resolvedCount = 0;
-                foreach ($plans as $plan) {
-                    $offering = $partner->accessibleOfferings()
-                        ->where('offerings.id', $plan->offering_id)
-                        ->first();
+                $offering = $partner->accessibleOfferings()
+                    ->where('offerings.id', $plan->offering_id)
+                    ->first();
 
-                    if (!$offering) continue; // offering deleted or access revoked — skip silently
-
-                    // State availability gate
-                    if ($effectiveState && !$offering->isAvailableInState($effectiveState)) {
-                        return response()->json([
-                            'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
-                            'errors'  => ['offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."]],
-                        ], 422);
-                    }
-
-                    // Category gate (unroutable without a category)
-                    if ($offering->category_id === null) {
-                        return response()->json([
-                            'message' => "Offering \"{$offering->name}\" has no product category configured and cannot be routed. Contact the platform administrator.",
-                            'errors'  => ['offerings' => ["Offering \"{$offering->name}\" has no product category configured."]],
-                        ], 422);
-                    }
-
-                    $entry                = $offeringData;
-                    $entry['offering_id'] = $offering->uuid; // inject UUID for questionnaire resolution
-                    $expandedOfferings[]  = $entry;
-                    $resolvedOfferings[]  = $offering;
-                    $resolvedCount++;
-                }
-
-                if ($resolvedCount === 0) {
+                if (!$offering) {
                     return response()->json([
-                        'message' => "No accessible offerings found for product_key \"{$offeringData['product_key']}\" with month_frequency {$offeringData['month_frequency']}.",
-                        'errors'  => ['offerings' => ["All plan offerings for \"{$offeringData['product_key']}\" ({$offeringData['month_frequency']}M) are inaccessible for this partner."]],
+                        'message' => "No accessible offering found for product_key \"{$offeringData['product_key']}\" with month_frequency {$offeringData['month_frequency']}.",
+                        'errors'  => ['offerings' => ["Offering for \"{$offeringData['product_key']}\" ({$offeringData['month_frequency']}M) is inaccessible for this partner."]],
                     ], 422);
                 }
+
+                // State availability gate
+                if ($effectiveState && !$offering->isAvailableInState($effectiveState)) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."]],
+                    ], 422);
+                }
+
+                // Category gate (unroutable without a category)
+                if ($offering->category_id === null) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" has no product category configured and cannot be routed. Contact the platform administrator.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" has no product category configured."]],
+                    ], 422);
+                }
+
+                $entry                = $offeringData;
+                $entry['offering_id'] = $offering->uuid;
+                $expandedOfferings[]  = $entry;
+                $resolvedOfferings[]  = $offering;
 
             // Path A (legacy): direct offering_id — one item in, one item out
             } elseif (!empty($offeringData['offering_id'])) {
@@ -343,6 +341,7 @@ class CaseController extends Controller
                             'price'           => $offeringData['price'] ?? $offering->price,
                             'month_frequency' => isset($offeringData['month_frequency']) ? (int) $offeringData['month_frequency'] : null,
                             'product_key'     => $offeringData['product_key'] ?? null,
+                            'bundle_group'    => $offeringData['bundle_group'] ?? null,
                         ]);
                         $attachedOfferingsIds[] = $offering->id;
                     }

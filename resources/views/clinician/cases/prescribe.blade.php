@@ -26,6 +26,7 @@
 
     $offeringData = $offerings->map(fn($o) => [
         'id' => $o->id, 'name' => $o->name,
+        'category_id' => $o->category_id,
         'refills' => $o->refills, 'quantity' => $o->quantity,
         'days_supply' => $o->days_supply, 'dispense_unit' => $o->dispense_unit,
         'compound_formula' => $o->compound_formula,
@@ -34,8 +35,6 @@
         // otherwise fall back to the global offering sig.
         'sig' => (($o->pivot->sig_override ?? '') !== '') ? $o->pivot->sig_override : ($o->sig ?? ''),
     ])->values();
-
-    $requestedIds = $case->caseOfferings->pluck('offering.id')->filter()->values();
 
     $usStates = [
         'AL'=>'Alabama','AK'=>'Alaska','AZ'=>'Arizona','AR'=>'Arkansas','CA'=>'California',
@@ -287,7 +286,7 @@
 @section('scripts')
 <script>
     var OFFERINGS = @json($offeringData);
-    var REQUESTED = @json($requestedIds);
+    var CASE_OFFERINGS_DATA = @json($caseOfferingsData);
     var ICD10_SUGGESTIONS = @json($icd10Suggestions ?? []);
 </script>
 <script>
@@ -419,10 +418,40 @@
             return 3;
         }
 
-        function offeringOptions(selId) {
-            return '<option value="">Select medication</option>' + OFFERINGS.map(function (o) {
+        // Map product_key → drug family for bundle dropdown filtering.
+        // Mirrors the server-side family() helper in JS so both sides agree.
+        function pkFamily(pk) {
+            if (!pk) return null;
+            var k = pk.toLowerCase();
+            if (k.indexOf('semaglutide') > -1) return 'semaglutide';
+            if (k.indexOf('tirzepatide') > -1) return 'tirzepatide';
+            if (k.indexOf('nad')         > -1) return 'nad';
+            if (k.indexOf('zofran')      > -1 || k.indexOf('ondansetron') > -1) return 'zofran';
+            return null;
+        }
+
+        // offeringOptions(selId, bundleProductKey)
+        // bundleProductKey: when set, filters the list to that drug family only.
+        // null / undefined → show all offerings (existing behaviour).
+        function offeringOptions(selId, bundleProductKey) {
+            var fam  = bundleProductKey ? pkFamily(bundleProductKey) : null;
+            var list = fam
+                ? OFFERINGS.filter(function (o) { return family(o.name) === fam; })
+                : OFFERINGS;
+            if (!list.length) {
+                list = OFFERINGS; // safety fallback: unknown family → show all
+            }
+            return '<option value="">Select medication</option>' + list.map(function (o) {
                 return '<option value="' + o.id + '"' + (String(o.id) === String(selId) ? ' selected' : '') + '>' + esc(o.name) + '</option>';
             }).join('');
+        }
+
+        // Remove all med-decision rows that share a bundle_group.
+        function removeBundle(bgKey) {
+            list.querySelectorAll('.med-decision[data-bundle-group="' + bgKey + '"]').forEach(function (r) {
+                r.remove();
+            });
+            refresh();
         }
         function optionList(arr, sel) {
             return arr.map(function (v) {
@@ -488,18 +517,38 @@
             }
         }
 
-        function addRow(offeringId) {
+        // addRow(offeringId, bundleGroup, productKey)
+        //   bundleGroup  — non-null string means this row is part of a bundle.
+        //                  The dropdown is filtered to the drug family of productKey,
+        //                  and Remove atomically removes all rows in the same group.
+        //   productKey   — partner's product_key (e.g. "semaglutide") used to derive
+        //                  the family filter for the bundle dropdown.
+        //   Both null    — standalone row, existing behaviour (full dropdown).
+        function addRow(offeringId, bundleGroup, productKey) {
             var i = idx++;
+            var isBundle = !!bundleGroup;
             var row = document.createElement('div');
             row.className = 'med-decision';
             row.setAttribute('data-idx', i);
-            row.style.cssText = 'border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px';
+            if (isBundle) {
+                row.setAttribute('data-bundle-group', bundleGroup);
+                row.setAttribute('data-product-key', productKey || '');
+            }
+            row.style.cssText = 'border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px'
+                + (isBundle ? ';border-color:#c7d8f5;background:#f7faff' : '');
+
+            var bundgeBadge = isBundle
+                ? '<span style="font-size:10px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:5px;margin-right:8px">Bundle</span>'
+                : '';
+            var removeLabel = isBundle ? 'Remove bundle' : 'Remove';
+
             row.innerHTML =
-                '<div style="display:flex;justify-content:flex-end;margin-bottom:6px">'
-                + '<button type="button" class="button-secondary" data-f="remove" style="padding:4px 10px">Remove</button></div>'
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+                + bundgeBadge
+                + '<button type="button" class="button-secondary" data-f="remove" style="padding:4px 10px;margin-left:auto">' + removeLabel + '</button></div>'
                 + '<div class="field-row">'
                 + '<div class="field"><label>Medication <span class="req">*</span></label>'
-                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>' + offeringOptions(offeringId) + '</select></div>'
+                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>' + offeringOptions(offeringId, isBundle ? productKey : null) + '</select></div>'
                 + '<div class="field"><label>Duration <span class="req">*</span></label>'
                 + '<select data-f="term" name="medications[' + i + '][term]" required>' + optionList(TERMS, defaultTerm) + '</select></div>'
                 + '</div>'
@@ -533,7 +582,9 @@
 
             med.addEventListener('change', syncMed);
             termSel.addEventListener('change', function () { renderMonths(row); });
-            row.querySelector('[data-f="remove"]').addEventListener('click', function () { row.remove(); refresh(); });
+            row.querySelector('[data-f="remove"]').addEventListener('click', function () {
+                if (isBundle) { removeBundle(bundleGroup); } else { row.remove(); refresh(); }
+            });
 
             syncMed();
         }
@@ -605,7 +656,7 @@
             });
         }
 
-        if (addBtn) addBtn.addEventListener('click', function () { addRow(''); });
+        if (addBtn) addBtn.addEventListener('click', function () { addRow('', null, null); });
         var diag = form.querySelector('[name="diagnoses"]');
         if (diag) diag.addEventListener('input', refresh);
 
@@ -623,10 +674,37 @@
             });
         }
 
-        // Pre-load one row per requested offering so every product the patient
-        // ordered appears without the clinician having to add them manually.
-        if (REQUESTED && REQUESTED.length) { REQUESTED.forEach(function (id) { addRow(id); }); }
-        else { addRow(''); }
+        // Pre-load medication rows from case_offerings.
+        // Bundle rows: grouped by bundle_group, dropdown filtered to drug family,
+        //              Remove atomically removes the whole group.
+        // Standalone rows: full dropdown, individual Remove — existing behaviour.
+        (function () {
+            if (!CASE_OFFERINGS_DATA || !CASE_OFFERINGS_DATA.length) {
+                addRow('', null, null);
+                return;
+            }
+            // Separate bundles from standalone offerings.
+            var bundleGroups = {};
+            var standalone   = [];
+            CASE_OFFERINGS_DATA.forEach(function (co) {
+                if (co.bundle_group) {
+                    if (!bundleGroups[co.bundle_group]) bundleGroups[co.bundle_group] = [];
+                    bundleGroups[co.bundle_group].push(co);
+                } else {
+                    standalone.push(co);
+                }
+            });
+            // Render bundle rows first (grouped, locked to drug family).
+            Object.keys(bundleGroups).forEach(function (bgKey) {
+                bundleGroups[bgKey].forEach(function (co) {
+                    addRow(co.offering_id, bgKey, co.product_key);
+                });
+            });
+            // Render standalone rows (existing behaviour, full dropdown).
+            standalone.forEach(function (co) {
+                addRow(co.offering_id, null, null);
+            });
+        }());
 
         refresh();
 

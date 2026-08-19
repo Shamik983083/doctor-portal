@@ -522,7 +522,8 @@ class CaseController extends Controller
             ->orderBy('offerings.name')
             ->get(['offerings.id', 'offerings.name', 'offerings.internal_name', 'offerings.compound_formula',
                 'offerings.refills', 'offerings.quantity', 'offerings.days_supply', 'offerings.dispense_unit',
-                'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels', 'offerings.sig']);
+                'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels', 'offerings.sig',
+                'offerings.category_id']);
 
         $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
 
@@ -569,7 +570,18 @@ class CaseController extends Controller
             }
         }
 
-        return view('clinician.cases.prescribe', compact('case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions', 'priorCase', 'checkInResponses', 'requestedMonthFrequency'));
+        // Build per-offering metadata for the prescribe form JS so it can render
+        // bundle-aware rows (filtered dropdowns, atomic remove) vs standalone rows.
+        $caseOfferingsData = $case->caseOfferings->map(fn ($co) => [
+            'offering_id'  => $co->offering_id,
+            'bundle_group' => $co->bundle_group,
+            'product_key'  => $co->product_key,
+        ])->values();
+
+        return view('clinician.cases.prescribe', compact(
+            'case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions',
+            'priorCase', 'checkInResponses', 'requestedMonthFrequency', 'caseOfferingsData'
+        ));
     }
 
     public function prescribe(Request $request, string $uuid)
