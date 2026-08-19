@@ -497,9 +497,9 @@ Content-Type: application/json
 <h6 class="fw-semibold mb-2"><code>prescription_written</code> Webhook — Full Payload Shape</h6>
 <p class="small mb-2">
     Fired when the clinician confirms the prescription. The <code>offerings</code> array echoes back every offering
-    attached to the case — when Option B is used, this may contain <strong>multiple items</strong> (one per plan row
-    that was resolved from the submitted <code>product_key + month_frequency</code>).
-    <code>product_key</code> is <code>null</code> on items that came from Option A.
+    attached to the case — <strong>one entry per submitted offering</strong>. Option A items have <code>product_key: null</code>;
+    Option B items echo the submitted <code>product_key</code>; Option C (bundle) items echo both <code>product_key</code>
+    and <code>bundle_group</code> so you can identify which offerings belong to the same bundle.
 </p>
 <pre id="code-webhook-rx-aa">{
   "case_id":        "case-uuid",
@@ -529,17 +529,16 @@ Content-Type: application/json
     }
   ],
   "offerings": [
-    ← Option B fan-out: one entry per resolved plan row (may be multiple)
+    // Option B — one submission resolves to exactly one entry:
     {
       "offering_id":     "uuid-nad-1000",    ← always present
       "product_key":     "nad",              ← null if Option A used without product_key
-      "month_frequency": 3                   ← null if not submitted
-    },
-    {
-      "offering_id":     "uuid-companion",
-      "product_key":     "nad",
-      "month_frequency": 3
+      "month_frequency": 3,                  ← null if not submitted
+      "bundle_group":    null                ← null for standalone (Option A / B) submissions
     }
+    // Option C — bundle: two submitted entries sharing bundle_group → two entries here:
+    // { "offering_id": "uuid-nad-1000", "product_key": "nad",        "month_frequency": 3, "bundle_group": "combo-1" },
+    // { "offering_id": "uuid-aa",       "product_key": "anti-aging", "month_frequency": 1, "bundle_group": "combo-1" }
   ],
   "timestamp": 1722000000
 }</pre>
@@ -549,7 +548,8 @@ Content-Type: application/json
     <i class="bi bi-check-circle me-1"></i>
     <strong>VRIO CRM order flow:</strong> Iterate <code>offerings[]</code> — each item's <code>product_key</code>
     (your identifier) combined with <code>meds_prescribed[0].dosing.term</code> (the clinician's selected duration)
-    identifies the VRIO SKU to order. When Option B fans out to multiple offerings, place one CRM order per item.
+    identifies the VRIO SKU to order. Place one CRM order per offering item. For bundles, items sharing the same
+    <code>bundle_group</code> value belong to one logical group — link them in your CRM as needed.
 </div>
 
 </div>
@@ -820,7 +820,7 @@ Content-Type: application/json
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>POST /api/partner/auth/token</code> and cache the token (valid 1 year)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Call <code>GET /api/partner/questionnaires/{{ $qUuid }}</code> <strong>once</strong> to discover all question slugs — store the <code>slug</code> list; you do <em>not</em> need this UUID for submission</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Submit <code>POST /api/partner/cases</code> with <code>offerings[].offering_id</code> (legacy) <em>or</em> <code>offerings[].product_key + month_frequency</code> (new — see Product Plans section) + a flat <code>answers[]</code> array of <code>slug</code>/<code>answer</code> pairs. Include <strong>height</strong> (inches), <strong>weight</strong> (lbs), and <strong>bmi</strong> in the <code>patient</code> block</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Read <code>prescription_written</code> webhook: iterate <code>offerings[]</code> — each item's <code>product_key</code> + <code>meds_prescribed[0].dosing.term</code> identifies the VRIO SKU; place one CRM order per offering when Option B fans out to multiple</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Read <code>prescription_written</code> webhook: iterate <code>offerings[]</code> — each item's <code>product_key</code> + <code>meds_prescribed[0].dosing.term</code> identifies the VRIO SKU; place one CRM order per item. Bundle items share the same <code>bundle_group</code> value — link them as a group in your CRM</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Include <code>patient.id_verified_status</code> = <code>"verified"</code> (or <code>"failed"</code> / <code>"pending"</code>) with your Vouched result at case creation time. If Vouched completes asynchronously, push it later via <code>PATCH /api/partner/patients/{uuid}</code> — open cases re-triage automatically</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Only send conditional answers when the parent condition was met — omit <code>aa_primary_reason_other</code>, <code>aa_current_symptoms_other</code>, <code>aa_prior_treatment_reactions</code>, and <code>aa_prior_treatment_reaction_details</code> unless triggered</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Store the returned <code>uuid</code> (case UUID) for future status lookups and messaging</li>
