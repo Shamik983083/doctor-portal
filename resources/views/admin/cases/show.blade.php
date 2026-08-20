@@ -31,47 +31,97 @@
     {{-- Left sidebar --}}
     <div class="col-lg-4">
 
-        {{-- Status & Assignment --}}
-        <div class="card mb-3">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Case Info</h6></div>
-            <div class="card-body small">
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th>Status</th><td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td></tr>
+        {{-- Case Info --}}
+        <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-body p-0">
+                {{-- Header row --}}
+                <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom">
+                    <span class="fw-semibold text-secondary" style="font-size:.7rem;letter-spacing:.07em;text-transform:uppercase">Case Info</span>
+                    <span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span>
+                </div>
+                <div class="px-3 py-2" style="font-size:.82rem">
+                    {{-- Visit type + IDs --}}
                     @if($case->visit_type)
-                    <tr>
-                        <th>Visit Type</th>
-                        <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size:.75rem">{{ $case->visit_type }}</span></td>
-                    </tr>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Visit type</span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">{{ $case->visit_type }}</span>
+                    </div>
                     @endif
-                    <tr><th>Partner</th><td>{{ $case->partner->name ?? '—' }}</td></tr>
-                    <tr><th>Clinician</th><td>{{ $case->clinician?->full_name ?? '—' }}</td></tr>
-                    <tr><th>Created</th><td>{{ $case->created_at->format('M d, Y H:i') }}</td></tr>
-                    @if($case->assigned_at)<tr><th>Assigned</th><td>{{ $case->assigned_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->support_at)<tr><th>Support since</th><td>{{ $case->support_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->approved_at)<tr><th>Approved</th><td>{{ $case->approved_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->completed_at)<tr><th>Completed</th><td>{{ $case->completed_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->cancelled_at)<tr><th>Cancelled</th><td>{{ $case->cancelled_at->format('M d, Y H:i') }}</td></tr>@endif
-                </table>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Partner</span>
+                        <span class="fw-medium text-end" style="max-width:60%">{{ $case->partner->name ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Clinician</span>
+                        <span class="fw-medium text-end" style="max-width:60%">{{ $case->clinician?->full_name ?? '—' }}</span>
+                    </div>
+                    {{-- Timestamps --}}
+                    <div class="border-top pt-2 mt-1" style="font-size:.78rem">
+                        @php
+                            $timestamps = [
+                                'Created'      => $case->created_at,
+                                'Assigned'     => $case->assigned_at,
+                                'Support since'=> $case->support_at,
+                                'Approved'     => $case->approved_at,
+                                'Completed'    => $case->completed_at,
+                                'Cancelled'    => $case->cancelled_at,
+                            ];
+                        @endphp
+                        @foreach($timestamps as $label => $ts)
+                            @if($ts)
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">{{ $label }}</span>
+                                <span class="text-body-secondary">{{ $ts->format('M d, Y H:i') }}</span>
+                            </div>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
             </div>
         </div>
 
         {{-- Patient --}}
-        <div class="card mb-3">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-person-circle me-2"></i>Patient</h6></div>
-            <div class="card-body small">
-                <h6 class="mb-1">{{ $case->patient->full_name }}</h6>
-                <p class="text-muted mb-2">{{ $case->patient->email }}</p>
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th>DOB</th><td>{{ $case->patient->date_of_birth?->format('M d, Y') ?? '—' }}</td></tr>
-                    <tr><th>State</th><td>{{ $case->patient_state ?? $case->patient->state ?? '—' }}</td></tr>
-                    <tr><th>Phone</th><td>{{ $case->patient->phone ?? '—' }}</td></tr>
-                    <tr>
-                        <th>Height</th>
-                        <td>{{ $case->patient->height ? (int)floor($case->patient->height/12)."' ".round(fmod($case->patient->height,12)).'"' : '—' }}</td>
-                    </tr>
-                    <tr><th>Weight</th><td>{{ $case->patient->weight ? number_format($case->patient->weight,1).' lbs' : '—' }}</td></tr>
-                    <tr><th>BMI</th><td>{{ $case->patient->bmi ? number_format($case->patient->bmi,1) : '—' }}</td></tr>
-                </table>
+        <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bi bi-person-circle text-secondary fs-5"></i>
+                        <div>
+                            <div class="fw-semibold" style="font-size:.95rem">{{ $case->patient->full_name }}</div>
+                            <div class="text-muted" style="font-size:.78rem">{{ $case->patient->email }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-3 py-2" style="font-size:.82rem">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">DOB</span>
+                        <span>{{ $case->patient->date_of_birth?->format('M d, Y') ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">State</span>
+                        <span>{{ $case->patient_state ?? $case->patient->state ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Phone</span>
+                        <span>{{ $case->patient->phone ?? '—' }}</span>
+                    </div>
+                    <div class="border-top pt-2 mt-1">
+                        <div class="row g-2 text-center">
+                            <div class="col-4">
+                                <div class="fw-semibold">{{ $case->patient->height ? (int)floor($case->patient->height/12)."'".round(fmod($case->patient->height,12)).'"' : '—' }}</div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Height</div>
+                            </div>
+                            <div class="col-4 border-start border-end">
+                                <div class="fw-semibold">{{ $case->patient->weight ? number_format($case->patient->weight,1) : '—' }}</div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">lbs</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="fw-semibold">{{ $case->patient->bmi ? number_format($case->patient->bmi,1) : '—' }}</div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">BMI</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
