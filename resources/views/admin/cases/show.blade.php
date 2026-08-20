@@ -691,11 +691,11 @@
                     $typeMap = [
                         'clinician_reassigned'          => ['Clinician reassigned',           'bg-primary'],
                         'prescription.confirmed'        => ['Prescription confirmed',          'bg-success'],
-                        'prescription.document.generated' => ['Prescription document generated', 'bg-secondary'],
-                        'pharmacy.dispatch.preview'     => ['Pharmacy dispatch (preview)',     'bg-secondary'],
+                        'prescription.document.generated' => ['Prescription document generated', 'bg-info text-dark'],
+                        'pharmacy.dispatch.preview'     => ['Pharmacy dispatch (preview)',     'bg-warning text-dark'],
                         'pharmacy.dispatch.queued'      => ['Sent to pharmacy',                'bg-success'],
-                        'ehr.push.preview'              => ['EHR push (preview)',              'bg-secondary'],
-                        'ehr.push.queued'               => ['Sent to EHR',                    'bg-success'],
+                        'ehr_record_built'              => ['EHR record built',                'style:background-color:#6f42c1;color:#fff'],
+                        'ehr.push.queued'               => ['Sent to EHR',                    'style:background-color:#6f42c1;color:#fff'],
                     ];
                     if (isset($typeMap[$event->event_type])) {
                         return ['label' => $typeMap[$event->event_type][0], 'color' => $typeMap[$event->event_type][1]];
@@ -745,7 +745,11 @@
                         {{ $event->created_at->format('M d, H:i') }}
                     </div>
                     <div>
+                        @if(str_starts_with($color, 'style:'))
+                        <span class="badge mb-1" style="{{ substr($color, 6) }}">{{ $label }}</span>
+                        @else
                         <span class="badge {{ $color }} mb-1">{{ $label }}</span>
+                        @endif
                         <div class="small text-muted">{{ $actorLabel($event) }}</div>
                         @if($event->notes)
                             <p class="small mb-0 mt-1 text-body">{{ $event->notes }}</p>
