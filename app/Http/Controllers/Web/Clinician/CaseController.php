@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Clinician;
 
 use App\Events\CaseMessageSent;
 use App\Http\Controllers\Controller;
+use App\Models\CaseOffering;
 use App\Models\CasePrescription;
 use App\Models\CasePrescriptionDiagnosis;
 use App\Models\ClinicalNote;
@@ -820,6 +821,7 @@ class CaseController extends Controller
             }
 
             $this->stateMachine->approve($case, $clinician->id);
+            CaseOffering::where('case_id', $case->id)->update(['status' => 'prescribed']);
         });
 
         $this->stateMachine->complete($case);
@@ -1689,6 +1691,7 @@ class CaseController extends Controller
                     }
 
                     $this->stateMachine->approve($case, $clinician->id);
+                    CaseOffering::where('case_id', $case->id)->update(['status' => 'prescribed']);
                 });
 
                 $this->stateMachine->complete($case);
