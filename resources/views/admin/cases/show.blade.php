@@ -338,13 +338,14 @@
 
             {{-- Clinical Notes --}}
             <div class="tab-pane fade" id="tab-notes">
-                @forelse($case->clinicalNotes->where('is_private', false)->sortByDesc('created_at') as $note)
+                @forelse($case->clinicalNotes->sortByDesc('created_at') as $note)
                 <div class="card mb-2">
                     <div class="card-body py-2 px-3">
                         <div class="d-flex justify-content-between mb-1">
                             <small class="fw-semibold">
                                 {{ $note->clinician->full_name ?? 'Unknown' }}
                                 &bull; <span class="text-muted">{{ ucfirst($note->type) }}</span>
+                                @if($note->is_private)<span class="badge bg-secondary ms-1" style="font-size:.65rem">Private</span>@endif
                             </small>
                             <small class="text-muted">{{ $note->created_at->diffForHumans() }}</small>
                         </div>
