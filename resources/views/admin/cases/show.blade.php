@@ -310,6 +310,19 @@
                                     <span><span class="text-muted">Days Until Dispense:</span> {{ $med->days_until_dispense }}</span>
                                 @endif
                             </div>
+                            @if(!empty($med->dosing['months']))
+                            <div class="mt-2 d-flex flex-column gap-1">
+                                @foreach($med->dosing['months'] as $mi => $dose)
+                                <div class="d-flex align-items-baseline gap-2 small">
+                                    <span class="fw-bold text-primary" style="min-width:24px;font-size:11px">M{{ $mi + 1 }}</span>
+                                    <span>{{ $dose }}</span>
+                                    @if(!empty($med->dosing['sigs'][$mi]))
+                                        <span class="text-muted">— {{ $med->dosing['sigs'][$mi] }}</span>
+                                    @endif
+                                </div>
+                                @endforeach
+                            </div>
+                            @endif
                         </div>
                         @endforeach
                         @endif
