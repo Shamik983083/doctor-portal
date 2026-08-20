@@ -688,8 +688,17 @@
                     $from = $event->payload['from'] ?? null;
                     $to   = $event->payload['to']   ?? null;
 
-                    if ($event->event_type === 'clinician_reassigned') {
-                        return ['label' => 'Clinician reassigned', 'color' => 'bg-primary'];
+                    $typeMap = [
+                        'clinician_reassigned'          => ['Clinician reassigned',           'bg-primary'],
+                        'prescription.confirmed'        => ['Prescription confirmed',          'bg-success'],
+                        'prescription.document.generated' => ['Prescription document generated', 'bg-secondary'],
+                        'pharmacy.dispatch.preview'     => ['Pharmacy dispatch (preview)',     'bg-secondary'],
+                        'pharmacy.dispatch.queued'      => ['Sent to pharmacy',                'bg-success'],
+                        'ehr.push.preview'              => ['EHR push (preview)',              'bg-secondary'],
+                        'ehr.push.queued'               => ['Sent to EHR',                    'bg-success'],
+                    ];
+                    if (isset($typeMap[$event->event_type])) {
+                        return ['label' => $typeMap[$event->event_type][0], 'color' => $typeMap[$event->event_type][1]];
                     }
 
                     $map = [
@@ -699,6 +708,7 @@
                         'assigned→support'    => ['Sent to support',             'bg-warning text-dark'],
                         'support→assigned'    => ['Returned to clinician',       'bg-primary'],
                         'assigned→approved'   => ['Case approved',               'bg-success'],
+                        'approved→completed'  => ['Prescription confirmed · case completed', 'bg-success'],
                         'approved→processing' => ['Sent to pharmacy',            'bg-success'],
                         'processing→completed'=> ['Case completed',              'bg-success'],
                         'assigned→cancelled'  => ['Case cancelled',              'bg-danger'],
