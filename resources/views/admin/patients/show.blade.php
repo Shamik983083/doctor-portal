@@ -37,7 +37,8 @@
                             <div class="text-muted" style="font-size:.75rem">{{ $patient->email }}</div>
                         </div>
                     </div>
-                    <span class="badge flex-shrink-0 {{ match($patient->status ?? 'active') { 'active' => 'bg-success', 'inactive' => 'bg-secondary', default => 'bg-warning text-dark' } }}">
+                    @php $statusBadge = match($patient->status ?? 'active') { 'active' => 'bg-success', 'inactive' => 'bg-secondary', default => 'bg-warning text-dark' }; @endphp
+                    <span class="badge flex-shrink-0 {{ $statusBadge }}">
                         {{ ucfirst($patient->status ?? 'active') }}
                     </span>
                 </div>
@@ -58,7 +59,7 @@
                     </div>
                     <div class="d-flex justify-content-between mb-1">
                         <span class="text-muted">State</span>
-                        <span>{{ $patient->state ?? '—' }}@if($patient->city), {{ $patient->city }}@endif@if($patient->zip) {{ $patient->zip }}@endif</span>
+                        <span>{{ implode(', ', array_filter([$patient->state, $patient->city, $patient->zip])) ?: '—' }}</span>
                     </div>
                     @if($patient->address)
                     <div class="d-flex justify-content-between mb-1">
