@@ -11,84 +11,107 @@
     PROVIDER_POOL is the design working. Merging them would make "broken" and
     "working" look the same, which is how a screen like this stops being read.
 --}}
-<div class="d-flex justify-content-between align-items-start mb-3">
-    <div>
-        <h4 class="fw-semibold mb-1">Routing Exceptions</h4>
-        <p class="text-muted small mb-0">
-            Cases that could not be assigned, with the reason each one is stuck. An exception clears
-            itself the moment its case routes.
-        </p>
-    </div>
-    <div>
-        <a href="{{ route('admin.routing.pull-requests') }}" class="btn btn-outline-secondary btn-sm">Pull requests</a>
-    </div>
-</div>
+<style>
+.rt-page { max-width: 960px; }
+.rt-section { background:#fff; border:1px solid #e5e7eb; border-radius:12px; margin-bottom:16px; overflow:hidden; }
+.rt-section-header { padding:14px 20px; border-bottom:1px solid #f1f3f5; display:flex; align-items:center; justify-content:space-between; }
+.rt-section-header .title { font-size:.78rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:#6b7280; }
+.rt-section-header .count { font-size:.78rem; font-weight:600; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:20px; padding:2px 10px; }
+.rt-table { width:100%; border-collapse:collapse; }
+.rt-table th { font-size:.68rem; letter-spacing:.07em; text-transform:uppercase; color:#9ca3af; font-weight:600; padding:10px 16px; background:#f9fafb; border-bottom:1px solid #e5e7eb; }
+.rt-table td { font-size:.82rem; padding:11px 16px; border-bottom:1px solid #f3f4f6; color:#374151; vertical-align:middle; }
+.rt-table tbody tr:last-child td { border-bottom:none; }
+.rt-table tbody tr.systemic td { background:#fff5f5; }
+.rt-table .case-link { font-family:monospace; font-size:.82rem; color:#4f46e5; text-decoration:none; font-weight:500; }
+.rt-table .case-link:hover { text-decoration:underline; }
+.rt-table .partner-name { font-size:.73rem; color:#9ca3af; margin-top:2px; }
+.rt-table .reason-main { font-weight:500; color:#1f2937; }
+.rt-table .reason-sub { font-size:.73rem; color:#6b7280; margin-top:3px; }
+.stuck-normal { color:#374151; }
+.stuck-warn { color:#dc2626; font-weight:600; }
+.systemic-badge { display:inline-block; font-size:.67rem; font-weight:600; letter-spacing:.05em; text-transform:uppercase; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:4px; padding:1px 6px; margin-top:4px; }
+.clear-btn { font-size:.75rem; font-weight:500; padding:4px 12px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#374151; cursor:pointer; transition:background .12s; }
+.clear-btn:hover { background:#f3f4f6; }
+.rt-empty { padding:24px 20px; font-size:.82rem; color:#9ca3af; }
+.rt-footer { padding:11px 20px; border-top:1px solid #f1f3f5; font-size:.73rem; color:#9ca3af; }
+.ok-callout { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 18px; font-size:.82rem; color:#166534; margin-bottom:16px; }
+.waiting-orange { color:#d97706; font-weight:600; }
+</style>
 
-@if($exceptions->isEmpty())
-    <div class="alert alert-success">
-        <i class="bi bi-check-circle me-2"></i><strong>Nothing is stuck.</strong>
-        Every case has either been assigned or is waiting in the pool below.
-    </div>
-@else
-    <div class="card mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <span class="fw-semibold">{{ $exceptions->count() }} case(s) could not be assigned</span>
+<div class="rt-page">
+
+    {{-- Header --}}
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h4 class="fw-semibold mb-1" style="font-size:1.2rem;color:#111827;letter-spacing:-.02em">Routing Exceptions</h4>
+            <p class="mb-0" style="font-size:.82rem;color:#6b7280">Cases that could not be assigned, with the reason each one is stuck. An exception clears itself the moment its case routes.</p>
         </div>
-        <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-                <thead class="table-light">
+        <a href="{{ route('admin.routing.pull-requests') }}" class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;border-radius:8px">
+            <i class="bi bi-inbox me-1"></i>Pull requests
+        </a>
+    </div>
+
+    {{-- Exceptions --}}
+    @if($exceptions->isEmpty())
+        <div class="ok-callout mb-4">
+            <i class="bi bi-check-circle me-2"></i><strong>Nothing is stuck.</strong>
+            Every case has either been assigned or is waiting in the pool below.
+        </div>
+    @else
+        <div class="rt-section mb-4">
+            <div class="rt-section-header">
+                <span class="title">Stuck — needs attention</span>
+                <span class="count">{{ $exceptions->count() }} {{ Str::plural('case', $exceptions->count()) }}</span>
+            </div>
+            <table class="rt-table">
+                <thead>
                     <tr>
                         <th>Case</th>
                         <th>State</th>
                         <th>Why</th>
                         <th>Stuck for</th>
                         <th>Tries</th>
-                        <th class="text-end">Action</th>
+                        <th style="text-align:right">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach($exceptions as $exception)
-                    <tr class="{{ $exception->isSystemic() ? 'table-danger' : '' }}">
+                    <tr class="{{ $exception->isSystemic() ? 'systemic' : '' }}">
                         <td>
                             @if($exception->case)
-                                <a href="{{ route('admin.cases.show', $exception->case->uuid) }}">
+                                <a class="case-link" href="{{ route('admin.cases.show', $exception->case->uuid) }}">
                                     {{ Str::limit($exception->case->uuid, 8, '') }}
                                 </a>
-                                <div class="text-muted small">{{ $exception->case->partner?->name }}</div>
+                                <div class="partner-name">{{ $exception->case->partner?->name }}</div>
                             @else
-                                <span class="text-muted">(case removed)</span>
+                                <span style="color:#9ca3af;font-size:.78rem">case removed</span>
                             @endif
                         </td>
                         <td>{{ $exception->case?->patient_state ?? '—' }}</td>
                         <td>
-                            <span class="fw-semibold">{{ $exception->reasonLabel() }}</span>
+                            <div class="reason-main">{{ $exception->reasonLabel() }}</div>
                             @if($exception->isSystemic())
-                                <div class="badge bg-danger mt-1">Affects every case</div>
+                                <div><span class="systemic-badge">Affects every case</span></div>
                             @endif
                             @if($exception->provider_reasons)
-                                {{-- Per-doctor reasons, so "nobody was eligible"
-                                     can be read as WHY nobody was. --}}
-                                @php
-                                    $codes = collect($exception->provider_reasons)->flatten()->countBy();
-                                @endphp
-                                <div class="text-muted small mt-1">
+                                @php $codes = collect($exception->provider_reasons)->flatten()->countBy(); @endphp
+                                <div class="reason-sub">
                                     @foreach($codes as $code => $count)
-                                        {{ \App\Services\Routing\EligibilityEvaluator::REASON_LABELS[$code] ?? $code }}
-                                        ({{ $count }}){{ ! $loop->last ? ' · ' : '' }}
+                                        {{ \App\Services\Routing\EligibilityEvaluator::REASON_LABELS[$code] ?? $code }} ({{ $count }}){{ !$loop->last ? ' · ' : '' }}
                                     @endforeach
                                 </div>
                             @endif
                         </td>
                         <td>
-                            <span class="{{ $exception->ageHours() >= 24 ? 'text-danger fw-semibold' : '' }}">
+                            <span class="{{ $exception->ageHours() >= 24 ? 'stuck-warn' : 'stuck-normal' }}">
                                 {{ $exception->first_seen_at?->diffForHumans(null, true) }}
                             </span>
                         </td>
                         <td>{{ $exception->occurrences }}</td>
-                        <td class="text-end">
+                        <td style="text-align:right">
                             <form method="POST" action="{{ route('admin.routing.exceptions.resolve', $exception->id) }}">
                                 @csrf
-                                <button class="btn btn-outline-secondary btn-sm">Clear</button>
+                                <button class="clear-btn">Clear</button>
                             </form>
                         </td>
                     </tr>
@@ -96,23 +119,19 @@
                 </tbody>
             </table>
         </div>
-    </div>
-@endif
+    @endif
 
-<div class="card">
-    <div class="card-header bg-white">
-        <span class="fw-semibold">Unclaimed pool queue</span>
-        <span class="text-muted small ms-2">
-            {{ $pooledTotal }} case(s) waiting to be claimed. Not errors: under provider pool mode
-            this is how cases wait. Ordered oldest first, which is the order the pool grants them in.
-        </span>
-    </div>
-    @if($pooled->isEmpty())
-        <div class="card-body text-muted small">Nothing waiting.</div>
-    @else
-        <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-                <thead class="table-light">
+    {{-- Pool queue --}}
+    <div class="rt-section">
+        <div class="rt-section-header">
+            <span class="title">Unclaimed pool queue</span>
+            <span class="count">{{ $pooledTotal }} {{ Str::plural('case', $pooledTotal) }} waiting</span>
+        </div>
+        @if($pooled->isEmpty())
+            <div class="rt-empty">Nothing waiting in the pool.</div>
+        @else
+            <table class="rt-table">
+                <thead>
                     <tr>
                         <th>Case</th>
                         <th>State</th>
@@ -123,22 +142,32 @@
                 <tbody>
                 @foreach($pooled as $case)
                     <tr>
-                        <td><a href="{{ route('admin.cases.show', $case->uuid) }}">{{ Str::limit($case->uuid, 8, '') }}</a></td>
+                        <td>
+                            <a class="case-link" href="{{ route('admin.cases.show', $case->uuid) }}">
+                                {{ Str::limit($case->uuid, 8, '') }}
+                            </a>
+                        </td>
                         <td>{{ $case->patient_state ?? '—' }}</td>
                         <td>{{ $case->partner?->name }}</td>
-                        <td class="{{ $case->created_at->diffInHours(now()) >= 48 ? 'text-danger fw-semibold' : '' }}">
-                            {{ $case->created_at->diffForHumans(null, true) }}
+                        <td>
+                            <span class="{{ $case->created_at->diffInHours(now()) >= 48 ? 'stuck-warn' : ($case->created_at->diffInHours(now()) >= 24 ? 'waiting-orange' : '') }}">
+                                {{ $case->created_at->diffForHumans(null, true) }}
+                            </span>
                         </td>
                     </tr>
                 @endforeach
                 </tbody>
             </table>
-        </div>
-        @if($pooledTotal > $pooled->count())
-            <div class="card-body text-muted small">
-                Showing the {{ $pooled->count() }} oldest of {{ $pooledTotal }}.
-            </div>
+            @if($pooledTotal > $pooled->count())
+                <div class="rt-footer">
+                    Showing the {{ $pooled->count() }} oldest of {{ $pooledTotal }} total.
+                    Not errors — under provider pool mode this is how cases wait.
+                </div>
+            @else
+                <div class="rt-footer">Not errors — under provider pool mode this is how cases wait. Ordered oldest first.</div>
+            @endif
         @endif
-    @endif
+    </div>
+
 </div>
 @endsection
