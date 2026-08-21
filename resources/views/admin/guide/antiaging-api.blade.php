@@ -644,7 +644,7 @@ function renderAAQRows($rows, $allRows) {
 </tr>
 <tr>
     <td><span class="badge bg-warning text-dark">409</span></td>
-    <td><code>external_id</code> already exists for this partner</td>
+    <td><code>external_id</code> already exists for this partner (skipped when <code>is_refill: true</code>)</td>
     <td><code>{"message":"Case with this external_id already exists."}</code></td>
 </tr>
 <tr>
@@ -700,7 +700,7 @@ function renderAAQRows($rows, $allRows) {
             <ul class="small mb-0 ps-3">
                 <li>Status set to <strong>waiting</strong> immediately (unless <code>hold_status: true</code>)</li>
                 <li>Linked to patient and partner</li>
-                <li>Your <code>external_id</code> stored for idempotency</li>
+                <li>Your <code>external_id</code> stored for idempotency (refill cases may reuse the same <code>external_id</code>)</li>
             </ul>
         </div>
     </div>

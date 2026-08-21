@@ -311,7 +311,7 @@ class CaseController extends Controller
             $patient->update(['collaborating_clinician_id' => $partner->collaborating_clinician_id]);
         }
 
-        if (($data['external_id'] ?? null) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
+        if (($data['external_id'] ?? null) && empty($data['is_refill']) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
             return response()->json(['message' => 'Case with this external_id already exists.'], 409);
         }
 

@@ -130,7 +130,7 @@ Content-Type: application/json
 | Field | Required | Type | Notes |
 |---|---|---|---|
 | `patient_state` | — | string | 2-letter state where the patient is located. Falls back to `patient.state` if omitted. Used for licensure routing. |
-| `external_id` | — | string | Your order / case ID. Must be unique per partner. Duplicate returns 409. |
+| `external_id` | — | string | Your order / case ID. Must be unique per partner (duplicate returns 409). Uniqueness check is skipped when `is_refill` is `true`, allowing refill cases to reuse the original `external_id`. |
 | `visit_type` | — | string | `asynchronous` (default for GLP-1 weight loss) or `synchronous` (video required). Do **not** pass `"weightloss"` — use `"asynchronous"`. |
 | `is_chargeable` | — | boolean | Default `true` |
 | `hold_status` | — | boolean | `true` = case sits on hold until you release it via `POST /{uuid}/hold`. Default `false`. |
@@ -266,7 +266,7 @@ The patient is matched by `email` or `patient.external_id`. The prior case and p
 }
 ```
 
-**409 Conflict** — `external_id` already exists for this partner.
+**409 Conflict** — `external_id` already exists for this partner (not returned when `is_refill` is `true`).
 
 **422 Unprocessable** — validation failed (see `errors` object):
 ```json
@@ -464,7 +464,7 @@ Then in `answers`:
 | HTTP | Cause | Fix |
 |---|---|---|
 | 401 | Invalid or expired token | Re-authenticate |
-| 409 | Duplicate `external_id` | Use a unique value per case |
+| 409 | Duplicate `external_id` (non-refill) | Use a unique value per case, or set `is_refill: true` for follow-up cases |
 | 422 | Validation failed | Check `errors` object — common cause: `month_frequency` not matching a configured product plan |
 | 403 | Offering not available in patient state | Check `patient_state` and offering state availability |
 
