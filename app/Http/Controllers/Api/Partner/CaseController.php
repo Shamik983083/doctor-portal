@@ -358,9 +358,24 @@ class CaseController extends Controller
 
                 $missing = array_diff($requiredQUuids, $submittedQUuids);
                 if ($missing) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'questionnaire_responses' => 'Required questionnaires not submitted: ' . implode(', ', $missing),
-                    ]);
+                    $missingQuestionnaires = Questionnaire::with(['questions' => function ($q) {
+                        $q->where('is_active', true)->where('is_required', true);
+                    }])->whereIn('uuid', $missing)->get()->map(function ($questionnaire) {
+                        return [
+                            'questionnaire_id'   => $questionnaire->uuid,
+                            'questionnaire_name' => $questionnaire->name,
+                            'questions'          => $questionnaire->questions->map(fn ($q) => [
+                                'key'      => $q->slug,
+                                'question' => $q->question,
+                                'type'     => $q->type,
+                            ])->values()->toArray(),
+                        ];
+                    })->values()->toArray();
+
+                    return response()->json([
+                        'message'                => 'Required questionnaires not submitted.',
+                        'missing_questionnaires' => $missingQuestionnaires,
+                    ], 422);
                 }
             }
 
