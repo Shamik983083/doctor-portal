@@ -372,10 +372,10 @@ class CaseController extends Controller
                         ];
                     })->values()->toArray();
 
-                    return response()->json([
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
                         'message'                => 'Required questionnaires not submitted.',
                         'missing_questionnaires' => $missingQuestionnaires,
-                    ], 422);
+                    ], 422));
                 }
             }
 
