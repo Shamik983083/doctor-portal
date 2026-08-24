@@ -311,7 +311,7 @@ class CaseController extends Controller
             $patient->update(['collaborating_clinician_id' => $partner->collaborating_clinician_id]);
         }
 
-        if (($data['external_id'] ?? null) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
+        if (($data['external_id'] ?? null) && empty($data['is_refill']) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
             return response()->json(['message' => 'Case with this external_id already exists.'], 409);
         }
 
@@ -358,9 +358,24 @@ class CaseController extends Controller
 
                 $missing = array_diff($requiredQUuids, $submittedQUuids);
                 if ($missing) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'questionnaire_responses' => 'Required questionnaires not submitted: ' . implode(', ', $missing),
-                    ]);
+                    $missingQuestionnaires = Questionnaire::with(['questions' => function ($q) {
+                        $q->where('is_active', true)->where('is_required', true);
+                    }])->whereIn('uuid', $missing)->get()->map(function ($questionnaire) {
+                        return [
+                            'questionnaire_id'   => $questionnaire->uuid,
+                            'questionnaire_name' => $questionnaire->name,
+                            'questions'          => $questionnaire->questions->map(fn ($q) => [
+                                'key'      => $q->slug,
+                                'question' => $q->question,
+                                'type'     => $q->type,
+                            ])->values()->toArray(),
+                        ];
+                    })->values()->toArray();
+
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                        'message'                => 'Required questionnaires not submitted.',
+                        'missing_questionnaires' => $missingQuestionnaires,
+                    ], 422));
                 }
             }
 

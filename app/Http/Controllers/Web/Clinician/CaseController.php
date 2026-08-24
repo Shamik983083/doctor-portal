@@ -824,6 +824,42 @@ class CaseController extends Controller
             CaseOffering::where('case_id', $case->id)->update(['status' => 'prescribed']);
         });
 
+        // C8: include SIG per medication; C9: send structured codes
+        // Fire prescription_written before case_completed so partners have
+        // prescription data before the case is marked done.
+        $case->loadMissing('caseOfferings');
+        $prescription->loadMissing('medications.offering');
+        $coByOffering = $case->caseOfferings->keyBy('offering_id');
+        $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
+            'case_id'         => $case->uuid,
+            'external_id'     => $case->external_id,
+            'patient_id'      => $case->patient->uuid ?? null,
+            'clinician_name'  => $clinician->full_name,
+            'clinician_npi'   => $clinician->npi,
+            'diagnoses'       => $prescription->diagnosesCodes->map(fn ($d) => [
+                'code'        => $d->icd_code,
+                'description' => $d->description,
+            ])->toArray() ?: $prescription->diagnoses,
+            'meds_prescribed' => $prescription->medications->map(function ($m) use ($coByOffering) {
+                $co = $coByOffering->get($m->offering_id);
+                return [
+                    'name'                => $m->name,
+                    'offering_id'         => $m->offering?->uuid,
+                    'product_key'         => $co?->product_key ?: null,
+                    'month_frequency'     => $co?->month_frequency ?: null,
+                    'compound_formula'    => $m->compound_formula,
+                    'sig'                 => $m->sig,
+                    'refills'             => (string) $m->refills,
+                    'quantity'            => (string) $m->quantity,
+                    'days_supply'         => (string) $m->days_supply,
+                    'dispense_unit'       => $m->dispense_unit,
+                    'days_until_dispense' => $m->days_until_dispense,
+                    'dosing'              => $m->dosing,
+                ];
+            })->toArray(),
+            'timestamp' => now()->timestamp,
+        ]);
+
         $this->stateMachine->complete($case);
 
         // C12: create the patient-facing approval message the provider just edited
@@ -915,40 +951,6 @@ class CaseController extends Controller
                 'error'   => $e->getMessage(),
             ]);
         }
-
-        // C8: include SIG per medication; C9: send structured codes
-        $case->loadMissing('caseOfferings');
-        $prescription->loadMissing('medications.offering');
-        $coByOffering = $case->caseOfferings->keyBy('offering_id');
-        $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
-            'case_id'         => $case->uuid,
-            'external_id'     => $case->external_id,
-            'patient_id'      => $case->patient->uuid ?? null,
-            'clinician_name'  => $clinician->full_name,
-            'clinician_npi'   => $clinician->npi,
-            'diagnoses'       => $prescription->diagnosesCodes->map(fn ($d) => [
-                'code'        => $d->icd_code,
-                'description' => $d->description,
-            ])->toArray() ?: $prescription->diagnoses,
-            'meds_prescribed' => $prescription->medications->map(function ($m) use ($coByOffering) {
-                $co = $coByOffering->get($m->offering_id);
-                return [
-                    'name'                => $m->name,
-                    'offering_id'         => $m->offering?->uuid,
-                    'product_key'         => $co?->product_key ?: null,
-                    'month_frequency'     => $co?->month_frequency ?: null,
-                    'compound_formula'    => $m->compound_formula,
-                    'sig'                 => $m->sig,
-                    'refills'             => (string) $m->refills,
-                    'quantity'            => (string) $m->quantity,
-                    'days_supply'         => (string) $m->days_supply,
-                    'dispense_unit'       => $m->dispense_unit,
-                    'days_until_dispense' => $m->days_until_dispense,
-                    'dosing'              => $m->dosing,
-                ];
-            })->toArray(),
-            'timestamp' => now()->timestamp,
-        ]);
 
         return redirect()->route('clinician.cases.show', $uuid)
             ->with('success', 'Prescription confirmed · case completed.');
@@ -1694,18 +1696,8 @@ class CaseController extends Controller
                     CaseOffering::where('case_id', $case->id)->update(['status' => 'prescribed']);
                 });
 
-                $this->stateMachine->complete($case);
-
-                try {
-                    $document = $this->prescriptionDocuments->generate($case, $prescription);
-                    $this->pharmacyDispatch->queue($document);
-                } catch (\Throwable $e) {
-                    Log::error('Batch prescription document/dispatch failed', [
-                        'uuid'  => $uuid,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-
+                // Fire prescription_written before case_completed so partners have
+                // prescription data before the case is marked done.
                 $case->loadMissing('caseOfferings');
                 $prescription->load('medications.offering');
                 $coByOffering = $case->caseOfferings->keyBy('offering_id');
@@ -1735,6 +1727,18 @@ class CaseController extends Controller
                     })->toArray(),
                     'timestamp'       => now()->timestamp,
                 ]);
+
+                $this->stateMachine->complete($case);
+
+                try {
+                    $document = $this->prescriptionDocuments->generate($case, $prescription);
+                    $this->pharmacyDispatch->queue($document);
+                } catch (\Throwable $e) {
+                    Log::error('Batch prescription document/dispatch failed', [
+                        'uuid'  => $uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
 
                 /*
                  * EHR: record each batch approval. No clinical note is created in
