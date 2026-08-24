@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Check actual DB state before acting — staging may not have the
-        // unique index if the DB was initialised without it, which caused
-        // the original migration to fail and block every subsequent deploy.
+        // MySQL error 1553: cannot drop a unique index that a foreign key
+        // depends on unless a replacement index exists first.  We therefore
+        // ADD the regular index before dropping the unique one so MySQL
+        // always has an index covering (partner_id, external_id).
+
         $uniqueExists = collect(DB::select(
             "SHOW INDEX FROM `cases` WHERE Key_name = 'cases_partner_id_external_id_unique'"
         ))->isNotEmpty();
@@ -20,14 +22,19 @@ return new class extends Migration
             "SHOW INDEX FROM `cases` WHERE Key_name = 'cases_partner_id_external_id_index'"
         ))->isNotEmpty();
 
-        Schema::table('cases', function (Blueprint $table) use ($uniqueExists, $regularExists) {
-            if ($uniqueExists) {
-                $table->dropUnique(['partner_id', 'external_id']);
-            }
-            if (! $regularExists) {
+        // Step 1 — add replacement index first (safe to run even if unique still exists)
+        if (! $regularExists) {
+            Schema::table('cases', function (Blueprint $table) {
                 $table->index(['partner_id', 'external_id']);
-            }
-        });
+            });
+        }
+
+        // Step 2 — now safe to drop the unique index; regular index covers the gap
+        if ($uniqueExists) {
+            Schema::table('cases', function (Blueprint $table) {
+                $table->dropUnique(['partner_id', 'external_id']);
+            });
+        }
     }
 
     public function down(): void
@@ -40,13 +47,17 @@ return new class extends Migration
             "SHOW INDEX FROM `cases` WHERE Key_name = 'cases_partner_id_external_id_unique'"
         ))->isNotEmpty();
 
-        Schema::table('cases', function (Blueprint $table) use ($regularExists, $uniqueExists) {
-            if ($regularExists) {
-                $table->dropIndex(['partner_id', 'external_id']);
-            }
-            if (! $uniqueExists) {
+        // Step 1 — restore unique index first, then drop the regular one
+        if (! $uniqueExists) {
+            Schema::table('cases', function (Blueprint $table) {
                 $table->unique(['partner_id', 'external_id']);
-            }
-        });
+            });
+        }
+
+        if ($regularExists) {
+            Schema::table('cases', function (Blueprint $table) {
+                $table->dropIndex(['partner_id', 'external_id']);
+            });
+        }
     }
 };
