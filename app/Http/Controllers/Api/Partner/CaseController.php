@@ -49,7 +49,7 @@ class CaseController extends Controller
             'patient.gender'                                  => 'nullable|in:male,female,other',
             'patient.height'                                  => 'required|numeric|min:0',
             'patient.weight'                                  => 'required|numeric|min:0',
-            'patient.bmi'                                     => 'required|numeric|min:0',
+            'patient.bmi'                                     => 'required|numeric|min:0|max:999.99',
             'patient.address'                                 => 'nullable|string',
             'patient.city'                                    => 'nullable|string',
             'patient.state'                                   => 'nullable|string|size:2',
