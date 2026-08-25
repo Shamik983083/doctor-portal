@@ -122,6 +122,15 @@ class OfferingController extends Controller
 
         $offering = Offering::create($data);
 
+        // Auto-grant the owning partner access to their own offering.
+        // Without this row in offering_partner, accessibleOfferings() never
+        // returns the offering and case creation via product_key fails.
+        if ($offering->partner_id) {
+            $offering->partner->accessibleOfferings()->syncWithoutDetaching([
+                $offering->id => ['is_active' => (bool) $data['is_active']],
+            ]);
+        }
+
         try {
             $offering->load('partner');
             User::role(['admin', 'super_admin'])->each(
@@ -293,6 +302,14 @@ class OfferingController extends Controller
         }
 
         $offering->update($data);
+
+        // Keep offering_partner.is_active in sync when the offering's active
+        // flag changes, so the accessible offering gate stays consistent.
+        if ($offering->partner_id) {
+            $offering->partner->accessibleOfferings()->syncWithoutDetaching([
+                $offering->id => ['is_active' => (bool) $data['is_active']],
+            ]);
+        }
 
         return back()->with('success', 'Offering updated.');
     }
