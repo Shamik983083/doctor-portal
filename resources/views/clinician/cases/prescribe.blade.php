@@ -451,7 +451,102 @@
             list.querySelectorAll('.med-decision[data-bundle-group="' + bgKey + '"]').forEach(function (r) {
                 r.remove();
             });
+            var wrapper = list.querySelector('.bundle-group-wrapper[data-bundle-group="' + bgKey + '"]');
+            if (wrapper) wrapper.remove();
             refresh();
+        }
+
+        // Render a single offering as a sub-row inside a bundle wrapper.
+        function addBundleMedRow(container, offeringId, bgKey, productKey, sharedTermEl) {
+            var i = idx++;
+            var row = document.createElement('div');
+            row.className = 'med-decision bundle-med-row';
+            row.setAttribute('data-idx', i);
+            row.setAttribute('data-bundle-group', bgKey);
+            row.setAttribute('data-product-key', productKey || '');
+            row.style.cssText = 'border:1px solid #dde8f8;border-radius:8px;padding:12px;background:var(--surface);margin-top:8px';
+
+            row.innerHTML =
+                '<div class="field-row">'
+                + '<div class="field"><label>Medication <span class="req">*</span></label>'
+                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>'
+                + offeringOptions(offeringId, productKey) + '</select></div>'
+                + '<div class="field"><label>Administration frequency <span class="req">*</span></label>'
+                + '<select name="medications[' + i + '][frequency]" required>' + optionList(FREQUENCIES, 'Weekly') + '</select></div>'
+                + '<div class="field"><label>Refills <span class="req">*</span></label>'
+                + '<select name="medications[' + i + '][refills]" required>' + optionList(REFILLS, '0') + '</select></div>'
+                + '</div>'
+                + '<div data-f="months"></div>'
+                + '<input type="hidden" data-f="term" name="medications[' + i + '][term]" value="' + esc(sharedTermEl ? sharedTermEl.value : defaultTerm) + '">'
+                + '<input type="hidden" data-f="name" name="medications[' + i + '][name]" value="">'
+                + '<input type="hidden" data-f="quantity" name="medications[' + i + '][quantity]" value="">'
+                + '<input type="hidden" data-f="days_supply" name="medications[' + i + '][days_supply]" value="">'
+                + '<input type="hidden" data-f="dispense_unit" name="medications[' + i + '][dispense_unit]" value="">'
+                + '<input type="hidden" data-f="compound" name="medications[' + i + '][compound_formula]" value="">';
+
+            container.appendChild(row);
+
+            var med = row.querySelector('[data-f="med"]');
+            function syncMed() {
+                var o = OFFERINGS.filter(function (x) { return String(x.id) === String(med.value); })[0];
+                row.querySelector('[data-f="name"]').value          = o ? o.name : '';
+                row.querySelector('[data-f="quantity"]').value      = o && o.quantity       != null ? o.quantity       : '';
+                row.querySelector('[data-f="days_supply"]').value   = o && o.days_supply    != null ? o.days_supply    : '';
+                row.querySelector('[data-f="dispense_unit"]').value = o && o.dispense_unit  != null ? o.dispense_unit  : '';
+                row.querySelector('[data-f="compound"]').value      = o && o.compound_formula != null ? o.compound_formula : '';
+                renderMonths(row);
+                refresh();
+            }
+            med.addEventListener('change', syncMed);
+            syncMed();
+            return row;
+        }
+
+        // Render all offerings in a bundle inside a single shared wrapper.
+        // One duration dropdown controls all sub-rows; one button removes everything.
+        function addBundleGroup(bundleItems, bgKey) {
+            var wrapper = document.createElement('div');
+            wrapper.className = 'bundle-group-wrapper';
+            wrapper.setAttribute('data-bundle-group', bgKey);
+            wrapper.style.cssText = 'border:1px solid #c7d8f5;border-radius:12px;padding:14px;margin-bottom:12px;background:#f7faff';
+
+            wrapper.innerHTML =
+                '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
+                + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+                + '<span style="font-size:10px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:5px">Bundle</span>'
+                + '<label style="font-size:12px;font-weight:600;margin:0;white-space:nowrap">Duration <span class="req">*</span></label>'
+                + '<select class="bundle-shared-term" style="font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)">'
+                + optionList(TERMS, defaultTerm) + '</select>'
+                + '</div>'
+                + '<button type="button" class="button-secondary bundle-remove-btn" style="padding:4px 10px">Remove bundle</button>'
+                + '</div>'
+                + '<div class="bundle-meds-container"></div>';
+
+            list.appendChild(wrapper);
+
+            var sharedTerm    = wrapper.querySelector('.bundle-shared-term');
+            var medsContainer = wrapper.querySelector('.bundle-meds-container');
+
+            wrapper.querySelector('.bundle-remove-btn').addEventListener('click', function () {
+                wrapper.remove();
+                refresh();
+            });
+
+            bundleItems.forEach(function (co) {
+                addBundleMedRow(medsContainer, co.offering_id, bgKey, co.product_key, sharedTerm);
+            });
+
+            // When shared duration changes, push the new value into every sub-row
+            // hidden term input and re-render that row's dosage ladder.
+            sharedTerm.addEventListener('change', function () {
+                wrapper.querySelectorAll('.bundle-med-row').forEach(function (row) {
+                    var termInput = row.querySelector('[data-f="term"]');
+                    if (termInput) {
+                        termInput.value = sharedTerm.value;
+                        renderMonths(row);
+                    }
+                });
+            });
         }
         function optionList(arr, sel) {
             return arr.map(function (v) {
@@ -694,11 +789,10 @@
                     standalone.push(co);
                 }
             });
-            // Render bundle rows first (grouped, locked to drug family).
+            // Render bundle rows first — all offerings in a group share one wrapper,
+            // one duration dropdown, and one Remove button.
             Object.keys(bundleGroups).forEach(function (bgKey) {
-                bundleGroups[bgKey].forEach(function (co) {
-                    addRow(co.offering_id, bgKey, co.product_key);
-                });
+                addBundleGroup(bundleGroups[bgKey], bgKey);
             });
             // Render standalone rows (existing behaviour, full dropdown).
             standalone.forEach(function (co) {
