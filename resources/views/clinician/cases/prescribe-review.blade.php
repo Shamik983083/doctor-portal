@@ -133,7 +133,7 @@
                            onclick="return confirm('Discard this draft and return to the prescribe form?')"
                            class="button-secondary">Discard draft</a>
                     </div>
-                    <button type="submit" class="button-primary">Confirm &amp; approve</button>
+                    <button type="submit" class="button-primary" id="confirmBtn">Confirm &amp; approve</button>
                 </div>
             </div>
 
@@ -145,6 +145,18 @@
 
 @section('scripts')
 <script>
+    (function () {
+        var form       = document.querySelector('form');
+        var confirmBtn = document.getElementById('confirmBtn');
+        if (form && confirmBtn) {
+            form.addEventListener('submit', function () {
+                if (confirmBtn.classList.contains('btn-loading')) return;
+                confirmBtn.classList.add('btn-loading');
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<span class="btn-spin"></span>Approving…';
+            });
+        }
+    })();
     (function () {
         var noteArea = document.getElementById('noteArea');
         var notice   = document.getElementById('noteNotice');
