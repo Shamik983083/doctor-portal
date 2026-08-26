@@ -64,7 +64,7 @@
 @else
 {{-- ── Two-pane layout ──────────────────────────────────────────── --}}
 <div class="card" style="border-top-left-radius:0;">
-    <div class="row g-0" style="min-height:520px; max-height:75vh;">
+    <div class="row g-0" style="height:calc(100vh - 220px); min-height:520px;">
 
         {{-- Left: conversation list --}}
         <div class="col-4 border-end d-flex flex-column" style="overflow:hidden;">
