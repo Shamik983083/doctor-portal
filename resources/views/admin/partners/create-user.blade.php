@@ -18,11 +18,6 @@
                 <div class="text-muted small mt-1">This user will be able to log in at <code>/login</code> and access the Partner Portal for <strong>{{ $partner->name }}</strong>.</div>
             </div>
             <div class="card-body">
-                @if($errors->any())
-                    <div class="alert alert-danger mb-4">
-                        <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-                    </div>
-                @endif
 
                 <form method="POST" action="{{ route('admin.partners.users.store', $partner->id) }}">
                     @csrf

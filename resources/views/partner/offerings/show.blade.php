@@ -18,11 +18,6 @@
 <form method="POST" action="{{ route('partner.offerings.update', $offering->id) }}">
     @csrf @method('PUT')
 
-    @if($errors->any())
-        <div class="alert alert-danger mb-4">
-            <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-        </div>
-    @endif
 
     @if($offering->approval_status === 'pending')
         <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
