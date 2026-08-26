@@ -320,12 +320,6 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         return view('admin.guide.antiaging-api', compact('questionnaire'));
     })->name('guide.antiaging-api');
 
-    // Webhook Deliveries
-    Route::prefix('webhooks')->name('webhooks.')->group(function () {
-        Route::get('/',              [AdminWebhookDeliveryController::class, 'index'])->name('index');
-        Route::post('/{uuid}/resend',[AdminWebhookDeliveryController::class, 'resend'])->name('resend');
-    });
-
     // EHR Records — integration surface, super admin only (Devin msg 2117)
     Route::prefix('ehr-records')->name('ehr-records.')->middleware('role:super_admin')->group(function () {
         Route::get('/',               [AdminEhrRecordController::class, 'index'])->name('index');
@@ -382,6 +376,13 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     });
 
     }); // end super-admin-only integration and configuration group
+
+    // Webhook Deliveries — read-only log, open to all admin tiers.
+    // Resend is write but low-risk (retries an already-authorised outbound event).
+    Route::prefix('webhooks')->name('webhooks.')->group(function () {
+        Route::get('/',              [AdminWebhookDeliveryController::class, 'index'])->name('index');
+        Route::post('/{uuid}/resend',[AdminWebhookDeliveryController::class, 'resend'])->name('resend');
+    });
 
     /*
      * ROUTING OPERATIONS, open to Doctor Admins as well as super admins.
