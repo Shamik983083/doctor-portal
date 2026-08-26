@@ -178,14 +178,14 @@
             <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
                 {{-- Notification bell --}}
                 <div style="position:relative;" id="notifWrap">
-                    <button class="notif-bell-btn" id="notifBellBtn" aria-label="Notifications">
+                    <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Notifications">
                         <i class="bi bi-bell-fill" style="font-size:1.05rem;"></i>
                         <span class="notif-badge" id="notifBadge"></span>
                     </button>
                     <div class="notif-panel" id="notifPanel">
                         <div class="notif-panel-header">
                             <span>Notifications</span>
-                            <button class="notif-mark-all" id="notifMarkAll">Mark all read</button>
+                            <button type="button" class="notif-mark-all" id="notifMarkAll">Mark all read</button>
                         </div>
                         <div class="notif-list" id="notifList">
                             <div class="notif-empty" id="notifEmpty">You're all caught up!</div>
