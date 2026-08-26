@@ -64,13 +64,13 @@
 @else
 {{-- ── Two-pane layout ──────────────────────────────────────────── --}}
 <div class="card" style="border-top-left-radius:0;">
-    <div class="row g-0" style="height:calc(100vh - 220px); min-height:520px;">
+    <div class="row g-0" id="msgPaneRow" style="min-height:520px;">
 
         {{-- Left: conversation list --}}
         <div class="col-4 border-end d-flex flex-column" style="overflow:hidden;">
 
             {{-- List scroll area --}}
-            <div style="overflow-y:auto; flex:1;">
+            <div style="overflow-y:scroll; flex:1;">
                 @foreach($cases as $case)
                 @php
                     $preview  = $latestByCase->get($case->id);
@@ -296,6 +296,20 @@
 @section('scripts')
 <script>
 (function () {
+    // Dynamically size the two-pane row so it fills exactly the remaining
+    // viewport height below its top edge, preventing the page from scrolling.
+    var row = document.getElementById('msgPaneRow');
+    if (row) {
+        function fitRow() {
+            var top = row.getBoundingClientRect().top;
+            var pageBottomPad = 24; // matches .page-content padding-bottom (1.5rem)
+            var h = Math.max(window.innerHeight - top - pageBottomPad, 520);
+            row.style.height = h + 'px';
+        }
+        fitRow();
+        window.addEventListener('resize', fitRow);
+    }
+
     // Scroll message thread to bottom on load so the latest message is visible.
     var thread = document.getElementById('msgThread');
     if (thread) thread.scrollTop = thread.scrollHeight;
