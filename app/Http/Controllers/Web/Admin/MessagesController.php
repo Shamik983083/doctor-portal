@@ -103,10 +103,18 @@ class MessagesController extends Controller
                         ->update(['is_read' => true, 'read_at' => now()]);
 
                 } else {
-                    // Show the full thread (portal + internal) so the admin sees the
-                    // conversation in context — clinician replies land as portal-channel
-                    // messages, and they must appear alongside the admin's internal notes.
+                    // Show internal messages plus any portal messages sent BY the
+                    // clinician (outbound) so their replies appear in context.
+                    // Patient-inbound portal messages are excluded — those belong
+                    // in the Patient Conversations tab, not here.
                     $thread = $selected->messages()
+                        ->where(function ($q) {
+                            $q->where('channel', 'internal')
+                              ->orWhere(function ($q2) {
+                                  $q2->where('channel', 'portal')
+                                     ->where('direction', 'outbound');
+                              });
+                        })
                         ->with(['clinician.user', 'user'])
                         ->orderBy('created_at')
                         ->get();
