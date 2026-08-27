@@ -111,22 +111,39 @@ class CaseStateMachine
      * Reassign an already-assigned case to a different clinician without a status change.
      * Used by admin to override both manual and auto-assignments.
      */
-    public function reassign(PatientCase $case, Clinician $clinician): PatientCase
+    public function reassign(PatientCase $case, Clinician $clinician, ?int $adminUserId = null): PatientCase
     {
-        DB::transaction(function () use ($case, $clinician) {
-            $case->update(['clinician_id' => $clinician->id]);
+        DB::transaction(function () use ($case, $clinician, $adminUserId) {
+            $case->update([
+                'clinician_id' => $clinician->id,
+                'assigned_at'  => now(),
+            ]);
 
             CaseEvent::create([
                 'case_id'    => $case->id,
                 'event_type' => 'clinician_reassigned',
                 'actor_type' => 'admin',
-                'actor_id'   => null,
+                'actor_id'   => $adminUserId,
                 'payload'    => ['clinician_id' => $clinician->id],
                 'notes'      => "Reassigned to {$clinician->full_name}",
             ]);
         });
 
-        return $case->refresh();
+        $case->refresh();
+
+        // Notify the new clinician. Failure must not roll back the reassignment.
+        try {
+            if ($case->clinician?->user) {
+                $case->clinician->user->notify(new ClinicianCaseAssigned($case));
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('clinician_reassigned notification failed', [
+                'case_id' => $case->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
+
+        return $case;
     }
 
     public function release(PatientCase $case): PatientCase

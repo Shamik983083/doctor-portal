@@ -332,30 +332,77 @@ class ClinicianController extends Controller
 
     public function bulkReassignSubmit(Request $request)
     {
+        $user = $request->user();
+
         $request->validate([
-            'to_clinician_id'   => 'required|exists:clinicians,id',
-            'case_ids'          => 'required|array|min:1',
-            'case_ids.*'        => 'integer|exists:cases,id',
+            'to_clinician_id' => 'required|exists:clinicians,id',
+            'case_ids'        => 'required|array|min:1',
+            'case_ids.*'      => 'integer|exists:cases,id',
         ]);
 
-        $toClinician = Clinician::visibleTo($request->user())->findOrFail($request->to_clinician_id);
+        // Target must be within this admin's scope.
+        $toClinician = Clinician::visibleTo($user)->findOrFail($request->to_clinician_id);
 
-        // Guard: only move cases that originally belong to a visible clinician
-        $visibleIds = Clinician::visibleTo($request->user())->pluck('id');
+        // Guard: source and target must differ.
+        $fromId = (int) $request->input('from_clinician_id', 0);
+        if ($fromId && $fromId === $toClinician->id) {
+            return back()->withInput()
+                ->with('error', 'Source and target clinicians must be different.');
+        }
 
-        $moved = PatientCase::whereIn('id', $request->case_ids)
-            ->whereIn('clinician_id', $visibleIds)
+        // Fetch only cases that are within scope and in a movable status.
+        // This is the authoritative server-side filter; the JS selection is
+        // only for UX — we never trust client-side case_ids blindly.
+        $visibleClinicianIds = Clinician::visibleTo($user)->pluck('id');
+
+        $eligibleCases = PatientCase::whereIn('id', $request->case_ids)
+            ->whereIn('clinician_id', $visibleClinicianIds)
             ->whereIn('status', [
                 PatientCase::STATUS_ASSIGNED,
                 PatientCase::STATUS_APPROVED,
                 PatientCase::STATUS_PROCESSING,
             ])
-            ->update([
-                'clinician_id' => $toClinician->id,
-                'assigned_at'  => now(),
-            ]);
+            ->with('clinician.user')
+            ->get();
 
-        return redirect()->route('admin.clinicians.bulk-reassign')
-            ->with('success', "{$moved} case(s) reassigned to {$toClinician->full_name}.");
+        if ($eligibleCases->isEmpty()) {
+            return back()->withInput()
+                ->with('error', 'No eligible cases found. Cases must be open and within your admin scope.');
+        }
+
+        // Reassign each case through the state machine so that:
+        //   - a CaseEvent (clinician_reassigned) is logged with actor_id
+        //   - assigned_at is updated
+        //   - the new clinician receives a ClinicianCaseAssigned notification
+        $stateMachine = app(\App\Services\CaseStateMachine::class);
+        $moved   = 0;
+        $skipped = 0;
+
+        foreach ($eligibleCases as $case) {
+            try {
+                $stateMachine->reassign($case, $toClinician, $user->id);
+                $moved++;
+            } catch (\Throwable $e) {
+                $skipped++;
+                \Log::error('bulk_reassign: single case failed', [
+                    'case_id' => $case->id,
+                    'error'   => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($moved === 0) {
+            return back()->withInput()
+                ->with('error', 'Reassignment failed for all selected cases. Please try again or contact support.');
+        }
+
+        $message = "{$moved} case(s) successfully reassigned to {$toClinician->full_name}.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} case(s) could not be moved and were skipped.";
+        }
+
+        return redirect()
+            ->route('admin.clinicians.bulk-reassign', ['from_clinician_id' => $fromId ?: null])
+            ->with('success', $message);
     }
 }
