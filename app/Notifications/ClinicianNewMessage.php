@@ -20,10 +20,21 @@ class ClinicianNewMessage extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        $senderName = $this->message->patient?->full_name ?? 'Patient';
-        $caseUuid   = $this->message->case?->uuid;
-        $snippet    = Str::limit($this->message->body, 80);
+        $caseUuid = $this->message->case?->uuid;
+        $snippet  = Str::limit($this->message->body, 80);
 
+        if ($this->message->sender_type === 'partner') {
+            $senderName = $this->message->case?->partner?->name ?? 'Support Team';
+            return [
+                'type'      => 'escalation_reply',
+                'title'     => 'New message from support team',
+                'body'      => $senderName . ': "' . $snippet . '"',
+                'url'       => $caseUuid ? '/clinician/cases/' . $caseUuid . '#escalation' : '/clinician/cases',
+                'case_uuid' => $caseUuid,
+            ];
+        }
+
+        $senderName = $this->message->patient?->full_name ?? 'Patient';
         return [
             'type'      => 'new_message',
             'title'     => 'New message from patient',

@@ -66,6 +66,8 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
             <li><a class="toc-link text-decoration-none" href="#ev-case-waiting">case_waiting</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-assigned">case_assigned_to_clinician</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-support">case_support</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-escalation-message">escalation_message_sent</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-case-returned">case_returned_to_clinician</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-approved">case_approved</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-prescription-written">prescription_written</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-processing">case_processing</a></li>
@@ -413,8 +415,70 @@ def webhook():
 </div>
 <div class="endpoint-row mt-1">
     <span class="method-pill method-post">POST</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
+    <span class="text-muted" style="font-size:.75rem">— send a message directly to the clinician (escalation chat, when <code>escalation_target=support</code>)</span>
+</div>
+<div class="endpoint-row mt-1">
+    <span class="method-pill method-post">POST</span>
     <code>{{ $base }}/api/partner/cases/{case_id}/return-to-clinician</code>
-    <span class="text-muted" style="font-size:.75rem">— send your response note back to the clinician</span>
+    <span class="text-muted" style="font-size:.75rem">— close the escalation and return the case to the clinician</span>
+</div>
+</div>
+</div>
+
+{{-- escalation_message_sent --}}
+<div id="ev-escalation-message" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge" style="background:#ede9fe;border-color:#c4b5fd;color:#5b21b6;">escalation_message_sent</span>
+    <span class="text-muted small">Clinician replied in the escalation thread — poll for the message body</span>
+</div>
+<div class="card-body">
+<p class="small text-muted mb-2">Fired when the assigned clinician sends a message into an active support escalation thread. Subscribe to this to avoid polling; then call <code>GET /messages?channel=escalation</code> to fetch the body (PHI exclusion — body is not in the webhook payload).</p>
+<pre id="code-ev-esc-msg">{
+  "event":      "escalation_message_sent",
+  "case_id":    "9d2f1c3e-...",
+  "patient_id": "a1b2c3d4-...",
+  "sender":     "clinician",
+  "timestamp":  1751539800
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-esc-msg')">Copy</button>
+<div class="alert alert-warning mt-3 mb-2 small">
+    <i class="bi bi-shield-lock me-1"></i>
+    <strong>PHI exclusion.</strong> The message body is not included in this webhook. After receiving this event, call <code>GET /api/partner/cases/{case_id}/messages?channel=escalation</code> to fetch the full thread.
+</div>
+<div class="endpoint-row">
+    <span class="method-pill method-get">GET</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}/messages?channel=escalation</code>
+    <span class="text-muted" style="font-size:.75rem">— fetch the escalation thread after receiving this event</span>
+</div>
+<div class="endpoint-row mt-1">
+    <span class="method-pill method-post">POST</span>
+    <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
+    <span class="text-muted" style="font-size:.75rem">— reply to the clinician (body: <code>{ "body": "..." }</code>)</span>
+</div>
+</div>
+</div>
+
+{{-- case_returned_to_clinician --}}
+<div id="ev-case-returned" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge" style="background:#dcfce7;border-color:#86efac;color:#166534;">case_returned_to_clinician</span>
+    <span class="text-muted small">Escalation closed — case is back with the clinician</span>
+</div>
+<div class="card-body">
+<p class="small text-muted mb-2">Fired when your team closes the support escalation (via the partner portal or API). Use this to lock the escalation thread on your side. You will also receive a <code>case_assigned_to_clinician</code> event on the same transition — subscribe to <code>case_returned_to_clinician</code> specifically when you need to distinguish a return-from-support from an initial assignment.</p>
+<pre id="code-ev-returned">{
+  "event":      "case_returned_to_clinician",
+  "case_id":    "9d2f1c3e-...",
+  "patient_id": "a1b2c3d4-...",
+  "status":     "assigned",
+  "visit_type": "asynchronous",
+  "timestamp":  1751540200
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-returned')">Copy</button>
+<div class="alert alert-success mt-3 mb-2 small">
+    <i class="bi bi-check-circle me-1"></i>
+    <strong>No pull needed.</strong> Use this event to mark the escalation resolved in your system and stop polling the escalation thread.
 </div>
 </div>
 </div>
@@ -886,7 +950,9 @@ function sigForLevel(array $med, int $levelIndex): string {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify <code>X-Webhook-Signature</code> on <strong>every</strong> incoming request using a constant-time comparison</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Route by <code>X-Event-Type</code> header — do not rely solely on payload fields to identify the event</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> includes <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, a flat <code>sig</code> (offering default), and per-level <code>dosing.sigs[]</code> overrides; use <code>sigForLevel(med, index)</code> pattern — prefer <code>dosing.sigs[i]</code> when non-empty, fall back to <code>sig</code></li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and respond via API or portal</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and use the escalation chat (portal or <code>POST /messages</code>) to reply</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Subscribe to <strong><code>escalation_message_sent</code></strong> — poll <code>GET /messages?channel=escalation</code> on receipt to fetch the clinician's reply body</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_returned_to_clinician</code></strong> — lock the escalation thread on your side when received</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>message_created</code></strong> — check <code>sender</code>: <code>clinician</code> = doctor message or prescription approval message, <code>system</code> = automated intake confirmation, <code>support</code> = support team message; if <code>reason === "case_declined"</code> the body is in the payload directly (rejection path only)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Make your handler <strong>idempotent</strong> — the same event may be delivered more than once on retry</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Return <code>200</code> immediately, then process asynchronously — do not do heavy work before responding</li>

@@ -15,7 +15,9 @@ use App\Models\PatientCase;
 use App\Models\PatientFile;
 use App\Models\User;
 use App\Notifications\CaseEscalatedToDoctorAdmin;
+use App\Notifications\ClinicianNewMessage;
 use App\Notifications\NewCaseMessage;
+use App\Notifications\PartnerNewCaseMessage;
 use App\Services\AiAssistService;
 use App\Services\CaseStateMachine;
 use App\Services\EhrRecordService;
@@ -1315,15 +1317,21 @@ class CaseController extends Controller
         $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
+        // Escalation context: when the case is in support status directed at the
+        // partner, the clinician is replying into the escalation thread — use the
+        // 'escalation' channel so it is separated from the patient portal thread.
+        $isEscalationReply = $case->status === PatientCase::STATUS_SUPPORT
+            && $case->escalation_target === PatientCase::ESCALATION_SUPPORT;
+
         $message = Message::create([
-            'case_id' => $case->id,
-            'patient_id' => $case->patient_id,
+            'case_id'      => $case->id,
+            'patient_id'   => $case->patient_id,
             'clinician_id' => $clinician->id,
-            'partner_id' => $case->partner_id,
-            'direction' => 'outbound',
-            'channel' => 'portal',
-            'sender_type' => 'clinician',
-            'body' => $request->body,
+            'partner_id'   => $case->partner_id,
+            'direction'    => 'outbound',
+            'channel'      => $isEscalationReply ? 'escalation' : 'portal',
+            'sender_type'  => 'clinician',
+            'body'         => $request->body,
         ]);
 
         try {
@@ -1332,11 +1340,32 @@ class CaseController extends Controller
             \Illuminate\Support\Facades\Log::warning('Reverb broadcast failed for message '.$message->id.': '.$e->getMessage());
         }
 
-        $this->webhooks->dispatch($case->partner_id, 'message_created', [
-            'case_id' => $case->uuid,
-            'sender' => 'clinician',
-            'timestamp' => now()->timestamp,
-        ]);
+        if ($isEscalationReply) {
+            // Fire dedicated escalation webhook so partner systems know to poll.
+            $this->webhooks->dispatch($case->partner_id, 'escalation_message_sent', [
+                'case_id'    => $case->uuid,
+                'patient_id' => $case->patient?->uuid,
+                'sender'     => 'clinician',
+                'timestamp'  => now()->timestamp,
+            ]);
+
+            // Notify all partner users so they see the reply in their portal.
+            try {
+                $case->loadMissing('partner.users');
+                $clinicianName = $clinician->user?->name ?? 'Clinician';
+                $case->partner?->users->each(
+                    fn ($u) => $u->notify(new PartnerNewCaseMessage($case, $request->body, $clinicianName))
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Escalation partner notification failed: ' . $e->getMessage());
+            }
+        } else {
+            $this->webhooks->dispatch($case->partner_id, 'message_created', [
+                'case_id'   => $case->uuid,
+                'sender'    => 'clinician',
+                'timestamp' => now()->timestamp,
+            ]);
+        }
 
         try {
             $message->load(['case.clinician.user', 'patient']);

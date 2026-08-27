@@ -182,10 +182,23 @@ class CaseStateMachine
 
     public function returnToClinicianFromSupport(PatientCase $case, string $partnerNote): PatientCase
     {
-        return $this->transition($case, PatientCase::STATUS_ASSIGNED, [
+        $case = $this->transition($case, PatientCase::STATUS_ASSIGNED, [
             'actor_type' => 'partner',
             'notes'      => $partnerNote,
         ]);
+
+        // Fire a dedicated webhook so partner systems can distinguish this
+        // reassignment-from-support from an initial case_assigned_to_clinician event.
+        $this->webhookDispatcher->dispatch($case->partner_id, 'case_returned_to_clinician', [
+            'event'      => 'case_returned_to_clinician',
+            'case_id'    => $case->uuid,
+            'patient_id' => $case->patient?->uuid,
+            'status'     => $case->status,
+            'visit_type' => $case->visit_type,
+            'timestamp'  => now()->timestamp,
+        ]);
+
+        return $case;
     }
 
     public function startProcessing(PatientCase $case): PatientCase

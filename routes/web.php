@@ -465,6 +465,8 @@ Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])
         Route::get('/{uuid}', [PartnerCaseController::class, 'show'])->name('show');
         Route::post('/{uuid}/cancel', [PartnerCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/return-to-clinician', [PartnerCaseController::class, 'returnToClinician'])->name('return-to-clinician');
+        Route::post('/{uuid}/messages',            [PartnerCaseController::class, 'sendMessage'])->name('messages.store');
+        Route::get('/{uuid}/messages/poll',        [PartnerCaseController::class, 'pollMessages'])->name('messages.poll');
     });
 
     // Notifications

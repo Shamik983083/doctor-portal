@@ -55,7 +55,12 @@
                href="{{ route('clinician.messages.index', array_merge(request()->except('page'), ['case' => $c->uuid])) }}">
                 <span class="msg-avatar">{{ $initials($c->patient?->full_name) }}</span>
                 <span class="msg-row-body">
-                    <strong>{{ $c->patient?->full_name ?? 'Unknown patient' }}</strong>
+                    <span class="d-flex align-items-center gap-1 flex-wrap">
+                        <strong>{{ $c->patient?->full_name ?? 'Unknown patient' }}</strong>
+                        @if($c->status === 'support' && $c->escalation_target === 'support')
+                        <span style="font-size:.6rem;font-weight:700;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;letter-spacing:.04em;line-height:1.4;">ESCALATION</span>
+                        @endif
+                    </span>
                     <span>{{ $msg ? \Illuminate\Support\Str::limit($msg->body, 54) : ($c->partner?->name ?? '') }}</span>
                 </span>
                 <span class="msg-row-meta">

@@ -73,6 +73,7 @@
                     <li><a href="#s-events">6. Webhook Events</a></li>
                     <li><a href="#s-hmac">7. Verify Signatures</a></li>
                     <li><a href="#s-flow">8. Full Flow Example</a></li>
+                    <li><a href="#s-escalation">9. Escalation Chat</a></li>
                 </ul>
             </div>
         </div>
@@ -426,6 +427,91 @@ app.post(<span class="hv">'/webhooks/doctor'</span>, express.raw({ type: <span c
                     <li>☐ Return <code>200</code> from your webhook endpoint within 10 seconds (process async if needed)</li>
                     <li>☐ Store <code>case_id</code> (UUID) against your patient record so you can thread messages correctly</li>
                     <li>☐ Handle <code>case_cancelled</code> and <code>case_completed</code> to update patient-facing status</li>
+                </ul>
+            </div>
+        </div>
+
+        {{-- ── 9. Escalation Chat ────────────────────────────────── --}}
+        <div class="card mb-4 guide-section" id="s-escalation">
+            <div class="card-header"><strong>9. Escalation Chat (Clinician ↔ Partner)</strong></div>
+            <div class="card-body" style="font-size:.875rem">
+
+                <p>When a clinician has a question they cannot resolve from the patient's record, they escalate the case to your support team. This opens a <strong>private, two-way chat thread</strong> between the clinician and your team — separate from the patient portal thread.</p>
+
+                <h6 class="fw-semibold mt-4 mb-2">How it activates</h6>
+                <p>Your webhook receives <code>case_support</code> with <code>escalation_target: "support"</code> and a <code>support_note</code> from the clinician. The case is now in an escalation state.</p>
+
+                <h6 class="fw-semibold mt-4 mb-2">Channel field on messages</h6>
+                <p>All messages now include a <code>channel</code> field:</p>
+                <table class="table table-sm table-bordered" style="font-size:.8rem;">
+                    <thead class="table-light"><tr><th>channel</th><th>sender_type</th><th>Meaning</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>portal</code></td><td><code>clinician</code> / <code>patient</code></td><td>Normal patient ↔ clinician thread</td></tr>
+                        <tr><td><code>escalation</code></td><td><code>clinician</code> / <code>partner</code></td><td>Support escalation thread (private)</td></tr>
+                    </tbody>
+                </table>
+
+                <h6 class="fw-semibold mt-4 mb-2">Send a message to the clinician</h6>
+                <p>Use the same <code>POST /messages</code> endpoint. When the case is in support status, the request is routed to the escalation thread automatically:</p>
+                <pre class="bg-light p-3 rounded"><code>POST /api/partner/cases/{case_id}/messages
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "body": "We reviewed the labs — values are within normal range."
+}</code></pre>
+                <p class="text-muted small">Response includes <code>"channel": "escalation"</code> and <code>"sender_type": "partner"</code>.</p>
+
+                <h6 class="fw-semibold mt-4 mb-2">Receive a clinician reply</h6>
+                <ol>
+                    <li>Subscribe to the <code>escalation_message_sent</code> webhook event.</li>
+                    <li>On receipt, call <code>GET /api/partner/cases/{case_id}/messages?channel=escalation</code> to fetch the thread.</li>
+                    <li>The message body is not in the webhook payload (PHI exclusion) — always pull.</li>
+                </ol>
+                <pre class="bg-light p-3 rounded"><code>GET /api/partner/cases/{case_id}/messages?channel=escalation
+Authorization: Bearer {token}
+
+// Response: array of escalation messages, newest last
+[
+  { "uuid": "...", "channel": "escalation", "sender_type": "partner",   "direction": "inbound",  "body": "We reviewed the labs...", "created_at": "..." },
+  { "uuid": "...", "channel": "escalation", "sender_type": "clinician", "direction": "outbound", "body": "Thank you, proceeding.", "created_at": "..." }
+]</code></pre>
+
+                <h6 class="fw-semibold mt-4 mb-2">Close the escalation</h6>
+                <p>When your team has resolved the issue, call <code>return-to-clinician</code> to close the thread and transition the case back to the clinician:</p>
+                <pre class="bg-light p-3 rounded"><code>POST /api/partner/cases/{case_id}/return-to-clinician
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "partner_note": "Issue resolved — labs confirmed normal."
+}</code></pre>
+                <p>You will receive a <code>case_returned_to_clinician</code> webhook. The escalation thread becomes read-only on both sides.</p>
+
+                <h6 class="fw-semibold mt-4 mb-2">Full escalation flow</h6>
+                <pre class="bg-light p-3 rounded" style="font-size:.78rem; line-height:1.7;"><code>Clinician               Platform              Your System
+    │                       │                       │
+    │──escalateToSupport────▶│                       │
+    │                       │──case_support wh──────▶│  (escalation_target: "support")
+    │                       │                       │
+    │                       │◀──POST /messages───────│  (your team sends)
+    │◀─ notification ───────│                       │
+    │                       │                       │
+    │──escalation reply─────▶│                       │
+    │                       │──escalation_msg wh────▶│  (poll GET /messages?channel=escalation)
+    │                       │                       │
+    │                       │◀──return-to-clinician──│
+    │◀─ case back ──────────│                       │
+    │                       │──case_returned wh─────▶│  (lock thread on your side)</code></pre>
+
+                <hr class="my-4">
+                <p class="fw-semibold mb-2">Escalation checklist</p>
+                <ul class="mb-0" style="line-height:2">
+                    <li>☐ Handle <code>case_support</code> with <code>escalation_target: "support"</code> — surface to your ops team</li>
+                    <li>☐ Subscribe to <code>escalation_message_sent</code> — poll <code>GET /messages?channel=escalation</code> on receipt</li>
+                    <li>☐ Use <code>POST /messages</code> (while case is in support) to reply to the clinician</li>
+                    <li>☐ Call <code>POST /return-to-clinician</code> when resolved</li>
+                    <li>☐ Handle <code>case_returned_to_clinician</code> — lock the escalation thread on your side</li>
                 </ul>
             </div>
         </div>

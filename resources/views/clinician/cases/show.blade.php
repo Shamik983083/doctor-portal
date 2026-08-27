@@ -113,6 +113,13 @@
             <button class="case-tab" data-tab="questionnaires">Questionnaires @if($case->questionnaireResponses->count())<span class="pill neutral">{{ $case->questionnaireResponses->count() }}</span>@endif</button>
             <button class="case-tab" data-tab="notes">Notes <span class="pill neutral">{{ $case->clinicalNotes->count() }}</span></button>
             <button class="case-tab" data-tab="messages">Messages @if($unreadMessageCount > 0)<span class="pill yellow">{{ $unreadMessageCount }}</span>@elseif($case->messages->count())<span class="pill neutral">{{ $case->messages->count() }}</span>@endif</button>
+            @if($case->support_at && $case->escalation_target === 'support')
+            @php $unreadEscalation = $case->messages->where('channel','escalation')->where('direction','inbound')->where('is_read',false)->count(); @endphp
+            <button class="case-tab" data-tab="escalation" id="escalationTab">
+                <i class="bi bi-headset" style="font-size:.8rem;"></i> Support Thread
+                @if($unreadEscalation > 0)<span class="pill yellow">{{ $unreadEscalation }}</span>@endif
+            </button>
+            @endif
             <button class="case-tab" data-tab="files">Files <span class="pill neutral">{{ $case->files->count() }}</span></button>
             <button class="case-tab" data-tab="timeline">Timeline</button>
         </div>
@@ -389,6 +396,84 @@
                 </div>
             </section>
         </div>
+
+        {{-- Support Thread (clinician ↔ partner escalation chat) --}}
+        @if($case->support_at && $case->escalation_target === 'support')
+        <div class="case-pane" data-pane="escalation" id="escalationPane" hidden>
+            <section class="panel" style="min-height:auto;margin-bottom:12px;">
+                <div style="padding:14px 18px 10px;">
+                    {{-- Status banner --}}
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        @if($case->status === 'support')
+                            <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:6px;">
+                                <i class="bi bi-hourglass-split me-1"></i>Escalation Active
+                            </span>
+                        @else
+                            <span class="badge" style="background:#dcfce7;color:#166534;font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:6px;">
+                                <i class="bi bi-check-circle me-1"></i>Escalation Resolved
+                            </span>
+                        @endif
+                        <span class="text-muted" style="font-size:.72rem;">
+                            Escalated {{ $case->support_at->format('M j, Y') }} — private thread with {{ $case->partner?->name ?? 'the partner' }}
+                        </span>
+                    </div>
+
+                    {{-- The clinician's original escalation note --}}
+                    @if($case->support_note)
+                    <div class="mb-3 p-3" style="background:#fff8ec;border-left:3px solid #f59e0b;border-radius:8px;font-size:.82rem;">
+                        <div class="fw-semibold mb-1" style="font-size:.7rem;color:#92400e;text-transform:uppercase;letter-spacing:.06em;">
+                            <i class="bi bi-flag-fill me-1"></i>Your escalation note
+                        </div>
+                        {{ $case->support_note }}
+                    </div>
+                    @endif
+
+                    {{-- Escalation message thread --}}
+                    <div id="escalationClinThread" style="max-height:380px;overflow-y:scroll;overflow-x:hidden;padding-right:4px;margin-bottom:12px;">
+                        @php $escalationMessages = $case->messages->where('channel','escalation')->sortBy('created_at'); @endphp
+                        @forelse($escalationMessages as $msg)
+                        @php $isMine = $msg->sender_type === 'clinician'; @endphp
+                        <div class="bubble-row {{ $isMine ? 'me' : 'them' }}" data-escmsg-id="{{ $msg->id }}" style="margin-bottom:8px;">
+                            @if(!$isMine)
+                            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px;padding-left:4px;">
+                                {{ $case->partner?->name ?? 'Support Team' }}
+                            </div>
+                            @endif
+                            <div class="bubble {{ $isMine ? 'me' : 'them' }}"
+                                 style="{{ !$isMine ? 'background:#f1f5f9;color:#1e293b;' : '' }}">
+                                {{ $msg->body }}
+                            </div>
+                            <div style="font-size:.65rem;color:#94a3b8;text-align:{{ $isMine ? 'right' : 'left' }};margin-top:2px;padding:0 4px;">
+                                {{ $msg->created_at->format('M j, g:i A') }}
+                            </div>
+                        </div>
+                        @empty
+                        <div class="text-muted text-center py-3" id="escalationClinEmpty" style="font-size:.82rem;">
+                            No replies yet. The partner will be notified and can reply here.
+                        </div>
+                        @endforelse
+                    </div>
+
+                    {{-- Compose box — only while actively in escalation --}}
+                    @if($case->status === 'support')
+                    <div class="chat-compose" id="escalationClinCompose" style="border-top:1px solid #e2e8f0;padding-top:10px;">
+                        <input type="text" id="escalationClinInput"
+                               placeholder="Reply to {{ $case->partner?->name ?? 'support' }}…"
+                               aria-label="Escalation reply"
+                               autocomplete="off"
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();clinSendEscalation();}">
+                        <button type="button" class="chat-send" aria-label="Send escalation reply"
+                                onclick="clinSendEscalation()">&uarr;</button>
+                    </div>
+                    @else
+                    <div class="p-2 px-3 rounded" style="background:#f1f5f9;font-size:.78rem;color:#64748b;">
+                        <i class="bi bi-lock-fill me-1"></i>Escalation resolved — thread is read-only.
+                    </div>
+                    @endif
+                </div>
+            </section>
+        </div>
+        @endif
 
         {{-- Files --}}
         <div class="case-pane" data-pane="files" hidden>
@@ -688,6 +773,105 @@
             body: JSON.stringify({ body: body }),
         }).catch(function (err) { console.error('[Chat] Send failed:', err); });
     };
+
+    // ── Escalation thread send + append ──────────────────────────────────
+    (function () {
+        var escThread  = document.getElementById('escalationClinThread');
+        var escInput   = document.getElementById('escalationClinInput');
+        if (!escThread || !escInput) return;
+
+        var escSendUrl = "{{ route('clinician.cases.messages.store', $case->uuid) }}";
+        var csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
+
+        function appendEscMsg(msg) {
+            var empty = document.getElementById('escalationClinEmpty');
+            if (empty) empty.remove();
+
+            var isMine = msg.sender_type === 'clinician';
+            var wrap   = document.createElement('div');
+            wrap.className = 'bubble-row ' + (isMine ? 'me' : 'them');
+            wrap.style.marginBottom = '8px';
+            if (msg.id) wrap.dataset.escmsgId = msg.id;
+
+            var senderLabel = isMine ? '' :
+                '<div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px;padding-left:4px;">{{ $case->partner?->name ?? "Support Team" }}</div>';
+            var bubbleStyle = isMine ? '' : 'background:#f1f5f9;color:#1e293b;';
+            var timeAlign   = isMine ? 'right' : 'left';
+            var timeStr     = msg.time || new Date().toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+
+            wrap.innerHTML = senderLabel +
+                '<div class="bubble ' + (isMine ? 'me' : 'them') + '" style="' + bubbleStyle + '">' +
+                    msg.body.replace(/</g,'&lt;').replace(/\n/g,'<br>') +
+                '</div>' +
+                '<div style="font-size:.65rem;color:#94a3b8;text-align:' + timeAlign + ';margin-top:2px;padding:0 4px;">' + timeStr + '</div>';
+
+            escThread.appendChild(wrap);
+            escThread.scrollTop = escThread.scrollHeight;
+        }
+
+        window.clinSendEscalation = function () {
+            var body = escInput.value.trim();
+            if (!body) return;
+            escInput.value = '';
+            appendEscMsg({ body: body, sender_type: 'clinician' });
+            fetch(escSendUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({ body: body }),
+            }).catch(function (err) { console.error('[Escalation] Send failed:', err); });
+        };
+
+        // Listen for partner replies via Echo or fallback poll.
+        if (window.Echo) {
+            window.Echo.private('case.' + caseId).listen('.CaseMessageSent', function (e) {
+                if (e.channel === 'escalation' && e.sender_type === 'partner') {
+                    appendEscMsg({ body: e.body, sender_type: 'partner', time: e.time });
+                    // Remove unread badge from tab if open
+                    var tab = document.getElementById('escalationTab');
+                    if (tab) { var pill = tab.querySelector('.pill'); if (pill) pill.remove(); }
+                }
+            });
+        } else {
+            // Fallback: poll every 8s when escalation tab is active.
+            var escLastId = 0;
+            escThread.querySelectorAll('[data-escmsg-id]').forEach(function (el) {
+                var id = parseInt(el.dataset.escmsgId, 10);
+                if (id > escLastId) escLastId = id;
+            });
+            var escPollUrl = '{{ route("clinician.cases.messages.poll", $case->uuid) }}?channel=escalation';
+            var escInterval = null;
+            function isEscTab() { var p = document.getElementById('escalationPane'); return p && !p.hidden; }
+            function escPoll() {
+                if (!isEscTab()) return;
+                fetch(escPollUrl + '&after=' + escLastId, { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (!data || !data.messages) return;
+                        data.messages.forEach(function (msg) {
+                            if (msg.sender_type === 'partner') {
+                                appendEscMsg({ body: msg.body, sender_type: 'partner' });
+                                escLastId = msg.id;
+                            }
+                        });
+                    }).catch(function () {});
+            }
+            document.addEventListener('case-tab', function (e) {
+                if (e.detail === 'escalation') { escPoll(); escInterval = setInterval(escPoll, 8000); }
+                else { clearInterval(escInterval); escInterval = null; }
+            });
+        }
+
+        // Scroll to bottom when tab opens.
+        document.addEventListener('case-tab', function (e) {
+            if (e.detail === 'escalation') escThread.scrollTop = escThread.scrollHeight;
+        });
+
+        // Auto-open escalation tab if URL has #escalation anchor.
+        if (window.location.hash === '#escalation') {
+            var escTabBtn = document.querySelector('[data-tab="escalation"]');
+            if (escTabBtn) escTabBtn.click();
+        }
+    })();
 
     // Echo is initialised globally by the layout; subscribe to this case's channel here.
     if (window.Echo) {
