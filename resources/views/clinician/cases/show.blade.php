@@ -360,6 +360,55 @@
                 <div class="chat-head">
                     <span class="msg-avatar big">{{ $initials($patientName) }}</span>
                     <div><strong>{{ $patientName }}</strong><span>{{ $case->partner?->name ?? '' }}</span></div>
+                    <div style="margin-left:auto;">
+                        @if($case->escalation_target === 'support' && $case->support_at)
+                        <span style="font-size:.75rem;background:#fef3c7;color:#92400e;border-radius:6px;padding:4px 10px;font-weight:600;cursor:pointer;"
+                              onclick="document.querySelector('[data-tab=\'escalation\']')?.click()" title="Go to support thread">
+                            <i class="bi bi-headset"></i> Support thread open
+                        </span>
+                        @else
+                        <button type="button" class="button-secondary" id="caseFwdBtn"
+                                onclick="openCaseFwdModal()"
+                                style="font-size:.8rem;padding:5px 12px;">
+                            <i class="bi bi-send"></i> Forward to Support
+                        </button>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Forward-to-support modal --}}
+                <div id="caseFwdModal" style="display:none;position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.45);align-items:center;justify-content:center;">
+                    <div style="background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);padding:24px 28px;max-width:480px;width:92%;position:relative;">
+                        <button type="button" onclick="closeCaseFwdModal()" aria-label="Close"
+                                style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;">&times;</button>
+                        <h3 style="font-size:1rem;font-weight:700;margin:0 0 4px;">Forward to Support</h3>
+                        <p style="font-size:.8rem;color:var(--muted);margin:0 0 16px;">Opens a private thread with the partner's support team. The patient conversation continues normally.</p>
+                        <form method="POST" action="{{ route('clinician.cases.forward-to-support', $case->uuid) }}">
+                            @csrf
+                            <input type="hidden" name="quoted_message" id="caseFwdQuotedInput">
+                            <div style="margin-bottom:14px;">
+                                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Patient message to forward <span style="color:var(--muted);font-weight:400;">(pre-filled from last patient message)</span></label>
+                                <textarea id="caseFwdQuotedDisplay" rows="3"
+                                          style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;background:var(--surface);resize:vertical;"
+                                          placeholder="Paste or type the patient message to forward…"
+                                          oninput="document.getElementById('caseFwdQuotedInput').value=this.value"></textarea>
+                            </div>
+                            <div style="margin-bottom:18px;">
+                                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Your note to support <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+                                <textarea name="note" rows="2"
+                                          style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;background:var(--surface);resize:none;"
+                                          placeholder="Add context or a specific question for the support team…"></textarea>
+                            </div>
+                            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                                <button type="button" onclick="closeCaseFwdModal()"
+                                        style="padding:7px 18px;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer;font-size:.83rem;">Cancel</button>
+                                <button type="submit"
+                                        style="padding:7px 18px;border:none;border-radius:8px;background:#4361ee;color:#fff;font-weight:600;cursor:pointer;font-size:.83rem;">
+                                    <i class="bi bi-send me-1"></i> Open Support Thread
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
                 <div class="chat-scroll" id="clinThread" style="max-height:440px"
                      data-last-id="{{ $case->messages->sortBy('created_at')->last()?->id ?? 0 }}"
@@ -742,6 +791,35 @@
 </script>
 
 <script>
+(function () {
+    // ── Forward-to-support modal (Messages tab) ──────────────────────
+    var caseFwdModal        = document.getElementById('caseFwdModal');
+    var caseFwdQuotedDisplay = document.getElementById('caseFwdQuotedDisplay');
+    var caseFwdQuotedInput   = document.getElementById('caseFwdQuotedInput');
+
+    window.openCaseFwdModal = function () {
+        // Pre-fill with the last inbound (patient) bubble text
+        var bubbles = document.querySelectorAll('#clinThread .bubble.them');
+        var lastMsg = bubbles.length ? bubbles[bubbles.length - 1].textContent.trim() : '';
+        if (caseFwdQuotedDisplay) {
+            caseFwdQuotedDisplay.value = lastMsg;
+            if (caseFwdQuotedInput) caseFwdQuotedInput.value = lastMsg;
+        }
+        if (caseFwdModal) { caseFwdModal.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+        if (caseFwdQuotedDisplay) caseFwdQuotedDisplay.focus();
+    };
+    window.closeCaseFwdModal = function () {
+        if (caseFwdModal) { caseFwdModal.style.display = 'none'; document.body.style.overflow = ''; }
+    };
+    if (caseFwdModal) {
+        caseFwdModal.addEventListener('click', function (e) { if (e.target === caseFwdModal) window.closeCaseFwdModal(); });
+    }
+    // Sync textarea → hidden input
+    if (caseFwdQuotedDisplay && caseFwdQuotedInput) {
+        caseFwdQuotedDisplay.addEventListener('input', function () { caseFwdQuotedInput.value = caseFwdQuotedDisplay.value; });
+    }
+})();
+
 (function () {
     var thread = document.getElementById('clinThread');
     if (!thread) return;
