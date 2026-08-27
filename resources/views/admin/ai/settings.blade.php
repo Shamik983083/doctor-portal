@@ -5,12 +5,6 @@
 
 @section('content')
 
-@if(session('success'))
-<div class="alert alert-success alert-dismissible fade show py-2 px-3 small mb-3" role="alert">
-    <i class="bi bi-check-circle me-1"></i> {{ session('success') }}
-    <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>
-</div>
-@endif
 
 @if($errors->any())
 <div class="alert alert-danger alert-dismissible fade show py-2 px-3 small mb-3" role="alert">

@@ -54,12 +54,6 @@
         <div class="mt-1 pt-1" style="border-top:1px solid #c7d2fe">Not to be confused with <a href="{{ route('admin.settings') }}">Case SLA Targets</a>, which measure how fast a case is picked up. This measures a doctor, and only when they ask for more.</div>
     </div>
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show mb-3" role="alert" style="border-radius:10px;font-size:.82rem">
-        <i class="bi bi-check-circle me-1"></i>{{ session('success') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    @endif
 
     {{-- SLA form --}}
     <div class="sla-section">
