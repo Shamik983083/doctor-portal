@@ -105,15 +105,15 @@
                         style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;">&times;</button>
                 <h3 style="font-size:1rem;font-weight:700;margin:0 0 4px;">Forward to Support</h3>
                 <p style="font-size:.8rem;color:var(--muted);margin:0 0 16px;">This opens a private thread with the partner's support team. The patient conversation is unaffected.</p>
-                <form id="fwdForm" method="POST" action="{{ route('clinician.cases.forward-to-support', $selected->uuid) }}">
+                <form id="fwdForm" method="POST" action="{{ route('clinician.cases.forward-to-support', $selected->uuid) }}"
+                      onsubmit="var q=this.querySelector('[name=quoted_message]'),n=this.querySelector('[name=note]');if(!q.value.trim()&&(!n||!n.value.trim())){q.focus();q.style.borderColor='#ef4444';return false;}return true;">
                     @csrf
-                    <input type="hidden" name="quoted_message" id="fwdQuotedInput">
                     <div style="margin-bottom:14px;">
-                        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Message to forward <span style="color:var(--muted);font-weight:400;">(pre-filled from last patient message)</span></label>
-                        <textarea id="fwdQuotedDisplay" rows="3"
+                        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Message to forward <span style="color:#ef4444;">*</span></label>
+                        <textarea name="quoted_message" id="fwdQuotedDisplay" rows="3" required
                                   style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;background:var(--surface);resize:vertical;"
-                                  placeholder="Paste or type the patient message to forward…"
-                                  oninput="document.getElementById('fwdQuotedInput').value=this.value"></textarea>
+                                  placeholder="Paste or type the patient message to forward…"></textarea>
+                        <span style="font-size:.72rem;color:var(--muted);">The support team will see this as context.</span>
                     </div>
                     <div style="margin-bottom:18px;">
                         <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Your note to support <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
@@ -299,9 +299,8 @@
     }
 
     // ── Forward-to-support modal ─────────────────────────────────────
-    var fwdModal = document.getElementById('fwdModal');
+    var fwdModal         = document.getElementById('fwdModal');
     var fwdQuotedDisplay = document.getElementById('fwdQuotedDisplay');
-    var fwdQuotedInput   = document.getElementById('fwdQuotedInput');
 
     window.openFwdModal = function () {
         // Pre-fill with the last inbound (patient) bubble text
@@ -309,7 +308,7 @@
         var lastPatientMsg = bubbles.length ? bubbles[bubbles.length - 1].textContent.trim() : '';
         if (fwdQuotedDisplay) {
             fwdQuotedDisplay.value = lastPatientMsg;
-            if (fwdQuotedInput) fwdQuotedInput.value = lastPatientMsg;
+            fwdQuotedDisplay.style.borderColor = '';
         }
         if (fwdModal) { fwdModal.style.display = 'flex'; }
         if (fwdQuotedDisplay) fwdQuotedDisplay.focus();
@@ -319,7 +318,6 @@
         if (fwdModal) fwdModal.style.display = 'none';
     };
 
-    // Close on backdrop click
     if (fwdModal) {
         fwdModal.addEventListener('click', function (e) {
             if (e.target === fwdModal) closeFwdModal();
