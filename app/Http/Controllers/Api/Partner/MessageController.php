@@ -50,8 +50,8 @@ class MessageController extends Controller
         // When the case is in active support status directed at this partner, treat
         // the POST as a partner-to-clinician escalation message rather than a
         // simulated patient message. Same endpoint, context-sensitive behaviour.
-        $isEscalation = $case->status === PatientCase::STATUS_SUPPORT
-            && $case->escalation_target === PatientCase::ESCALATION_SUPPORT;
+        $isEscalation = $case->escalation_target === PatientCase::ESCALATION_SUPPORT
+            && $case->support_at !== null;
 
         if ($isEscalation) {
             $message = Message::create([

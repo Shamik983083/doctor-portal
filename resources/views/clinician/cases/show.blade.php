@@ -404,17 +404,17 @@
                 <div style="padding:14px 18px 10px;">
                     {{-- Status banner --}}
                     <div class="d-flex align-items-center gap-2 mb-3">
-                        @if($case->status === 'support')
+                        @if($case->escalation_target === 'support')
                             <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:6px;">
-                                <i class="bi bi-hourglass-split me-1"></i>Escalation Active
+                                <i class="bi bi-hourglass-split me-1"></i>Support Thread Active
                             </span>
                         @else
                             <span class="badge" style="background:#dcfce7;color:#166534;font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:6px;">
-                                <i class="bi bi-check-circle me-1"></i>Escalation Resolved
+                                <i class="bi bi-check-circle me-1"></i>Thread Closed
                             </span>
                         @endif
                         <span class="text-muted" style="font-size:.72rem;">
-                            Escalated {{ $case->support_at->format('M j, Y') }} — private thread with {{ $case->partner?->name ?? 'the partner' }}
+                            Opened {{ $case->support_at->format('M j, Y') }} — private thread with {{ $case->partner?->name ?? 'the partner' }}
                         </span>
                     </div>
 
@@ -454,8 +454,8 @@
                         @endforelse
                     </div>
 
-                    {{-- Compose box — only while actively in escalation --}}
-                    @if($case->status === 'support')
+                    {{-- Compose box — open while escalation_target=support --}}
+                    @if($case->escalation_target === 'support')
                     <div class="chat-compose" id="escalationClinCompose" style="border-top:1px solid #e2e8f0;padding-top:10px;">
                         <input type="text" id="escalationClinInput"
                                placeholder="Reply to {{ $case->partner?->name ?? 'support' }}…"
@@ -467,7 +467,7 @@
                     </div>
                     @else
                     <div class="p-2 px-3 rounded" style="background:#f1f5f9;font-size:.78rem;color:#64748b;">
-                        <i class="bi bi-lock-fill me-1"></i>Escalation resolved — thread is read-only.
+                        <i class="bi bi-lock-fill me-1"></i>Thread closed — read-only archive.
                     </div>
                     @endif
                 </div>

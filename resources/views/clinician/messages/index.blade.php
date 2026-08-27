@@ -57,8 +57,8 @@
                 <span class="msg-row-body">
                     <span class="d-flex align-items-center gap-1 flex-wrap">
                         <strong>{{ $c->patient?->full_name ?? 'Unknown patient' }}</strong>
-                        @if($c->status === 'support' && $c->escalation_target === 'support')
-                        <span style="font-size:.6rem;font-weight:700;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;letter-spacing:.04em;line-height:1.4;">ESCALATION</span>
+                        @if($c->escalation_target === 'support' && $c->support_at)
+                        <span style="font-size:.6rem;font-weight:700;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;letter-spacing:.04em;line-height:1.4;">SUPPORT</span>
                         @endif
                     </span>
                     <span>{{ $msg ? \Illuminate\Support\Str::limit($msg->body, 54) : ($c->partner?->name ?? '') }}</span>
@@ -82,7 +82,55 @@
                 <strong>{{ $selected->patient?->full_name ?? 'Unknown patient' }}</strong>
                 <span>{{ $selected->partner?->name ?? '' }} · case {{ $selected->external_id ?? \Illuminate\Support\Str::limit($selected->uuid, 8, '') }}</span>
             </div>
-            <a class="button-secondary" style="margin-left:auto" href="{{ route('clinician.cases.show', $selected->uuid) }}">Open case</a>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+                @if($selected->escalation_target === 'support' && $selected->support_at)
+                <span style="font-size:.75rem;background:#fef3c7;color:#92400e;border-radius:6px;padding:4px 10px;font-weight:600;white-space:nowrap;">
+                    <i class="bi bi-headset"></i> Support thread open
+                </span>
+                @else
+                <button type="button" class="button-secondary" id="fwdSupportBtn"
+                        onclick="openFwdModal()"
+                        style="font-size:.8rem;padding:5px 12px;white-space:nowrap;">
+                    <i class="bi bi-send"></i> Forward to Support
+                </button>
+                @endif
+                <a class="button-secondary" style="font-size:.8rem;padding:5px 12px;" href="{{ route('clinician.cases.show', $selected->uuid) }}">Open case</a>
+            </div>
+        </div>
+
+        {{-- Forward to Support modal --}}
+        <div id="fwdModal" style="display:none;position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.45);align-items:center;justify-content:center;">
+            <div style="background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);padding:24px 28px;max-width:480px;width:92%;position:relative;">
+                <button type="button" onclick="closeFwdModal()" aria-label="Close"
+                        style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;">&times;</button>
+                <h3 style="font-size:1rem;font-weight:700;margin:0 0 4px;">Forward to Support</h3>
+                <p style="font-size:.8rem;color:var(--muted);margin:0 0 16px;">This opens a private thread with the partner's support team. The patient conversation is unaffected.</p>
+                <form id="fwdForm" method="POST" action="{{ route('clinician.cases.forward-to-support', $selected->uuid) }}">
+                    @csrf
+                    <input type="hidden" name="quoted_message" id="fwdQuotedInput">
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Message to forward <span style="color:var(--muted);font-weight:400;">(pre-filled from last patient message)</span></label>
+                        <textarea id="fwdQuotedDisplay" rows="3"
+                                  style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;background:var(--surface);resize:vertical;"
+                                  placeholder="Paste or type the patient message to forward…"
+                                  oninput="document.getElementById('fwdQuotedInput').value=this.value"></textarea>
+                    </div>
+                    <div style="margin-bottom:18px;">
+                        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Your note to support <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+                        <textarea name="note" rows="2"
+                                  style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;background:var(--surface);resize:none;"
+                                  placeholder="Add context, specific question, or any details for the support team…"></textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;justify-content:flex-end;">
+                        <button type="button" onclick="closeFwdModal()"
+                                style="padding:7px 18px;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer;font-size:.83rem;">Cancel</button>
+                        <button type="submit"
+                                style="padding:7px 18px;border:none;border-radius:8px;background:#4361ee;color:#fff;font-weight:600;cursor:pointer;font-size:.83rem;">
+                            <i class="bi bi-send me-1"></i> Open Support Thread
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <div class="chat-scroll" id="chatScroll">
@@ -247,6 +295,34 @@
             if (!row || !row.dataset.uuid || row.dataset.uuid === selectedUuid) return;
             // Fire and forget — navigation proceeds immediately after
             markRead(row.dataset.uuid, row);
+        });
+    }
+
+    // ── Forward-to-support modal ─────────────────────────────────────
+    var fwdModal = document.getElementById('fwdModal');
+    var fwdQuotedDisplay = document.getElementById('fwdQuotedDisplay');
+    var fwdQuotedInput   = document.getElementById('fwdQuotedInput');
+
+    window.openFwdModal = function () {
+        // Pre-fill with the last inbound (patient) bubble text
+        var bubbles = document.querySelectorAll('#chatScroll .bubble.them');
+        var lastPatientMsg = bubbles.length ? bubbles[bubbles.length - 1].textContent.trim() : '';
+        if (fwdQuotedDisplay) {
+            fwdQuotedDisplay.value = lastPatientMsg;
+            if (fwdQuotedInput) fwdQuotedInput.value = lastPatientMsg;
+        }
+        if (fwdModal) { fwdModal.style.display = 'flex'; }
+        if (fwdQuotedDisplay) fwdQuotedDisplay.focus();
+    };
+
+    window.closeFwdModal = function () {
+        if (fwdModal) fwdModal.style.display = 'none';
+    };
+
+    // Close on backdrop click
+    if (fwdModal) {
+        fwdModal.addEventListener('click', function (e) {
+            if (e.target === fwdModal) closeFwdModal();
         });
     }
 

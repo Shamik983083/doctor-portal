@@ -66,8 +66,10 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
             <li><a class="toc-link text-decoration-none" href="#ev-case-waiting">case_waiting</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-assigned">case_assigned_to_clinician</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-support">case_support</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-escalation-started">escalation_started</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-escalation-message">escalation_message_sent</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-returned">case_returned_to_clinician</a></li>
+            <li><a class="toc-link text-decoration-none" href="#ev-support-thread-closed">support_thread_closed</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-approved">case_approved</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-prescription-written">prescription_written</a></li>
             <li><a class="toc-link text-decoration-none" href="#ev-case-processing">case_processing</a></li>
@@ -426,6 +428,27 @@ def webhook():
 </div>
 </div>
 
+{{-- escalation_started --}}
+<div id="ev-escalation-started" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge" style="background:#fef3c7;border-color:#fde68a;color:#92400e;">escalation_started</span>
+    <span class="text-muted small">Clinician forwarded a patient message to your support team</span>
+</div>
+<div class="card-body">
+<p class="small text-muted mb-2">Fired when a clinician clicks <strong>Forward to Support</strong> on a patient message. Unlike <code>case_support</code>, this does <em>not</em> change the case status — the case stays in its current workflow (assigned/processing) while a parallel support thread opens. Notify your support team and use <code>GET /messages?channel=escalation</code> or the partner portal to view and reply.</p>
+<pre id="code-ev-esc-started">{
+  "event":       "escalation_started",
+  "case_id":     "9d2f1c3e-...",
+  "patient_id":  "a1b2c3d4-...",
+  "case_status": "assigned",
+  "timestamp":   1724745600
+}</pre>
+<div class="d-flex gap-2 mt-2">
+    <button class="btn btn-sm btn-outline-secondary" onclick="copyCode('code-ev-esc-started')">Copy</button>
+</div>
+</div>
+</div>
+
 {{-- escalation_message_sent --}}
 <div id="ev-escalation-message" class="card mb-3 section-anchor">
 <div class="card-header py-2 d-flex align-items-center gap-2">
@@ -455,6 +478,27 @@ def webhook():
     <span class="method-pill method-post">POST</span>
     <code>{{ $base }}/api/partner/cases/{case_id}/messages</code>
     <span class="text-muted" style="font-size:.75rem">— reply to the clinician (body: <code>{ "body": "..." }</code>)</span>
+</div>
+</div>
+</div>
+
+{{-- support_thread_closed --}}
+<div id="ev-support-thread-closed" class="card mb-3 section-anchor">
+<div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="event-badge" style="background:#dcfce7;border-color:#86efac;color:#166534;">support_thread_closed</span>
+    <span class="text-muted small">Parallel support thread closed by partner (case status unchanged)</span>
+</div>
+<div class="card-body">
+<p class="small text-muted mb-2">Fired when the partner closes a <em>parallel</em> support thread (one opened via <strong>Forward to Support</strong>, where the case was never moved to <code>status=support</code>). The case continues in its current status. Both compose forms lock immediately. This is distinct from <code>case_returned_to_clinician</code>, which fires when closing a full-escalation thread.</p>
+<pre id="code-ev-thread-closed">{
+  "event":       "support_thread_closed",
+  "case_id":     "9d2f1c3e-...",
+  "patient_id":  "a1b2c3d4-...",
+  "case_status": "assigned",
+  "timestamp":   1724745600
+}</pre>
+<div class="d-flex gap-2 mt-2">
+    <button class="btn btn-sm btn-outline-secondary" onclick="copyCode('code-ev-thread-closed')">Copy</button>
 </div>
 </div>
 </div>
@@ -951,8 +995,10 @@ function sigForLevel(array $med, int $levelIndex): string {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Route by <code>X-Event-Type</code> header — do not rely solely on payload fields to identify the event</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> includes <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, a flat <code>sig</code> (offering default), and per-level <code>dosing.sigs[]</code> overrides; use <code>sigForLevel(med, index)</code> pattern — prefer <code>dosing.sigs[i]</code> when non-empty, fall back to <code>sig</code></li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and use the escalation chat (portal or <code>POST /messages</code>) to reply</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>escalation_started</code></strong> — clinician forwarded a patient message without changing case status; notify your support team and call <code>GET /messages?channel=escalation</code> to fetch the initial message</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Subscribe to <strong><code>escalation_message_sent</code></strong> — poll <code>GET /messages?channel=escalation</code> on receipt to fetch the clinician's reply body</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_returned_to_clinician</code></strong> — lock the escalation thread on your side when received</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_returned_to_clinician</code></strong> — lock the escalation thread on your side when received (full escalation path)</li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>support_thread_closed</code></strong> — parallel thread closed by your team; lock the thread on your side (case status unchanged)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>message_created</code></strong> — check <code>sender</code>: <code>clinician</code> = doctor message or prescription approval message, <code>system</code> = automated intake confirmation, <code>support</code> = support team message; if <code>reason === "case_declined"</code> the body is in the payload directly (rejection path only)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Make your handler <strong>idempotent</strong> — the same event may be delivered more than once on retry</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Return <code>200</code> immediately, then process asynchronously — do not do heavy work before responding</li>

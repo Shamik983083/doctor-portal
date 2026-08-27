@@ -115,7 +115,7 @@
         </div>
         @endif
 
-        {{-- Return to clinician --}}
+        {{-- Return to clinician (full escalation: case status=support) --}}
         @if($case->status === 'support')
         <div class="card border-primary mb-4">
             <div class="card-header bg-primary bg-opacity-10 py-2">
@@ -134,6 +134,28 @@
                     </div>
                     <button class="btn btn-sm btn-primary w-100">
                         <i class="bi bi-arrow-return-left me-1"></i> Return to Clinician
+                    </button>
+                </form>
+            </div>
+        </div>
+        @endif
+
+        {{-- Close thread (parallel escalation: case status is NOT support) --}}
+        @if($case->escalation_target === 'support' && $case->status !== 'support')
+        <div class="card border-warning mb-4">
+            <div class="card-header" style="background:#fff8ec;border-bottom:1px solid #fde68a;">
+                <h6 class="mb-0 fw-semibold" style="color:#92400e;"><i class="bi bi-x-circle me-1"></i>Close Support Thread</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ route('partner.cases.close-thread', $case->uuid) }}">
+                    @csrf
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Closing note <span class="text-muted">(optional)</span></label>
+                        <textarea name="partner_note" class="form-control form-control-sm" rows="2"
+                                  placeholder="Summary of resolution or action taken…">{{ old('partner_note') }}</textarea>
+                    </div>
+                    <button class="btn btn-sm btn-warning w-100" style="color:#92400e;">
+                        <i class="bi bi-x-circle me-1"></i> Close Thread
                     </button>
                 </form>
             </div>
@@ -421,8 +443,8 @@
                                 @endforelse
                             </div>
 
-                            {{-- Compose form — only when case is actively in escalation --}}
-                            @if($case->status === 'support' && $case->escalation_target === 'support')
+                            {{-- Compose form — open while escalation_target=support --}}
+                            @if($case->escalation_target === 'support')
                             <form method="POST" action="{{ route('partner.cases.messages.store', $case->uuid) }}"
                                   id="escalationForm" class="mt-3">
                                 @csrf
@@ -444,7 +466,7 @@
                             @else
                             <div class="alert alert-secondary border-0 mt-3 py-2 px-3" style="font-size:.78rem;border-radius:8px;">
                                 <i class="bi bi-lock-fill me-1"></i>
-                                This escalation has been resolved. The thread is read-only.
+                                This support thread has been closed. The thread is read-only.
                             </div>
                             @endif
                         </div>

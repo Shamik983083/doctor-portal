@@ -94,8 +94,39 @@ class CaseController extends Controller
     }
 
     /**
+     * Close a parallel support thread (case NOT in STATUS_SUPPORT).
+     * Clears escalation_target so compose forms lock on both portals.
+     */
+    public function closeThread(Request $request, string $uuid)
+    {
+        $request->validate(['partner_note' => 'nullable|string|max:1000']);
+
+        $partner = $this->partner();
+        $case = $partner->cases()
+            ->whereNotNull('support_at')
+            ->where('escalation_target', PatientCase::ESCALATION_SUPPORT)
+            ->where('uuid', $uuid)
+            ->whereNotIn('status', [PatientCase::STATUS_SUPPORT])
+            ->firstOrFail();
+
+        $partnerNote = $request->input('partner_note', '');
+        $this->stateMachine->closeParallelSupportThread($case, $partnerNote);
+
+        if ($partnerNote && $case->clinician_id) {
+            ClinicalNote::create([
+                'case_id'      => $case->id,
+                'clinician_id' => $case->clinician_id,
+                'type'         => 'general',
+                'note'         => 'Support thread closed: ' . $partnerNote,
+                'is_private'   => false,
+            ]);
+        }
+
+        return back()->with('success', 'Support thread closed.');
+    }
+
+    /**
      * Partner sends a message to the assigned clinician on an active escalation.
-     * Only allowed while the case is in support status with escalation_target=support.
      */
     public function sendMessage(Request $request, string $uuid)
     {
@@ -105,7 +136,6 @@ class CaseController extends Controller
 
         $case = $partner->cases()
             ->whereNotNull('support_at')
-            ->where('status', PatientCase::STATUS_SUPPORT)
             ->where('escalation_target', PatientCase::ESCALATION_SUPPORT)
             ->where('uuid', $uuid)
             ->firstOrFail();

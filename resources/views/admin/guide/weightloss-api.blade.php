@@ -882,7 +882,8 @@ Content-Type: application/json
 <tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/return-to-clinician</code></td><td>Close the escalation and return the case to the clinician. Body: <code>{ "partner_note": "..." }</code> (required). Fires <code>case_returned_to_clinician</code> webhook.</td></tr>
 <tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}/events</code></td><td>Full event log for the case (status transitions, notes, assignments)</td></tr>
 <tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/cases/{uuid}/messages</code></td><td>Full message thread. Add <code>?channel=escalation</code> to fetch only the support escalation thread, or <code>?channel=portal</code> for the patient thread.</td></tr>
-<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/messages</code></td><td>Send a message. When the case is in <code>support</code> status with <code>escalation_target=support</code>, routes to the clinician escalation thread. Otherwise creates a patient inbound message. Body: <code>{ "body": "..." }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/messages</code></td><td>Send a message. When <code>escalation_target=support</code> and <code>support_at</code> is set, routes to the clinician escalation thread regardless of case status. Otherwise creates a patient inbound message. Body: <code>{ "body": "..." }</code></td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/close-thread</code></td><td>Close a parallel support thread (case NOT in <code>support</code> status). Locks compose forms on both portals and fires <code>support_thread_closed</code> webhook. Body: <code>{ "partner_note": "..." }</code> (optional).</td></tr>
 </tbody>
 </table>
 

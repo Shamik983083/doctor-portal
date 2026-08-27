@@ -1250,6 +1250,65 @@ class CaseController extends Controller
         return back()->with('success', 'Case escalated to support. Partner has been notified.');
     }
 
+    /**
+     * Forward a patient message to the partner support team WITHOUT changing
+     * the case status. Opens a parallel escalation thread so the case continues
+     * its normal workflow (assigned/processing) while the chat runs alongside.
+     */
+    public function forwardToSupport(Request $request, string $uuid)
+    {
+        $request->validate([
+            'note'           => 'nullable|string|max:1000',
+            'quoted_message' => 'nullable|string|max:10000',
+        ]);
+
+        $case = PatientCase::where('uuid', $uuid)->firstOrFail();
+        $this->assertLicensedForCase($case);
+
+        if ($case->escalation_target === PatientCase::ESCALATION_SUPPORT) {
+            return back()->with('error', 'A support thread is already open for this case. Use the Support Thread tab to send messages.');
+        }
+
+        $note = trim($request->input('note', ''));
+        $this->stateMachine->startSupportThread($case, $note);
+
+        $quotedMessage = trim($request->input('quoted_message', ''));
+        if ($quotedMessage) {
+            $clinician     = Auth::user()->clinician;
+            $clinicianName = Auth::user()->name ?? 'Clinician';
+            $body          = ($note ? $note . "\n\n" : '') . "Forwarded patient message:\n\"{$quotedMessage}\"";
+
+            $message = Message::create([
+                'uuid'         => (string) \Illuminate\Support\Str::uuid(),
+                'case_id'      => $case->id,
+                'clinician_id' => $clinician?->id,
+                'partner_id'   => $case->partner_id,
+                'direction'    => 'outbound',
+                'channel'      => 'escalation',
+                'sender_type'  => 'clinician',
+                'body'         => $body,
+                'is_read'      => true,
+            ]);
+
+            try {
+                broadcast(new CaseMessageSent($message));
+            } catch (\Throwable $e) {
+                Log::warning('Forward-to-support broadcast failed: ' . $e->getMessage());
+            }
+
+            try {
+                $case->loadMissing('partner.users');
+                $case->partner?->users->each(
+                    fn ($u) => $u->notify(new PartnerNewCaseMessage($case, $body, $clinicianName))
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Forward-to-support partner notification failed: ' . $e->getMessage());
+            }
+        }
+
+        return back()->with('success', 'Support thread opened. The partner team has been notified.');
+    }
+
     public function escalateToDoctorAdmin(Request $request, string $uuid)
     {
         $request->validate(['reason' => 'required|string|max:1000']);
@@ -1317,11 +1376,10 @@ class CaseController extends Controller
         $this->assertLicensedForCase($case);
         $clinician = Auth::user()->clinician;
 
-        // Escalation context: when the case is in support status directed at the
-        // partner, the clinician is replying into the escalation thread — use the
-        // 'escalation' channel so it is separated from the patient portal thread.
-        $isEscalationReply = $case->status === PatientCase::STATUS_SUPPORT
-            && $case->escalation_target === PatientCase::ESCALATION_SUPPORT;
+        // Escalation context: when the case has an active support thread directed at
+        // the partner (regardless of case status), route into the 'escalation' channel.
+        $isEscalationReply = $case->escalation_target === PatientCase::ESCALATION_SUPPORT
+            && $case->support_at !== null;
 
         $message = Message::create([
             'case_id'      => $case->id,

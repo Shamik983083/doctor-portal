@@ -232,6 +232,83 @@ class CaseStateMachine
         return $this->escalateToSupport($case, $reason, PatientCase::ESCALATION_CLIENT_RESPONSE);
     }
 
+    /**
+     * Open a support thread WITHOUT changing case status.
+     * Used when a clinician forwards a patient message to the partner support
+     * team while the case continues its normal workflow (assigned/processing).
+     */
+    public function startSupportThread(PatientCase $case, string $note = ''): void
+    {
+        DB::transaction(function () use ($case, $note) {
+            $updates = ['escalation_target' => PatientCase::ESCALATION_SUPPORT];
+            if (!$case->support_at) {
+                $updates['support_at'] = now();
+            }
+            if ($note) {
+                $updates['support_note'] = $note;
+            }
+            $case->update($updates);
+
+            CaseEvent::create([
+                'case_id'    => $case->id,
+                'event_type' => 'support_thread_started',
+                'actor_type' => 'clinician',
+                'actor_id'   => null,
+                'payload'    => [],
+                'notes'      => $note ?: null,
+            ]);
+        });
+
+        $case->refresh();
+
+        try {
+            $case->loadMissing('partner.users');
+            $case->partner?->users->each(
+                fn ($u) => $u->notify(new PartnerCaseSupport($case))
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Support thread start notification failed: ' . $e->getMessage());
+        }
+
+        $this->webhookDispatcher->dispatch($case->partner_id, 'escalation_started', [
+            'event'      => 'escalation_started',
+            'case_id'    => $case->uuid,
+            'patient_id' => $case->patient?->uuid,
+            'case_status' => $case->status,
+            'timestamp'  => now()->timestamp,
+        ]);
+    }
+
+    /**
+     * Close a parallel support thread (case NOT in STATUS_SUPPORT).
+     * Clears escalation_target so compose forms lock on both portals.
+     */
+    public function closeParallelSupportThread(PatientCase $case, string $note = ''): void
+    {
+        DB::transaction(function () use ($case, $note) {
+            $case->update(['escalation_target' => null]);
+
+            CaseEvent::create([
+                'case_id'    => $case->id,
+                'event_type' => 'support_thread_closed',
+                'actor_type' => 'partner',
+                'actor_id'   => null,
+                'payload'    => [],
+                'notes'      => $note ?: null,
+            ]);
+        });
+
+        $case->refresh();
+
+        $this->webhookDispatcher->dispatch($case->partner_id, 'support_thread_closed', [
+            'event'      => 'support_thread_closed',
+            'case_id'    => $case->uuid,
+            'patient_id' => $case->patient?->uuid,
+            'case_status' => $case->status,
+            'timestamp'  => now()->timestamp,
+        ]);
+    }
+
     private function dispatchWebhookEvent(PatientCase $case, string $status): void
     {
         $eventMap = [

@@ -103,6 +103,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
         Route::get('/{uuid}/reject-draft', [ClinicianCaseController::class, 'rejectDraft'])->name('reject-draft');
         Route::post('/{uuid}/reject-confirm', [ClinicianCaseController::class, 'rejectConfirm'])->name('reject-confirm');
         Route::post('/{uuid}/support', [ClinicianCaseController::class, 'escalateToSupport'])->name('support');
+        Route::post('/{uuid}/forward-to-support', [ClinicianCaseController::class, 'forwardToSupport'])->name('forward-to-support');
         Route::post('/{uuid}/doctor-admin-escalate', [ClinicianCaseController::class, 'escalateToDoctorAdmin'])->name('doctor-admin-escalate');
         Route::post('/{uuid}/notes', [ClinicianCaseController::class, 'addNote'])->name('notes.store');
         Route::post('/{uuid}/messages', [ClinicianCaseController::class, 'sendMessage'])->name('messages.store');
@@ -465,6 +466,7 @@ Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])
         Route::get('/{uuid}', [PartnerCaseController::class, 'show'])->name('show');
         Route::post('/{uuid}/cancel', [PartnerCaseController::class, 'cancel'])->name('cancel');
         Route::post('/{uuid}/return-to-clinician', [PartnerCaseController::class, 'returnToClinician'])->name('return-to-clinician');
+        Route::post('/{uuid}/close-thread',        [PartnerCaseController::class, 'closeThread'])->name('close-thread');
         Route::post('/{uuid}/messages',            [PartnerCaseController::class, 'sendMessage'])->name('messages.store');
         Route::get('/{uuid}/messages/poll',        [PartnerCaseController::class, 'pollMessages'])->name('messages.poll');
     });
