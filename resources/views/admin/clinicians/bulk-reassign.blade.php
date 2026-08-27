@@ -194,10 +194,16 @@
     var toSelect      = document.querySelector('[name="to_clinician_id"]');
     var form          = document.getElementById('reassignForm');
 
-    // Bootstrap modal instance
-    var modalEl       = document.getElementById('confirmReassignModal');
-    var bsModal       = modalEl ? new bootstrap.Modal(modalEl) : null;
-    var confirmBtn    = document.getElementById('confirmReassignBtn');
+    var modalEl    = document.getElementById('confirmReassignModal');
+    var confirmBtn = document.getElementById('confirmReassignBtn');
+    var bsModal    = null; // initialised lazily so Bootstrap is definitely loaded
+
+    function getModal() {
+        if (!bsModal && modalEl && typeof bootstrap !== 'undefined') {
+            bsModal = new bootstrap.Modal(modalEl);
+        }
+        return bsModal;
+    }
 
     function updateState() {
         var checked  = document.querySelectorAll('.case-checkbox:checked').length;
@@ -233,14 +239,14 @@
     // Intercept form submit — show modal instead of browser confirm().
     var confirmed = false;
 
-    if (form && bsModal) {
+    if (form) {
         form.addEventListener('submit', function (e) {
             var checked = document.querySelectorAll('.case-checkbox:checked').length;
             if (!checked) { e.preventDefault(); return; }
 
             if (confirmed) {
-                confirmed = false; // reset for potential future use
-                return;            // let the form submit normally
+                confirmed = false;
+                return; // let the form submit normally
             }
 
             e.preventDefault();
@@ -253,7 +259,7 @@
             document.getElementById('confirmCaseCount').textContent  = checked;
             document.getElementById('confirmTargetName').textContent = targetName;
 
-            bsModal.show();
+            getModal().show();
         });
     }
 
@@ -261,7 +267,8 @@
     if (confirmBtn && form) {
         confirmBtn.addEventListener('click', function () {
             confirmed = true;
-            if (bsModal) bsModal.hide();
+            var m = getModal();
+            if (m) m.hide();
             form.submit();
         });
     }
