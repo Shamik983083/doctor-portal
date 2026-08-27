@@ -51,6 +51,7 @@ class NotificationController extends Controller
     public function markAllRead()
     {
         Auth::user()->unreadNotifications->markAsRead();
-        return response()->json(['ok' => true]);
+        return redirect()->route('clinician.notifications.index')
+            ->with('success', 'All notifications marked as read.');
     }
 }
