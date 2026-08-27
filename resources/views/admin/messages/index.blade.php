@@ -5,6 +5,292 @@
 
 @section('content')
 
+<style>
+/* ── Messages page ──────────────────────────────────────────────────── */
+.msg-card {
+    border: 1px solid #e2e8f0;
+    border-top-left-radius: 0;
+    border-radius: 0 10px 10px 10px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 2px 16px rgba(0,0,0,.06);
+    display: flex;
+    flex-direction: column;
+}
+.msg-body {
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 520px;
+}
+
+/* ── Left rail ──────────────────────────────────────────────────────── */
+.msg-rail {
+    width: 300px;
+    flex-shrink: 0;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f8fafc;
+}
+.msg-rail-hdr {
+    padding: 13px 16px 10px;
+    border-bottom: 1px solid #edf0f5;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.msg-rail-label {
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: #64748b;
+}
+.msg-rail-count {
+    font-size: .7rem;
+    font-weight: 500;
+    color: #94a3b8;
+    background: #eef2ff;
+    border-radius: 10px;
+    padding: 1px 7px;
+}
+
+/* scrollable list */
+.msg-list {
+    flex: 1;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+.msg-list::-webkit-scrollbar          { width: 5px; }
+.msg-list::-webkit-scrollbar-track    { background: transparent; }
+.msg-list::-webkit-scrollbar-thumb    { background: #cbd5e1; border-radius: 3px; }
+
+/* conversation row */
+.msg-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 11px 16px;
+    border-bottom: 1px solid #edf0f5;
+    text-decoration: none;
+    cursor: pointer;
+    position: relative;
+    transition: background .1s;
+}
+.msg-item:hover { background: #f1f5f9; }
+.msg-item.is-active {
+    background: #eef2ff;
+    border-left: 3px solid #4361ee;
+    padding-left: 13px;
+}
+.msg-avatar-sm {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; font-weight: 700; color: #fff;
+    flex-shrink: 0; margin-top: 1px;
+}
+.msg-item-content { flex: 1; min-width: 0; }
+.msg-item-row1 {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
+    margin-bottom: 3px;
+}
+.msg-item-name {
+    font-size: .84rem; font-weight: 600; color: #1e293b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.msg-item.is-active .msg-item-name { color: #1e3a8a; }
+.msg-item-time { font-size: .67rem; color: #94a3b8; flex-shrink: 0; white-space: nowrap; }
+.msg-item-row2 {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+}
+.msg-item-preview {
+    font-size: .74rem; color: #64748b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.msg-item-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: #4361ee; color: #fff;
+    font-size: .6rem; font-weight: 700; flex-shrink: 0;
+}
+.msg-item-sub { font-size: .68rem; color: #94a3b8; margin-top: 3px; }
+
+.msg-rail-footer {
+    border-top: 1px solid #e2e8f0;
+    padding: 8px 16px;
+    background: #f8fafc;
+    flex-shrink: 0;
+    font-size: .76rem;
+}
+
+/* ── Right pane ─────────────────────────────────────────────────────── */
+.msg-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* Thread header */
+.msg-pane-hdr {
+    padding: 13px 22px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    min-height: 60px;
+}
+.msg-pane-hdr-name {
+    font-size: .92rem; font-weight: 700; color: #1e293b; line-height: 1.2;
+}
+.msg-pane-hdr-meta { font-size: .72rem; color: #64748b; margin-top: 2px; }
+
+/* Thread scroll */
+.msg-thread {
+    flex: 1;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+    padding: 20px 26px;
+    background: #f0f3f9;
+}
+.msg-thread::-webkit-scrollbar          { width: 5px; }
+.msg-thread::-webkit-scrollbar-track    { background: transparent; }
+.msg-thread::-webkit-scrollbar-thumb    { background: #cbd5e1; border-radius: 3px; }
+
+/* Date separator */
+.msg-date-sep {
+    display: flex; align-items: center; gap: 10px; margin: 14px 0;
+}
+.msg-date-sep hr { flex: 1; margin: 0; border-color: #cdd5e0; }
+.msg-date-sep-label {
+    font-size: .64rem; font-weight: 600; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: .07em; white-space: nowrap;
+}
+
+/* Message rows */
+.msg-row {
+    display: flex; align-items: flex-end; gap: 9px; margin-bottom: 16px;
+}
+.msg-row.msg-right { flex-direction: row-reverse; }
+.msg-sender-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .6rem; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.msg-bubble-wrap { max-width: 70%; }
+.msg-meta-row {
+    display: flex; align-items: baseline; gap: 5px; margin-bottom: 4px;
+    font-size: .69rem;
+}
+.msg-row.msg-right .msg-meta-row { justify-content: flex-end; }
+.msg-sender-name   { font-weight: 600; color: #475569; }
+.msg-sent-time     { color: #94a3b8; }
+.msg-internal-pill {
+    font-size: .6rem; font-weight: 600;
+    color: #7c3aed; background: #f3eeff;
+    padding: 1px 7px; border-radius: 10px;
+}
+.msg-bubble {
+    padding: 10px 15px;
+    font-size: .875rem; line-height: 1.55;
+    word-break: break-word;
+}
+.msg-bubble-admin {
+    background: #6f42c1; color: #fff;
+    border-radius: 18px 4px 18px 18px;
+    box-shadow: 0 2px 8px rgba(111,66,193,.22);
+}
+.msg-bubble-clinician {
+    background: #4361ee; color: #fff;
+    border-radius: 4px 18px 18px 18px;
+    box-shadow: 0 2px 8px rgba(67,97,238,.18);
+}
+.msg-bubble-patient {
+    background: #fff; color: #212529;
+    border-radius: 4px 18px 18px 18px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07);
+}
+.msg-bubble-system {
+    background: #f1f4f8; color: #475569;
+    border-radius: 12px;
+    border: 1px dashed #cbd5e1;
+    font-size: .82rem;
+}
+
+/* Compose */
+.msg-compose {
+    border-top: 1px solid #e2e8f0;
+    padding: 13px 20px;
+    background: #fff;
+    flex-shrink: 0;
+}
+.msg-compose-label {
+    font-size: .71rem; color: #64748b; margin-bottom: 8px;
+}
+.msg-compose-row { display: flex; gap: 10px; align-items: flex-end; }
+.msg-compose-row textarea {
+    flex: 1;
+    border: 1px solid #d1d9e6;
+    border-radius: 10px;
+    padding: 9px 13px;
+    font-size: .875rem;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: none;
+    min-height: 44px;
+    transition: border-color .15s, box-shadow .15s;
+}
+.msg-compose-row textarea:focus {
+    outline: none;
+    border-color: #4361ee;
+    box-shadow: 0 0 0 3px rgba(67,97,238,.12);
+}
+.msg-compose-send {
+    height: 44px; padding: 0 18px;
+    background: #4361ee; color: #fff;
+    border: none; border-radius: 10px;
+    font-size: .84rem; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: background .15s;
+}
+.msg-compose-send:hover { background: #3451d9; }
+
+/* Placeholders */
+.msg-no-sel {
+    flex: 1; display: flex; align-items: center;
+    justify-content: center; color: #94a3b8; background: #f8f9fc;
+}
+.msg-list-empty {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 48px 20px; color: #94a3b8; text-align: center;
+}
+.msg-no-clinician {
+    font-size: .82rem; color: #64748b;
+    padding: 12px 16px; background: #f8f9fc;
+    border-radius: 8px; border: 1px solid #e2e8f0;
+}
+
+/* Responsive: stack at narrow widths */
+@media (max-width: 767.98px) {
+    .msg-body { flex-direction: column; }
+    .msg-rail { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; max-height: 220px; }
+}
+</style>
+
 @if(session('success'))
 <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
     {{ session('success') }}
@@ -47,200 +333,183 @@
     </li>
 </ul>
 
-@if($cases->isEmpty())
-{{-- ── Empty state ──────────────────────────────────────────────── --}}
-<div class="card" style="border-top-left-radius:0;">
-    <div class="card-body text-center py-5 text-muted">
-        <i class="bi bi-chat-square-text fs-2 d-block mb-2 opacity-25"></i>
-        @if($tab === 'patient')
-            No patient conversations found in your scope yet.
-        @else
-            No internal provider messages yet. Open a case and use
-            <strong>Message Clinician</strong> to start a thread.
-        @endif
-    </div>
-</div>
+<div class="msg-card">
+    <div class="msg-body" id="msgPaneRow">
 
-@else
-{{-- ── Two-pane layout ──────────────────────────────────────────── --}}
-<div class="card" style="border-top-left-radius:0;">
-    <div class="row g-0" id="msgPaneRow" style="min-height:520px;">
+        {{-- ── LEFT RAIL ──────────────────────────────────────────── --}}
+        <div class="msg-rail">
 
-        {{-- Left: conversation list --}}
-        <div class="col-4 border-end d-flex flex-column" style="overflow:hidden;">
+            <div class="msg-rail-hdr">
+                <span class="msg-rail-label">
+                    @if($tab === 'patient') Patients @else Providers @endif
+                </span>
+                @if($cases->total() > 0)
+                    <span class="msg-rail-count">{{ $cases->total() }}</span>
+                @endif
+            </div>
 
-            {{-- List scroll area --}}
-            <div style="overflow-y:scroll; flex:1;">
-                @foreach($cases as $case)
+            <div class="msg-list">
+                @forelse($cases as $case)
                 @php
                     $preview  = $latestByCase->get($case->id);
                     $isActive = $selected && $selected->id === $case->id;
                     $unread   = (int)($case->unread_count ?? 0);
+                    $pname    = trim(($case->patient?->first_name ?? '') . ' ' . ($case->patient?->last_name ?? ''));
+                    $initials = strtoupper(collect(explode(' ', $pname))->map(fn($p) => mb_substr($p,0,1))->take(2)->implode(''));
+                    $avBg     = $tab === 'patient' ? '#4361ee' : '#6f42c1';
                 @endphp
                 <a href="{{ route('admin.messages.index', ['tab' => $tab, 'case' => $case->uuid]) }}"
-                   class="d-flex align-items-start gap-2 px-3 py-2 text-decoration-none border-bottom {{ $isActive ? 'bg-primary bg-opacity-10' : '' }}"
-                   style="transition:background .12s;">
+                   class="msg-item {{ $isActive ? 'is-active' : '' }}">
 
-                    {{-- Avatar --}}
-                    @php
-                        $pname = trim(($case->patient?->first_name ?? '') . ' ' . ($case->patient?->last_name ?? ''));
-                        $initials = strtoupper(collect(explode(' ', $pname))->map(fn($p) => mb_substr($p,0,1))->take(2)->implode(''));
-                    @endphp
-                    <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold text-white"
-                         style="width:36px;height:36px;font-size:.7rem;background:{{ $tab === 'patient' ? '#4361ee' : '#6f42c1' }};margin-top:2px;">
+                    <div class="msg-avatar-sm" style="background:{{ $avBg }};">
                         {{ $initials ?: '?' }}
                     </div>
 
-                    <div class="flex-grow-1 overflow-hidden">
-                        <div class="d-flex justify-content-between align-items-baseline">
-                            <span class="fw-semibold text-dark" style="font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">
-                                {{ $pname ?: 'Unknown Patient' }}
-                            </span>
-                            <span class="text-muted flex-shrink-0" style="font-size:.68rem;">
-                                {{ $case->last_message_at ? \Carbon\Carbon::parse($case->last_message_at)->diffForHumans(null,true) : '' }}
+                    <div class="msg-item-content">
+                        <div class="msg-item-row1">
+                            <span class="msg-item-name">{{ $pname ?: 'Unknown Patient' }}</span>
+                            <span class="msg-item-time">
+                                {{ $case->last_message_at ? \Carbon\Carbon::parse($case->last_message_at)->diffForHumans(null, true) : '' }}
                             </span>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center mt-1">
-                            <span class="text-muted" style="font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">
+                        <div class="msg-item-row2">
+                            <span class="msg-item-preview">
                                 @if($preview)
-                                    {{ \Illuminate\Support\Str::limit($preview->body, 48) }}
+                                    {{ \Illuminate\Support\Str::limit($preview->body, 52) }}
                                 @else
                                     {{ $case->partner?->name ?? '' }}
                                 @endif
                             </span>
                             @if($unread > 0)
-                                <span class="badge bg-primary rounded-pill flex-shrink-0" style="font-size:.6rem;">{{ $unread }}</span>
+                                <span class="msg-item-badge">{{ $unread }}</span>
                             @endif
                         </div>
                         @if($tab === 'provider')
-                            <div class="text-muted mt-1" style="font-size:.68rem;">
+                            <div class="msg-item-sub">
                                 <i class="bi bi-person-badge me-1"></i>{{ $case->clinician?->full_name ?? 'Unassigned' }}
                             </div>
                         @endif
                     </div>
                 </a>
-                @endforeach
+
+                @empty
+                <div class="msg-list-empty">
+                    <i class="bi bi-chat-square-text" style="font-size:2rem;opacity:.2;margin-bottom:8px;"></i>
+                    <span style="font-size:.8rem;">
+                        @if($tab === 'patient') No patient conversations yet. @else No provider threads yet. @endif
+                    </span>
+                </div>
+                @endforelse
             </div>
 
-            {{-- Pagination --}}
             @if($cases->hasPages())
-            <div class="border-top px-3 py-2" style="font-size:.78rem;">
+            <div class="msg-rail-footer">
                 {{ $cases->links('pagination::simple-bootstrap-5') }}
             </div>
             @endif
-        </div>
 
-        {{-- Right: thread + compose --}}
-        <div class="col-8 d-flex flex-column" style="overflow:hidden;">
+        </div>{{-- /msg-rail --}}
+
+        {{-- ── RIGHT PANE ─────────────────────────────────────────── --}}
+        <div class="msg-pane">
 
             @if($selected)
-            {{-- Thread header --}}
             @php
                 $pname = trim(($selected->patient?->first_name ?? '') . ' ' . ($selected->patient?->last_name ?? ''));
             @endphp
-            <div class="d-flex align-items-center gap-2 px-4 py-3 border-bottom bg-white">
-                <div>
-                    <div class="fw-semibold" style="font-size:.9rem;">{{ $pname ?: 'Unknown Patient' }}</div>
-                    <div class="text-muted" style="font-size:.72rem;">
+
+            {{-- Header --}}
+            <div class="msg-pane-hdr">
+                <div style="flex:1;min-width:0;">
+                    <div class="msg-pane-hdr-name">{{ $pname ?: 'Unknown Patient' }}</div>
+                    <div class="msg-pane-hdr-meta">
                         {{ $selected->partner?->name ?? '' }}
-                        @if($tab === 'provider')
-                            &middot; {{ $selected->clinician?->full_name ?? 'Unassigned' }}
+                        @if($tab === 'provider' && $selected->clinician)
+                            &middot; {{ $selected->clinician->full_name }}
                         @endif
                     </div>
                 </div>
                 <a href="{{ route('admin.cases.show', $selected->uuid) }}"
-                   class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" style="font-size:.75rem;">
-                    Open case <i class="bi bi-arrow-right ms-1"></i>
+                   class="btn btn-sm btn-outline-secondary px-3 py-1 flex-shrink-0"
+                   style="font-size:.78rem;">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Open case
                 </a>
             </div>
 
-            {{-- Thread scroll --}}
-            <div id="msgThread" style="flex:1;overflow-y:auto;padding:16px 20px;background:#f8f9fc;">
+            {{-- Thread --}}
+            <div class="msg-thread" id="msgThread">
                 @php $prevDate = null; @endphp
+
                 @forelse($thread as $msg)
                 @php
-                    $msgDate   = $msg->created_at->format('Y-m-d');
-                    $isAdmin   = $msg->sender_type === 'admin';
-                    $isClinic  = $msg->sender_type === 'clinician';
-                    $isPatient = $msg->sender_type === 'patient';
-                    $isInternal= $msg->channel === 'internal';
+                    $msgDate = $msg->created_at->format('Y-m-d');
+                    $isInternal = $msg->channel === 'internal';
 
-                    if ($isAdmin) {
-                        $avatarBg  = '#6f42c1'; $avatarTxt = '#fff';
+                    if ($msg->sender_type === 'admin') {
+                        $avBg       = '#6f42c1';
                         $senderName = $msg->user?->name ?? 'Admin';
-                        $alignRight = true;
-                    } elseif ($isClinic) {
-                        $avatarBg  = '#4361ee'; $avatarTxt = '#fff';
+                        $right      = true;
+                        $bClass     = 'msg-bubble-admin';
+                    } elseif ($msg->sender_type === 'clinician') {
+                        $avBg       = '#4361ee';
                         $senderName = $msg->clinician?->user?->name ?? 'Clinician';
-                        $alignRight = false;
-                    } elseif ($isPatient) {
-                        $avatarBg  = '#2dc653'; $avatarTxt = '#fff';
+                        $right      = false;
+                        $bClass     = 'msg-bubble-clinician';
+                    } elseif ($msg->sender_type === 'patient') {
+                        $avBg       = '#16a34a';
                         $senderName = $pname ?: 'Patient';
-                        $alignRight = false;
+                        $right      = false;
+                        $bClass     = 'msg-bubble-patient';
                     } else {
-                        $avatarBg  = '#6c757d'; $avatarTxt = '#fff';
+                        $avBg       = '#6c757d';
                         $senderName = ucfirst($msg->sender_type ?? 'System');
-                        $alignRight = false;
+                        $right      = false;
+                        $bClass     = 'msg-bubble-system';
                     }
 
-                    $initials = strtoupper(collect(explode(' ', trim($senderName)))->map(fn($p) => mb_substr($p,0,1))->take(2)->implode(''));
+                    $initials = strtoupper(
+                        collect(explode(' ', trim($senderName)))
+                            ->map(fn($p) => mb_substr($p, 0, 1))
+                            ->take(2)
+                            ->implode('')
+                    );
                 @endphp
 
-                {{-- Date separator --}}
                 @if($msgDate !== $prevDate)
-                @php $prevDate = $msgDate; @endphp
-                <div class="d-flex align-items-center gap-2 my-3">
-                    <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
-                    <span style="font-size:.68rem;color:#adb5bd;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;font-weight:500;">
-                        {{ $msg->created_at->isToday() ? 'Today' : ($msg->created_at->isYesterday() ? 'Yesterday' : $msg->created_at->format('M j, Y')) }}
-                    </span>
-                    <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
-                </div>
+                    @php $prevDate = $msgDate; @endphp
+                    <div class="msg-date-sep">
+                        <hr>
+                        <span class="msg-date-sep-label">
+                            {{ $msg->created_at->isToday() ? 'Today'
+                               : ($msg->created_at->isYesterday() ? 'Yesterday'
+                                  : $msg->created_at->format('M j, Y')) }}
+                        </span>
+                        <hr>
+                    </div>
                 @endif
 
-                {{-- Message row --}}
-                <div class="d-flex align-items-end gap-2 mb-3 {{ $alignRight ? 'flex-row-reverse' : '' }}">
-
-                    <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold"
-                         style="width:32px;height:32px;font-size:.65rem;background:{{ $avatarBg }};color:{{ $avatarTxt }};">
+                <div class="msg-row {{ $right ? 'msg-right' : '' }}">
+                    <div class="msg-sender-avatar" style="background:{{ $avBg }};">
                         {{ $initials ?: '?' }}
                     </div>
-
-                    <div style="max-width:65%;">
-                        <div class="d-flex align-items-baseline gap-1 mb-1 {{ $alignRight ? 'justify-content-end' : '' }}">
-                            <span style="font-size:.7rem;font-weight:600;color:#495057;">{{ $senderName }}</span>
-                            <span style="font-size:.65rem;color:#adb5bd;">{{ $msg->created_at->format('H:i') }}</span>
+                    <div class="msg-bubble-wrap">
+                        <div class="msg-meta-row">
+                            <span class="msg-sender-name">{{ $senderName }}</span>
+                            <span class="msg-sent-time">{{ $msg->created_at->format('H:i') }}</span>
                             @if($isInternal)
-                                <span style="font-size:.62rem;color:#6f42c1;font-weight:500;">internal</span>
+                                <span class="msg-internal-pill">internal</span>
                             @endif
                         </div>
-
-                        @if($isAdmin)
-                        <div style="background:#6f42c1;color:#fff;padding:9px 13px;border-radius:{{ $alignRight ? '14px 3px 14px 14px' : '3px 14px 14px 14px' }};font-size:.85rem;line-height:1.5;word-break:break-word;box-shadow:0 2px 6px rgba(111,66,193,.2);">
-                            {{ $msg->body }}
-                        </div>
-                        @elseif($isClinic)
-                        <div style="background:#4361ee;color:#fff;padding:9px 13px;border-radius:{{ $alignRight ? '14px 3px 14px 14px' : '3px 14px 14px 14px' }};font-size:.85rem;line-height:1.5;word-break:break-word;box-shadow:0 2px 6px rgba(67,97,238,.2);">
-                            {{ $msg->body }}
-                        </div>
-                        @elseif($isPatient)
-                        <div style="background:#fff;color:#212529;padding:9px 13px;border-radius:3px 14px 14px 14px;border:1px solid #e9ecef;font-size:.85rem;line-height:1.5;word-break:break-word;box-shadow:0 1px 4px rgba(0,0,0,.06);">
-                            {{ $msg->body }}
-                        </div>
-                        @else
-                        <div style="background:#f1f3f5;color:#495057;padding:8px 12px;border-radius:8px;border:1px dashed #dee2e6;font-size:.8rem;line-height:1.5;word-break:break-word;">
-                            {{ $msg->body }}
-                        </div>
-                        @endif
+                        <div class="msg-bubble {{ $bClass }}">{{ $msg->body }}</div>
                     </div>
                 </div>
 
                 @empty
-                <div class="text-center text-muted py-5 small">
+                <div style="text-align:center;padding:48px 0;color:#94a3b8;font-size:.84rem;">
                     @if($tab === 'patient')
                         No messages on this case yet.
                     @else
-                        No internal messages yet. Use the form below to write to the clinician.
+                        No internal messages yet. Use the compose area below to write to the clinician.
                     @endif
                 </div>
                 @endforelse
@@ -248,69 +517,72 @@
 
             {{-- Compose (provider tab only) --}}
             @if($tab === 'provider')
-            <div class="border-top bg-white px-4 py-3">
+            <div class="msg-compose">
                 @if($selected->clinician_id)
-                <form method="POST" action="{{ route('admin.messages.send') }}" class="d-flex gap-2 align-items-end">
+                <form method="POST" action="{{ route('admin.messages.send') }}">
                     @csrf
                     <input type="hidden" name="case_uuid" value="{{ $selected->uuid }}">
-                    <div class="flex-grow-1">
-                        <label class="form-label small mb-1" style="font-size:.72rem;color:#6c757d;">
-                            Message to <strong>{{ $selected->clinician->full_name }}</strong> (internal — not visible to patient)
-                        </label>
-                        <textarea name="body" rows="2" required maxlength="5000"
-                                  class="form-control form-control-sm"
-                                  placeholder="Write an internal note to the clinician…"
-                                  style="resize:none;"></textarea>
+                    <div class="msg-compose-label">
+                        Message <strong>{{ $selected->clinician->full_name }}</strong>
+                        <span style="color:#94a3b8;">&mdash; internal note, not visible to patient</span>
                     </div>
-                    <button type="submit" class="btn btn-sm btn-primary px-3 flex-shrink-0" style="height:fit-content;">
-                        <i class="bi bi-send me-1"></i>Send
-                    </button>
+                    <div class="msg-compose-row">
+                        <textarea name="body" rows="2" required maxlength="5000"
+                                  placeholder="Write an internal note to the clinician…"></textarea>
+                        <button type="submit" class="msg-compose-send">
+                            <i class="bi bi-send-fill"></i>Send
+                        </button>
+                    </div>
                 </form>
                 @else
-                <div class="text-muted small py-1">
+                <div class="msg-no-clinician">
                     <i class="bi bi-info-circle me-1"></i>
-                    No clinician is assigned to this case. <a href="{{ route('admin.cases.show', $selected->uuid) }}">Assign one</a> before sending an internal message.
+                    No clinician assigned to this case.
+                    <a href="{{ route('admin.cases.show', $selected->uuid) }}">Assign one</a>
+                    before sending an internal message.
                 </div>
                 @endif
             </div>
             @endif
 
             @else
-            {{-- No case selected (edge case: paginator moved and ?case= no longer matches) --}}
-            <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+            {{-- Nothing selected --}}
+            <div class="msg-no-sel">
                 <div class="text-center">
-                    <i class="bi bi-chat-square-text fs-2 d-block mb-2 opacity-25"></i>
-                    <div class="small">Select a conversation from the list</div>
+                    <i class="bi bi-chat-square-text" style="font-size:2.5rem;opacity:.18;display:block;margin-bottom:10px;"></i>
+                    <div style="font-size:.84rem;">Select a conversation from the list</div>
                 </div>
             </div>
             @endif
 
-        </div>{{-- /col-8 --}}
-    </div>{{-- /row --}}
-</div>
+        </div>{{-- /msg-pane --}}
 
-@endif
+    </div>{{-- /msg-body --}}
+</div>{{-- /msg-card --}}
 
 @endsection
 
 @section('scripts')
 <script>
 (function () {
-    // Dynamically size the two-pane row so it fills exactly the remaining
-    // viewport height below its top edge, preventing the page from scrolling.
+    // Fit the two-pane container to exactly the remaining viewport height
+    // so neither the page body nor the container overflows. Using
+    // getBoundingClientRect().top avoids hardcoding the offset above the row
+    // (tabs, alerts, page padding all vary per user role).
     var row = document.getElementById('msgPaneRow');
     if (row) {
         function fitRow() {
             var top = row.getBoundingClientRect().top;
-            var pageBottomPad = 24; // matches .page-content padding-bottom (1.5rem)
-            var h = Math.max(window.innerHeight - top - pageBottomPad, 520);
+            // 26 = page-content bottom-padding (24px) + card border-bottom (1px) + 1px buffer
+            var h = Math.max(window.innerHeight - top - 26, 520);
             row.style.height = h + 'px';
         }
-        fitRow();
+        // Defer one rAF so the sticky topbar layout has settled.
+        requestAnimationFrame(fitRow);
         window.addEventListener('resize', fitRow);
     }
 
-    // Scroll message thread to bottom on load so the latest message is visible.
+    // Auto-scroll thread to latest message on load.
     var thread = document.getElementById('msgThread');
     if (thread) thread.scrollTop = thread.scrollHeight;
 })();
