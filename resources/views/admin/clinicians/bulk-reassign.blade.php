@@ -137,16 +137,64 @@
 
 </div>
 
+{{-- ── Confirm Reassign Modal ──────────────────────────────────────── --}}
+<div class="modal fade" id="confirmReassignModal" tabindex="-1" aria-labelledby="confirmReassignLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:14px;overflow:hidden;">
+
+            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle"
+                         style="width:42px;height:42px;background:#fff3cd;flex-shrink:0;">
+                        <i class="bi bi-arrow-left-right" style="font-size:1.1rem;color:#b45309;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold mb-0" id="confirmReassignLabel" style="font-size:1rem;">
+                        Confirm Reassignment
+                    </h5>
+                </div>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body px-4 pt-3 pb-2">
+                <p class="text-secondary mb-2" style="font-size:.88rem;" id="confirmReassignMsg">
+                    You are about to reassign <strong id="confirmCaseCount">0</strong> case(s)
+                    to <strong id="confirmTargetName">the selected clinician</strong>.
+                </p>
+                <div class="rounded p-2 px-3 mb-1" style="background:#fff8ec;border:1px solid #fde68a;font-size:.8rem;color:#92400e;">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    This action cannot be undone. The clinicians will be notified.
+                </div>
+            </div>
+
+            <div class="modal-footer border-0 px-4 pb-4 pt-2 gap-2">
+                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal" style="font-size:.875rem;">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-warning px-4 fw-semibold" id="confirmReassignBtn" style="font-size:.875rem;color:#1c1917;">
+                    <i class="bi bi-arrow-left-right me-1"></i>Yes, Reassign
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
 <script>
 (function () {
-    var selectAll      = document.getElementById('selectAll');
-    var checkboxes     = document.querySelectorAll('.case-checkbox');
-    var submitBtn      = document.getElementById('submitBtn');
-    var selectedCount  = document.getElementById('selectedCount');
-    var toSelect       = document.querySelector('[name="to_clinician_id"]');
+    var selectAll     = document.getElementById('selectAll');
+    var checkboxes    = document.querySelectorAll('.case-checkbox');
+    var submitBtn     = document.getElementById('submitBtn');
+    var selectedCount = document.getElementById('selectedCount');
+    var toSelect      = document.querySelector('[name="to_clinician_id"]');
+    var form          = document.getElementById('reassignForm');
+
+    // Bootstrap modal instance
+    var modalEl       = document.getElementById('confirmReassignModal');
+    var bsModal       = modalEl ? new bootstrap.Modal(modalEl) : null;
+    var confirmBtn    = document.getElementById('confirmReassignBtn');
 
     function updateState() {
         var checked = document.querySelectorAll('.case-checkbox:checked').length;
@@ -164,13 +212,41 @@
     checkboxes.forEach(function (cb) { cb.addEventListener('change', updateState); });
     if (toSelect) toSelect.addEventListener('change', updateState);
 
-    document.getElementById('reassignForm') && document.getElementById('reassignForm').addEventListener('submit', function (e) {
-        var checked = document.querySelectorAll('.case-checkbox:checked').length;
-        if (!checked) { e.preventDefault(); return; }
-        if (!confirm('Reassign ' + checked + ' case(s)? This cannot be undone.')) {
+    // Intercept form submit — show modal instead of browser confirm().
+    var confirmed = false;
+
+    if (form && bsModal) {
+        form.addEventListener('submit', function (e) {
+            var checked = document.querySelectorAll('.case-checkbox:checked').length;
+            if (!checked) { e.preventDefault(); return; }
+
+            if (confirmed) {
+                confirmed = false; // reset for potential future use
+                return;            // let the form submit normally
+            }
+
             e.preventDefault();
-        }
-    });
+
+            // Populate modal with live counts + target name.
+            var targetOpt  = toSelect && toSelect.selectedIndex >= 0
+                ? toSelect.options[toSelect.selectedIndex]
+                : null;
+            var targetName = (targetOpt && targetOpt.value) ? targetOpt.text : 'the selected clinician';
+            document.getElementById('confirmCaseCount').textContent  = checked;
+            document.getElementById('confirmTargetName').textContent = targetName;
+
+            bsModal.show();
+        });
+    }
+
+    // Confirm button inside modal → set flag and submit.
+    if (confirmBtn && form) {
+        confirmBtn.addEventListener('click', function () {
+            confirmed = true;
+            if (bsModal) bsModal.hide();
+            form.submit();
+        });
+    }
 })();
 </script>
 @endsection
