@@ -5,40 +5,78 @@
 
 @section('content')
 
+<style>
+.step-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #e0e7ff; color: #4361ee;
+    font-size: .72rem; font-weight: 700; flex-shrink: 0;
+}
+.step-badge.done { background: #dcfce7; color: #16a34a; }
+.reassign-toolbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+}
+.reassign-toolbar .sel-summary {
+    font-size: .82rem; font-weight: 600; color: #475569;
+    white-space: nowrap;
+}
+.reassign-toolbar .sel-summary span { color: #4361ee; }
+#submitBtn {
+    white-space: nowrap;
+    min-width: 160px;
+    font-size: .875rem;
+    font-weight: 600;
+    padding: 7px 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+}
+#submitBtn:not(:disabled):hover { filter: brightness(1.07); }
+.case-row-selected { background: #f0f4ff !important; }
+</style>
+
 @if(session('success'))
 <div class="alert alert-success alert-dismissible fade show" role="alert">
-    {{ session('success') }}
+    <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 @endif
 
 <div class="row g-4">
 
-    {{-- Step 1: Pick source clinician --}}
+    {{-- ── Step 1: Pick source clinician ──────────────────────────────── --}}
     <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-person-check me-2"></i>Step 1 — Select Source Clinician</h6>
+        <div class="card border-0 shadow-sm" style="border-radius:10px;">
+            <div class="card-header bg-white border-bottom px-4 py-3" style="border-radius:10px 10px 0 0;">
+                <h6 class="mb-0 fw-semibold d-flex align-items-center gap-2">
+                    <span class="step-badge {{ $fromId ? 'done' : '' }}">
+                        {{ $fromId ? '✓' : '1' }}
+                    </span>
+                    Select Source Clinician
+                </h6>
             </div>
-            <div class="card-body">
-                <form method="GET" action="{{ route('admin.clinicians.bulk-reassign') }}" class="row g-3 align-items-end">
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">From Clinician</label>
-                        <select name="from_clinician_id" class="form-select" onchange="this.form.submit()">
-                            <option value="">— Choose a clinician —</option>
-                            @foreach($clinicians as $c)
-                                <option value="{{ $c->id }}" {{ $fromId == $c->id ? 'selected' : '' }}>
-                                    {{ $c->full_name }}
-                                    @php
-                                        $openCount = $c->cases()
-                                            ->whereIn('status', ['assigned','approved','processing'])
-                                            ->count();
-                                    @endphp
-                                    ({{ $openCount }} open)
-                                </option>
-                            @endforeach
-                        </select>
-                        <div class="form-text">Only open (assigned/approved/processing) cases can be moved.</div>
+            <div class="card-body px-4 py-3">
+                <form method="GET" action="{{ route('admin.clinicians.bulk-reassign') }}">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold text-secondary mb-1">From Clinician</label>
+                            <select name="from_clinician_id" class="form-select" onchange="this.form.submit()">
+                                <option value="">— Choose a clinician —</option>
+                                @foreach($clinicians as $c)
+                                    <option value="{{ $c->id }}" {{ $fromId == $c->id ? 'selected' : '' }}>
+                                        {{ $c->full_name }}
+                                        @php $openCount = $c->cases()->whereIn('status',['assigned','approved','processing'])->count(); @endphp
+                                        ({{ $openCount }} open)
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Only open (assigned / approved / processing) cases can be moved.</div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -46,74 +84,103 @@
     </div>
 
     @if($fromId && $cases->count())
-    {{-- Step 2: Select cases and target --}}
+    {{-- ── Step 2: Select cases and target ────────────────────────────── --}}
     <div class="col-12">
         <form method="POST" action="{{ route('admin.clinicians.bulk-reassign.submit') }}" id="reassignForm">
             @csrf
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Step 2 — Choose Cases &amp; Target</h6>
-                    <div class="d-flex align-items-center gap-3">
-                        <label class="form-label mb-0 small fw-semibold">Move to:</label>
-                        <select name="to_clinician_id" class="form-select form-select-sm" style="min-width:220px" required>
-                            <option value="">— Select target clinician —</option>
-                            @foreach($clinicians as $c)
-                                @if($c->id != $fromId)
-                                <option value="{{ $c->id }}">{{ $c->full_name }}</option>
-                                @endif
-                            @endforeach
-                        </select>
-                        <button type="submit" class="btn btn-sm btn-success" id="submitBtn" disabled
-                                title="Select at least one case to enable">
-                            <i class="bi bi-arrow-right-circle me-1"></i>
-                            <span id="submitBtnLabel">Reassign Selected</span>
-                        </button>
-                    </div>
+            <div class="card border-0 shadow-sm" style="border-radius:10px; overflow:hidden;">
+
+                {{-- Card header --}}
+                <div class="card-header bg-white border-bottom px-4 py-3">
+                    <h6 class="mb-0 fw-semibold d-flex align-items-center gap-2">
+                        <span class="step-badge">2</span>
+                        Choose Cases &amp; Target Clinician
+                    </h6>
                 </div>
 
+                {{-- Action toolbar --}}
+                <div class="reassign-toolbar">
+                    {{-- Select-all + count --}}
+                    <div class="d-flex align-items-center gap-2 me-auto">
+                        <input type="checkbox" class="form-check-input mt-0" id="selectAll" title="Select all">
+                        <span class="sel-summary">
+                            <span id="selectedCount">0</span> of {{ $cases->count() }} cases selected
+                        </span>
+                    </div>
+
+                    {{-- Move-to select --}}
+                    <label class="form-label mb-0 small fw-semibold text-secondary" style="white-space:nowrap;">
+                        Move to:
+                    </label>
+                    <select name="to_clinician_id" class="form-select form-select-sm" style="min-width:200px; max-width:260px;" required>
+                        <option value="">— Select target clinician —</option>
+                        @foreach($clinicians as $c)
+                            @if($c->id != $fromId)
+                            <option value="{{ $c->id }}">{{ $c->full_name }}</option>
+                            @endif
+                        @endforeach
+                    </select>
+
+                    {{-- Reassign button --}}
+                    <button type="submit" class="btn btn-success" id="submitBtn" disabled
+                            title="Select at least one case and a target clinician">
+                        <i class="bi bi-arrow-right-circle"></i>
+                        <span id="submitBtnLabel">Reassign Selected</span>
+                    </button>
+                </div>
+
+                {{-- Cases table --}}
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0 align-middle">
-                            <thead class="table-light">
+                        <table class="table mb-0 align-middle" style="font-size:.875rem;">
+                            <thead style="background:#f8fafc; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b;">
                                 <tr>
-                                    <th style="width:40px">
-                                        <input type="checkbox" class="form-check-input" id="selectAll" title="Select all">
-                                    </th>
-                                    <th>Patient</th>
-                                    <th>Product / Offering</th>
-                                    <th>Status</th>
-                                    <th>Assigned</th>
-                                    <th>State</th>
+                                    <th style="width:44px; padding:10px 16px;"></th>
+                                    <th style="padding:10px 12px;">Patient</th>
+                                    <th style="padding:10px 12px;">Product / Offering</th>
+                                    <th style="padding:10px 12px;">Status</th>
+                                    <th style="padding:10px 12px;">Assigned</th>
+                                    <th style="padding:10px 12px;">State</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($cases as $case)
-                                <tr>
-                                    <td>
+                                <tr class="case-row border-bottom" style="transition:background .1s; cursor:pointer;"
+                                    onclick="toggleRow(this)">
+                                    <td style="padding:12px 16px;" onclick="event.stopPropagation()">
                                         <input type="checkbox" name="case_ids[]" value="{{ $case->id }}"
-                                               class="form-check-input case-checkbox">
+                                               class="form-check-input mt-0 case-checkbox"
+                                               onclick="event.stopPropagation(); syncRow(this)">
                                     </td>
-                                    <td>
-                                        <a href="{{ route('admin.cases.show', $case->uuid) }}" target="_blank" class="text-decoration-none">
+                                    <td style="padding:12px;">
+                                        <a href="{{ route('admin.cases.show', $case->uuid) }}" target="_blank"
+                                           class="fw-semibold text-decoration-none"
+                                           style="color:#1e293b; font-size:.875rem;"
+                                           onclick="event.stopPropagation()">
                                             {{ $case->patient?->full_name ?? '—' }}
                                         </a>
-                                        <small class="text-muted d-block">{{ $case->patient?->email }}</small>
+                                        <div class="text-muted" style="font-size:.74rem;">{{ $case->patient?->email }}</div>
                                     </td>
-                                    <td>
-                                        <small>{{ $case->caseOfferings->first()?->offering?->name ?? '—' }}</small>
+                                    <td style="padding:12px; color:#475569;">
+                                        {{ $case->caseOfferings->first()?->offering?->name ?? '—' }}
                                     </td>
-                                    <td>
-                                        <span class="badge
+                                    <td style="padding:12px;">
+                                        <span class="badge rounded-pill
                                             @if($case->status === 'assigned') bg-primary
                                             @elseif($case->status === 'approved') bg-success
                                             @elseif($case->status === 'processing') bg-warning text-dark
                                             @else bg-secondary
-                                            @endif">
+                                            @endif"
+                                            style="font-size:.72rem; padding:4px 10px;">
                                             {{ ucfirst($case->status) }}
                                         </span>
                                     </td>
-                                    <td><small>{{ $case->assigned_at?->format('M d, Y') ?? '—' }}</small></td>
-                                    <td><small>{{ $case->patient_state ?? $case->patient?->state ?? '—' }}</small></td>
+                                    <td style="padding:12px; color:#64748b; font-size:.82rem;">
+                                        {{ $case->assigned_at?->format('M d, Y') ?? '—' }}
+                                    </td>
+                                    <td style="padding:12px; color:#64748b; font-size:.82rem;">
+                                        {{ $case->patient_state ?? $case->patient?->state ?? '—' }}
+                                    </td>
                                 </tr>
                                 @endforeach
                             </tbody>
@@ -121,18 +188,15 @@
                     </div>
                 </div>
 
-                <div class="card-footer text-muted small">
-                    <span id="selectedCount">0</span> of {{ $cases->count() }} cases selected
-                </div>
             </div>
         </form>
     </div>
 
     @elseif($fromId && $cases->isEmpty())
     <div class="col-12">
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle me-2"></i>
-            This clinician has no open cases to reassign.
+        <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-2">
+            <i class="bi bi-info-circle-fill fs-5"></i>
+            <span>This clinician has no open cases to reassign.</span>
         </div>
     </div>
     @endif
@@ -185,6 +249,17 @@
 
 @section('scripts')
 <script>
+// Click anywhere on a row to toggle its checkbox.
+function toggleRow(tr) {
+    var cb = tr.querySelector('.case-checkbox');
+    if (cb) { cb.checked = !cb.checked; syncRow(cb); }
+}
+function syncRow(cb) {
+    var tr = cb.closest('tr');
+    if (tr) tr.classList.toggle('case-row-selected', cb.checked);
+    if (typeof updateState === 'function') updateState();
+}
+
 (function () {
     var selectAll     = document.getElementById('selectAll');
     var checkboxes    = document.querySelectorAll('.case-checkbox');
@@ -196,7 +271,7 @@
 
     var modalEl    = document.getElementById('confirmReassignModal');
     var confirmBtn = document.getElementById('confirmReassignBtn');
-    var bsModal    = null; // initialised lazily so Bootstrap is definitely loaded
+    var bsModal    = null;
 
     function getModal() {
         if (!bsModal && modalEl && typeof bootstrap !== 'undefined') {
@@ -205,11 +280,17 @@
         return bsModal;
     }
 
-    function updateState() {
-        var checked  = document.querySelectorAll('.case-checkbox:checked').length;
+    window.updateState = function updateState() {
+        var checked   = document.querySelectorAll('.case-checkbox:checked').length;
         var hasTarget = toSelect && toSelect.value;
 
         if (selectedCount) selectedCount.textContent = checked;
+
+        // Sync select-all indeterminate state.
+        if (selectAll) {
+            selectAll.checked       = checked > 0 && checked === checkboxes.length;
+            selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
+        }
 
         var enabled = checked > 0 && hasTarget;
         if (submitBtn) {
@@ -224,11 +305,15 @@
                 ? 'Reassign ' + checked + ' Case' + (checked === 1 ? '' : 's')
                 : 'Reassign Selected';
         }
-    }
+    };
 
     if (selectAll) {
         selectAll.addEventListener('change', function () {
-            checkboxes.forEach(function (cb) { cb.checked = selectAll.checked; });
+            checkboxes.forEach(function (cb) {
+                cb.checked = selectAll.checked;
+                var tr = cb.closest('tr');
+                if (tr) tr.classList.toggle('case-row-selected', cb.checked);
+            });
             updateState();
         });
     }
