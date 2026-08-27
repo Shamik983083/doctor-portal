@@ -3,10 +3,9 @@
 @section('title', 'Case Preview')
 @section('page-title')
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap');
 .case-preview-title { display:inline-flex; align-items:baseline; gap:7px; }
 .case-preview-title .label { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:.65rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:#94a3b8; }
-.case-preview-title .word  { font-family:'DM Serif Display',Georgia,serif; font-style:normal; font-size:1.2rem; font-weight:400; letter-spacing:.01em; color:#1e293b; line-height:1; }
+.case-preview-title .word  { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:1.05rem; font-weight:700; letter-spacing:-.01em; color:#1e293b; line-height:1; }
 </style>
 <span class="case-preview-title"><span class="label">Case</span><span class="word">Preview</span></span>
 @endsection
