@@ -335,7 +335,7 @@ class ClinicianController extends Controller
         $request->validate([
             'to_clinician_id'   => 'required|exists:clinicians,id',
             'case_ids'          => 'required|array|min:1',
-            'case_ids.*'        => 'integer|exists:patient_cases,id',
+            'case_ids.*'        => 'integer|exists:cases,id',
         ]);
 
         $toClinician = Clinician::visibleTo($request->user())->findOrFail($request->to_clinician_id);
