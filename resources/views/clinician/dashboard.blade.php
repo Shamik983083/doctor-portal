@@ -158,7 +158,7 @@
                 <div>
                     <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">New Messages</p>
                     <h3 class="fw-bold mb-0" style="color:{{ $unreadMessagesCount > 0 ? '#e83e8c' : '#adb5bd' }};">{{ $unreadMessagesCount }}</h3>
-                    <p class="text-muted mb-0" style="font-size:.7rem;">unread from patients</p>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">Unread from patients</p>
                 </div>
             </div>
         </div>

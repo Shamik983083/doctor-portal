@@ -11,7 +11,7 @@
             <div>
                 <span class="text-muted fs-6">
                     @if($unread > 0)
-                        <span class="badge bg-danger me-1">{{ $unread }}</span> unread
+                        <span class="badge bg-danger me-1">{{ $unread }}</span> Unread
                     @else
                         All caught up
                     @endif
