@@ -63,8 +63,10 @@
                                 @endif
                             @endforeach
                         </select>
-                        <button type="submit" class="btn btn-sm btn-primary" id="submitBtn" disabled>
-                            <i class="bi bi-arrow-right-circle me-1"></i>Reassign Selected
+                        <button type="submit" class="btn btn-sm btn-success" id="submitBtn" disabled
+                                title="Select at least one case to enable">
+                            <i class="bi bi-arrow-right-circle me-1"></i>
+                            <span id="submitBtnLabel">Reassign Selected</span>
                         </button>
                     </div>
                 </div>
@@ -187,6 +189,7 @@
     var selectAll     = document.getElementById('selectAll');
     var checkboxes    = document.querySelectorAll('.case-checkbox');
     var submitBtn     = document.getElementById('submitBtn');
+    var submitBtnLabel= document.getElementById('submitBtnLabel');
     var selectedCount = document.getElementById('selectedCount');
     var toSelect      = document.querySelector('[name="to_clinician_id"]');
     var form          = document.getElementById('reassignForm');
@@ -197,9 +200,24 @@
     var confirmBtn    = document.getElementById('confirmReassignBtn');
 
     function updateState() {
-        var checked = document.querySelectorAll('.case-checkbox:checked').length;
+        var checked  = document.querySelectorAll('.case-checkbox:checked').length;
+        var hasTarget = toSelect && toSelect.value;
+
         if (selectedCount) selectedCount.textContent = checked;
-        if (submitBtn) submitBtn.disabled = checked === 0 || !toSelect || !toSelect.value;
+
+        var enabled = checked > 0 && hasTarget;
+        if (submitBtn) {
+            submitBtn.disabled = !enabled;
+            submitBtn.title    = enabled ? '' :
+                (checked === 0 && !hasTarget ? 'Select cases and a target clinician' :
+                 checked === 0              ? 'Select at least one case' :
+                                              'Choose a target clinician');
+        }
+        if (submitBtnLabel) {
+            submitBtnLabel.textContent = checked > 0
+                ? 'Reassign ' + checked + ' Case' + (checked === 1 ? '' : 's')
+                : 'Reassign Selected';
+        }
     }
 
     if (selectAll) {
