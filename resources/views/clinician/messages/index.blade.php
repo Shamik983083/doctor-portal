@@ -99,34 +99,60 @@
         </div>
 
         {{-- Forward to Support modal --}}
-        <div id="fwdModal" style="display:none;position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.45);align-items:center;justify-content:center;">
-            <div style="background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);padding:24px 28px;max-width:480px;width:92%;position:relative;">
-                <button type="button" onclick="closeFwdModal()" aria-label="Close"
-                        style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;">&times;</button>
-                <h3 style="font-size:1rem;font-weight:700;margin:0 0 4px;">Forward to Support</h3>
-                <p style="font-size:.8rem;color:var(--muted);margin:0 0 16px;">This opens a private thread with the partner's support team. The patient conversation is unaffected.</p>
+        @php $fwdMsgs = $thread->where('direction','inbound')->values(); @endphp
+        <div id="fwdModal" class="fwd-modal-overlay" style="display:none;">
+            <div class="fwd-modal-box">
+                <div class="fwd-modal-head">
+                    <h3>Forward to Support</h3>
+                    <p>Select one or more patient messages to share with the support team, then add an optional note.</p>
+                    <button type="button" class="fwd-close-btn" onclick="closeFwdModal()" aria-label="Close">&times;</button>
+                </div>
                 <form id="fwdForm" method="POST" action="{{ route('clinician.cases.forward-to-support', $selected->uuid) }}"
-                      onsubmit="var q=this.querySelector('[name=quoted_message]'),n=this.querySelector('[name=note]');if(!q.value.trim()&&(!n||!n.value.trim())){q.focus();q.style.borderColor='#ef4444';return false;}return true;">
+                      onsubmit="return compileFwdMsg(this)"
+                      style="display:flex;flex-direction:column;overflow:hidden;flex:1;min-height:0;">
                     @csrf
-                    <div style="margin-bottom:14px;">
-                        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Message to forward <span style="color:#ef4444;">*</span></label>
-                        <textarea name="quoted_message" id="fwdQuotedDisplay" rows="3" required
-                                  style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;background:var(--surface);resize:vertical;"
-                                  placeholder="Paste or type the patient message to forward…"></textarea>
-                        <span style="font-size:.72rem;color:var(--muted);">The support team will see this as context.</span>
+                    <input type="hidden" name="quoted_message" id="fwdQuotedInput">
+                    <div class="fwd-msg-section">
+                        <div class="fwd-msg-section-head">
+                            <span class="fwd-msg-section-label">
+                                Patient Messages
+                                <span class="fwd-count-badge" id="fwdCount" style="display:none;"></span>
+                            </span>
+                            @if($fwdMsgs->count() > 1)
+                            <button type="button" class="fwd-select-all-btn" id="fwdSelectAll"
+                                    onclick="fwdToggleAll('fwdMsgList','fwdSelectAll','fwdCount')">Select all</button>
+                            @endif
+                        </div>
+                        <div class="fwd-msg-list" id="fwdMsgList">
+                            @forelse($fwdMsgs as $msg)
+                            <label class="fwd-msg-item"
+                                   data-body="{{ e($msg->body) }}"
+                                   data-time="{{ $msg->created_at->format('M j, g:i A') }}">
+                                <input type="checkbox" class="fwd-check"
+                                       onchange="fwdCheckChange('fwdMsgList','fwdCount','fwdSelectAll')">
+                                <div class="fwd-msg-content">
+                                    <span class="fwd-msg-time">{{ $msg->created_at->format('M j, g:i A') }}</span>
+                                    <span class="fwd-msg-body">{{ $msg->body }}</span>
+                                </div>
+                            </label>
+                            @empty
+                            <div class="fwd-empty-state">
+                                <i class="bi bi-chat-text" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:.35;"></i>
+                                No patient messages yet. Add a note below to open the support thread.
+                            </div>
+                            @endforelse
+                        </div>
                     </div>
-                    <div style="margin-bottom:18px;">
-                        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:4px;">Your note to support <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-                        <textarea name="note" rows="2"
-                                  style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;background:var(--surface);resize:none;"
-                                  placeholder="Add context, specific question, or any details for the support team…"></textarea>
+                    <div class="fwd-note-section">
+                        <label>Your note to support <span style="color:var(--muted,#64748b);font-weight:400;">(optional)</span></label>
+                        <textarea name="note" class="fwd-note-textarea" rows="2"
+                                  placeholder="Add context or a specific question for the support team…"></textarea>
                     </div>
-                    <div style="display:flex;gap:10px;justify-content:flex-end;">
-                        <button type="button" onclick="closeFwdModal()"
-                                style="padding:7px 18px;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer;font-size:.83rem;">Cancel</button>
-                        <button type="submit"
-                                style="padding:7px 18px;border:none;border-radius:8px;background:#4361ee;color:#fff;font-weight:600;cursor:pointer;font-size:.83rem;">
-                            <i class="bi bi-send me-1"></i> Open Support Thread
+                    <div class="fwd-error-msg" id="fwdError">Please select at least one message, or add a note.</div>
+                    <div class="fwd-footer">
+                        <button type="button" class="fwd-cancel-btn" onclick="closeFwdModal()">Cancel</button>
+                        <button type="submit" class="fwd-submit-btn">
+                            <i class="bi bi-send-fill"></i> Open Support Thread
                         </button>
                     </div>
                 </form>
@@ -162,6 +188,41 @@
 @endsection
 
 @section('scripts')
+<style>
+.fwd-modal-overlay { position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px; }
+.fwd-modal-box { background:var(--surface,#fff);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.18);max-width:520px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden; }
+.fwd-modal-head { padding:20px 22px 14px;border-bottom:1px solid var(--line,#e2e8f0);position:relative;flex-shrink:0; }
+.fwd-modal-head h3 { font-size:1rem;font-weight:700;margin:0 0 3px;color:var(--ink,#1e293b); }
+.fwd-modal-head p { font-size:.78rem;color:var(--muted,#64748b);margin:0;line-height:1.45; }
+.fwd-close-btn { position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted,#64748b);line-height:1;padding:3px 7px;border-radius:6px; }
+.fwd-close-btn:hover { background:var(--line,#f1f5f9);color:var(--ink,#1e293b); }
+.fwd-msg-section { padding:14px 22px 0;flex-shrink:0; }
+.fwd-msg-section-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:8px; }
+.fwd-msg-section-label { font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted,#64748b); }
+.fwd-count-badge { display:inline-block;margin-left:6px;font-size:.68rem;background:#e0e7ff;color:#3730a3;border-radius:20px;padding:1px 8px;font-weight:700; }
+.fwd-select-all-btn { font-size:.73rem;color:#4361ee;background:none;border:none;cursor:pointer;padding:0;font-weight:500; }
+.fwd-select-all-btn:hover { text-decoration:underline; }
+.fwd-msg-list { max-height:210px;overflow-y:auto;border:1px solid var(--line,#e2e8f0);border-radius:10px; }
+.fwd-msg-item { display:flex;align-items:flex-start;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .12s;user-select:none; }
+.fwd-msg-item:last-child { border-bottom:none; }
+.fwd-msg-item:hover { background:#f8fafc; }
+.fwd-msg-item.fwd-selected { background:#eff6ff;border-left:3px solid #4361ee; }
+.fwd-check { width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:#4361ee;cursor:pointer; }
+.fwd-msg-content { flex:1;min-width:0; }
+.fwd-msg-time { display:block;font-size:.68rem;color:var(--muted,#64748b);margin-bottom:2px; }
+.fwd-msg-body { display:block;font-size:.82rem;color:var(--ink,#1e293b);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; }
+.fwd-empty-state { padding:20px;text-align:center;color:var(--muted,#64748b);font-size:.82rem; }
+.fwd-note-section { padding:12px 22px 0;flex-shrink:0; }
+.fwd-note-section label { font-size:.78rem;font-weight:600;display:block;margin-bottom:5px;color:var(--ink,#1e293b); }
+.fwd-note-textarea { width:100%;border:1px solid var(--line,#e2e8f0);border-radius:8px;padding:8px 10px;font-size:.82rem;resize:none;background:var(--surface,#fff);color:var(--ink,#1e293b);box-sizing:border-box; }
+.fwd-note-textarea:focus { outline:none;border-color:#4361ee;box-shadow:0 0 0 3px rgba(67,97,238,.12); }
+.fwd-error-msg { margin:8px 22px 0;padding:8px 12px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:.78rem;color:#dc2626;display:none; }
+.fwd-footer { padding:14px 22px 18px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--line,#e2e8f0);flex-shrink:0;margin-top:12px; }
+.fwd-cancel-btn { padding:8px 18px;border:1px solid var(--line,#e2e8f0);border-radius:8px;background:none;cursor:pointer;font-size:.83rem;color:var(--ink,#1e293b); }
+.fwd-cancel-btn:hover { background:#f8fafc; }
+.fwd-submit-btn { padding:8px 18px;border:none;border-radius:8px;background:#4361ee;color:#fff;font-weight:600;cursor:pointer;font-size:.83rem;display:flex;align-items:center;gap:6px; }
+.fwd-submit-btn:hover { background:#3451d1; }
+</style>
 <script>
 (function () {
     // Scroll thread to bottom on load
@@ -299,28 +360,84 @@
     }
 
     // ── Forward-to-support modal ─────────────────────────────────────
-    var fwdModal         = document.getElementById('fwdModal');
-    var fwdQuotedDisplay = document.getElementById('fwdQuotedDisplay');
+    var fwdModal = document.getElementById('fwdModal');
+
+    // fwdCheckChange and fwdToggleAll are defined on cases/show too — safe to
+    // re-declare here since these are separate pages.
+    window.fwdCheckChange = function (listId, countId, selectAllId) {
+        var list = document.getElementById(listId);
+        if (!list) return;
+        var all     = list.querySelectorAll('.fwd-check');
+        var checked = list.querySelectorAll('.fwd-check:checked');
+        all.forEach(function (cb) {
+            cb.closest('.fwd-msg-item').classList.toggle('fwd-selected', cb.checked);
+        });
+        var countEl = document.getElementById(countId);
+        if (countEl) {
+            countEl.style.display = checked.length > 0 ? '' : 'none';
+            countEl.textContent   = checked.length + ' selected';
+        }
+        var saBtn = document.getElementById(selectAllId);
+        if (saBtn && all.length > 0) {
+            saBtn.textContent = checked.length === all.length ? 'Deselect all' : 'Select all';
+        }
+    };
+
+    window.fwdToggleAll = function (listId, selectAllId, countId) {
+        var list = document.getElementById(listId);
+        if (!list) return;
+        var all        = list.querySelectorAll('.fwd-check');
+        var allChecked = list.querySelectorAll('.fwd-check:checked').length === all.length;
+        all.forEach(function (cb) { cb.checked = !allChecked; });
+        window.fwdCheckChange(listId, countId, selectAllId);
+    };
+
+    window.compileFwdMsg = function (form) {
+        var list      = document.getElementById('fwdMsgList');
+        var hiddenInp = document.getElementById('fwdQuotedInput');
+        var errorEl   = document.getElementById('fwdError');
+        var noteField = form.querySelector('[name="note"]');
+        var note      = noteField ? noteField.value.trim() : '';
+        var selected  = list ? list.querySelectorAll('.fwd-check:checked') : [];
+
+        if (selected.length === 0 && !note) {
+            if (errorEl) errorEl.style.display = '';
+            return false;
+        }
+        if (errorEl) errorEl.style.display = 'none';
+
+        var quoted = '';
+        selected.forEach(function (cb) {
+            var item = cb.closest('.fwd-msg-item');
+            quoted += '[' + (item.dataset.time || '') + ']\n"' + (item.dataset.body || '') + '"\n\n';
+        });
+        if (hiddenInp) hiddenInp.value = quoted.trim();
+        return true;
+    };
 
     window.openFwdModal = function () {
-        // Pre-fill with the last inbound (patient) bubble text
-        var bubbles = document.querySelectorAll('#chatScroll .bubble.them');
-        var lastPatientMsg = bubbles.length ? bubbles[bubbles.length - 1].textContent.trim() : '';
-        if (fwdQuotedDisplay) {
-            fwdQuotedDisplay.value = lastPatientMsg;
-            fwdQuotedDisplay.style.borderColor = '';
-        }
-        if (fwdModal) { fwdModal.style.display = 'flex'; }
-        if (fwdQuotedDisplay) fwdQuotedDisplay.focus();
+        if (fwdModal) { fwdModal.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
     };
 
     window.closeFwdModal = function () {
-        if (fwdModal) fwdModal.style.display = 'none';
+        if (!fwdModal) return;
+        fwdModal.style.display = 'none';
+        document.body.style.overflow = '';
+        var list = document.getElementById('fwdMsgList');
+        if (list) {
+            list.querySelectorAll('.fwd-check:checked').forEach(function (cb) {
+                cb.checked = false;
+                cb.closest('.fwd-msg-item').classList.remove('fwd-selected');
+            });
+            window.fwdCheckChange('fwdMsgList', 'fwdCount', 'fwdSelectAll');
+        }
+        var err = document.getElementById('fwdError');
+        if (err) err.style.display = 'none';
     };
 
     if (fwdModal) {
         fwdModal.addEventListener('click', function (e) {
-            if (e.target === fwdModal) closeFwdModal();
+            if (e.target === fwdModal) window.closeFwdModal();
         });
     }
 
