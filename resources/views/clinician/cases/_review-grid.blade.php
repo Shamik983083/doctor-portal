@@ -523,6 +523,7 @@
             var actBtn = e.target.closest('.button-primary.full-width,.button-secondary.full-width,.button-danger.full-width');
             if (actBtn && !actBtn.classList.contains('btn-loading') && !actBtn.hasAttribute('data-review-url')) {
                 var label = actBtn.textContent.trim();
+                actBtn.dataset.origLabel = label;
                 actBtn.classList.add('btn-loading');
                 actBtn.innerHTML = '<span class="btn-spin"></span>' + label;
                 return;
@@ -539,6 +540,17 @@
                     else { p.setAttribute('hidden', ''); }
                 });
             }
+        });
+
+        // Reset spinner buttons when the page is restored from the browser's
+        // back/forward cache (bfcache) — e.persisted === true on bfcache restore.
+        window.addEventListener('pageshow', function (e) {
+            if (!e.persisted) return;
+            document.querySelectorAll('.btn-loading').forEach(function (btn) {
+                var orig = btn.dataset.origLabel || btn.textContent.trim();
+                btn.classList.remove('btn-loading');
+                btn.textContent = orig;
+            });
         });
     })();
 </script>
