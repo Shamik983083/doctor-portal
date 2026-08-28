@@ -49,7 +49,7 @@
         <div style="height:8px"></div>
 
         @foreach($cases as $c)
-            @php($msg = $latest->get($c->id))
+            @php $msg = $latest->get($c->id); @endphp
             <a class="msg-row {{ $selected && $selected->id === $c->id ? 'active' : '' }}"
                data-uuid="{{ $c->uuid }}"
                href="{{ route('clinician.messages.index', array_merge(request()->except('page'), ['case' => $c->uuid])) }}">
