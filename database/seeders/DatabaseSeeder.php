@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             IntakeQuestionnairesSeeder::class,
             OfferIntakeQuestionnairesSeeder::class,
+            NadQuestionnaireSeeder::class,
             DemoDataSeeder::class,
             OfferingCategoriesSeeder::class,
             GlpOfferingsSeeder::class,
