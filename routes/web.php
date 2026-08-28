@@ -321,6 +321,13 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         return view('admin.guide.antiaging-api', compact('questionnaire'));
     })->name('guide.antiaging-api');
 
+    Route::get('/guide/nad-api', function () {
+        $questionnaire = \App\Models\Questionnaire::with([
+            'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
+        ])->where('name', 'NAD Questionnaire')->first();
+        return view('admin.guide.nad-api', compact('questionnaire'));
+    })->name('guide.nad-api');
+
     // EHR Records — integration surface, super admin only (Devin msg 2117)
     Route::prefix('ehr-records')->name('ehr-records.')->middleware('role:super_admin')->group(function () {
         Route::get('/',               [AdminEhrRecordController::class, 'index'])->name('index');
