@@ -105,6 +105,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             Log::warning('Healthie returned GraphQL errors', [
                 'partner_id' => $this->settings->partner_id,
                 'errors'     => $messages,
+                'full_errors' => $json['errors'] ?? [],
             ]);
 
             return ['ok' => false, 'code' => $response->status(), 'body' => $messages, 'reference' => null];
@@ -296,12 +297,14 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             }
             GQL;
 
+            $approvedAt  = $payload['encounter']['approved_at'] ?? now()->toIso8601String();
+            $entryDate   = substr($approvedAt, 0, 10); // YYYY-MM-DD only
+
             $variables = [
                 'input' => [
                     'user_id'    => $healthieClientId,
                     'content'    => $noteText,
-                    'created_at' => $payload['encounter']['approved_at']
-                        ?? now()->toIso8601String(),
+                    'entry_date' => $entryDate,
                 ],
             ];
         }
