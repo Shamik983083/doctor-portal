@@ -226,6 +226,7 @@
 
     {{-- MA-DOCPORTAL design system promoted to global shell (O0.1) --}}
     <x-ma-styles />
+    @stack('head')
 </head>
 <body>
 

@@ -7,8 +7,10 @@ use App\Models\Clinician;
 use App\Models\Partner;
 use App\Models\PartnerEhrSetting;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Passport\ClientRepository;
@@ -317,5 +319,55 @@ class PartnerController extends Controller
         $webhook->delete();
 
         return redirect()->route('admin.partners.show', $partner->id)->with('success', 'Webhook deleted.');
+    }
+
+    /**
+     * Proxy a Healthie lookup for forms and groups using the stored credentials.
+     * Never exposes the API key to the browser — key stays server-side.
+     */
+    public function healthieLookup(int $id): JsonResponse
+    {
+        $partner  = Partner::findOrFail($id);
+        $settings = PartnerEhrSetting::where('partner_id', $partner->id)
+            ->where('provider', 'healthie')
+            ->first();
+
+        if (! $settings || ! $settings->api_key || ! $settings->endpoint) {
+            return response()->json([
+                'error' => 'No API key or endpoint is saved for this partner yet. Save those fields first.',
+            ], 422);
+        }
+
+        $gql = <<<'GQL'
+        {
+            customModuleForms { id name }
+            userGroups { id name }
+        }
+        GQL;
+
+        try {
+            $response = Http::withHeaders($settings->authHeaders())
+                ->acceptJson()
+                ->timeout(15)
+                ->post($settings->endpoint, ['query' => $gql]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Could not reach Healthie: ' . $e->getMessage()], 422);
+        }
+
+        if (! $response->successful()) {
+            return response()->json(['error' => 'Healthie returned HTTP ' . $response->status()], 422);
+        }
+
+        $json = $response->json();
+
+        if (! empty($json['errors'])) {
+            $msg = implode('; ', array_map(fn ($e) => $e['message'], $json['errors']));
+            return response()->json(['error' => $msg], 422);
+        }
+
+        return response()->json([
+            'forms'  => $json['data']['customModuleForms'] ?? [],
+            'groups' => $json['data']['userGroups'] ?? [],
+        ]);
     }
 }
