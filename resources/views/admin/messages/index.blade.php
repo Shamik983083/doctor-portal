@@ -507,7 +507,7 @@
             @if($tab === 'provider')
             <div class="msg-compose">
                 @if($selected->clinician_id)
-                <form method="POST" action="{{ route('admin.messages.send') }}">
+                <form id="msgComposeForm" method="POST" action="{{ route('admin.messages.send') }}">
                     @csrf
                     <input type="hidden" name="case_uuid" value="{{ $selected->uuid }}">
                     <div class="msg-compose-label">
@@ -517,7 +517,7 @@
                     <div class="msg-compose-row">
                         <textarea name="body" rows="2" required maxlength="5000"
                                   placeholder="Write an internal note to the clinician…"></textarea>
-                        <button type="submit" class="msg-compose-send">
+                        <button id="msgSendBtn" type="submit" class="msg-compose-send">
                             <i class="bi bi-send-fill"></i>Send
                         </button>
                     </div>
@@ -573,6 +573,27 @@
     // Auto-scroll thread to latest message on load.
     var thread = document.getElementById('msgThread');
     if (thread) thread.scrollTop = thread.scrollHeight;
+
+    // Prevent double-submission on the compose form.
+    // Disabling the button on submit stops a second click from firing a
+    // duplicate POST before the redirect completes, which was the source
+    // of two identical success alerts appearing on the messages page.
+    // bfcache restore re-enables the button so the form stays usable if
+    // the user navigates back without a full reload.
+    var composeForm = document.getElementById('msgComposeForm');
+    var sendBtn     = document.getElementById('msgSendBtn');
+    if (composeForm && sendBtn) {
+        composeForm.addEventListener('submit', function () {
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.55';
+        });
+        window.addEventListener('pageshow', function (e) {
+            if (e.persisted) {
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '';
+            }
+        });
+    }
 })();
 </script>
 @endsection
