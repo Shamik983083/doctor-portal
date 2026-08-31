@@ -280,7 +280,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
 
         $categories = [
             'weight' => 'Weight',
-            'height' => 'Height',
+            'height' => 'Height (in.)',
             'bmi'    => 'BMI',
         ];
 
