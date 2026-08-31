@@ -255,57 +255,74 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
     {
         $noteText = $this->buildNoteText($payload);
 
-        if ($this->settings->note_form_id) {
-            $mutation = <<<'GQL'
-            mutation CreateChartNote($input: createFormAnswerGroupInput!) {
-                createFormAnswerGroup(input: $input) {
-                    formAnswerGroup {
-                        id
-                    }
-                    messages {
-                        field
-                        message
-                    }
+        if (! $this->settings->note_form_id) {
+            throw new RuntimeException(
+                'No note_form_id configured for this partner. Set a Healthie chart note form ID '
+                . 'on the partner\'s EHR settings before pushing records.'
+            );
+        }
+
+        $moduleId = $this->resolveNoteModuleId();
+
+        $mutation = <<<'GQL'
+        mutation CreateChartNote($input: createFormAnswerGroupInput!) {
+            createFormAnswerGroup(input: $input) {
+                formAnswerGroup {
+                    id
+                }
+                messages {
+                    field
+                    message
                 }
             }
-            GQL;
+        }
+        GQL;
 
-            $variables = [
-                'input' => [
-                    'user_id'               => $healthieClientId,
-                    'custom_module_form_id' => $this->settings->note_form_id,
-                    'external_id'           => $payload['patient']['external_id'],
-                    'name'                  => $noteText,
-                    'finished'              => true,
-                    'marked_locked'         => true,
-                    'created_at'            => $payload['encounter']['approved_at']
-                        ?? now()->toIso8601String(),
-                ],
-            ];
-        } else {
-            $mutation = <<<'GQL'
-            mutation CreateNote($input: createNoteInput!) {
-                createNote(input: $input) {
-                    note {
-                        id
-                    }
-                    messages {
-                        field
-                        message
-                    }
-                }
-            }
-            GQL;
+        $input = [
+            'user_id'               => $healthieClientId,
+            'custom_module_form_id' => $this->settings->note_form_id,
+            'finished'              => true,
+        ];
 
-            $variables = [
-                'input' => [
-                    'user_id' => $healthieClientId,
-                    'content' => $noteText,
+        if ($moduleId !== null) {
+            $input['form_answers'] = [
+                [
+                    'custom_module_id' => $moduleId,
+                    'answer'           => $noteText,
+                    'user_id'          => $healthieClientId,
                 ],
             ];
         }
 
-        return [$mutation, $variables];
+        return [$mutation, ['input' => $input]];
+    }
+
+    /**
+     * Fetches the first textarea/text module ID from the configured note form.
+     *
+     * Each Healthie org has its own custom module IDs even for the same form
+     * template, so this must be looked up at runtime rather than hardcoded.
+     */
+    private function resolveNoteModuleId(): ?string
+    {
+        $query = <<<'GQL'
+        query FormModules($id: ID) {
+            customModuleForm(id: $id) {
+                custom_modules { id mod_type }
+            }
+        }
+        GQL;
+
+        $response = $this->graphql($query, ['id' => $this->settings->note_form_id]);
+        $modules  = $response->json('data.customModuleForm.custom_modules') ?? [];
+
+        foreach ($modules as $module) {
+            if (in_array($module['mod_type'] ?? '', ['textarea', 'text', 'paragraph'], true)) {
+                return (string) $module['id'];
+            }
+        }
+
+        return ! empty($modules[0]['id']) ? (string) $modules[0]['id'] : null;
     }
 
     /**
