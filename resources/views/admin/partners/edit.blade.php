@@ -331,8 +331,8 @@
 @endpush
 
 @section('content')
-@php($healthie = $partner->healthieSettings)
 @php
+    $healthie = $partner->healthieSettings;
     $ehrStatus = 'inactive';
     $ehrStatusLabel = 'Not configured';
     if ($healthie) {
