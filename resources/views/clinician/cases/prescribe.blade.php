@@ -647,7 +647,7 @@
                 + '<div class="field"><label>Duration <span class="req">*</span></label>'
                 + '<select data-f="term" name="medications[' + i + '][term]" required>' + optionList(TERMS, defaultTerm) + '</select></div>'
                 + '</div>'
-                + '<div class="field-row">'
+                + '<div class="field-row" style="margin-top:10px">'
                 + '<div class="field"><label>Administration frequency <span class="req">*</span></label>'
                 + '<select name="medications[' + i + '][frequency]" required>' + optionList(FREQUENCIES, 'Weekly') + '</select></div>'
                 + '<div class="field"><label>Refills <span class="req">*</span></label>'
