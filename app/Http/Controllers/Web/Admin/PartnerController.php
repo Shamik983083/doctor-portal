@@ -140,6 +140,9 @@ class PartnerController extends Controller
         $missing = $settings->missingValues();
 
         if ($missing === []) {
+            if ($settings->isPushable()) {
+                return null;
+            }
             return 'Healthie values saved. The company is still disabled for push: enable it once its sandbox '
                 . 'has been validated. See docs/integrations/HEALTHIE-SETUP.md.';
         }
