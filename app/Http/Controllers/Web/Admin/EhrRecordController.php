@@ -36,8 +36,7 @@ class EhrRecordController extends Controller
         $maxAttempts = (int) config('ehr.max_attempts', 5);
 
         $canRetry = $record->status === EhrRecord::STATUS_FAILED
-            && $record->attempts < $maxAttempts
-            && (bool) config('ehr.enabled');
+            && $record->attempts < $maxAttempts;
 
         return view('admin.ehr-records.show', compact('record', 'canRetry', 'maxAttempts'));
     }
