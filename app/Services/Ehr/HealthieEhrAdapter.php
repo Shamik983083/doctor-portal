@@ -297,14 +297,10 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             }
             GQL;
 
-            $approvedAt  = $payload['encounter']['approved_at'] ?? now()->toIso8601String();
-            $entryDate   = substr($approvedAt, 0, 10); // YYYY-MM-DD only
-
             $variables = [
                 'input' => [
-                    'user_id'    => $healthieClientId,
-                    'content'    => $noteText,
-                    'entry_date' => $entryDate,
+                    'user_id' => $healthieClientId,
+                    'content' => $noteText,
                 ],
             ];
         }

@@ -186,20 +186,6 @@
 
 <div class="ehr-page">
 
-{{-- Alerts --}}
-@if(session('success'))
-<div class="alert alert-success alert-dismissible fade show py-2 mb-2" role="alert" style="font-size:.85rem;">
-    <i class="bi bi-check-circle me-1"></i>{{ session('success') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-@endif
-@if(session('error'))
-<div class="alert alert-danger alert-dismissible fade show py-2 mb-2" role="alert" style="font-size:.85rem;">
-    <i class="bi bi-exclamation-triangle me-1"></i>{{ session('error') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-@endif
-
 {{-- Action bar --}}
 <div class="ehr-bar">
     <div style="display:flex;align-items:center;gap:.65rem;min-width:0;">
