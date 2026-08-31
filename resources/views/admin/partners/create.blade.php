@@ -73,6 +73,14 @@
                 </div>
             </div>
 
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Default Group ID <span class="text-muted fw-normal">(optional)</span></label>
+                    <input type="text" name="healthie_default_group_id" class="form-control" value="{{ old('healthie_default_group_id') }}">
+                    <div class="form-text">Healthie patient group new clients are added to. Leave blank if no groups are configured.</div>
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label class="form-label fw-semibold">Authorization Shard <span class="text-muted fw-normal">(optional)</span></label>
                 <input type="text" name="healthie_authorization_shard" class="form-control" value="{{ old('healthie_authorization_shard') }}">

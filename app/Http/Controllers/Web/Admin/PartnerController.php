@@ -54,11 +54,13 @@ class PartnerController extends Controller
             'healthie_organization_id'     => 'nullable|string|max:255',
             'healthie_default_provider_id' => 'nullable|string|max:255',
             'healthie_note_form_id'        => 'nullable|string|max:255',
+            'healthie_default_group_id'    => 'nullable|string|max:255',
         ]);
 
         $partnerData = collect($data)->except([
             'healthie_api_key', 'healthie_endpoint', 'healthie_authorization_shard',
             'healthie_organization_id', 'healthie_default_provider_id', 'healthie_note_form_id',
+            'healthie_default_group_id',
         ])->all();
 
         $partnerData['slug'] = Str::slug($partnerData['name']);
@@ -111,6 +113,7 @@ class PartnerController extends Controller
             'organization_id'     => $request->input('healthie_organization_id') ?: $settings->organization_id,
             'default_provider_id' => $request->input('healthie_default_provider_id') ?: $settings->default_provider_id,
             'note_form_id'        => $request->input('healthie_note_form_id') ?: $settings->note_form_id,
+            'default_group_id'    => $request->input('healthie_default_group_id') ?: $settings->default_group_id,
         ]);
 
         if ($request->filled('healthie_api_key')) {
@@ -185,6 +188,7 @@ class PartnerController extends Controller
             'healthie_organization_id'     => 'nullable|string|max:255',
             'healthie_default_provider_id' => 'nullable|string|max:255',
             'healthie_note_form_id'        => 'nullable|string|max:255',
+            'healthie_default_group_id'    => 'nullable|string|max:255',
 
             // Enabling push for a company is deliberate and separate from
             // entering its values, so a paste of credentials never switches a

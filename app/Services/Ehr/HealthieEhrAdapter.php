@@ -218,6 +218,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             'gender'            => $payload['patient']['gender'] ?? null,
             'record_identifier' => $namespacedKey,
             'dietitian_id'      => $this->settings->default_provider_id ?: null,
+            'user_group_id'     => $this->settings->default_group_id ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 
         $input['dont_send_welcome'] = true;

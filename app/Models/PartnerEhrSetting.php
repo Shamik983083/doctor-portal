@@ -23,6 +23,7 @@ class PartnerEhrSetting extends Model
         'organization_id',
         'default_provider_id',
         'note_form_id',
+        'default_group_id',
         'is_enabled',
         'sandbox_validated',
     ];
