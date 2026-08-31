@@ -328,6 +328,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         return view('admin.guide.nad-api', compact('questionnaire'));
     })->name('guide.nad-api');
 
+    Route::get('/guide/healthie-ehr', fn() => view('admin.guide.healthie-ehr'))->name('guide.healthie-ehr');
+
     // EHR Records — integration surface, super admin only (Devin msg 2117)
     Route::prefix('ehr-records')->name('ehr-records.')->middleware('role:super_admin')->group(function () {
         Route::get('/',               [AdminEhrRecordController::class, 'index'])->name('index');

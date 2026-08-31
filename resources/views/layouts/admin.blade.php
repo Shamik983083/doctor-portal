@@ -8,7 +8,7 @@
         'admin.questionnaires.*', 'admin.questions.*', 'admin.partner-dashboard.*',
         'admin.escalations.*', 'admin.messages.*'
     );
-    $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*', 'admin.ehr-records.*');
+    $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*', 'admin.ehr-records.*', 'guide.healthie-ehr');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*', 'admin.ai.*');
     $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*', 'admin.users.*');
 @endphp
@@ -142,6 +142,10 @@
         <a class="nav-link {{ request()->routeIs('admin.guide.nad-api') ? 'active' : '' }}"
            href="{{ route('admin.guide.nad-api') }}">
             <i class="bi bi-capsule"></i> NAD API
+        </a>
+        <a class="nav-link {{ request()->routeIs('admin.guide.healthie-ehr') ? 'active' : '' }}"
+           href="{{ route('admin.guide.healthie-ehr') }}">
+            <i class="bi bi-hospital"></i> Healthie EHR Guide
         </a>
         <a class="nav-link {{ request()->routeIs('admin.guide.webhooks') ? 'active' : '' }}"
            href="{{ route('admin.guide.webhooks') }}">
