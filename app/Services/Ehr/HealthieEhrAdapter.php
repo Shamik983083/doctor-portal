@@ -75,7 +75,11 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         // outbox will try again up to max_attempts).
         $healthieClientId = $this->findOrCreateClient($payload);
 
-        // Step 2: post the clinical note.
+        // Step 2: push vitals (weight, height, BMI) as metric entries.
+        // Best-effort: a vital failing to post must not block or fail the record.
+        $this->pushVitals($payload, $healthieClientId);
+
+        // Step 3: post the clinical note.
         [$mutation, $variables] = $this->buildMutation($payload, $healthieClientId);
 
         try {
@@ -251,6 +255,67 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
      * (a plain text note on the patient's timeline) when it is not. Either
      * path produces a record the extractReference helper can parse.
      */
+    /**
+     * Pushes weight, height, and BMI to Healthie as MetricEntry records.
+     *
+     * Failures are logged but never thrown — a vital that fails to post must not
+     * roll back a clinical note that already succeeded, and the outbox must not
+     * be left in a retryable state over a non-critical metric value.
+     */
+    private function pushVitals(array $payload, string $healthieClientId): void
+    {
+        $vitals = $payload['vitals'] ?? [];
+        if (empty($vitals)) {
+            return;
+        }
+
+        $mutation = <<<'GQL'
+        mutation CreateVitalEntry($input: createEntryInput!) {
+            createEntry(input: $input) {
+                entry { id }
+                messages { field message }
+            }
+        }
+        GQL;
+
+        $categories = [
+            'weight' => 'Weight',
+            'height' => 'Height',
+            'bmi'    => 'BMI',
+        ];
+
+        foreach ($categories as $key => $category) {
+            if (! isset($vitals[$key])) {
+                continue;
+            }
+
+            try {
+                $response = $this->graphql($mutation, [
+                    'input' => [
+                        'type'        => 'MetricEntry',
+                        'category'    => $category,
+                        'metric_stat' => $vitals[$key],
+                        'user_id'     => $healthieClientId,
+                    ],
+                ]);
+
+                if (! empty($response->json('errors'))) {
+                    Log::warning('Healthie vital entry failed', [
+                        'partner_id' => $this->settings->partner_id,
+                        'category'   => $category,
+                        'errors'     => $response->json('errors'),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Healthie vital entry threw', [
+                    'partner_id' => $this->settings->partner_id,
+                    'category'   => $category,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
     private function buildMutation(array $payload, string $healthieClientId): array
     {
         $noteText = $this->buildNoteText($payload);

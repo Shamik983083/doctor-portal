@@ -217,6 +217,12 @@ class EhrRecordService
                 'state'         => $patient->state,
             ],
 
+            'vitals' => array_filter([
+                'weight' => $patient->weight !== null ? (string) $patient->weight : null,
+                'height' => $patient->height !== null ? (string) $patient->height : null,
+                'bmi'    => $patient->bmi    !== null ? (string) $patient->bmi    : null,
+            ], fn ($v) => $v !== null),
+
             'encounter' => [
                 'visit_type'  => $case->visit_type,
                 'status'      => $case->status,
