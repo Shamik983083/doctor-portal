@@ -267,7 +267,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         $mutation = <<<'GQL'
         mutation CreateChartNote($input: createFormAnswerGroupInput!) {
             createFormAnswerGroup(input: $input) {
-                formAnswerGroup {
+                form_answer_group {
                     id
                 }
                 messages {
@@ -414,7 +414,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
 
         foreach ($data as $result) {
             if (is_array($result)) {
-                foreach (['formAnswerGroup', 'note', 'client', 'user'] as $objectKey) {
+                foreach (['form_answer_group', 'note', 'client', 'user'] as $objectKey) {
                     if (! empty($result[$objectKey]['id'])) {
                         return (string) $result[$objectKey]['id'];
                     }
