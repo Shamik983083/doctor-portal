@@ -56,7 +56,6 @@ jobs:
             $PHP artisan db:seed --class="Database\\Seeders\\PartnerProductPlanSeeder"    --force
             $PHP artisan db:seed --class="Database\\Seeders\\SettingsSeeder"              --force
             $PHP artisan db:seed --class="Database\\Seeders\\AiInstructionSetsSeeder"     --force
-            $PHP artisan db:seed --class="Database\\Seeders\\StagingPreviewSeeder"        --force
 
             echo "--- Clearing and rebuilding caches ---"
             /opt/cpanel/ea-php82/root/usr/bin/php artisan config:cache
