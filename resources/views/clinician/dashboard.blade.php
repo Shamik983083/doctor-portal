@@ -1,4 +1,4 @@
-@extends('layouts.clinician')
+@extends('layouts.clinician-exact')
 
 @section('title', 'Clinician Dashboard')
 @section('page-title', 'Dashboard')
@@ -24,7 +24,7 @@
 
     {{-- Queue size --}}
     <div class="col-sm-6 col-xl-3">
-        <a href="{{ route('clinician.queue') }}" class="text-decoration-none">
+        <a href="{{ route('clinician.queue', ['status' => 'waiting']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #4361ee !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -43,6 +43,7 @@
 
     {{-- My active --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'active']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #ffc107 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -56,10 +57,12 @@
                 </div>
             </div>
         </div>
+        </a>
     </div>
 
     {{-- Completed this month --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'completed']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #2dc653 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -73,10 +76,12 @@
                 </div>
             </div>
         </div>
+        </a>
     </div>
 
     {{-- SLA status --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'active']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100"
              style="border-left:4px solid {{ $slaBreached > 0 ? '#dc3545' : ($slaAtRisk > 0 ? '#ffc107' : '#2dc653') }} !important;">
             <div class="card-body d-flex align-items-center gap-3">
@@ -100,11 +105,12 @@
                 </div>
             </div>
         </div>
+        </a>
     </div>
 
     {{-- Total Assigned Cases --}}
     <div class="col-sm-6 col-xl-3">
-        <a href="{{ route('clinician.queue', ['status' => 'assigned']) }}" class="text-decoration-none">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'all']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #6f42c1 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -123,6 +129,7 @@
 
     {{-- Total Completed Cases --}}
     <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.cases.my-cases', ['tab' => 'completed']) }}" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #20c997 !important;">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
@@ -136,6 +143,45 @@
                 </div>
             </div>
         </div>
+        </a>
+    </div>
+
+    {{-- E17: New Messages --}}
+    <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.messages.index', $unreadMessagesCount > 0 ? ['filter' => 'unread'] : []) }}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $unreadMessagesCount > 0 ? '#e83e8c' : '#adb5bd' }} !important;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:48px;height:48px;background:{{ $unreadMessagesCount > 0 ? '#e83e8c1a' : '#adb5bd1a' }};">
+                    <i class="bi bi-chat-dots" style="font-size:1.3rem;color:{{ $unreadMessagesCount > 0 ? '#e83e8c' : '#adb5bd' }};"></i>
+                </div>
+                <div>
+                    <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">New Messages</p>
+                    <h3 class="fw-bold mb-0" style="color:{{ $unreadMessagesCount > 0 ? '#e83e8c' : '#adb5bd' }};">{{ $unreadMessagesCount }}</h3>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">Unread from patients</p>
+                </div>
+            </div>
+        </div>
+        </a>
+    </div>
+
+    {{-- E17: New Cases --}}
+    <div class="col-sm-6 col-xl-3">
+        <a href="{{ route('clinician.queue', ['status' => 'waiting']) }}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {{ $newCasesCount > 0 ? '#fd7e14' : '#adb5bd' }} !important;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:48px;height:48px;background:{{ $newCasesCount > 0 ? '#fd7e141a' : '#adb5bd1a' }};">
+                    <i class="bi bi-inbox" style="font-size:1.3rem;color:{{ $newCasesCount > 0 ? '#fd7e14' : '#adb5bd' }};"></i>
+                </div>
+                <div>
+                    <p class="text-muted mb-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;">New Cases</p>
+                    <h3 class="fw-bold mb-0" style="color:{{ $newCasesCount > 0 ? '#fd7e14' : '#adb5bd' }};">{{ $newCasesCount }}</h3>
+                    <p class="text-muted mb-0" style="font-size:.7rem;">{{ $clinician?->cases_last_viewed_at ? 'since last queue visit' : 'in last 24 hours' }}</p>
+                </div>
+            </div>
+        </div>
+        </a>
     </div>
 
     {{-- Completion rate with SVG ring --}}
@@ -225,7 +271,7 @@
             <h6 class="mb-0 fw-semibold">My Active Cases</h6>
             <p class="text-muted mb-0" style="font-size:.72rem;">Cases currently assigned or approved &mdash; showing up to 10</p>
         </div>
-        <a href="{{ route('clinician.queue') }}" class="btn btn-sm btn-outline-primary">View Queue</a>
+        <a href="{{ route('clinician.queue') }}?mine=1" class="btn btn-sm btn-outline-primary">View Queue</a>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -258,11 +304,8 @@
                         </td>
                         <td>{{ $case->partner->name ?? '—' }}</td>
                         <td>
-                            @foreach($case->caseOfferings->take(2) as $co)
-                                <span class="badge bg-light text-dark border" style="font-size:.7rem;">{{ $co->offering->name ?? 'Unknown' }}</span>
-                            @endforeach
-                            @if($case->caseOfferings->count() > 2)
-                                <span class="text-muted" style="font-size:.7rem;">+{{ $case->caseOfferings->count() - 2 }} more</span>
+                            @if($case->caseOfferings->isNotEmpty())
+                                <span class="badge bg-light text-dark border" style="font-size:.7rem;">{{ $case->caseOfferings->first()->offering->name ?? 'Unknown' }}</span>
                             @endif
                         </td>
                         <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>

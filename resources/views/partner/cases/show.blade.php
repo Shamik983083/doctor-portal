@@ -115,7 +115,7 @@
         </div>
         @endif
 
-        {{-- Return to clinician --}}
+        {{-- Return to clinician (full escalation: case status=support) --}}
         @if($case->status === 'support')
         <div class="card border-primary mb-4">
             <div class="card-header bg-primary bg-opacity-10 py-2">
@@ -134,6 +134,28 @@
                     </div>
                     <button class="btn btn-sm btn-primary w-100">
                         <i class="bi bi-arrow-return-left me-1"></i> Return to Clinician
+                    </button>
+                </form>
+            </div>
+        </div>
+        @endif
+
+        {{-- Close thread (parallel escalation: case status is NOT support) --}}
+        @if($case->escalation_target === 'support' && $case->status !== 'support')
+        <div class="card border-warning mb-4">
+            <div class="card-header" style="background:#fff8ec;border-bottom:1px solid #fde68a;">
+                <h6 class="mb-0 fw-semibold" style="color:#92400e;"><i class="bi bi-x-circle me-1"></i>Close Support Thread</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ route('partner.cases.close-thread', $case->uuid) }}">
+                    @csrf
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Closing note <span class="text-muted">(optional)</span></label>
+                        <textarea name="partner_note" class="form-control form-control-sm" rows="2"
+                                  placeholder="Summary of resolution or action taken…">{{ old('partner_note') }}</textarea>
+                    </div>
+                    <button class="btn btn-sm btn-warning w-100" style="color:#92400e;">
+                        <i class="bi bi-x-circle me-1"></i> Close Thread
                     </button>
                 </form>
             </div>
@@ -374,33 +396,114 @@
 
                     <!-- Messages -->
                     <div class="tab-pane fade" id="tab-messages">
-                        @forelse($case->messages->sortBy('created_at') as $msg)
-                        @php
-                            $isOwn  = $msg->sender_type === 'partner';
-                            $sender = match($msg->sender_type) {
-                                'clinician' => 'Dr ' . ($msg->clinician?->user->name ?? 'Clinician'),
-                                'partner'   => 'You',
-                                'patient'   => 'Patient',
-                                default     => ucfirst($msg->sender_type),
-                            };
-                        @endphp
-                        <div class="d-flex mb-3 {{ $isOwn ? 'justify-content-end' : '' }}">
-                            <div class="rounded p-3 small {{ $isOwn ? 'bg-primary text-white' : 'bg-light border' }}"
-                                 style="max-width:75%;">
-                                <div class="fw-semibold mb-1 {{ $isOwn ? 'text-white-50' : 'text-muted' }}"
-                                     style="font-size:.72rem;">
-                                    {{ $sender }}
+
+                        {{-- ── Escalation thread (clinician ↔ partner) ──────────── --}}
+                        @if($case->support_at)
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <span class="badge bg-warning text-dark" style="font-size:.7rem;letter-spacing:.04em;">
+                                    <i class="bi bi-headset me-1"></i>SUPPORT THREAD
+                                </span>
+                                <span class="text-muted" style="font-size:.72rem;">
+                                    Escalated {{ $case->support_at->format('M j, Y') }} — private between you and the clinician
+                                </span>
+                            </div>
+
+                            {{-- Support note the clinician sent when escalating --}}
+                            @if($case->support_note)
+                            <div class="alert border-0 mb-3 p-3" style="background:#fff8ec;border-left:3px solid #f59e0b !important;border-radius:8px;font-size:.82rem;">
+                                <div class="text-muted mb-1" style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">
+                                    <i class="bi bi-flag-fill me-1" style="color:#f59e0b;"></i>Clinician's escalation note
                                 </div>
-                                <p class="mb-1">{{ $msg->body }}</p>
-                                <div class="text-end {{ $isOwn ? 'text-white-50' : 'text-muted' }}"
-                                     style="font-size:.68rem;">
-                                    {{ $msg->created_at->format('M j, g:i A') }}
+                                {{ $case->support_note }}
+                            </div>
+                            @endif
+
+                            {{-- Escalation message bubbles --}}
+                            <div id="escalationThread" style="min-height:60px;">
+                                @forelse($escalationMessages as $msg)
+                                @php $isOwn = $msg->sender_type === 'partner'; @endphp
+                                <div class="d-flex mb-3 {{ $isOwn ? 'justify-content-end' : '' }}" data-msg-id="{{ $msg->id }}">
+                                    <div class="rounded-3 p-3" style="max-width:75%;font-size:.835rem;
+                                         background:{{ $isOwn ? '#4361ee' : '#f1f5f9' }};
+                                         color:{{ $isOwn ? '#fff' : '#1e293b' }};">
+                                        <div class="fw-semibold mb-1" style="font-size:.7rem;opacity:.7;">
+                                            {{ $isOwn ? 'You' : 'Dr ' . ($msg->clinician?->user->name ?? 'Clinician') }}
+                                        </div>
+                                        <p class="mb-1" style="white-space:pre-wrap;">{{ $msg->body }}</p>
+                                        <div class="text-end" style="font-size:.65rem;opacity:.65;">
+                                            {{ $msg->created_at->format('M j, g:i A') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                @empty
+                                <p class="text-muted text-center py-3" style="font-size:.82rem;" id="escalationEmpty">
+                                    No messages yet. Send the first message to the clinician below.
+                                </p>
+                                @endforelse
+                            </div>
+
+                            {{-- Compose form — open while escalation_target=support --}}
+                            @if($case->escalation_target === 'support')
+                            <form method="POST" action="{{ route('partner.cases.messages.store', $case->uuid) }}"
+                                  id="escalationForm" class="mt-3">
+                                @csrf
+                                <div class="d-flex gap-2 align-items-end">
+                                    <textarea name="body" id="escalationBody" rows="2"
+                                              class="form-control form-control-sm"
+                                              style="resize:none;border-radius:10px;font-size:.835rem;"
+                                              placeholder="Message the clinician…" required maxlength="2000"></textarea>
+                                    <button type="submit" class="btn btn-primary btn-sm px-3 flex-shrink-0"
+                                            style="border-radius:10px;height:62px;font-size:.8rem;font-weight:600;">
+                                        <i class="bi bi-send-fill d-block mb-1" style="font-size:1rem;"></i>Send
+                                    </button>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span class="text-muted" style="font-size:.68rem;">Max 2,000 characters</span>
+                                    <span class="text-muted" style="font-size:.68rem;" id="escalationCharCount">0 / 2000</span>
+                                </div>
+                            </form>
+                            @else
+                            <div class="alert alert-secondary border-0 mt-3 py-2 px-3" style="font-size:.78rem;border-radius:8px;">
+                                <i class="bi bi-lock-fill me-1"></i>
+                                This support thread has been closed. The thread is read-only.
+                            </div>
+                            @endif
+                        </div>
+                        <hr class="my-3">
+                        @endif
+
+                        {{-- ── Patient portal messages (read-only for partner) ──── --}}
+                        <div class="mb-2">
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <span class="badge bg-secondary" style="font-size:.7rem;letter-spacing:.04em;">
+                                    <i class="bi bi-chat-dots me-1"></i>PATIENT MESSAGES
+                                </span>
+                                <span class="text-muted" style="font-size:.72rem;">Read-only — between patient and clinician</span>
+                            </div>
+                            @forelse($portalMessages as $msg)
+                            @php
+                                $sender = match($msg->sender_type) {
+                                    'clinician' => 'Dr ' . ($msg->clinician?->user->name ?? 'Clinician'),
+                                    'patient'   => $case->patient?->full_name ?? 'Patient',
+                                    default     => ucfirst($msg->sender_type),
+                                };
+                                $isClinicianMsg = $msg->sender_type === 'clinician';
+                            @endphp
+                            <div class="d-flex mb-3 {{ $isClinicianMsg ? 'justify-content-end' : '' }}">
+                                <div class="rounded-3 p-3" style="max-width:75%;font-size:.835rem;
+                                     background:{{ $isClinicianMsg ? '#e0e7ff' : '#f1f5f9' }};color:#1e293b;">
+                                    <div class="fw-semibold mb-1" style="font-size:.7rem;opacity:.7;">{{ $sender }}</div>
+                                    <p class="mb-1" style="white-space:pre-wrap;">{{ $msg->body }}</p>
+                                    <div class="text-end" style="font-size:.65rem;opacity:.65;">
+                                        {{ $msg->created_at->format('M j, g:i A') }}
+                                    </div>
                                 </div>
                             </div>
+                            @empty
+                            <p class="text-muted small text-center py-3">No patient messages yet.</p>
+                            @endforelse
                         </div>
-                        @empty
-                        <p class="text-muted small text-center py-4">No messages yet.</p>
-                        @endforelse
                     </div>
 
                     <!-- Orders -->
@@ -435,6 +538,7 @@
 
 @push('scripts')
 <script>
+// Q&A toggle
 document.addEventListener('click', function (e) {
     var btn = e.target.closest('.q-toggle');
     if (!btn) return;
@@ -446,5 +550,77 @@ document.addEventListener('click', function (e) {
     full.classList.toggle('d-none', !expanded);
     btn.textContent = expanded ? 'Hide' : 'Show more';
 });
+
+// Escalation thread: char counter + polling for new clinician replies
+(function () {
+    var body    = document.getElementById('escalationBody');
+    var counter = document.getElementById('escalationCharCount');
+    var thread  = document.getElementById('escalationThread');
+    var pollUrl = '{{ route("partner.cases.messages.poll", $case->uuid) }}';
+    var csrf    = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+    // Character counter
+    if (body && counter) {
+        body.addEventListener('input', function () {
+            counter.textContent = body.value.length + ' / 2000';
+        });
+    }
+
+    // Poll for new clinician messages every 8 seconds when Messages tab is visible.
+    // We track the highest message id we've already rendered.
+    if (!thread) return;
+
+    var lastId = 0;
+    thread.querySelectorAll('[data-msg-id]').forEach(function (el) {
+        var id = parseInt(el.dataset.msgId, 10);
+        if (id > lastId) lastId = id;
+    });
+
+    var isMessagesTabActive = false;
+
+    document.querySelectorAll('[data-bs-target="#tab-messages"]').forEach(function (tab) {
+        tab.addEventListener('shown.bs.tab', function () { isMessagesTabActive = true; });
+        tab.addEventListener('hidden.bs.tab', function () { isMessagesTabActive = false; });
+    });
+
+    function appendMessage(msg) {
+        var empty = document.getElementById('escalationEmpty');
+        if (empty) empty.remove();
+
+        var isOwn  = msg.sender_type === 'partner';
+        var sender = isOwn ? 'You' : 'Clinician';
+        var time   = new Date(msg.created_at).toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+
+        var wrap = document.createElement('div');
+        wrap.className = 'd-flex mb-3' + (isOwn ? ' justify-content-end' : '');
+        wrap.dataset.msgId = msg.id;
+        wrap.innerHTML =
+            '<div class="rounded-3 p-3" style="max-width:75%;font-size:.835rem;' +
+            'background:' + (isOwn ? '#4361ee' : '#f1f5f9') + ';' +
+            'color:' + (isOwn ? '#fff' : '#1e293b') + ';">' +
+            '<div class="fw-semibold mb-1" style="font-size:.7rem;opacity:.7;">' + sender + '</div>' +
+            '<p class="mb-1" style="white-space:pre-wrap;">' + msg.body.replace(/</g,'&lt;') + '</p>' +
+            '<div class="text-end" style="font-size:.65rem;opacity:.65;">' + time + '</div>' +
+            '</div>';
+        thread.appendChild(wrap);
+        if (lastId < msg.id) lastId = msg.id;
+    }
+
+    function poll() {
+        if (!isMessagesTabActive) return;
+        fetch(pollUrl + '?after=' + lastId, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+        })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (msgs) {
+            msgs.forEach(function (msg) {
+                if (msg.sender_type !== 'partner') appendMessage(msg);
+            });
+        })
+        .catch(function () {});
+    }
+
+    setInterval(poll, 8000);
+})();
 </script>
 @endpush

@@ -3,18 +3,63 @@
 namespace App\Http\Controllers\Api\Partner;
 
 use App\Http\Controllers\Controller;
+use App\Models\Partner;
 use App\Models\Questionnaire;
+use Illuminate\Http\Request;
 
 class QuestionnaireController extends Controller
 {
-    public function show(string $uuid)
+    /** Same accessor the other partner API controllers use. */
+    private function partner(Request $request): Partner
     {
+        return $request->attributes->get('partner');
+    }
+
+    /**
+     * WAS AN UNSCOPED LOOKUP BY UUID. Every other partner API controller scopes
+     * to the calling partner; this one did not, and `questionnaires.partner_id`
+     * exists and is nullable, so a questionnaire can be partner-owned. Partner A
+     * holding Partner B's uuid could read B's entire intake form: every
+     * question, slug, key, option set and disqualification rule.
+     *
+     * THE SCOPE BELOW IS DELIBERATELY THREE CLAUSES, NOT TWO, so that closing
+     * the hole cannot break a live integration:
+     *
+     *   1. partner_id IS NULL   a platform-level template, shared by design.
+     *   2. partner_id = caller  their own questionnaire.
+     *   3. attached to an offering the caller owns. This is the clause that
+     *      matters for not breaking anything. An admin can attach ANY
+     *      questionnaire to ANY offering through offering_questionnaire,
+     *      including one owned by a different partner, and that composition is
+     *      intentional. Scoping on 1 and 2 alone would cut a partner off from a
+     *      form their own offering requires.
+     *
+     * Nothing legitimately reachable is lost. The only way a partner discovers a
+     * questionnaire uuid through this API is GET /offerings/{id}/questionnaires,
+     * which is already scoped to their own offerings, so clause 3 covers every
+     * uuid that endpoint can hand out.
+     *
+     * NOT scoped: `linkedQuestionnaire`. A linked questionnaire is an
+     * admin-configured composition of one form into another, so a link crossing
+     * partners is the feature working rather than a leak. Restricting it would
+     * break multi-part intake.
+     */
+    public function show(Request $request, string $uuid)
+    {
+        $partnerId = $this->partner($request)->id;
+
         $questionnaire = Questionnaire::with([
             'questions'                      => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
             'linkedQuestionnaire.questions'  => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
         ])
             ->where('uuid', $uuid)
             ->where('is_active', true)
+            ->where(function ($q) use ($partnerId) {
+                $q->whereNull('partner_id')
+                  ->orWhere('partner_id', $partnerId)
+                  // Phase 1a: check access via offering_partner pivot (replaces offerings.partner_id filter).
+                  ->orWhereHas('offerings', fn($o) => $o->whereHas('partners', fn($p) => $p->where('partners.id', $partnerId)));
+            })
             ->firstOrFail();
 
         $mapQuestion = fn($q, string $sourceUuid) => [

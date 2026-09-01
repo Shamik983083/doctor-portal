@@ -125,9 +125,6 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
                         @endforeach
                     </div>
                 </div>
-                @error('license_info')
-                    <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ $message }}</div>
-                @enderror
                 <div id="stateError" class="text-danger small mt-1" style="display:none">
                     <i class="bi bi-exclamation-circle me-1"></i>Please select at least one licensed state.
                 </div>

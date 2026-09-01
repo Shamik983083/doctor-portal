@@ -21,39 +21,94 @@
     <div class="col-lg-4">
 
         {{-- Personal Info --}}
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="bi bi-person-circle me-2"></i>Patient Info</h6>
-                <span class="badge {{ match($patient->status) { 'active' => 'bg-success', 'inactive' => 'bg-secondary', default => 'bg-warning text-dark' } }}">
-                    {{ ucfirst($patient->status ?? 'active') }}
-                </span>
-            </div>
-            <div class="card-body small">
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th class="text-muted" style="width:40%">Full Name</th><td>{{ $patient->full_name }}</td></tr>
-                    <tr><th class="text-muted">Email</th><td>{{ $patient->email }}</td></tr>
-                    <tr><th class="text-muted">Phone</th><td>{{ $patient->phone ?? '—' }}</td></tr>
-                    <tr><th class="text-muted">DOB</th><td>{{ $patient->date_of_birth?->format('M d, Y') ?? '—' }}</td></tr>
-                    <tr><th class="text-muted">Gender</th><td>{{ ucfirst($patient->gender ?? '—') }}</td></tr>
-                    <tr>
-                        <th class="text-muted">Height</th>
-                        <td>{{ $patient->height ? (int)floor($patient->height/12)."' ".round(fmod($patient->height,12)).'"' : '—' }}</td>
-                    </tr>
-                    <tr><th class="text-muted">Weight</th><td>{{ $patient->weight ? number_format($patient->weight,1).' lbs' : '—' }}</td></tr>
-                    <tr><th class="text-muted">BMI</th><td>{{ $patient->bmi ? number_format($patient->bmi,1) : '—' }}</td></tr>
-                    <tr><th class="text-muted">State</th><td>{{ $patient->state ?? '—' }}</td></tr>
-                    <tr><th class="text-muted">City</th><td>{{ $patient->city ?? '—' }}</td></tr>
-                    <tr><th class="text-muted">Zip</th><td>{{ $patient->zip ?? '—' }}</td></tr>
+        <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-body p-0">
+
+                {{-- Avatar + name header --}}
+                <div class="px-3 pt-3 pb-3 border-bottom d-flex align-items-center justify-content-between gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#e0e7ff,#c7d2fe);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <span style="font-size:1rem;font-weight:700;color:#4f46e5;letter-spacing:-.02em">
+                                {{ strtoupper(substr($patient->full_name, 0, 1)) }}{{ strtoupper(substr(strrchr($patient->full_name, ' ') ?: '', 1, 1)) }}
+                            </span>
+                        </div>
+                        <div>
+                            <div class="fw-semibold" style="font-size:.95rem;line-height:1.2">{{ $patient->full_name }}</div>
+                            <div class="text-muted" style="font-size:.75rem">{{ $patient->email }}</div>
+                        </div>
+                    </div>
+                    @php $statusBadge = match($patient->status ?? 'active') { 'active' => 'bg-success', 'inactive' => 'bg-secondary', default => 'bg-warning text-dark' }; @endphp
+                    <span class="badge flex-shrink-0 {{ $statusBadge }}">
+                        {{ ucfirst($patient->status ?? 'active') }}
+                    </span>
+                </div>
+
+                {{-- Contact & demographics --}}
+                <div class="px-3 py-2" style="font-size:.82rem">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Phone</span>
+                        <span>{{ $patient->phone ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">DOB</span>
+                        <span>{{ $patient->date_of_birth?->format('M d, Y') ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Gender</span>
+                        <span>{{ ucfirst($patient->gender ?? '—') }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">State</span>
+                        <span>{{ implode(', ', array_filter([$patient->state, $patient->city, $patient->zip])) ?: '—' }}</span>
+                    </div>
                     @if($patient->address)
-                    <tr><th class="text-muted">Address</th><td>{{ $patient->address }}</td></tr>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Address</span>
+                        <span class="text-end" style="max-width:60%">{{ $patient->address }}</span>
+                    </div>
                     @endif
-                    <tr><th class="text-muted">Partner</th><td>{{ $patient->partner->name ?? '—' }}</td></tr>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Partner</span>
+                        <span>{{ $patient->partner->name ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-0">
+                        <span class="text-muted">Joined</span>
+                        <span>{{ $patient->created_at->format('M d, Y') }}</span>
+                    </div>
+                </div>
+
+                {{-- Biometric stat strip --}}
+                <div class="border-top border-bottom mx-0 px-3 py-2">
+                    <div class="row g-0 text-center" style="font-size:.82rem">
+                        <div class="col-4">
+                            <div class="fw-semibold">{{ $patient->height ? (int)floor($patient->height/12)."'".round(fmod($patient->height,12)).'"' : '—' }}</div>
+                            <div class="text-muted" style="font-size:.67rem;text-transform:uppercase;letter-spacing:.06em">Height</div>
+                        </div>
+                        <div class="col-4 border-start border-end">
+                            <div class="fw-semibold">{{ $patient->weight ? number_format($patient->weight,1) : '—' }}</div>
+                            <div class="text-muted" style="font-size:.67rem;text-transform:uppercase;letter-spacing:.06em">lbs</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fw-semibold">{{ $patient->bmi ? number_format($patient->bmi,1) : '—' }}</div>
+                            <div class="text-muted" style="font-size:.67rem;text-transform:uppercase;letter-spacing:.06em">BMI</div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Identifiers --}}
+                <div class="px-3 py-2" style="font-size:.75rem">
                     @if($patient->external_id)
-                    <tr><th class="text-muted">External ID</th><td><small class="font-monospace">{{ $patient->external_id }}</small></td></tr>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">External ID</span>
+                        <span class="font-monospace text-body-secondary">{{ $patient->external_id }}</span>
+                    </div>
                     @endif
-                    <tr><th class="text-muted">UUID</th><td><small class="font-monospace text-muted">{{ substr($patient->uuid, 0, 16) }}…</small></td></tr>
-                    <tr><th class="text-muted">Joined</th><td>{{ $patient->created_at->format('M d, Y') }}</td></tr>
-                </table>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">UUID</span>
+                        <span class="font-monospace text-body-secondary">{{ substr($patient->uuid, 0, 16) }}…</span>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -69,7 +124,40 @@
         </div>
         @endif
 
+        {{-- E19: Collaborating Clinician --}}
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-person-plus me-2"></i>Collaborating Clinician</h6></div>
+            <div class="card-body">
+                @if($patient->collaboratingClinician)
+                    <p class="mb-2 small">
+                        <strong>{{ $patient->collaboratingClinician->full_name }}</strong>
+                        @if($patient->collaboratingClinician->license_state)
+                            <span class="text-muted">({{ $patient->collaboratingClinician->license_state }})</span>
+                        @endif
+                    </p>
+                @else
+                    <p class="text-muted small mb-2">No collaborating clinician assigned.</p>
+                @endif
+                <form method="POST" action="{{ route('admin.patients.collaborating-clinician.update', $patient->id) }}">
+                    @csrf
+                    @method('PATCH')
+                    <div class="input-group input-group-sm">
+                        <select name="collaborating_clinician_id" class="form-select form-select-sm">
+                            <option value="">— None —</option>
+                            @foreach($clinicians as $c)
+                                <option value="{{ $c->id }}" {{ $patient->collaborating_clinician_id == $c->id ? 'selected' : '' }}>
+                                    {{ $c->full_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {{-- Orders summary --}}
+        {{-- @todo un-comment when orders are wired up
         <div class="card">
             <div class="card-header"><h6 class="mb-0"><i class="bi bi-cart me-2"></i>Orders ({{ $patient->orders->count() }})</h6></div>
             @if($patient->orders->count())
@@ -93,6 +181,7 @@
             <div class="card-body"><p class="text-muted small mb-0">No orders yet.</p></div>
             @endif
         </div>
+        --}}
     </div>
 
     {{-- Right: Cases --}}

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendIntakeConfirmationJob;
 use App\Models\PatientCase;
 use App\Models\Clinician;
 use App\Models\CaseEvent;
@@ -58,6 +59,9 @@ class CaseStateMachine
                 if (isset($context['support_note'])) {
                     $updates['support_note'] = $context['support_note'];
                 }
+                if (isset($context['escalation_target'])) {
+                    $updates['escalation_target'] = $context['escalation_target'];
+                }
                 // Record first time this case entered support — never overwrite
                 if (!$case->support_at) {
                     $updates['support_at'] = now();
@@ -107,22 +111,39 @@ class CaseStateMachine
      * Reassign an already-assigned case to a different clinician without a status change.
      * Used by admin to override both manual and auto-assignments.
      */
-    public function reassign(PatientCase $case, Clinician $clinician): PatientCase
+    public function reassign(PatientCase $case, Clinician $clinician, ?int $adminUserId = null): PatientCase
     {
-        DB::transaction(function () use ($case, $clinician) {
-            $case->update(['clinician_id' => $clinician->id]);
+        DB::transaction(function () use ($case, $clinician, $adminUserId) {
+            $case->update([
+                'clinician_id' => $clinician->id,
+                'assigned_at'  => now(),
+            ]);
 
             CaseEvent::create([
                 'case_id'    => $case->id,
                 'event_type' => 'clinician_reassigned',
                 'actor_type' => 'admin',
-                'actor_id'   => null,
+                'actor_id'   => $adminUserId,
                 'payload'    => ['clinician_id' => $clinician->id],
                 'notes'      => "Reassigned to {$clinician->full_name}",
             ]);
         });
 
-        return $case->refresh();
+        $case->refresh();
+
+        // Notify the new clinician. Failure must not roll back the reassignment.
+        try {
+            if ($case->clinician?->user) {
+                $case->clinician->user->notify(new ClinicianCaseAssigned($case));
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('clinician_reassigned notification failed', [
+                'case_id' => $case->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
+
+        return $case;
     }
 
     public function release(PatientCase $case): PatientCase
@@ -161,10 +182,23 @@ class CaseStateMachine
 
     public function returnToClinicianFromSupport(PatientCase $case, string $partnerNote): PatientCase
     {
-        return $this->transition($case, PatientCase::STATUS_ASSIGNED, [
+        $case = $this->transition($case, PatientCase::STATUS_ASSIGNED, [
             'actor_type' => 'partner',
             'notes'      => $partnerNote,
         ]);
+
+        // Fire a dedicated webhook so partner systems can distinguish this
+        // reassignment-from-support from an initial case_assigned_to_clinician event.
+        $this->webhookDispatcher->dispatch($case->partner_id, 'case_returned_to_clinician', [
+            'event'      => 'case_returned_to_clinician',
+            'case_id'    => $case->uuid,
+            'patient_id' => $case->patient?->uuid,
+            'status'     => $case->status,
+            'visit_type' => $case->visit_type,
+            'timestamp'  => now()->timestamp,
+        ]);
+
+        return $case;
     }
 
     public function startProcessing(PatientCase $case): PatientCase
@@ -177,11 +211,101 @@ class CaseStateMachine
         return $this->transition($case, PatientCase::STATUS_COMPLETED, ['actor_type' => 'system']);
     }
 
-    public function escalateToSupport(PatientCase $case, string $note = ''): PatientCase
+    public function escalateToSupport(PatientCase $case, string $note = '', string $target = PatientCase::ESCALATION_SUPPORT): PatientCase
     {
         return $this->transition($case, PatientCase::STATUS_SUPPORT, [
-            'support_note' => $note,
-            'actor_type'   => 'system',
+            'support_note'      => $note,
+            'escalation_target' => $target,
+            'actor_type'        => 'system',
+        ]);
+    }
+
+    /** Escalate to a Doctor Admin (B10). Wired to UI in Phase 3. */
+    public function escalateToDoctorAdmin(PatientCase $case, string $reason = ''): PatientCase
+    {
+        return $this->escalateToSupport($case, $reason, PatientCase::ESCALATION_DOCTOR_ADMIN);
+    }
+
+    /** Pause a case awaiting a client/patient response (D15/D16). */
+    public function escalateAwaitingClientResponse(PatientCase $case, string $reason = ''): PatientCase
+    {
+        return $this->escalateToSupport($case, $reason, PatientCase::ESCALATION_CLIENT_RESPONSE);
+    }
+
+    /**
+     * Open a support thread WITHOUT changing case status.
+     * Used when a clinician forwards a patient message to the partner support
+     * team while the case continues its normal workflow (assigned/processing).
+     */
+    public function startSupportThread(PatientCase $case, string $note = ''): void
+    {
+        DB::transaction(function () use ($case, $note) {
+            $updates = ['escalation_target' => PatientCase::ESCALATION_SUPPORT];
+            if (!$case->support_at) {
+                $updates['support_at'] = now();
+            }
+            if ($note) {
+                $updates['support_note'] = $note;
+            }
+            $case->update($updates);
+
+            CaseEvent::create([
+                'case_id'    => $case->id,
+                'event_type' => 'support_thread_started',
+                'actor_type' => 'clinician',
+                'actor_id'   => null,
+                'payload'    => [],
+                'notes'      => $note ?: null,
+            ]);
+        });
+
+        $case->refresh();
+
+        try {
+            $case->loadMissing('partner.users');
+            $case->partner?->users->each(
+                fn ($u) => $u->notify(new PartnerCaseSupport($case))
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Support thread start notification failed: ' . $e->getMessage());
+        }
+
+        $this->webhookDispatcher->dispatch($case->partner_id, 'escalation_started', [
+            'event'      => 'escalation_started',
+            'case_id'    => $case->uuid,
+            'patient_id' => $case->patient?->uuid,
+            'case_status' => $case->status,
+            'timestamp'  => now()->timestamp,
+        ]);
+    }
+
+    /**
+     * Close a parallel support thread (case NOT in STATUS_SUPPORT).
+     * Clears escalation_target so compose forms lock on both portals.
+     */
+    public function closeParallelSupportThread(PatientCase $case, string $note = ''): void
+    {
+        DB::transaction(function () use ($case, $note) {
+            $case->update(['escalation_target' => null]);
+
+            CaseEvent::create([
+                'case_id'    => $case->id,
+                'event_type' => 'support_thread_closed',
+                'actor_type' => 'partner',
+                'actor_id'   => null,
+                'payload'    => [],
+                'notes'      => $note ?: null,
+            ]);
+        });
+
+        $case->refresh();
+
+        $this->webhookDispatcher->dispatch($case->partner_id, 'support_thread_closed', [
+            'event'      => 'support_thread_closed',
+            'case_id'    => $case->uuid,
+            'patient_id' => $case->patient?->uuid,
+            'case_status' => $case->status,
+            'timestamp'  => now()->timestamp,
         ]);
     }
 
@@ -200,13 +324,25 @@ class CaseStateMachine
 
         $eventType = $eventMap[$status] ?? "case_{$status}";
 
-        $this->webhookDispatcher->dispatch($case->partner_id, $eventType, [
+        $payload = [
             'case_id'    => $case->uuid,
             'patient_id' => $case->patient->uuid ?? null,
             'status'     => $status,
             'visit_type' => $case->visit_type,
             'timestamp'  => now()->timestamp,
-        ]);
+        ];
+
+        if ($status === PatientCase::STATUS_SUPPORT) {
+            $payload['escalation_target'] = $case->escalation_target;
+            // support_note is the populated field; escalation_reason was planned
+            // but never wired — fall back so partners always get the note.
+            $note = $case->support_note ?: $case->escalation_reason;
+            if ($note) {
+                $payload['support_note'] = $note;
+            }
+        }
+
+        $this->webhookDispatcher->dispatch($case->partner_id, $eventType, $payload);
     }
 
     private function notifyAdmins(PatientCase $case, string $toStatus): void
@@ -244,6 +380,15 @@ class CaseStateMachine
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Clinician assignment notification failed: ' . $e->getMessage());
+            }
+
+            // A1: queue the intake confirmation message to the patient.
+            // Dispatched after notifications so a notification failure cannot
+            // prevent the patient message from being queued.
+            try {
+                SendIntakeConfirmationJob::dispatch($case->id)->onQueue('default')->delay(10);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('A1: intake confirmation dispatch failed: ' . $e->getMessage());
             }
         }
     }

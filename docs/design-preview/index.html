@@ -1,0 +1,2502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>MEDAXIS Doctor Portal · Design Preview</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232563eb'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-size='17' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
+<style>
+/* ---------------------------------------------------------------------------
+   Design tokens lifted verbatim from MA-DOCPORTAL apps/portal/app/globals.css
+   so this preview and the demo you already looked at share one palette.
+   --------------------------------------------------------------------------- */
+:root{
+  --ink:#172033; --muted:#647188; --soft-muted:#8792a3;
+  --line:#e5e9f0; --line-strong:#d8deea;
+  --bg:#f5f7fb; --card:#ffffff; --surface:#fbfcfe;
+  --accent:#2563eb; --accent-ink:#1d4ed8;
+  --green:#17834e; --green-bg:#eaf8ef;
+  --yellow:#9a6500; --yellow-bg:#fff7df;
+  --red:#b42318; --red-bg:#fff0ef;
+  --blue-bg:#eaf1ff;
+  --shadow:0 14px 45px rgba(26,40,73,.08);
+  --rail:264px; --rail-collapsed:68px;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+/* Type. MA names Inter first but never self-hosts it, so in practice it falls
+   through to the platform UI face. Putting -apple-system first makes that
+   explicit: SF Pro on Apple, Segoe UI on Windows, which is the look Devin asked
+   for. Optical sizing, tabular numerals in data, and the tightened tracking on
+   headings are the parts that actually read as "Apple" rather than the family
+   name alone. */
+body{
+  margin:0; color:var(--ink);
+  background:radial-gradient(circle at top left,#fff 0,var(--bg) 42%,#f3f6fb 100%);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",Inter,ui-sans-serif,system-ui,sans-serif;
+  font-size:15px; line-height:1.47; letter-spacing:-.006em;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+  font-variant-numeric:tabular-nums;
+}
+/* Display face for headings, and progressively tighter tracking as size grows,
+   which is the single biggest tell of the Apple type ramp. */
+h1,h2,h3,.metric-value,.brand-text{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display","Segoe UI",Inter,sans-serif;
+}
+h1{letter-spacing:-.032em}
+h2{letter-spacing:-.024em}
+h3{letter-spacing:-.016em}
+/* Numbers in tables, metrics and counts align in columns. */
+.tbl td,.review-grid td,.metric-value,.nav-count,.months-grid select{font-variant-numeric:tabular-nums}
+/* Uppercase micro-labels need tracking OPENED, not tightened. */
+.eyebrow,.kicker,.subheading,.field label,.months-head label,.rx-meta dt,.tbl th,.review-grid th,.nav-section{
+  letter-spacing:.055em;
+}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit}
+button{cursor:pointer}
+
+/* ---------------------------------------------------------------- layout */
+.app{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);min-height:100vh;transition:grid-template-columns .18s ease}
+.app.collapsed{grid-template-columns:var(--rail-collapsed) minmax(0,1fr)}
+
+/* ---------------------------------------------------------------- sidebar */
+.side{
+  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;
+  background:#fff;border-right:1px solid var(--line);overflow:hidden;
+}
+.side-head{display:flex;align-items:center;gap:9px;padding:16px 14px;border-bottom:1px solid var(--line);min-height:61px}
+.brand-mark{
+  display:grid;place-items:center;width:28px;height:28px;border-radius:9px;color:#fff;
+  background:linear-gradient(145deg,#2e70ed,#1747b6);font-size:13px;font-weight:800;
+  box-shadow:0 5px 13px rgba(37,99,235,.28);flex:0 0 auto;
+}
+.brand-text{font-weight:780;letter-spacing:-.03em;font-size:14px;white-space:nowrap}
+.side-scroll{overflow-y:auto;overflow-x:hidden;padding:10px 10px 18px;flex:1}
+.nav-section{
+  display:flex;align-items:center;justify-content:space-between;width:100%;
+  background:none;border:0;padding:13px 10px 6px;color:var(--soft-muted);
+  font-size:10px;font-weight:780;letter-spacing:.1em;text-transform:uppercase;
+}
+.nav-section .chev{transition:transform .16s ease;font-size:9px}
+.nav-section.closed .chev{transform:rotate(-90deg)}
+.nav-group{display:grid;overflow:hidden}
+.nav-group.closed{display:none}
+.nav-link{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;margin:1px 0;
+  border-radius:9px;color:var(--muted);font-size:13px;font-weight:650;
+  white-space:nowrap;border:0;background:none;width:100%;text-align:left;
+}
+.nav-link:hover{background:#f4f7fc;color:var(--ink)}
+.nav-link.active{background:var(--blue-bg);color:var(--accent-ink);font-weight:730}
+.nav-link.sub{padding-left:32px;font-size:12.5px}
+.nav-ico{width:18px;flex:0 0 auto;display:grid;place-items:center;font-size:13px;opacity:.85}
+.nav-badge{margin-left:auto;background:var(--yellow-bg);color:var(--yellow);border-radius:99px;padding:1px 7px;font-size:10px;font-weight:780}
+/* Work-queue counts sit flush right, like the reference. A zero is greyed
+   rather than hidden, so an empty queue still reads as "checked, nothing here". */
+.nav-count{margin-left:auto;color:var(--muted);font-size:11.5px;font-weight:730;font-variant-numeric:tabular-nums}
+.nav-count.zero{color:#b6bdc9;font-weight:650}
+.nav-link.active .nav-count{color:var(--accent-ink)}
+.side-foot{border-top:1px solid var(--line);padding:11px 12px;display:flex;align-items:center;gap:9px}
+.avatar{width:28px;height:28px;border-radius:99px;background:#e7edf8;color:#41537a;display:grid;place-items:center;font-size:11px;font-weight:760;flex:0 0 auto}
+.who{min-width:0}
+.who strong{display:block;font-size:12.5px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who span{display:block;color:var(--soft-muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* collapsed rail: icons only */
+.app.collapsed .brand-text,
+.app.collapsed .nav-link span.lbl,
+.app.collapsed .nav-section span,
+.app.collapsed .nav-badge,
+.app.collapsed .who{display:none}
+.app.collapsed .nav-section{justify-content:center;padding:12px 0 4px}
+.app.collapsed .nav-link{justify-content:center;padding:9px 0}
+.app.collapsed .nav-link.sub{padding-left:0}
+.app.collapsed .side-head{justify-content:center;padding:16px 0}
+.app.collapsed .side-foot{justify-content:center}
+.app.collapsed .nav-group.closed{display:grid}
+
+/* ---------------------------------------------------------------- topbar */
+.main{min-width:0;display:flex;flex-direction:column}
+/* Wraps rather than overflows. The tier switcher is a second control on this
+   row, and at 390px the three of them do not fit on one line: without wrap the
+   page picked up 47px of horizontal scroll. */
+.topbar{
+  display:flex;align-items:center;gap:14px;padding:12px 24px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);background:rgba(255,255,255,.82);
+  backdrop-filter:blur(7px);position:sticky;top:0;z-index:5;min-height:61px;
+}
+.icon-btn{
+  display:grid;place-items:center;width:34px;height:34px;border-radius:9px;
+  border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:14px;
+}
+.icon-btn:hover{background:#f7f9fc;color:var(--ink)}
+.role-switcher{display:flex;background:rgba(255,255,255,.78);border:1px solid var(--line);border-radius:12px;padding:4px;gap:3px}
+.role-button{padding:7px 12px;border-radius:8px;color:var(--muted);font-size:12px;font-weight:700;border:0;background:none}
+.role-button.active{color:var(--ink);background:#fff;box-shadow:0 1px 4px rgba(26,40,73,.12)}
+
+/* Admin tier switcher. Visually subordinate to the role switcher on purpose:
+   it selects an identity WITHIN the admin portal, not a different portal. */
+.scope-switcher{display:flex;align-items:center;gap:3px;flex-wrap:wrap;
+  border:1px dashed var(--line-strong);border-radius:12px;padding:4px 4px 4px 10px;background:rgba(255,255,255,.5)}
+.scope-switcher[hidden]{display:none}
+.scope-label{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;margin-right:4px}
+.scope-button{padding:6px 10px;border-radius:8px;color:var(--muted);font-size:12px;font-weight:700;border:0;background:none;white-space:nowrap}
+.scope-button:hover{color:var(--ink)}
+.scope-button.active{color:#fff;background:var(--accent)}
+@media (max-width:820px){
+  /* On a phone the tier switcher takes its own line and the banner drops to the
+     end, so nothing is squeezed off the side. */
+  .scope-switcher{order:3;width:100%;margin-left:0}
+  .demo-banner{order:4;margin-left:0}
+  .scope-button{padding:6px 8px;font-size:11px}
+}
+
+/* Banner explaining what the current tier can and cannot see. */
+.scope-note{display:flex;gap:11px;align-items:flex-start;margin-bottom:18px;padding:12px 15px;
+  border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;background:#fff;font-size:13px;line-height:1.55}
+.scope-note.restricted{border-left-color:#c8871b;background:#fffdf7}
+.scope-note.blocked{border-left-color:#c0392f;background:#fff8f7}
+.scope-note strong{display:block;margin-bottom:2px}
+.scope-note .sn-ico{font-size:15px;line-height:1.3;flex:0 0 auto}
+.scope-note .sn-body{color:var(--muted)}
+.scope-note .sn-body b{color:var(--ink);font-weight:750}
+
+.empty-scope{text-align:center;color:var(--muted);padding:26px 14px;font-size:13px}
+
+/* Medications: drug > variants > partners */
+.cat-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;
+  padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:13px;color:var(--muted)}
+.cat-summary strong{color:var(--ink);font-weight:780}
+.cat-summary .button-primary{margin-left:auto}
+.cat-panel{margin-bottom:16px}
+.cat-count{display:inline-grid;place-items:center;min-width:21px;height:21px;padding:0 6px;margin-left:7px;
+  border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted);
+  font-size:11px;font-weight:780;vertical-align:middle}
+.drug{padding:16px 18px;border-top:1px solid var(--line)}
+.drug-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.drug-head strong{font-size:15px;margin-right:8px}
+.drug-head .pill{margin-right:5px}
+.drug-row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding:9px 0}
+.drug-row .subheading{flex:0 0 118px;padding-top:5px}
+.partner-chips{display:flex;gap:7px;flex-wrap:wrap;flex:1;min-width:0}
+.partner-chip{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:9px;
+  border:1px solid var(--line);background:#fff;font-size:12px;font-weight:650;color:var(--ink);white-space:nowrap}
+.partner-chip.add{border-style:dashed;color:var(--muted);font-weight:600}
+.partner-chip.add:hover{color:var(--accent);border-color:var(--accent)}
+
+/* Permission matrix */
+.perm-tbl td.yes{color:#1d7a4d;font-weight:750}
+.perm-tbl td.no{color:#b03a2e;font-weight:750}
+.perm-note{margin-top:14px;padding:12px 15px;border:1px solid var(--line);border-radius:10px;
+  background:#fffdf7;border-left:3px solid #c8871b;font-size:13px;line-height:1.55;color:var(--muted)}
+.perm-note b{color:var(--ink)}
+.demo-banner{
+  display:flex;align-items:center;gap:8px;margin-left:auto;color:var(--muted);font-size:12px;
+  padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.78);white-space:nowrap;
+}
+.demo-dot{width:7px;height:7px;border-radius:999px;background:#31a56d;box-shadow:0 0 0 3px rgba(49,165,109,.13);flex:0 0 auto}
+
+/* ---------------------------------------------------------------- content */
+.wrap{padding:26px 24px 60px;max-width:1600px;width:100%}
+.page-head{margin-bottom:22px}
+.eyebrow{color:var(--muted);font-size:11px;font-weight:780;letter-spacing:.1em;text-transform:uppercase}
+.page-head h1{font-size:29px;letter-spacing:-.042em;line-height:1.1;margin:7px 0 7px}
+.page-head p{color:var(--muted);margin:0;max-width:760px;font-size:14px}
+.metric-grid{display:grid;gap:16px;grid-template-columns:repeat(4,1fr);margin-bottom:20px}
+.metric{background:rgba(255,255,255,.86);border:1px solid var(--line);border-radius:17px;padding:17px;box-shadow:0 1px 2px rgba(26,40,73,.03)}
+.metric-value{font-size:29px;line-height:1;font-weight:790;letter-spacing:-.045em;margin:9px 0 7px}
+.metric-note{color:var(--soft-muted);font-size:12px}
+.panel{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+.panel-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:19px 20px 15px}
+.panel-heading h2{margin:4px 0;font-size:18px;letter-spacing:-.028em}
+.panel-heading p{color:var(--muted);margin:0;font-size:13px}
+.toolbar{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 20px;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fcfdff;
+  font-size:12px;color:var(--muted);flex-wrap:wrap;
+}
+.tbl-scroll{overflow-x:auto}
+table.tbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;min-width:640px}
+.tbl th{
+  font-weight:780;font-size:10px;color:var(--muted);letter-spacing:.075em;text-transform:uppercase;
+  text-align:left;padding:11px 14px;background:#fbfcfe;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+.tbl td{padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px;color:#263248;white-space:nowrap}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover td{background:#fafcff}
+.pill{display:inline-flex;align-items:center;white-space:nowrap;padding:4px 9px;border-radius:99px;font-size:11px;font-weight:750;background:#eef4ff;color:#245ed8}
+.pill.green{background:var(--green-bg);color:var(--green)}
+.pill.yellow{background:var(--yellow-bg);color:var(--yellow)}
+.pill.red{background:var(--red-bg);color:var(--red)}
+.pill.neutral{background:#f0f3f8;color:#536175}
+.button{display:inline-flex;justify-content:center;align-items:center;gap:8px;border-radius:10px;padding:9px 14px;font-weight:740;font-size:13px;border:1px solid transparent;background:var(--accent);color:#fff;box-shadow:0 7px 16px rgba(37,99,235,.16)}
+.button:hover{background:var(--accent-ink)}
+.button.sec{background:#fff;border-color:var(--line-strong);color:var(--ink);box-shadow:none}
+.button.sec:hover{background:#f7f9fc}
+.two{display:grid;grid-template-columns:1.4fr .6fr;gap:16px;margin-top:16px}
+.stub{padding:34px 20px;text-align:center;color:var(--soft-muted);font-size:13px}
+.stub strong{display:block;color:var(--ink);font-size:14px;margin-bottom:6px}
+.note{border:1px solid #dce7fb;background:#f5f8ff;color:#47607f;padding:12px 14px;border-radius:12px;font-size:12.5px;margin-top:18px}
+/* ---------------------------------------------------------------------------
+   Provider review queue. Ported from MA-DOCPORTAL's practitioner demo:
+   apps/portal/components/demo/PractitionerDemo.tsx plus the matching rules in
+   apps/portal/app/globals.css. Same grid, same pinned columns, same drawer.
+   --------------------------------------------------------------------------- */
+.button-primary,.button-secondary,.button-danger{
+  display:inline-flex;justify-content:center;align-items:center;gap:8px;border-radius:10px;
+  padding:9px 14px;font-weight:740;font-size:13px;border:1px solid transparent;
+  transition:transform .15s ease,box-shadow .15s ease,background .15s ease;
+}
+.button-primary{background:var(--accent);color:#fff;box-shadow:0 7px 16px rgba(37,99,235,.16)}
+.button-primary:hover:not(:disabled){transform:translateY(-1px);background:var(--accent-ink)}
+.button-primary:disabled{cursor:not-allowed;opacity:.5;transform:none}
+.button-secondary{background:#fff;border-color:var(--line-strong);color:var(--ink)}
+.button-secondary:hover{background:#f7f9fc}
+.button-danger{background:#fff;border-color:#f0c3c1;color:var(--red)}
+.button-danger:hover{background:var(--red-bg)}
+.full-width{width:100%;margin-top:7px}
+
+.queue-panel{padding:0;overflow:hidden}
+.queue-actions{display:flex;gap:9px;flex-wrap:wrap}
+.queue-toolbar{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 20px;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fcfdff;
+  font-size:12px;color:var(--muted);flex-wrap:wrap;
+}
+.queue-count strong{color:var(--ink)}
+.select-all{display:flex;gap:7px;align-items:center;color:var(--ink);font-weight:650;cursor:pointer}
+.review-grid-scroll{overflow:auto}
+table.review-grid{width:100%;border-collapse:separate;border-spacing:0;background:#fff;min-width:1800px}
+.review-grid th{
+  font-weight:780;font-size:10px;line-height:1.2;color:var(--muted);letter-spacing:.075em;
+  text-transform:uppercase;text-align:left;padding:11px 12px;background:#fbfcfe;
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1;white-space:nowrap;
+}
+.review-grid td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px;color:#263248;vertical-align:middle;white-space:nowrap}
+.review-grid tbody tr:last-child td{border-bottom:0}
+.review-grid tr{cursor:pointer}
+.review-grid tr:hover td{background:#fafcff}
+.review-grid tr.selected-row td{background:#f2f6ff}
+/* Pinned first four columns, so triage and identity stay on screen while you
+   scroll the twenty-column grid sideways. */
+.review-grid th.pin,.review-grid td.pin{position:sticky;z-index:2;background:#fff}
+.review-grid th.pin{z-index:3;background:#fbfcfe}
+.review-grid .pin-select{left:0;min-width:44px;width:44px}
+.review-grid .pin-triage{left:44px;min-width:96px;width:96px}
+.review-grid .pin-time{left:140px;min-width:110px;width:110px}
+.review-grid .pin-name{left:250px;min-width:170px;width:170px;box-shadow:6px 0 8px -6px rgba(16,24,40,.14)}
+.review-grid tr:hover td.pin{background:#fafcff}
+.review-grid tr.selected-row td.pin{background:#f2f6ff}
+/* Compact density. Twenty columns need ~2017px; collapsing the rail only buys
+   196px, so on a 1440 screen six columns stay off-screen either way. This trades
+   padding and type size for columns.
+
+   Collapsing the rail now switches the grid into compact automatically, which is
+   what "closing the toolbar should expand it" actually has to mean: the reclaimed
+   196px is worth two columns on its own, and worth six once the padding shrinks
+   with it. Ticking Compact by hand still works independently. */
+.app.collapsed .review-grid,
+.review-grid.compact{min-width:0}
+.app.collapsed .review-grid th{padding:8px 7px;font-size:9.5px}
+.app.collapsed .review-grid td{padding:7px 7px;font-size:11.5px}
+.app.collapsed .review-grid .pin-select{min-width:34px;width:34px}
+.app.collapsed .review-grid .pin-triage{left:34px;min-width:74px;width:74px}
+.app.collapsed .review-grid .pin-time{left:108px;min-width:82px;width:82px}
+.app.collapsed .review-grid .pin-name{left:190px;min-width:132px;width:132px}
+.app.collapsed .review-grid .batch-reason{max-width:150px;font-size:10px}
+.review-grid.compact th{padding:8px 7px;font-size:9.5px}
+.review-grid.compact td{padding:7px 7px;font-size:11.5px}
+.review-grid.compact .pin-triage{left:34px;min-width:74px;width:74px}
+.review-grid.compact .pin-time{left:108px;min-width:82px;width:82px}
+.review-grid.compact .pin-name{left:190px;min-width:132px;width:132px}
+.review-grid.compact .pin-select{min-width:34px;width:34px}
+.review-grid.compact .batch-reason{max-width:150px;font-size:10px}
+.density{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:650;cursor:pointer}
+
+/* --------------------------------------------------- approval / case review */
+.modal-back{position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:60;display:grid;place-items:center;padding:24px}
+/* ONE scrolling surface, not a pane inside a pane (Devin msg 2079). The right
+   column used to have its own scrollbar and cut Administration frequency and
+   Duration off the bottom on a 4-month case. The modal itself is now the only
+   scroller, and the header and footer stay put, so Submit is never scrolled
+   away. The field reflow below is what makes it FIT at 1440x950 so this scroll
+   should not engage at all. */
+.modal{background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(16,24,40,.3);width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:auto}
+.modal-head{display:flex;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;top:0;z-index:3;flex:0 0 auto}
+.modal-head h2{margin:0;font-size:19px;letter-spacing:-.03em}
+.modal-who{display:flex;align-items:center;gap:11px}
+.modal-avatar{width:40px;height:40px;border-radius:99px;background:#e7edf8;color:#41537a;display:grid;place-items:center;font-size:13px;font-weight:770;flex:0 0 auto}
+.modal-demo{font-size:13px;font-weight:750}
+.modal-demo span{display:block;color:var(--soft-muted);font-size:11.5px;font-weight:600}
+.modal-facts{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
+.modal-facts div{font-size:11.5px}
+.modal-facts dt{color:var(--muted);margin:0 0 2px}
+.modal-facts dd{margin:0;font-weight:700}
+.modal-body{display:grid;grid-template-columns:.85fr 1.15fr;gap:0;overflow:visible;min-height:0}
+.modal-left{padding:20px;border-right:1px solid var(--line);background:#fcfdff}
+.modal-right{padding:20px;display:grid;gap:14px;align-content:start}
+.rx-meta{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.rx-meta dt{color:var(--muted);font-size:11px;font-weight:760;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px}
+.rx-meta dd{margin:0;font-size:13px;font-weight:650}
+.flags-panel{border:1px solid #f2c9c4;background:#fff5f4;border-radius:14px;padding:15px;margin-top:4px}
+.flags-panel.clean{border-color:#c9e7d5;background:#f2fbf6}
+.flags-title{font-weight:790;font-size:13px;color:var(--red);margin:0 0 10px}
+.flags-panel.clean .flags-title{color:var(--green)}
+.flags-grid{display:grid;gap:7px}
+.flags-grid > div{display:grid;grid-template-columns:130px 1fr;gap:10px;font-size:12px}
+.flags-grid dt{color:#8a5a55;margin:0}
+.flags-panel.clean .flags-grid dt{color:#4d7a62}
+.flags-grid dd{margin:0;font-weight:650;color:#2c3444}
+
+/* One tab per medication the storefront actually requested. */
+.med-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.med-tab{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:730;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
+.med-tab.active{background:var(--blue-bg);border-color:#bcd2f8;color:var(--accent-ink)}
+.med-tab .dot{width:7px;height:7px;border-radius:99px;background:#cfd6e2}
+.med-tab .dot.approve{background:#2ca66c}.med-tab .dot.deny{background:#d44e44}.med-tab .dot.none{background:#a8b1c0}
+.decision-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.decision-btn{border-radius:10px;padding:9px 18px;font-weight:750;font-size:13px;border:1px solid var(--line-strong);background:#fff;color:var(--ink)}
+.decision-btn.approve.on{background:#17834e;border-color:#17834e;color:#fff}
+.decision-btn.deny.on{background:var(--red);border-color:var(--red);color:#fff}
+.decision-btn.none.on{background:#5b6678;border-color:#5b6678;color:#fff}
+.field{display:grid;gap:6px}
+.field label{font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.field label .req{color:var(--red)}
+/* Controls inherit the page face rather than the browser default, which is what
+   makes a form stop looking like a form and start looking like the product. */
+/* Text-entry controls only. A bare `.modal input` here also caught the
+   checkboxes and painted them as full-width dropdowns with a chevron. */
+.field select,.field input[type=text],.modal select,.modal input[type=text]{
+  width:100%;padding:10px 11px;border-radius:10px;border:1px solid var(--line-strong);
+  background:#fff;font-size:13px;color:var(--ink);font-family:inherit;letter-spacing:inherit;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23647188' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:11px;padding-right:32px;
+}
+.field select:focus-visible,.decision-btn:focus-visible,.button-primary:focus-visible,
+.button-secondary:focus-visible,.med-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.field input[type=checkbox],.check-line input,.select-all input,.density input{accent-color:var(--accent)}
+.field select:disabled{background:#f4f6fa;color:var(--soft-muted)}
+.field.bad select{border-color:#e6a29c;background:#fff8f7}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.check-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink)}
+.check-stack{display:grid;gap:9px;align-content:end;padding-bottom:9px}
+.term-warn{font-size:11.5px;color:var(--yellow);margin:0}
+.months{display:grid;gap:8px}
+.months-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.months-head label{font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.months-note{font-size:11.5px;color:var(--soft-muted)}
+.months-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.months-grid .field label{font-size:11px;color:var(--accent-ink);font-weight:780}
+.modal-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 22px;border-top:1px solid var(--line);background:#fbfcfe;flex-wrap:wrap;position:sticky;bottom:0;z-index:3;flex:0 0 auto}
+.foot-status{font-size:12px;color:var(--muted)}
+.foot-status strong{color:var(--ink)}
+.foot-actions{display:flex;gap:9px;margin-left:auto}
+@media (max-width:900px){.modal-body{grid-template-columns:1fr}.modal-left{border-right:0;border-bottom:1px solid var(--line)}.field-row,.rx-meta{grid-template-columns:1fr}}
+.patient-link{background:none;border:0;padding:0;color:var(--accent-ink);font-size:inherit;font-weight:700;cursor:pointer}
+.batch-cell .batch-reason{margin-top:4px;font-size:11px;color:var(--soft-muted);white-space:normal;max-width:230px}
+.allergy-detail-wrap{position:relative;display:inline-block}
+.allergy-flag{background:none;border:0;padding:0;cursor:pointer;color:var(--yellow);font-weight:770}
+.allergy-tooltip{
+  display:none;position:absolute;bottom:calc(100% + 6px);left:0;z-index:4;width:220px;
+  white-space:normal;background:#1d2433;color:#fff;font-size:11px;line-height:1.45;padding:8px 10px;border-radius:8px;
+}
+.allergy-detail-wrap:hover .allergy-tooltip,.allergy-flag:focus + .allergy-tooltip{display:block}
+.notice{border:1px solid #dce7fb;background:#f5f8ff;color:#47607f;padding:13px 14px;border-radius:12px;font-size:12.5px}
+.queue-notice{margin:12px 20px 18px}
+.audit-verb{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;font-weight:620;color:#31436a;background:#f2f5fa;border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+
+.quick-review{padding:20px;margin-top:16px}
+.quick-pills{display:flex;gap:6px}
+.quick-review-grid{display:grid;grid-template-columns:1.25fr 1.15fr .75fr;gap:20px}
+.subheading{color:var(--soft-muted);font-size:11px;font-weight:770;letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
+.finding-list{list-style:none;padding:0;margin:0;display:grid;gap:11px;font-size:13px}
+.finding-list li{display:flex;gap:8px}
+.finding-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:0 0 auto}
+.finding-dot.green{background:#2ca66c}.finding-dot.yellow{background:#d7981b}.finding-dot.red{background:#d44e44}
+.ai-draft-chip{margin-bottom:9px}
+.summary-list{list-style:none;padding:0;margin:0 0 10px;display:grid;gap:9px;font-size:13px}
+.source-keys{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:6px;vertical-align:middle}
+/* Question labels, not slugs, so no monospace: this is prose, not code. */
+.source-key{font-size:10.5px;background:#eef2f9;border:1px solid #dbe3f0;border-radius:6px;padding:1px 6px;color:#3d4a63;font-weight:640;white-space:nowrap}
+.answer-sheet{display:grid;gap:16px;margin-top:12px}
+.answer-group dl{margin:0;display:grid;gap:0}
+.qa{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.qa:last-child{border-bottom:0}
+.qa dt{margin:0;color:var(--muted);font-size:12.5px;line-height:1.4}
+.qa dd{margin:0;color:var(--ink);font-size:12.5px;font-weight:650}
+.qa.consent{grid-template-columns:minmax(0,1fr) auto}
+.qa.consent dt{color:var(--ink)}
+@media (max-width:700px){.qa,.qa.consent{grid-template-columns:1fr;gap:3px}}
+.ai-honesty{font-size:11.5px;color:var(--soft-muted);margin:0 0 10px}
+.source-answers{margin:10px 0 0;display:grid;gap:7px;font-size:12px}
+.source-answers > div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline}
+.source-answers dd{margin:0;color:#263248}
+.protocol-version{font-size:12px;color:var(--muted);margin:0 0 9px}
+.holds-heading{margin-top:14px}
+.holds-list{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.no-holds{font-size:12.5px;color:var(--soft-muted);margin:0}
+.action-reason{font-size:11.5px;color:var(--soft-muted);margin:8px 0 0}
+@media (max-width:1100px){.quick-review-grid{grid-template-columns:1fr}}
+
+/* ------------------------------------------------------------ admin catalog */
+/* Case routing */
+.mode-list{display:grid;gap:9px;padding:0 20px 20px}
+.mode-row{display:flex;gap:11px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:#fff}
+.mode-row.on{border-color:#bcd2f8;background:var(--blue-bg)}
+.mode-row input{margin-top:2px;accent-color:var(--accent);flex:0 0 auto}
+.mode-row strong{font-size:13.5px;display:block}
+.mode-note{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.weight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;padding:0 20px 20px}
+.weight label{display:block;font-size:11px;font-weight:760;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.weight input{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line-strong);background:#fff;font-family:inherit;font-size:13px;color:var(--ink)}
+.ladder{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:13px}
+.rung{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);border-radius:10px;padding:7px 11px;font-size:12.5px;background:#fbfcfe}
+.rung-n{display:grid;place-items:center;width:18px;height:18px;border-radius:99px;background:var(--blue-bg);color:var(--accent-ink);font-size:10px;font-weight:790}
+.rung-arrow{color:var(--soft-muted);font-size:13px}
+.combos .subheading{margin:0}
+
+/* ------------------------------------------------- messages, iPhone styling */
+.msg-layout{display:grid;grid-template-columns:.8fr 1.2fr;gap:16px;align-items:start}
+.msg-list{padding-bottom:8px}
+.msg-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:0;
+  padding:11px 20px;border-top:1px solid var(--line)}
+.msg-row:hover{background:#fafcff}
+.msg-row.active{background:var(--blue-bg)}
+.msg-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:99px;background:#e7edf8;color:#41537a;font-size:12px;font-weight:770;flex:0 0 auto}
+.msg-avatar.big{width:40px;height:40px;font-size:13px}
+.msg-row-body{min-width:0;flex:1}
+.msg-row-body strong{display:block;font-size:13.5px}
+.msg-row-body span{display:block;color:var(--soft-muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-row-meta{display:flex;align-items:center;gap:7px;color:var(--soft-muted);font-size:11.5px;flex:0 0 auto}
+.msg-unread{display:grid;place-items:center;min-width:19px;height:19px;border-radius:99px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:780;padding:0 5px}
+
+.chat{display:flex;flex-direction:column;overflow:hidden;min-height:520px}
+.chat-head{display:flex;align-items:center;gap:11px;padding:14px 18px;border-bottom:1px solid var(--line);background:rgba(251,252,254,.9)}
+.chat-head strong{display:block;font-size:14px}
+.chat-head span{display:block;color:var(--soft-muted);font-size:11.5px}
+.chat-scroll{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:3px;background:#fff}
+.chat-time{align-self:center;color:var(--soft-muted);font-size:11px;font-weight:640;margin:12px 0 6px}
+.bubble-row{display:flex;margin-top:2px}
+.bubble-row.me{justify-content:flex-end}
+/* iMessage geometry: 18px radius, tail corner squared to 5px, blue out / grey in. */
+.bubble{max-width:74%;padding:8px 13px;border-radius:18px;font-size:13.5px;line-height:1.38;letter-spacing:-.004em;word-wrap:break-word}
+.bubble.them{background:#e9e9eb;color:#000;border-bottom-left-radius:5px}
+.bubble.me{background:#248bf5;color:#fff;border-bottom-right-radius:5px}
+.chat-read{align-self:flex-end;color:var(--soft-muted);font-size:10.5px;margin-top:5px}
+.chat-assist{padding:10px 16px;border-top:1px solid var(--line);background:#fbfcfe}
+.assist-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.assist-tones{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.tone-btn{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.tone-btn:hover{background:#f2f6ff;border-color:#bcd2f8;color:var(--accent-ink)}
+.note-block{padding:16px 20px 4px;border-top:1px solid var(--line)}
+.note-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;flex-wrap:wrap}
+.note-head > div{display:flex;align-items:center;gap:9px}
+.note-head .subheading{margin:0}
+.note-area{
+  width:100%;border:1px solid var(--line-strong);border-radius:12px;padding:11px 12px;
+  font-family:inherit;font-size:13px;line-height:1.5;color:var(--ink);resize:vertical;background:#fff;
+}
+.note-area:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chat-compose{display:flex;align-items:center;gap:9px;padding:12px 16px;border-top:1px solid var(--line);background:#fbfcfe}
+.chat-compose input{flex:1;border:1px solid var(--line-strong);border-radius:999px;padding:9px 15px;font-size:13.5px;font-family:inherit;background:#fff}
+.chat-send{display:grid;place-items:center;width:32px;height:32px;border-radius:99px;border:0;background:#248bf5;color:#fff;font-size:15px;font-weight:800;flex:0 0 auto}
+@media (max-width:900px){.msg-layout{grid-template-columns:1fr}}
+
+.endpoints{display:grid;gap:10px;padding:16px 20px 20px}
+.endpoint{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}
+.endpoint > div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.endpoint code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#2b3c61;overflow-wrap:anywhere}
+.endpoint p{margin:7px 0 0;font-size:12.5px;color:var(--muted)}
+.method{display:inline-flex;min-width:52px;justify-content:center;padding:3px 7px;border-radius:6px;background:#e9f8ef;color:#167846;font-size:10px;font-weight:790;letter-spacing:.04em}
+
+@media (max-width:1100px){.metric-grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+@media (max-width:820px){
+  .app,.app.collapsed{grid-template-columns:0 minmax(0,1fr)}
+  .side{position:fixed;z-index:40;width:var(--rail);transform:translateX(-100%);transition:transform .18s ease}
+  .app.mobile-open .side{transform:none;box-shadow:0 20px 60px rgba(16,24,40,.22)}
+  .wrap{padding:20px 16px 48px}
+  .metric-grid{grid-template-columns:1fr}
+  .demo-banner{display:none}
+  .page-head h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <aside class="side">
+    <div class="side-head">
+      <div class="brand-mark">M</div>
+      <div class="brand-text">MEDAXIS</div>
+    </div>
+    <div class="side-scroll" id="nav"></div>
+    <div class="side-foot">
+      <div class="avatar" id="avatar">SL</div>
+      <div class="who">
+        <strong id="whoName">Dr. Sarah Lin</strong>
+        <span id="whoRole">Super Admin</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="toggle" title="Collapse sidebar" aria-label="Collapse sidebar">&#9776;</button>
+      <div class="role-switcher" id="roles"></div>
+      <div class="scope-switcher" id="scopes" hidden></div>
+      <div class="demo-banner"><span class="demo-dot"></span> Design preview · fictional data</div>
+    </div>
+    <div class="wrap" id="view"></div>
+  </div>
+
+</div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   Nav model and table columns are taken from the real MEDAXIS-DOCTOR Blade
+   views (resources/views/layouts/*.blade.php and each index view's <th> row),
+   so the structure matches the running app. All ROW DATA below is invented
+   demo content, never real patient data.
+   --------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   Nav items and sections carrying su:true are SUPER ADMIN ONLY.
+
+   These flags are not decoration. Each one mirrors a real `role:super_admin`
+   middleware in routes/web.php, so what disappears from this sidebar when you
+   switch to a Doctor Admin is what the app itself would refuse to route:
+
+     Partners            prefix('partners')->middleware('role:super_admin')
+     API & Integrations   the whole Route::middleware('role:super_admin') group
+     SLA Settings         same group
+     Triage Rule Set      same group
+     Case Routing         same group
+     Admin Users          prefix('admins')->middleware('role:super_admin')
+
+   ONE ITEM IS NOT LIKE THE OTHERS: Products & Levels (admin.catalog) has NO
+   route in routes/web.php at all. It is gated here because it is platform
+   configuration and the seeder withholds `manage system` from admin, but that
+   is this preview taking a position, not a rule the app currently enforces.
+   Said out loud on the Roles & Permissions screen rather than buried here.
+   --------------------------------------------------------------------------- */
+const PORTALS = {
+  admin: {
+    label: "Admin", who: ["SL","Dr. Sarah Lin","Super Admin"],
+    nav: [
+      {type:"link", id:"admin.dashboard", ico:"◴", label:"Dashboard"},
+      {type:"section", label:"Management", open:true, items:[
+        {id:"admin.cases",       ico:"\u{1F5C2}", label:"Cases"},
+        {id:"admin.patients",    ico:"\u{1F465}", label:"Patients"},
+        {id:"admin.partners",    ico:"\u{1F3E2}", label:"Partners", su:true},
+        {id:"admin.clinicians",  ico:"\u{1F9D1}", label:"Clinicians"},
+        {id:"admin.priority",    ico:"⇅", label:"Assignment Priority", sub:true},
+        {id:"admin.offerings",   ico:"\u{1F48A}", label:"Medications", badge:"3"},
+        {id:"admin.categories",  ico:"\u{1F3F7}", label:"Categories", sub:true},
+        {id:"admin.questionnaires", ico:"☑", label:"Questionnaires"},
+        {id:"admin.questions",   ico:"❓", label:"Question Bank", sub:true}
+      ]},
+      {type:"section", label:"API & Integrations", open:false, su:true, items:[
+        {id:"admin.guide.messaging",  ico:"\u{1F4AC}", label:"Messaging API"},
+        {id:"admin.guide.weightloss", ico:"\u{1F4C4}", label:"Weight Loss API"},
+        {id:"admin.guide.antiaging",  ico:"\u{1F4C4}", label:"Anti-Aging API"},
+        {id:"admin.guide.webhooks",   ico:"\u{1F4C4}", label:"Webhook Guide"},
+        {id:"admin.webhooks",         ico:"\u{1F4E1}", label:"Webhook Logs"}
+      ]},
+      /* Products & Levels is GONE (Devin msg 2149, "merge to variant"). It held
+         the drug ladder and allowed combinations, which are now on the drug card
+         under Medications. Two screens describing one catalog is how they end up
+         disagreeing about what is prescribable. */
+      {type:"section", label:"Configuration", open:false, su:true, items:[
+        {id:"admin.settings", ico:"⚙", label:"SLA Settings"},
+        {id:"admin.triage",   ico:"\u{1F6A6}", label:"Triage Rule Set"},
+        {id:"admin.routing",  ico:"\u{1F500}", label:"Case Routing"}
+      ]},
+      {type:"section", label:"Super Admin", open:false, su:true, items:[
+        {id:"admin.admins",      ico:"\u{1F510}", label:"Admin Users"},
+        {id:"admin.permissions", ico:"\u{1F511}", label:"Roles & Permissions"}
+      ]}
+    ]
+  },
+  /* Clinician nav follows the work-queue shape Devin referenced (CareValidate):
+     collapsible sections, a live count on every row, organised by what needs
+     doing rather than by entity type. Every bucket below maps to something
+     MEDAXIS-DOCTOR already models: triage colour, the SLA review deadline, the
+     synchronous-video hold, the support flag, and case assignment. */
+  clinician: {
+    label: "Clinician", who: ["AH","Dr. Alex Hart","Provider"],
+    nav: [
+      {type:"link", id:"clin.dashboard", ico:"◴", label:"Dashboard"},
+      {type:"section", label:"Tasks (General)", open:true, items:[
+        {id:"clin.queue",    ico:"\u{1F5C2}", label:"Case Queue", count:12},
+        {id:"clin.mycases",  ico:"\u{1F4CB}", label:"My Cases", count:8},
+        {id:"clin.messages", ico:"\u{1F4AC}", label:"Messages For Provider", count:3},
+        {id:"clin.escalations", ico:"\u{26A0}", label:"My Escalations", count:1}
+      ]},
+      {type:"section", label:"Priority", open:true, items:[
+        {id:"clin.sla.breach",   ico:"\u{1F534}", label:"SLA breached", count:2},
+        {id:"clin.sla.due",      ico:"\u{1F7E0}", label:"Approaching deadline", count:4},
+        {id:"clin.hold.video",   ico:"\u{1F4F9}", label:"Video visit required", count:2},
+        {id:"clin.support.open", ico:"\u{1F6E0}", label:"Support thread open", count:1}
+      ]},
+      {type:"section", label:"Triage", open:true, items:[
+        {id:"clin.triage.red",    ico:"\u{1F534}", label:"Red", count:3},
+        {id:"clin.triage.yellow", ico:"\u{1F7E1}", label:"Yellow", count:6},
+        {id:"clin.triage.green",  ico:"\u{1F7E2}", label:"Green", count:42}
+      ]},
+      {type:"link", id:"clin.notifications", ico:"\u{1F514}", label:"Notifications"}
+    ]
+  },
+  partner: {
+    label: "Partner", who: ["MW","Marcus Webb","Storefront Admin"],
+    nav: [
+      {type:"link", id:"prt.dashboard",  ico:"◴", label:"Dashboard"},
+      {type:"link", id:"prt.offerings",  ico:"\u{1F48A}", label:"Medications"},
+      {type:"link", id:"prt.patients",   ico:"\u{1F465}", label:"Patients"},
+      {type:"link", id:"prt.cases",      ico:"\u{1F5C2}", label:"Cases"},
+      {type:"link", id:"prt.credentials",ico:"\u{1F511}", label:"API Credentials"},
+      {type:"link", id:"prt.notifications", ico:"\u{1F514}", label:"Notifications"}
+    ]
+  }
+};
+
+const P = (t,c) => ({t:t, c:c||""});
+
+/* ---------------------------------------------------------------------------
+   THE TWO-TIER ADMIN (Devin msg 2117), made visible.
+
+   super_admin = us. Sees everything, owns every integration.
+   admin       = a Doctor Admin. Sees only the doctors they are over.
+
+   Scoping is by CLINICIAN, not by storefront. That is a deliberate divergence
+   from MA-DOCPORTAL, which scopes admins to storefronts.
+
+   The three identities below are not three cosmetic labels. Each one produces a
+   different `visibleDoctors()` result, and every scoped screen is filtered
+   through it, so switching identity actually removes rows and nav items rather
+   than just relabelling the footer.
+
+   THE THIRD ONE IS THE POINT. `emptyAdmin` is over nobody, and must therefore
+   see NOTHING. In the app that distinction lives in User::visibleClinicianIds(),
+   which returns null for a super admin (no restriction) and [] for an admin over
+   nobody (matches no rows). The tempting `if (! $ids) return $query;` collapses
+   those two into each other and hands a half-configured admin the entire
+   platform. DoctorAdminScopingTest pins it server-side; this makes it something
+   you can see.
+   --------------------------------------------------------------------------- */
+const DOCTORS = ["Dr. Alex Hart","Dr. Priya Raman","Dr. Miles Fontaine","Dr. Wren Halloway"];
+
+const ADMIN_SCOPES = {
+  super: {
+    label: "Super Admin",
+    who: ["SL","Dr. Sarah Lin","Super Admin"],
+    /* null means NO RESTRICTION, and is not the same value as []. */
+    doctors: null,
+    note: "Super admin. Every case, every storefront, every integration."
+  },
+  scoped: {
+    label: "Doctor Admin",
+    who: ["TR","Tom Reyes","Admin · over 2 doctors"],
+    doctors: ["Dr. Alex Hart","Dr. Miles Fontaine"],
+    note: "Doctor Admin over Dr. Alex Hart and Dr. Miles Fontaine. Everything below is filtered to their work."
+  },
+  empty: {
+    label: "Admin · no doctors",
+    who: ["PS","Priya Shah","Admin · over 0 doctors"],
+    doctors: [],
+    note: "Doctor Admin assigned no doctors yet, so they see nothing at all. Not everything."
+  }
+};
+
+/** null = unrestricted (super admin). An array = exactly these doctors. */
+function visibleDoctors(){ return ADMIN_SCOPES[adminScope].doctors; }
+function isSuperAdmin(){ return visibleDoctors() === null; }
+
+/**
+ * Filter a table's rows by which doctor owns each one.
+ *
+ * `owners[i]` is the doctor on rows[i], or null when the row belongs to nobody
+ * (an unassigned case). A Doctor Admin does NOT see unassigned rows: server-side
+ * this is whereIn('clinician_id', $ids), and a null clinician_id is not in any
+ * list. Showing them here would make the preview claim access the app refuses.
+ */
+function scopeRows(rows, owners){
+  const mine = visibleDoctors();
+  if(mine === null) return rows.map((r,i) => [r,i]);
+  if(!owners)       return rows.map((r,i) => [r,i]);
+  return rows.map((r,i) => [r,i]).filter(([,i]) => owners[i] && mine.includes(owners[i]));
+}
+
+/* ---------------------------------------------------------------------------
+   Provider review queue rows. Shape and content mirror MA-DOCPORTAL's
+   apps/portal/lib/demo-fixtures.ts queueRows, so the clinician surface here is
+   the same surface a provider sees in the MA demo. Fictional patients.
+   --------------------------------------------------------------------------- */
+const QUEUE = [
+  { id:"demo-001", queue:"11m", product:"Semaglutide", name:"Avery Morgan", idv:"Y", sex:"F", age:37, bmi:32.8, onGlp:"N",
+    term:"3M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"Zofran", med3:"-", med4:"-",
+    company:"Northstar Health", allergy:"N", allergyDetail:null, zofran:"Y",
+    triage:"Green", video:"Clear", batch:"Eligible", batchReason:null, holds:[],
+    protocolVersion:"GLP-1 protocol v8",
+    findings:[["green","Requested dose matches the current protocol titration step."],
+              ["green","No active workflow hold."],
+              ["green","No concerning allergy flag from intake."]],
+    summary:[["Requested regimen: 3M term, dose L1 · 2.5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no; additional medication requests: Zofran.",["currentlyOnGlp","additionalMedications"]],
+             ["Concerning allergies flagged: no.",["concerningAllergies"]],
+             ["Identity verification: verified.",["identityVerified"]],
+             ["Triage classification: GREEN (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"3 months", requestedDoseLevel:"Level 1 (2.5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", additionalMedications:"Zofran for nausea", concerningAllergies:"No",
+                   identityVerified:"Yes (storefront verification passed)"} },
+
+  { id:"demo-002", queue:"28m", product:"Tirzepatide", name:"Jordan Ellis", idv:"Y", sex:"M", age:44, bmi:29.9, onGlp:"Y",
+    term:"4M", dose:"L3 · 7.5 mg", plan:"Hold", med2:"NAD+", med3:"-", med4:"-",
+    company:"Northstar Health", allergy:"Y", allergyDetail:"Reports hives after penicillin; documented at intake.", zofran:"N",
+    triage:"Yellow", video:"Required", batch:"Review", batchReason:"Yellow triage · video visit incomplete",
+    holds:["SYNCHRONOUS_VIDEO_VISIT_REQUIRED"], protocolVersion:"GLP-1 protocol v8",
+    findings:[["yellow","Dose hold requested while on active GLP-1 therapy, clinician review required."],
+              ["yellow","Synchronous-video requirement is not complete."],
+              ["yellow","Allergy flag requires provider review."]],
+    summary:[["Requested regimen: 4M term, dose L3 · 7.5 mg, plan Hold.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: yes; additional medication requests: NAD+.",["currentlyOnGlp","additionalMedications"]],
+             ["Concerning allergies flagged: yes, see the allergy detail for the patient's own words.",["concerningAllergies","allergyDetail"]],
+             ["Identity verification: verified.",["identityVerified"]],
+             ["Triage classification: YELLOW (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"4 months", requestedDoseLevel:"Level 3 (7.5 mg)", dosePlan:"Hold at current dose",
+                   currentlyOnGlp:"Yes", additionalMedications:"NAD+", concerningAllergies:"Yes",
+                   allergyDetail:"Hives after penicillin", identityVerified:"Yes (storefront verification passed)"} },
+
+  { id:"demo-003", queue:"42m", product:"Semaglutide", name:"Riley Chen", idv:"Y", sex:"F", age:31, bmi:34.1, onGlp:"N",
+    term:"1M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"-", med3:"-", med4:"-",
+    company:"Vitality Direct", allergy:"N", allergyDetail:null, zofran:"N",
+    triage:"Green", video:"Clear", batch:"Eligible", batchReason:null, holds:[],
+    protocolVersion:"GLP-1 protocol v8",
+    findings:[["green","Requested dose matches the current protocol titration step."],
+              ["green","No active workflow hold."],
+              ["green","Identity verified at intake."]],
+    summary:[["Requested regimen: 1M term, dose L1 · 2.5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no; no additional medication requests.",["currentlyOnGlp","additionalMedications"]],
+             ["Concerning allergies flagged: no.",["concerningAllergies"]],
+             ["Triage classification: GREEN (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"1 month", requestedDoseLevel:"Level 1 (2.5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", additionalMedications:"None", concerningAllergies:"No",
+                   identityVerified:"Yes (storefront verification passed)"} },
+
+  { id:"demo-004", queue:"1h 07m", product:"Tirzepatide", name:"Casey Rivera", idv:"N", sex:"F", age:52, bmi:27.4, onGlp:"N",
+    term:"3M", dose:"L2 · 5 mg", plan:"Titration", med2:"-", med3:"-", med4:"-",
+    company:"Meridian Wellness", allergy:"N", allergyDetail:null, zofran:"N",
+    triage:"Red", video:"Clear", batch:"Blocked", batchReason:"Red hard stop · identity not verified",
+    holds:[], protocolVersion:"GLP-1 protocol v8",
+    findings:[["red","Identity was not verified at intake, this is a hard stop."],
+              ["red","Red triage classification blocks batch submission."],
+              ["green","No active workflow hold."]],
+    summary:[["Requested regimen: 3M term, dose L2 · 5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no.",["currentlyOnGlp"]],
+             ["Identity verification: NOT verified.",["identityVerified"]],
+             ["Triage classification: RED (protocol version 8).",[]]],
+    sourceAnswers:{requestedTerm:"3 months", requestedDoseLevel:"Level 2 (5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", concerningAllergies:"No", identityVerified:"No"} },
+
+  { id:"demo-005", queue:"1h 24m", product:"Semaglutide", name:"Morgan Blake", idv:"Y", sex:"M", age:39, bmi:31.2, onGlp:"N",
+    term:"3M", dose:"L1 · 2.5 mg", plan:"Titration", med2:"Zofran", med3:"-", med4:"-",
+    company:"Vitality Direct", allergy:"N", allergyDetail:null, zofran:"Y",
+    triage:"Green", video:"Required", batch:"Blocked", batchReason:"Workflow hold · video visit required",
+    holds:["SYNCHRONOUS_VIDEO_VISIT_REQUIRED"], protocolVersion:"GLP-1 protocol v8",
+    findings:[["green","Triage is Green, the block is operational rather than clinical."],
+              ["yellow","State requires a synchronous video visit before dispatch."],
+              ["green","No concerning allergy flag from intake."]],
+    summary:[["Requested regimen: 3M term, dose L1 · 2.5 mg, plan Standard titration.",["requestedTerm","requestedDoseLevel","dosePlan"]],
+             ["Currently on GLP-1 therapy: no; additional medication requests: Zofran.",["currentlyOnGlp","additionalMedications"]],
+             ["Triage classification: GREEN (protocol version 8), with an active workflow hold.",[]]],
+    sourceAnswers:{requestedTerm:"3 months", requestedDoseLevel:"Level 1 (2.5 mg)", dosePlan:"Standard titration",
+                   currentlyOnGlp:"No", additionalMedications:"Zofran for nausea", concerningAllergies:"No",
+                   identityVerified:"Yes (storefront verification passed)"} }
+];
+
+/* ---------------------------------------------------------------------------
+   Routing attributes. Every clinician screen is the SAME grid over a different
+   slice of these rows, so a case can only appear in a bucket it genuinely
+   belongs to. Derived where the row already implies the answer (video holds,
+   triage) and declared where it does not (assignment, SLA, support).
+   --------------------------------------------------------------------------- */
+const ROUTING = {
+  "demo-001": { mine:false, sla:"ok",       support:true,  escalated:false },
+  "demo-002": { mine:false, sla:"due",      support:false, escalated:false },
+  "demo-003": { mine:false, sla:"due",      support:false, escalated:false },
+  "demo-004": { mine:false, sla:"breached", support:false, escalated:true  },
+  "demo-005": { mine:false, sla:"breached", support:false, escalated:false },
+  "demo-006": { mine:true,  sla:"ok",       support:false, escalated:false },
+  "demo-007": { mine:true,  sla:"ok",       support:false, escalated:false },
+  "demo-008": { mine:true,  sla:"due",      support:true,  escalated:false },
+  "demo-009": { mine:true,  sla:"ok",       support:false, escalated:false }
+};
+
+/* A compact factory for the extra rows. The five ported from MA's fixtures stay
+   written out in full above; these exist so the filtered views have enough to
+   show, and they carry the same shape so the drawer renders identically. */
+function mkRow(o){
+  const tone = o.triage === "Green" ? "green" : o.triage === "Yellow" ? "yellow" : "red";
+  return {
+    id:o.id, queue:o.queue, product:o.product, name:o.name, idv:o.idv || "Y", sex:o.sex, age:o.age,
+    bmi:o.bmi, onGlp:o.onGlp || "N", term:o.term, dose:o.dose, plan:o.plan || "Titration",
+    med2:o.med2 || "-", med3:"-", med4:"-", company:o.company,
+    allergy:o.allergy || "N", allergyDetail:o.allergyDetail || null, zofran:o.med2 === "Zofran" ? "Y" : "N",
+    triage:o.triage, video:o.video || "Clear", batch:o.batch,
+    batchReason:o.batchReason || null, holds:o.holds || [],
+    protocolVersion:"GLP-1 protocol v8",
+    findings:o.findings || [[tone, o.reason || "Triage classification "+o.triage+"."]],
+    summary:[
+      ["Requested regimen: "+o.term+" term, dose "+o.dose+", plan "+(o.plan||"Titration")+".",
+       ["requestedTerm","requestedDoseLevel","dosePlan"]],
+      ["Currently on GLP-1 therapy: "+(o.onGlp === "Y" ? "yes" : "no")+
+       (o.med2 && o.med2 !== "-" ? "; additional medication requests: "+o.med2+"." : "; no additional medication requests."),
+       ["currentlyOnGlp","additionalMedications"]],
+      ["Triage classification: "+o.triage.toUpperCase()+" (protocol version 8).", []]
+    ],
+    sourceAnswers:{
+      requestedTerm:TERM_TEXT[o.term], requestedDoseLevel:o.dose, dosePlan:o.plan || "Titration",
+      currentlyOnGlp:o.onGlp === "Y" ? "Yes" : "No",
+      additionalMedications:(o.med2 && o.med2 !== "-") ? o.med2 : "None",
+      concerningAllergies:o.allergy === "Y" ? "Yes" : "No",
+      identityVerified:(o.idv || "Y") === "Y" ? "Yes (storefront verification passed)" : "No"
+    }
+  };
+}
+const TERM_TEXT = { "1M":"1 month", "3M":"3 months", "4M":"4 months" };
+
+QUEUE.push(
+  mkRow({ id:"demo-006", queue:"2h 05m", product:"Semaglutide", name:"Noor Haddad", sex:"F", age:46, bmi:30.6,
+    term:"3M", dose:"L2 · 5 mg", company:"Vitality Direct", triage:"Yellow", batch:"Review",
+    batchReason:"Yellow triage · allergy flag needs review", allergy:"Y",
+    allergyDetail:"Reports rash after sulfa drugs; documented at intake.",
+    reason:"Allergy flag requires provider review." }),
+  mkRow({ id:"demo-007", queue:"2h 41m", product:"Tirzepatide", name:"Sam Okafor", sex:"M", age:48, bmi:34.2,
+    term:"4M", dose:"L2 · 5 mg", med2:"Zofran", company:"Meridian Wellness", triage:"Green", batch:"Eligible",
+    reason:"Requested dose matches the current protocol titration step." }),
+  mkRow({ id:"demo-008", queue:"3h 12m", product:"Semaglutide", name:"Devon Park", sex:"F", age:58, bmi:28.9,
+    term:"3M", dose:"L1 · 2.5 mg", company:"Northstar Health", triage:"Red", batch:"Blocked",
+    batchReason:"Red hard stop · thyroid cancer history",
+    findings:[["red","Thyroid cancer history is an absolute contraindication."],
+              ["red","Red triage classification blocks batch submission."]] }),
+  // Deliberately a HOLD on a 3M term, and eligible, so the hold path is
+  // reachable in the UI. demo-002 is the other hold but it is Yellow, so its
+  // approval screen cannot be opened.
+  mkRow({ id:"demo-009", queue:"4h 20m", product:"Tirzepatide", name:"Ari Delgado", sex:"M", age:35, bmi:31.9,
+    term:"3M", dose:"L3 · 7.5 mg", plan:"Hold", company:"Northstar Health", triage:"Green", batch:"Eligible",
+    reason:"Stable on the current level, continuing without escalation." })
+);
+
+/* ---------------------------------------------------------------------------
+   Triage rules. Admin owns these (the Triage Rule Set screen). Triage is a pure
+   function of the intake answers plus this list, so the provider is never told a
+   colour the answers do not support, and changing a rule changes the outcome.
+   Order matters: the first matching rule of the strongest colour wins.
+   --------------------------------------------------------------------------- */
+const TRIAGE_RULES = [
+  { id:"TR-01", label:"Thyroid cancer history",  result:"Red",    active:true, when:(a) => a.thyroidCancer === "Yes" },
+  { id:"TR-02", label:"Identity not verified",   result:"Red",    active:true, when:(a) => a.identityVerified === "No" },
+  { id:"TR-03", label:"BMI under 27",            result:"Red",    active:true, when:(a) => Number(a.bmi) < 27 },
+  { id:"TR-04", label:"Pregnant or breastfeeding", result:"Red",  active:true, when:(a) => a.pregnant === "Yes" },
+  { id:"TR-05", label:"Concerning allergy flag", result:"Yellow", active:true, when:(a) => a.concerningAllergies === "Yes" },
+  { id:"TR-06", label:"Dose hold while on GLP-1",result:"Yellow", active:true, when:(a) => a.currentlyOnGlp === "Yes" && a.dosePlan === "Hold" },
+  { id:"TR-07", label:"Age over 65",             result:"Yellow", active:true, when:(a) => Number(a.age) > 65 }
+];
+
+function evaluateTriage(answers){
+  const hits = TRIAGE_RULES.filter((r) => r.active && r.when(answers));
+  const red = hits.filter((r) => r.result === "Red");
+  const yellow = hits.filter((r) => r.result === "Yellow");
+  return { result: red.length ? "Red" : yellow.length ? "Yellow" : "Green", hits, red, yellow };
+}
+
+/* ---------------------------------------------------------------------------
+   The intake questions, as the patient was actually asked them.
+
+   The slugs stay as the internal keys, because that is what the rules, the CRM
+   fields and the answer record are wired to. But a provider must never be shown
+   one. Every place an answer surfaces, it is rendered through this map: the full
+   question in the source-answer list, the short label anywhere space is tight.
+   A key with no entry here falls back to a de-slugged version of itself, so a
+   new question degrades to readable rather than leaking `camelCaseGibberish`.
+   --------------------------------------------------------------------------- */
+const QUESTIONS = {
+  firstName:      { group:"About you", q:"First name", short:"First name" },
+  lastName:       { group:"About you", q:"Last name", short:"Last name" },
+  dateOfBirth:    { group:"About you", q:"Date of birth", short:"Date of birth" },
+  sexAtBirth:     { group:"About you", q:"What was your sex assigned at birth?", short:"Sex at birth" },
+  age:            { group:"About you", q:"Age at submission", short:"Age" },
+  shippingState:  { group:"About you", q:"Which state will your medication ship to?", short:"Shipping state" },
+  storefront:     { group:"About you", q:"Which storefront submitted this case?", short:"Storefront" },
+  submittedAt:    { group:"About you", q:"When was this intake submitted?", short:"Submitted" },
+
+  heightFeet:     { group:"Measurements", q:"Height (feet)", short:"Height (ft)" },
+  heightInches:   { group:"Measurements", q:"Height (inches)", short:"Height (in)" },
+  currentWeight:  { group:"Measurements", q:"What is your current weight?", short:"Current weight" },
+  goalWeight:     { group:"Measurements", q:"What is your goal weight?", short:"Goal weight" },
+  bmi:            { group:"Measurements", q:"Calculated BMI", short:"BMI" },
+
+  requestedTerm:      { group:"What you are requesting", q:"Which program length are you requesting?", short:"Program length" },
+  requestedDoseLevel: { group:"What you are requesting", q:"Which dose level are you requesting?", short:"Requested dose" },
+  dosePlan:           { group:"What you are requesting", q:"Do you want to titrate up or hold at your current dose?", short:"Titration or hold" },
+  additionalMedications:{ group:"What you are requesting", q:"Are you requesting any additional medications?", short:"Additional medications" },
+
+  currentlyOnGlp: { group:"Medical history", q:"Are you currently taking a GLP-1 medication?", short:"Currently on GLP-1" },
+  lastDose:       { group:"Medical history", q:"When was your last dose?", short:"Last dose" },
+  concerningAllergies:{ group:"Medical history", q:"Do you have any drug allergies?", short:"Drug allergies" },
+  allergyDetail:  { group:"Medical history", q:"Please describe your allergy and what happened.", short:"Allergy detail" },
+  thyroidCancer:  { group:"Medical history", q:"Have you or a family member ever been diagnosed with medullary thyroid cancer or MEN2?", short:"Thyroid cancer history" },
+  pancreatitis:   { group:"Medical history", q:"Have you ever been diagnosed with pancreatitis?", short:"Pancreatitis" },
+  pregnant:       { group:"Medical history", q:"Are you pregnant, breastfeeding, or planning to become pregnant?", short:"Pregnant or breastfeeding" },
+  type1Diabetes:  { group:"Medical history", q:"Have you been diagnosed with type 1 diabetes?", short:"Type 1 diabetes" },
+  gallbladderDisease:{ group:"Medical history", q:"Have you been diagnosed with gallbladder disease?", short:"Gallbladder disease" },
+  eatingDisorder: { group:"Medical history", q:"Have you ever been treated for an eating disorder?", short:"Eating disorder" },
+  currentMedications:{ group:"Medical history", q:"What other medications are you currently taking?", short:"Other medications" },
+  otherConditions:{ group:"Medical history", q:"Do you have any other medical conditions we should know about?", short:"Other conditions" },
+  adverseReactions:{ group:"Medical history", q:"Have you had any adverse reactions to previous treatment?", short:"Adverse reactions" },
+
+  identityVerified:{ group:"Verification", q:"Was the patient's identity verified at intake?", short:"Identity verified" },
+  videoVisit:      { group:"Verification", q:"Is a synchronous video visit required in this state?", short:"Video visit" },
+
+  consentTelehealth:{ group:"Consents", q:"I consent to receive care by telehealth and have read the informed consent.", short:"Telehealth consent", consent:true },
+  consentSms:       { group:"Consents", q:"I agree to receive treatment updates by SMS. Message and data rates may apply.", short:"SMS updates consent", consent:true }
+};
+
+const GROUP_ORDER = ["About you","Measurements","What you are requesting","Medical history","Verification","Consents"];
+
+/* Never show a raw key. An unmapped one is de-slugged instead of leaking. */
+const deslug = (k) => k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+const questionOf = (k) => (QUESTIONS[k] && QUESTIONS[k].q) || deslug(k);
+const labelOf    = (k) => (QUESTIONS[k] && QUESTIONS[k].short) || deslug(k);
+const CONSENT_KEYS = Object.keys(QUESTIONS).filter((k) => QUESTIONS[k].consent);
+
+/* The AI draft summary is COMPOSED from the recorded answers, never invented.
+   Each statement carries the answer keys it was built from, which is what makes
+   it checkable: a provider can open the source answers and see the inputs. */
+function buildSummary(a){
+  const s = [];
+  s.push(["Requested regimen: "+a.requestedTerm+", "+a.requestedDoseLevel+", plan "+a.dosePlan+".",
+          ["requestedTerm","requestedDoseLevel","dosePlan"]]);
+  s.push(["Currently on GLP-1 therapy: "+a.currentlyOnGlp.toLowerCase()
+          +"; additional medication requests: "+(a.additionalMedications || "none")+".",
+          ["currentlyOnGlp","additionalMedications"]]);
+  s.push(["Reported weight "+a.currentWeight+" with BMI "+a.bmi+", goal "+a.goalWeight+".",
+          ["currentWeight","bmi","goalWeight"]]);
+  s.push(["Concerning allergies flagged: "+a.concerningAllergies.toLowerCase()
+          +(a.allergyDetail ? ", "+a.allergyDetail : "")+".",
+          a.allergyDetail ? ["concerningAllergies","allergyDetail"] : ["concerningAllergies"]]);
+  s.push(["Identity verification: "+(a.identityVerified === "Yes" ? "verified" : "NOT verified")+".",
+          ["identityVerified"]]);
+  // Consents are confirmed on the short list, not buried in the full record.
+  // A missing consent is a blocker, so it has to be visible without expanding.
+  const consents = CONSENT_KEYS.map((k) => labelOf(k)+": "+(a[k] || "not recorded").toLowerCase());
+  s.push(["Consents recorded, "+consents.join("; ")+".", CONSENT_KEYS.slice()]);
+
+  const t = evaluateTriage(a);
+  s.push(["Triage classification: "+t.result.toUpperCase()
+          +(t.hits.length ? " on "+t.hits.map((r) => r.label.toLowerCase()).join(", ") : ", no rule matched")+".",
+          []]);
+  return s;
+}
+
+/* A full intake record. The provider must be able to see EVERYTHING the patient
+   filled out, not the handful of fields a summary happened to cite. */
+function fullAnswers(row){
+  const base = {
+    firstName:row.name.split(" ")[0], lastName:row.name.split(" ").slice(1).join(" "),
+    dateOfBirth:"See patient record", sexAtBirth:row.sex === "F" ? "Female" : "Male",
+    age:String(row.age), shippingState:({ "Northstar Health":"TN", "Vitality Direct":"TN", "Meridian Wellness":"KY" })[row.company] || "TN",
+    currentWeight:Math.round(row.bmi * 3.9) + " lbs", goalWeight:Math.round(row.bmi * 3.2) + " lbs",
+    heightFeet:"5", heightInches:row.sex === "F" ? "6" : "10", bmi:String(row.bmi),
+    requestedTerm:TERM_TEXT[row.term], requestedDoseLevel:row.dose, dosePlan:row.plan,
+    currentlyOnGlp:row.onGlp === "Y" ? "Yes" : "No",
+    lastDose:row.onGlp === "Y" ? "Within the last 7 days" : "Not applicable",
+    additionalMedications:[row.med2, row.med3, row.med4].filter((x) => x && x !== "-").join(", ") || "None",
+    concerningAllergies:row.allergy === "Y" ? "Yes" : "No",
+    allergyDetail:row.allergyDetail || "",
+    thyroidCancer:"No", pancreatitis:"No", pregnant:"No", type1Diabetes:"No",
+    gallbladderDisease:"No", eatingDisorder:"No",
+    currentMedications:"None reported", otherConditions:"None reported",
+    adverseReactions:"None reported",
+    identityVerified:row.idv === "Y" ? "Yes" : "No",
+    videoVisit:row.video === "Required" ? "Required by state" : "Not required",
+    consentTelehealth:"Agreed", consentSms:row.id.endsWith("1") || row.id.endsWith("3") ? "Agreed" : "Declined",
+    submittedAt:row.queue + " ago", storefront:row.company
+  };
+  if(row.id === "demo-008") base.thyroidCancer = "Yes";
+  if(row.id === "demo-004") base.identityVerified = "No";
+  return base;
+}
+
+/* Rebuild every row's answers, summary and triage from the rules above, so the
+   three can never disagree with each other. */
+for(const r of QUEUE){
+  r.answers = fullAnswers(r);
+  r.summary = buildSummary(r.answers);
+  r.triageEval = evaluateTriage(r.answers);
+  r.sourceAnswers = r.answers;
+}
+
+const ELIGIBLE_IDS = QUEUE.filter(r => r.batch === "Eligible").map(r => r.id);
+const batchTone = (b) => b === "Eligible" ? "green" : b === "Review" ? "yellow" : "red";
+
+/* ---------------------------------------------------------------------------
+   Approval. The storefront pushes a case that may request MORE THAN ONE
+   medication: the grid's Medication 2/3/4 Req columns are exactly that. So a
+   decision is per medication, not per case, and the case cannot be submitted
+   until every requested medication has one.
+
+   Term is constrained to the three the catalog sells (1M / 3M / 4M) and is
+   prefilled from what was requested; changing it is allowed but called out,
+   because dispensing a different term than the storefront sold is a billing
+   mismatch rather than a clinical one.
+   --------------------------------------------------------------------------- */
+const TERMS = ["1M","3M","4M"];
+const monthsIn = (term) => Number(String(term).replace("M","")) || 1;
+const TERM_LABEL = { "1M":"1 month", "3M":"3 months", "4M":"4 months" };
+/* ---------------------------------------------------------------------------
+   Product catalog. Admin owns this: the products, their ordered dose levels, and
+   which add-ons may be combined with them. Levels are ORDERED, because titration
+   means "the next level up", so the order is the clinical meaning and not just
+   display sequence.
+   --------------------------------------------------------------------------- */
+const CATALOG = {
+  Semaglutide: { kind:"GLP-1", levels:["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg"], combos:["Zofran","NAD+"] },
+  Tirzepatide: { kind:"GLP-1", levels:["L1 · 2.5 mg","L2 · 5 mg","L3 · 7.5 mg","L4 · 10 mg","L5 · 12.5 mg"], combos:["Zofran","NAD+"] },
+  Zofran:      { kind:"Add-on", levels:["4 mg","8 mg"], combos:[] },
+  "NAD+":      { kind:"Add-on", levels:["100 mg","200 mg"], combos:[] }
+};
+const DOSAGES = Object.fromEntries(Object.entries(CATALOG).map(([k,v]) => [k, v.levels]));
+
+/* Month prefill is derived, never typed in.
+   TITRATION starts at the requested level and steps up one level per month,
+   stopping at the top of the ladder rather than running off the end.
+   HOLD repeats the requested level for the whole term.
+   An unknown starting dose yields blanks rather than a guess. */
+function prefillMonths(product, startDose, plan, term){
+  const levels = (CATALOG[product] || {}).levels || [];
+  const n = monthsIn(term);
+  const i = levels.indexOf(startDose);
+  if(i < 0) return Array(n).fill("");
+  const out = [];
+  for(let m = 0; m < n; m++){
+    out.push(plan === "Hold" ? levels[i] : levels[Math.min(i + m, levels.length - 1)]);
+  }
+  return out;
+}
+const FREQUENCIES = ["Weekly","Every 2 weeks","Daily","As needed"];
+const REFILLS = ["0","1","2","3","5","11"];
+
+/* The medications a case actually asked for: the primary product plus whichever
+   of med2/med3/med4 carry a real value. "-" means the slot was not requested. */
+function requestedMeds(row){
+  const meds = [{ key:"primary", name:row.product, term:row.term, dose:row.dose, primary:true }];
+  for(const slot of ["med2","med3","med4"]){
+    const v = row[slot];
+    if(v && v !== "-") meds.push({ key:slot, name:v, term:row.term, dose:"", primary:false });
+  }
+  return meds;
+}
+
+const VIEWS = {
+  /* ------------------------------------------------------------- admin */
+  /* Scoped screens carry an `owners` array parallel to `rows`: which doctor owns
+     each row, or null for a row that belongs to nobody. See scopeRows(). */
+  "admin.dashboard": {
+    eyebrow:"Admin", title:"Dashboard", sub:"Platform-wide activity across every storefront and provider.",
+    scoped:true,
+    /* A function, not a literal, because the top-line numbers differ by tier.
+       Partners and total patients are platform figures: a Doctor Admin has no
+       business with a count that includes storefronts they do not touch, so the
+       app returns null for them (DashboardController: `$isSuper ? ... : null`)
+       and the card says so instead of quietly showing a smaller number. */
+    metrics: () => isSuperAdmin()
+      ? [["Open cases","148","across 6 storefronts"],["Unassigned","12","awaiting a provider"],
+         ["Providers online","9","of 23 on the roster"],["Webhook failures","2","last 24 hours"]]
+      : [["Open cases", String(scopeRows(VIEWS["admin.cases"].table.rows, VIEWS["admin.cases"].table.owners).length),
+          "across your doctors"],
+         ["Your doctors", String((visibleDoctors()||[]).length), "assigned to you"],
+         ["Storefronts","Super admin only","platform-wide figure"],
+         ["Webhook failures","Super admin only","integrations are super admin"]],
+    table:{title:"Recent cases", cols:["Triage","Patient","Partner","Clinician","Status","Created"],
+      owners:["Dr. Alex Hart","Dr. Priya Raman",null,"Dr. Alex Hart"],
+      rows:[
+      [P("Red","pill red"),"Jordan Avery","Northstar Health","Dr. Alex Hart",P("In review","pill yellow"),"14 min ago"],
+      [P("Green","pill green"),"Riley Chen","Vitality Direct","Dr. Priya Raman",P("Approved","pill green"),"38 min ago"],
+      [P("Yellow","pill yellow"),"Casey Morgan","Northstar Health",P("Unassigned","pill neutral"),P("Queued","pill"),"1 hr ago"],
+      [P("Green","pill green"),"Sam Okafor","Meridian Wellness","Dr. Alex Hart",P("Approved","pill green"),"2 hr ago"]
+    ]}
+  },
+  "admin.cases": {
+    eyebrow:"Management", title:"Cases", sub:"Every case across all storefronts, with triage and assignment state.",
+    scoped:true,
+    table:{title:"All cases", cols:["Triage","Patient","Partner","Clinician","Medications","Status","Support","Created"],
+      owners:["Dr. Alex Hart","Dr. Priya Raman",null,"Dr. Alex Hart",null],
+      rows:[
+      [P("Red","pill red"),"Jordan Avery","Northstar Health","Dr. Alex Hart","Semaglutide",P("In review","pill yellow"),P("Open","pill red"),"14 min ago"],
+      [P("Green","pill green"),"Riley Chen","Vitality Direct","Dr. Priya Raman","Tirzepatide",P("Approved","pill green"),"None","38 min ago"],
+      [P("Yellow","pill yellow"),"Casey Morgan","Northstar Health",P("Unassigned","pill neutral"),"NAD+",P("Queued","pill"),"None","1 hr ago"],
+      [P("Green","pill green"),"Sam Okafor","Meridian Wellness","Dr. Alex Hart","Semaglutide",P("Approved","pill green"),"None","2 hr ago"],
+      [P("Red","pill red"),"Devon Ellis","Vitality Direct",P("Unassigned","pill neutral"),"Peptide Therapy",P("On hold","pill neutral"),P("Open","pill red"),"3 hr ago"]
+    ]}
+  },
+  /* PHI. A Doctor Admin reaches a patient only THROUGH a case belonging to one
+     of their doctors, which is why the owner here is the treating doctor and not
+     anything about the patient. Server-side that is Patient::visibleTo(), a
+     whereExists over the case relation, not a column on patients. */
+  "admin.patients": {
+    eyebrow:"Management", title:"Patients", sub:"Patient records aggregated across every partner storefront.",
+    scoped:true,
+    table:{title:"All patients", cols:["Name","Email","Phone","State","Partner","Cases","Status","Joined"],
+      owners:["Dr. Alex Hart","Dr. Priya Raman",null,"Dr. Alex Hart"],
+      rows:[
+      ["Jordan Avery","j.avery@example.com","(615) 555-0142","TN","Northstar Health","3",P("Active","pill green"),"Mar 2026"],
+      ["Riley Chen","r.chen@example.com","(629) 555-0188","TN","Vitality Direct","1",P("Active","pill green"),"Apr 2026"],
+      ["Casey Morgan","c.morgan@example.com","(901) 555-0117","TN","Northstar Health","2",P("Active","pill green"),"May 2026"],
+      ["Sam Okafor","s.okafor@example.com","(615) 555-0163","KY","Meridian Wellness","5",P("Active","pill green"),"Jan 2026"]
+    ]}
+  },
+  "admin.partners": {
+    eyebrow:"Management", title:"Partners", sub:"Storefronts integrating with the platform over the partner API.",
+    table:{title:"Storefronts", cols:["Name","Email","Patients","Cases","Status","Client ID"], rows:[
+      ["Northstar Health","ops@northstar.example","412","1,284",P("Active","pill green"),"nsh_7f2a91"],
+      ["Vitality Direct","team@vitality.example","268","903",P("Active","pill green"),"vtd_3c8b40"],
+      ["Meridian Wellness","admin@meridian.example","97","221",P("Active","pill green"),"mrd_9a1e77"],
+      ["Anchor Clinic","hello@anchor.example","0","0",P("Pending","pill yellow"),"anc_5d6f02"]
+    ]}
+  },
+  "admin.clinicians": {
+    eyebrow:"Management", title:"Clinicians", sub:"Provider roster, licensure coverage and availability.",
+    scoped:true,
+    table:{title:"Providers", cols:["Clinician","Credentials","NPI","States","Total Cases","Status","Available"],
+      owners:["Dr. Alex Hart","Dr. Priya Raman","Dr. Miles Fontaine","Dr. Wren Halloway"],
+      rows:[
+      ["Dr. Alex Hart","MD","1234567890","TN, KY, GA","486",P("Active","pill green"),P("Yes","pill green")],
+      ["Dr. Priya Raman","MD","2345678901","TN, AL","312",P("Active","pill green"),P("Yes","pill green")],
+      ["Dr. Miles Fontaine","DO","3456789012","TN","198",P("Active","pill green"),P("No","pill neutral")],
+      ["Dr. Wren Halloway","NP","4567890123","KY, GA","54",P("Pending","pill yellow"),P("No","pill neutral")]
+    ]}
+  },
+  "admin.priority": {
+    eyebrow:"Management", title:"Assignment Priority", sub:"Order providers are offered new cases in. Drag to reorder in the live app.",
+    table:{title:"Priority order", cols:["#","Clinician","States","Active load","Status"], rows:[
+      ["1","Dr. Alex Hart","TN, KY, GA","8 cases",P("Active","pill green")],
+      ["2","Dr. Priya Raman","TN, AL","5 cases",P("Active","pill green")],
+      ["3","Dr. Miles Fontaine","TN","0 cases",P("Paused","pill neutral")]
+    ]}
+  },
+  "admin.offerings": {
+    eyebrow:"Management", title:"Medications",
+    sub:"Everything a storefront can prescribe, grouped by category, with each one's approval state.",
+    medications:true
+  },
+  "admin.categories":{eyebrow:"Management", title:"Categories", sub:"The grouping the medication catalog is organised by. A category with nothing in it still shows, because an empty category is usually a setup step someone did not finish.",
+    table:{title:"Categories", cols:["Name","Medications","Status"], rows:[
+      ["Weight Loss","12",P("Active","pill green")],["Anti-Aging","7",P("Active","pill green")],
+      ["Hormone Therapy","4",P("Active","pill green")],["Sexual Health","0",P("Needs review","pill yellow")]]}},
+  "admin.questionnaires":{eyebrow:"Management", title:"Questionnaires", sub:"Intake forms attached to medications, built in the questionnaire builder.",
+    table:{title:"Questionnaires", cols:["Name","Medications","Questions","Status","Updated"], rows:[
+      ["Weight Loss Intake v4","6","38",P("Published","pill green"),"2 days ago"],
+      ["Anti-Aging Intake v2","3","24",P("Published","pill green"),"1 week ago"],
+      ["Hormone Screen v1","1","19",P("Draft","pill neutral"),"3 weeks ago"]]}},
+  "admin.questions":{eyebrow:"Management", title:"Question Bank", sub:"Reusable questions shared across questionnaires.",
+    table:{title:"Questions", cols:["Question","Type","Used in","Disqualifier"], rows:[
+      ["Have you ever been diagnosed with thyroid cancer?","Yes / No","4 forms",P("Yes","pill red")],
+      ["What is your current weight?","Number","6 forms",P("No","pill neutral")],
+      ["Are you currently pregnant or breastfeeding?","Yes / No","5 forms",P("Yes","pill red")]]}},
+  "admin.guide.messaging":{eyebrow:"API & Integrations", title:"Messaging API", sub:"How a storefront posts and reads messages on a case.",
+    doc:[["POST","/api/partner/cases/{id}/messages","Post a message onto a case thread."],
+         ["GET","/api/partner/cases/{id}/messages","Read the thread, newest last."],
+         ["GET","/api/partner/cases/{id}/events","Audit trail of every state change."]]},
+  "admin.guide.weightloss":{eyebrow:"API & Integrations", title:"Weight Loss API", sub:"Creating a weight-loss case from your storefront.",
+    doc:[["POST","/api/partner/patients","Create or match a patient by external ID."],
+         ["GET","/api/partner/offerings","List the offerings you are approved to sell."],
+         ["POST","/api/partner/cases","Submit intake answers and open a case."],
+         ["GET","/api/partner/cases/{id}","Poll case status, or subscribe by webhook."]]},
+  "admin.guide.antiaging":{eyebrow:"API & Integrations", title:"Anti-Aging API", sub:"Creating an anti-aging case. Same shape, different catalog.",
+    doc:[["GET","/api/partner/offerings","Anti-aging offerings your storefront may sell."],
+         ["GET","/api/partner/offerings/{id}/questionnaires","Fetch the intake form for an offering."],
+         ["POST","/api/partner/cases","Submit the completed questionnaire."]]},
+  "admin.guide.webhooks":{eyebrow:"API & Integrations", title:"Webhook Guide", sub:"Events pushed to your endpoint, and how retries behave.",
+    doc:[["POST","case.completed","Fires when a provider approves or declines."],
+         ["POST","case.cancelled","Fires when a case is cancelled by either side."],
+         ["POST","case.support","Fires when a support thread is opened."],
+         ["POST","order.updated","Fires on any dispatch status change."]]},
+  "admin.webhooks":{eyebrow:"API & Integrations", title:"Webhook Logs", sub:"Delivery attempts, retries and failures per storefront endpoint.",
+    table:{title:"Recent deliveries", cols:["Event","Partner","Endpoint","Status","Attempts","Sent"], rows:[
+      ["case.completed","Northstar Health","/hooks/medaxis",P("200 OK","pill green"),"1","4 min ago"],
+      ["case.cancelled","Vitality Direct","/api/webhook",P("200 OK","pill green"),"1","22 min ago"],
+      ["case.completed","Meridian Wellness","/inbound",P("500 Error","pill red"),"4","1 hr ago"],
+      ["order.updated","Northstar Health","/hooks/medaxis",P("200 OK","pill green"),"1","2 hr ago"]]}},
+  /* "admin.catalog" (Products & Levels) removed, merged into Medications.
+     renderCatalog() goes with it: the ladder and the allowed combinations now
+     render on the drug card, from the same CATALOG object as before. */
+  "admin.settings":{eyebrow:"Configuration", title:"SLA Settings", sub:"Review deadlines and escalation thresholds.",
+    table:{title:"Thresholds", cols:["Setting","Value","Applies to"], rows:[
+      ["Review deadline","24 hours","All cases"],["Escalation warning","18 hours","All cases"],
+      ["Auto-reassign after","36 hours","Unclaimed cases"]]}},
+  "admin.routing":{eyebrow:"Configuration", title:"Case Routing", sub:"Which doctor a new case is auto-assigned to. Every change is a new version, and the live version is never edited in place.",
+    routing:true},
+  "admin.triage":{eyebrow:"Configuration", title:"Triage Rule Set", sub:"Rules that colour a case Green, Yellow or Red before a provider opens it.",
+    table:{title:"Active rules", cols:["Rule","Condition","Result","Active"], rows:[
+      ["Thyroid cancer history","Answer = Yes",P("Red","pill red"),P("On","pill green")],
+      ["BMI under 27","BMI < 27",P("Red","pill red"),P("On","pill green")],
+      ["Age over 65","Age > 65",P("Yellow","pill yellow"),P("On","pill green")],
+      ["Clean intake","No flags",P("Green","pill green"),P("On","pill green")]]}},
+  "admin.admins":{eyebrow:"Super Admin", title:"Admin Users", sub:"Platform staff accounts, their tier, and which doctors each one is over. Only a super admin can reach this screen: routes/web.php puts prefix('admins') behind role:super_admin.",
+    admins:true,
+    table:{title:"Admins", cols:["Name","Email","Tier","Doctors they are over","Last active"], rows:[
+      ["Dr. Sarah Lin","s.lin@medaxis.example",P("Super Admin","pill"),P("Everyone","pill neutral"),"Now"],
+      ["Tom Reyes","t.reyes@medaxis.example",P("Admin","pill neutral"),"Dr. Alex Hart, Dr. Miles Fontaine","1 hr ago"],
+      ["Priya Shah","p.shah@medaxis.example",P("Admin","pill neutral"),P("Nobody yet","pill red"),"3 hr ago"]]}},
+  "admin.permissions":{eyebrow:"Super Admin", title:"Roles & Permissions", sub:"What each tier actually holds. Taken from RolesAndPermissionsSeeder, not from a diagram.",
+    permissions:true},
+
+  /* --------------------------------------------------------- clinician */
+  /* Devin msg 2146: the dashboard used to show "Next in your queue" as a flat
+     five-column table, which was a different, thinner rendering of the same
+     cases the Case Queue screen shows properly. Two renderings of one queue
+     means the dashboard can imply something the queue does not, and a provider
+     landing here saw none of the triage, holds or batch eligibility that decide
+     what to pick up first. It now renders THE review queue through the same
+     renderQueue() as the Case Queue screen, with the same filter, so there is
+     one compact-column view of the queue and it cannot drift. */
+  "clin.dashboard": {
+    eyebrow:"Clinician", title:"Dashboard", sub:"Your queue, your workload and your SLA position.",
+    metrics:[["Waiting Queue","12","cases available to claim"],["My Active Cases","8","assigned and approved"],
+             ["Completed This Month","64","July 2026"],["SLA Status","All clear","24h review deadline"]],
+    queue:(r) => !ROUTING[r.id].mine
+  },
+  "clin.queue": {
+    eyebrow:"Clinician", title:"Case Queue", sub:"Unclaimed cases you are licensed to review. Claim one to start.",
+    metrics:[["Assigned to me","18","Provider-owned and pool-claimed cases"],
+             ["Batch-ready","42","Green triage with no active workflow hold"],
+             ["Yellow review","6","Needs clinician review or follow-up"],
+             ["Video visit holds","2","Active synchronous-video holds in my queue"]],
+    queue:(r) => !ROUTING[r.id].mine
+  },
+  /* Same grid, same drawer, same approval modal. Only the slice changes.
+     Messages is the one screen that is genuinely a different thing. */
+  "clin.mycases":{eyebrow:"Tasks", title:"My Cases", sub:"Cases assigned to you. Same grid, filtered to yours.",
+    queue:(r) => ROUTING[r.id].mine},
+  "clin.escalations":{eyebrow:"Tasks", title:"My Escalations", sub:"Escalated to you and waiting on a decision.",
+    queue:(r) => ROUTING[r.id].escalated},
+  "clin.sla.breach":{eyebrow:"Priority", title:"SLA breached", sub:"Past the review deadline. Clear these first.",
+    queue:(r) => ROUTING[r.id].sla === "breached"},
+  "clin.sla.due":{eyebrow:"Priority", title:"Approaching deadline", sub:"Inside the warning window before the review deadline.",
+    queue:(r) => ROUTING[r.id].sla === "due"},
+  "clin.hold.video":{eyebrow:"Priority", title:"Video visit required", sub:"Held on a synchronous video visit. Operational, not clinical.",
+    queue:(r) => r.video === "Required"},
+  "clin.support.open":{eyebrow:"Priority", title:"Support thread open", sub:"Cases with an open support conversation attached.",
+    queue:(r) => ROUTING[r.id].support},
+  "clin.triage.red":{eyebrow:"Triage", title:"Red", sub:"Hard stops. These cannot be batched and need a decision.",
+    queue:(r) => r.triage === "Red"},
+  "clin.triage.yellow":{eyebrow:"Triage", title:"Yellow", sub:"Needs clinician review before it can move.",
+    queue:(r) => r.triage === "Yellow"},
+  "clin.triage.green":{eyebrow:"Triage", title:"Green", sub:"Clean intake. Batch-eligible unless an operational hold applies.",
+    queue:(r) => r.triage === "Green"},
+
+  "clin.messages":{eyebrow:"Tasks", title:"Messages For Provider", sub:"The one screen that is not the case grid. Pick a conversation and the thread opens below it.",
+    chat:true},
+  "clin.notifications":{eyebrow:"Clinician", title:"Notifications", sub:"Case assignments, SLA warnings and support requests.",
+    table:{title:"Recent", cols:["Type","Message","When"], rows:[
+      [P("SLA","pill yellow"),"Case for Jordan Avery approaching the 24h deadline","20 min ago"],
+      [P("Assigned","pill"),"You were assigned a new case from Vitality Direct","1 hr ago"],
+      [P("Support","pill red"),"Storefront opened a support thread on case 4821","3 hr ago"]]}},
+
+  /* ----------------------------------------------------------- partner */
+  "prt.dashboard": {
+    eyebrow:"Partner", title:"Dashboard", sub:"Your storefront's cases, patients and integration health.",
+    metrics:[["Open cases","34","awaiting provider review"],["Patients","412","registered via your API"],
+             ["Approved this month","118","July 2026"],["Webhook health","OK","last failure 6 days ago"]],
+    table:{title:"Recent cases", cols:["UUID","Patient","Medications","Clinician","Status","Created"], rows:[
+      ["c_8f21a4","Jordan Avery","Semaglutide","Dr. Alex Hart",P("In review","pill yellow"),"14 min ago"],
+      ["c_7b90d3","Casey Morgan","NAD+",P("Unassigned","pill neutral"),P("Queued","pill"),"1 hr ago"],
+      ["c_6a45f8","Ari Delgado","NAD+","Dr. Alex Hart",P("Approved","pill green"),"Yesterday"]
+    ]}
+  },
+  "prt.cases": {
+    eyebrow:"Partner", title:"Cases", sub:"Every case your storefront has submitted.",
+    table:{title:"Your cases", cols:["UUID","Patient","Medications","Clinician","Status","Created"], rows:[
+      ["c_8f21a4","Jordan Avery","Semaglutide","Dr. Alex Hart",P("In review","pill yellow"),"14 min ago"],
+      ["c_7b90d3","Casey Morgan","NAD+",P("Unassigned","pill neutral"),P("Queued","pill"),"1 hr ago"],
+      ["c_6a45f8","Ari Delgado","NAD+","Dr. Alex Hart",P("Approved","pill green"),"Yesterday"],
+      ["c_5c33e1","Noor Haddad","Semaglutide","Dr. Priya Raman",P("Approved","pill green"),"2 days ago"]
+    ]}
+  },
+  "prt.patients": {
+    eyebrow:"Partner", title:"Patients", sub:"Patients you have created through the partner API.",
+    table:{title:"Your patients", cols:["Patient","External ID","DOB","State","Cases","Status"], rows:[
+      ["Jordan Avery","ext_10241","1985-04-12","TN","3",P("Active","pill green")],
+      ["Casey Morgan","ext_10388","1959-11-02","TN","2",P("Active","pill green")],
+      ["Ari Delgado","ext_10455","1990-07-19","KY","1",P("Active","pill green")]
+    ]}
+  },
+  "prt.offerings": {
+    eyebrow:"Partner", title:"Medications", sub:"What you are approved to sell, and where each one stands in approval.",
+    table:{title:"Your catalog", cols:["Name","Internal Name","Type","Category","States","Approval","Status"], rows:[
+      ["Semaglutide 0.25mg","sema_025","Injectable","Weight Loss","TN, KY",P("Approved","pill green"),P("Active","pill green")],
+      ["NAD+ 100mg","nad_100","Injectable","Anti-Aging","TN",P("Pending","pill yellow"),P("Inactive","pill neutral")]
+    ]}
+  },
+  "prt.credentials": {
+    eyebrow:"Partner", title:"API Credentials", sub:"Your OAuth client for the partner API. Webhooks are read-only here.",
+    table:{title:"Credentials", cols:["Field","Value","Status"], rows:[
+      ["Client ID","nsh_7f2a91",P("Active","pill green")],
+      ["Client Secret","Hidden, rotate to reveal",P("Active","pill green")],
+      ["Token endpoint","/api/partner/auth/token",P("Live","pill green")],
+      ["Webhook endpoint","/hooks/medaxis",P("Read-only","pill neutral")]
+    ]}
+  },
+  "prt.notifications":{eyebrow:"Partner", title:"Notifications", sub:"Case completions, cancellations and support replies.",
+    table:{title:"Recent", cols:["Type","Message","When"], rows:[
+      [P("Completed","pill green"),"Case c_6a45f8 was approved by Dr. Alex Hart","Yesterday"],
+      [P("Cancelled","pill red"),"Case c_4b12c9 was cancelled at patient request","2 days ago"]]}}
+};
+
+/* ------------------------------------------------------------------ state */
+let portal = "admin";
+let view = "admin.dashboard";
+/* Which admin identity the Admin portal is being viewed as. Only meaningful in
+   the admin portal; the switcher is hidden elsewhere. */
+let adminScope = "super";
+const app = document.getElementById("app");
+
+/* Section open/closed has to SURVIVE a re-render. Rebuilding the nav straight
+   from the model on every click collapsed whichever section you had just
+   opened, so picking an item inside it threw you back to the top. Keyed by
+   portal + section index; the section holding the active view is forced open. */
+const openState = {};
+const skey = (i) => portal + ":" + i;
+function sectionOpen(n, i){
+  if (n.items.some((it) => it.id === view)) return true;
+  const k = skey(i);
+  if (!(k in openState)) openState[k] = n.open !== false;
+  return openState[k];
+}
+
+/* ------------------------------------------------------------------ render */
+function renderRoles(){
+  document.getElementById("roles").innerHTML = Object.entries(PORTALS)
+    .map(([k,v]) => '<button class="role-button'+(k===portal?" active":"")+'" data-portal="'+k+'">'+v.label+'</button>')
+    .join("");
+}
+
+function navItem(it){
+  return '<button class="nav-link'+(it.sub?" sub":"")+(it.id===view?" active":"")+'" data-view="'+it.id+'" title="'+it.label+'">'
+       + '<span class="nav-ico">'+it.ico+'</span><span class="lbl">'+it.label+'</span>'
+       + (it.badge?'<span class="nav-badge">'+it.badge+'</span>':'')
+       + (it.count !== undefined?'<span class="nav-count'+(it.count?"":" zero")+'">'+it.count+'</span>':'')
+       + '</button>';
+}
+
+/* Is this nav entry visible to whoever is currently signed in?
+   Outside the admin portal there is no admin tier, so nothing is gated. */
+function navVisible(entry){
+  if(portal !== "admin") return true;
+  return !entry.su || isSuperAdmin();
+}
+
+function renderNav(){
+  const p = PORTALS[portal];
+  document.getElementById("nav").innerHTML = p.nav.map((n,i) => {
+    if(!navVisible(n)) return "";
+    if(n.type === "link") return navItem(n);
+    const items = n.items.filter(navVisible);
+    if(items.length === 0) return "";          // whole section gated away
+    const open = sectionOpen(n, i);
+    return '<button class="nav-section'+(open?"":" closed")+'" data-section="'+i+'">'
+         + '<span>'+n.label+'</span><span class="chev">▼</span></button>'
+         + '<div class="nav-group'+(open?"":" closed")+'" data-group="'+i+'">'
+         + items.map(navItem).join("") + '</div>';
+  }).join("");
+
+  /* The footer identity follows the admin tier, not just the portal, so who you
+     are viewing as is always readable without opening the switcher. */
+  const who = portal === "admin" ? ADMIN_SCOPES[adminScope].who : p.who;
+  document.getElementById("avatar").textContent = who[0];
+  document.getElementById("whoName").textContent = who[1];
+  document.getElementById("whoRole").textContent = who[2];
+}
+
+/* The admin tier switcher. Rendered only in the admin portal, because the two
+   tiers do not exist anywhere else. */
+function renderScopes(){
+  const box = document.getElementById("scopes");
+  if(portal !== "admin"){ box.innerHTML = ""; box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = '<span class="scope-label">Viewing as</span>'
+    + Object.entries(ADMIN_SCOPES).map(([k,v]) =>
+        '<button class="scope-button'+(k===adminScope?" active":"")+'" data-scope="'+k+'">'+v.label+'</button>'
+      ).join("");
+}
+
+/* Section open/closed is keyed by portal + index. Gating changes which sections
+   exist, so a stale active view (say Case Routing, then switch to Doctor Admin)
+   has to be walked back to something the current tier can actually open. */
+function ensureViewAllowed(){
+  if(portal !== "admin" || isSuperAdmin()) return;
+  const flat = [];
+  PORTALS.admin.nav.forEach((n) => {
+    if(!navVisible(n)) return;
+    if(n.type === "link") { flat.push(n); return; }
+    n.items.filter(navVisible).forEach((it) => flat.push(it));
+  });
+  if(!flat.some((it) => it.id === view)) view = flat[0].id;
+}
+
+function cell(c){
+  if(typeof c === "string") return c;
+  return '<span class="'+c.c+'">'+c.t+'</span>';
+}
+
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+/* ---------------------------------------------------------------------------
+   AI assist.
+
+   Two places a model would help: drafting the clinical note that accompanies a
+   decision, and drafting a reply to a patient or storefront message. Both are
+   DRAFTS. The provider edits and commits; nothing is sent or recorded from the
+   model's output directly, and the model never decides.
+
+   Nothing here calls a model. These are deterministic compositions over the
+   record, exactly like MA's summary placeholder, so the surface can be reviewed
+   before an approved clinical AI service and its BAA are in place.
+   --------------------------------------------------------------------------- */
+/* providerText is whatever the provider has already typed into the note. It is
+   an INPUT to the draft, never something the draft discards (Devin msg 2079:
+   "we can write the basics or instructions then say draft with AI and it reads
+   that and the base"). Their words lead, the record composes around them. */
+function draftNote(row, decisionsMap, providerText){
+  const meds = requestedMeds(row);
+  const lines = [];
+  const own = String(providerText || "").trim();
+  const approved = meds.filter((m) => (decisionsMap[m.key] || {}).decision === "approve");
+  const denied   = meds.filter((m) => (decisionsMap[m.key] || {}).decision === "deny");
+
+  lines.push(row.age+" year old "+(row.sex === "F" ? "female" : "male")
+    +", BMI "+row.bmi+", presenting through "+row.company+" for weight management.");
+  lines.push(row.answers.currentlyOnGlp === "Yes"
+    ? "Currently on GLP-1 therapy, last dose "+String(row.answers.lastDose).toLowerCase()+"."
+    : "Not currently on GLP-1 therapy.");
+
+  const t = row.triageEval;
+  lines.push(t.hits.length
+    ? "Intake screening flagged: "+t.hits.map((r) => r.label.toLowerCase()).join(", ")+"."
+    : "Intake screening flagged no contraindications.");
+
+  if(row.answers.concerningAllergies === "Yes" && row.answers.allergyDetail)
+    lines.push("Allergy noted: "+row.answers.allergyDetail);
+
+  for(const m of approved){
+    const d = decisionsMap[m.key];
+    const ladder = d.months.filter(Boolean);
+    lines.push("Approved "+m.name+", "+TERM_LABEL[d.term]+", "+String(d.freq).toLowerCase()
+      +(ladder.length > 1 ? ", dosing "+ladder.join(" then ") : ", "+(ladder[0] || ""))
+      +", "+d.refills+" refills.");
+  }
+  for(const m of denied) lines.push("Declined "+m.name+" at this time.");
+
+  lines.push("Patient advised to report severe or persistent side effects and to contact the clinic with any concerns.");
+
+  /* Anything the record would state that the provider has ALREADY stated is
+     dropped rather than repeated. This is also what makes Regenerate safe: the
+     previous draft comes back in as providerText, every fact in it is already
+     present, so a regenerate with no edits returns the same note instead of
+     stacking a second copy of itself. Edits the provider made survive, and only
+     genuinely new facts (a changed decision, a widened term) get added. */
+  const fresh = lines.filter((l) => !own.includes(l));
+  if(!own) return fresh.join(" ");
+  return [own.replace(/([^.!?])$/, "$1.")].concat(fresh).join(" ");
+}
+
+const REPLY_TONES = ["Answer the question","Ask for more detail","Explain the hold"];
+function draftReply(t, tone){
+  // Read every inbound message, not just the most recent one. The last thing a
+  // patient sends is often "thanks", and drafting a reply to that instead of to
+  // their actual question is worse than useless.
+  const topic = t.msgs.filter((m) => m[0] === "them").map((m) => m[1]).join(" ");
+  if(tone === "Ask for more detail")
+    return "Thanks for getting in touch. So I can help properly, could you tell me a little more about what you are seeing? Any detail about when it started and how it has changed is useful.";
+  if(tone === "Explain the hold")
+    return "Your case is with me and is not lost. It is waiting on a step your state requires before I can prescribe. As soon as that is complete I will review it straight away.";
+  if(/not open|call me/i.test(topic))
+    return "Sorry the link is not opening. I can arrange for someone to call you instead and book the visit over the phone. Would later today or tomorrow morning suit you better?";
+  if(/every week|feel sick|nausea/i.test(topic))
+    return "Only when you need it. It is there for the first few weeks while your body adjusts, and most people find they need it less over time.";
+  return "Thanks for your message. I have reviewed your case and will follow up with the detail you asked for shortly.";
+}
+
+/* ------------------------------------------------------------ admin catalog */
+/* ---------------------------------------------------------------- routing
+   Case routing, ported from MA-DOCPORTAL. Five modes, eight tunable
+   coefficients, per-doctor weights, versioned with one live version at a time.
+
+   The two warnings on this screen are not decoration. Switching mode changes
+   which doctor sees which patient, and the licence check does nothing for a
+   doctor with no licensed states recorded, so both are stated where the change
+   is actually made rather than left in a document nobody opens.        */
+const ROUTING_MODES = [
+  ["PRIORITY", "Priority order (current)", "Assigns to the lowest priority rank with capacity. This is how MEDAXIS behaves today.", true],
+  ["ROUND_ROBIN", "Round robin", "Rotates strictly through eligible doctors so everyone gets an even turn.", false],
+  ["WEIGHTED", "Weighted allocation", "Distributes by each doctor's configured share. A weight of 0 takes that doctor out of routing.", false],
+  ["INTELLIGENT", "Intelligent workload score", "Scores each doctor on open cases by triage, unanswered messages, decision speed and volume. Lowest score wins.", false],
+  ["PROVIDER_POOL", "Provider pool", "Nothing is auto-assigned. Cases wait for a doctor to pick them up.", false]
+];
+
+const ROUTING_WEIGHTS = [
+  ["Open green case", "1"], ["Open yellow case", "3"], ["Open red case", "2"],
+  ["Unanswered message", "2"], ["Message older than 12 hours", "25"],
+  ["Per minute of median decision time", "0.02"], ["Per case already assigned today", "0.25"],
+  ["Allocation penalty multiplier", "5"]
+];
+
+function renderRouting(){
+  let h = '<section class="panel"><div class="panel-heading"><div>'
+    + '<div class="eyebrow">Live policy</div><h2>v1 · Priority order</h2>'
+    + '<p>Seeded from the behaviour MEDAXIS already had, so routing is unchanged until another '
+    + 'version is activated. Activated automatically at install.</p></div>'
+    + '<span class="pill green">Live</span></div>';
+
+  h += '<div class="notice">Switching mode changes <strong>which doctor receives which case</strong>. '
+    + 'Drafting a version does nothing on its own; it only takes effect when you activate it.</div>';
+
+  h += '<div class="notice" style="border-color:#f2c9c4;background:#fff5f4">'
+    + '<strong>Licence check.</strong> A doctor with no licensed states recorded currently counts as '
+    + 'licensed everywhere, so the state-licence block does nothing for them. Fill in licensed states, '
+    + 'then switch on <em>Block doctors with no licensed states recorded</em>.</div>';
+
+  h += '<div class="mode-list">' + ROUTING_MODES.map(m =>
+      '<label class="mode-row'+(m[3]?" on":"")+'"><input type="radio" name="rmode"'+(m[3]?" checked":"")+' />'
+      + '<span><strong>'+m[1]+'</strong><span class="mode-note">'+m[2]+'</span></span></label>'
+    ).join("") + '</div></section>';
+
+  h += '<section class="panel"><div class="panel-heading"><div>'
+    + '<div class="eyebrow">Intelligent mode</div><h2>Score weights</h2>'
+    + '<p>Lower total score wins, so a larger number pushes work away from a doctor harder. '
+    + 'These are the defaults carried over from MA.</p></div></div>'
+    + '<div class="weight-grid">' + ROUTING_WEIGHTS.map(w =>
+        '<div class="weight"><label>'+w[0]+'</label><input type="text" value="'+w[1]+'" readonly /></div>'
+      ).join("") + '</div></section>';
+
+  h += '<section class="panel"><div class="panel-heading"><div>'
+    + '<div class="eyebrow">Version history</div><h2>Every change is a version</h2>'
+    + '<p>The live version is never edited. To change routing you draft a new version and activate '
+    + 'it, which leaves the previous rules on the record.</p></div></div>'
+    + '<table class="grid"><thead><tr><th>Version</th><th>Mode</th><th>Status</th><th>Activated</th><th>Why</th></tr></thead><tbody>'
+    + '<tr><td><strong>v1</strong></td><td>Priority order</td><td><span class="pill green">Live</span></td>'
+    + '<td>At install</td><td>Seeded from existing behaviour so nothing changed on deploy.</td></tr>'
+    + '</tbody></table></section>';
+
+  return h;
+}
+
+
+/* ------------------------------------------------------- messages, iPhone style */
+const THREADS = [
+  { id:"t1", who:"Jordan Ellis", sub:"Patient · case demo-002", waiting:"22 min", unread:2,
+    msgs:[["them","Hi doctor, I got the email about needing a video visit. Do I have to do that before you can review?","9:41 AM"],
+          ["me","You do, yes. Kentucky requires a live visit before a first prescription.","9:44 AM"],
+          ["them","Okay. The link they sent me does not open on my phone.","9:46 AM"],
+          ["them","Can someone call me instead?","9:46 AM"]] },
+  { id:"t2", who:"Meridian Wellness", sub:"Storefront · case demo-004", waiting:"1 hr", unread:1,
+    msgs:[["them","We are seeing this case blocked for identity. The patient sent us a licence copy directly.","8:58 AM"],
+          ["me","It needs to come through the intake so it lands on the record. Re-send it that way and the block clears.","9:12 AM"],
+          ["them","Understood, resending now.","9:15 AM"]] },
+  { id:"t3", who:"Avery Morgan", sub:"Patient · case demo-001", waiting:"3 hr", unread:0,
+    msgs:[["them","Quick question about the nausea medication, do I take it every week or only when I feel sick?","7:20 AM"],
+          ["me","Only when you need it. It is there for the first few weeks while your body adjusts.","7:31 AM"],
+          ["them","Perfect, thank you.","7:33 AM"]] }
+];
+let thread = THREADS[0].id;
+
+function renderMessages(){
+  const t = THREADS.find((x) => x.id === thread) || THREADS[0];
+  let h = '<div class="msg-layout"><div class="panel msg-list">'
+    + '<div class="panel-heading"><div><h2>Awaiting reply</h2><p>Pick a conversation.</p></div></div>';
+  for(const x of THREADS){
+    h += '<button class="msg-row'+(x.id===t.id?" active":"")+'" data-thread="'+x.id+'">'
+      + '<span class="msg-avatar">'+x.who.split(" ").map((p)=>p[0]).join("").slice(0,2)+'</span>'
+      + '<span class="msg-row-body"><strong>'+esc(x.who)+'</strong>'
+      + '<span>'+esc(x.msgs[x.msgs.length-1][1]).slice(0,54)+'...</span></span>'
+      + '<span class="msg-row-meta">'+x.waiting+(x.unread?'<span class="msg-unread">'+x.unread+'</span>':'')+'</span>'
+      + '</button>';
+  }
+  h += '</div>';
+
+  // The thread itself, styled like an iPhone conversation.
+  h += '<div class="panel chat"><div class="chat-head">'
+    + '<span class="msg-avatar big">'+t.who.split(" ").map((p)=>p[0]).join("").slice(0,2)+'</span>'
+    + '<div><strong>'+esc(t.who)+'</strong><span>'+esc(t.sub)+'</span></div></div>'
+    + '<div class="chat-scroll">';
+  let lastSide = null;
+  for(const [side, text, time] of t.msgs){
+    if(side !== lastSide) h += '<div class="chat-time">'+time+'</div>';
+    h += '<div class="bubble-row '+side+'"><div class="bubble '+side+'">'+esc(text)+'</div></div>';
+    lastSide = side;
+  }
+  h += '<div class="chat-read">Delivered</div></div>';
+
+  // AI assist for the reply. Suggests, never sends.
+  h += '<div class="chat-assist"><div class="assist-head">'
+    + '<span class="pill neutral">AI draft · you send it, not the model</span>'
+    + '<div class="assist-tones">'
+    + REPLY_TONES.map((t) => '<button class="tone-btn" data-tone="'+esc(t)+'">'+esc(t)+'</button>').join("")
+    + '</div></div></div>';
+
+  h += '<div class="chat-compose">'
+    + '<input type="text" id="composeBox" placeholder="Message" aria-label="Message" value="'+esc(replyDraft)+'" />'
+    + '<button class="chat-send" aria-label="Send">&uarr;</button></div>'
+    + '</div></div>';
+  return h;
+}
+
+/* ------------------------------------------------------------ approval state */
+let approvalFor = null;   // row id, or null when the modal is shut
+let activeMed = null;     // which medication tab is open
+let decisions = {};       // medKey -> { decision, product, medication, dosage, custom, freq, term, startToday, refills }
+
+function openApproval(rowId){
+  const row = QUEUE.find((r) => r.id === rowId);
+  approvalFor = rowId;
+  /* The note belongs to ONE patient. Carrying it into the next case would put one
+     patient's clinical note in front of another's record, so it clears when the
+     case changes. Reopening the SAME case keeps it, because closing the modal to
+     go and check something must not destroy what was typed. */
+  if(noteFor !== rowId){ noteText = ""; noteSteered = false; noteFor = rowId; }
+  decisions = {};
+  for(const m of requestedMeds(row)){
+    decisions[m.key] = {
+      decision:null, product:m.primary ? m.name+"-"+m.term : m.name,
+      medication:m.name, dosage:m.dose || "", custom:false,
+      freq:m.primary ? "Weekly" : "", term:m.term, startToday:true, refills:"0",
+      plan:row.plan,
+      // Months are prefilled from the requested dose and the requested plan:
+      // Titration steps up a level per month, Hold repeats it. Still editable,
+      // this is a starting point rather than a decision.
+      months:prefillMonths(m.name, m.dose, row.plan, m.term)
+    };
+  }
+  activeMed = requestedMeds(row)[0].key;
+}
+
+/* A medication is only complete when a decision has been made, and an APPROVED
+   one also needs every required field. Deny and None need no prescription. */
+function medComplete(m){
+  const d = decisions[m.key];
+  if(!d || !d.decision) return false;
+  if(d.decision !== "approve") return true;
+  // Every month of a multi-month term needs its own dose. A 3M script with
+  // months 2 and 3 blank is not a prescription, and silently repeating month 1
+  // would invent a titration the provider never chose.
+  const n = monthsIn(d.term);
+  for(let i = 0; i < n; i++) if(!d.months[i]) return false;
+  return Boolean(d.medication && d.freq && d.term && d.refills !== "");
+}
+function approvalReady(row){
+  return requestedMeds(row).every(medComplete);
+}
+
+/* ----------------------------------------------------- provider review queue */
+/* Selection state. Only batch-eligible rows may ever enter it: Yellow, Red and
+   workflow-held rows are refused here as well as being disabled in the markup,
+   so the count can never disagree with what the grid allows. */
+let selected = [];
+let drawerId = QUEUE[0].id;
+let showSource = false;
+let showPreflight = false;
+let compact = false;
+let submitted = null;
+let noteText = "";      // the clinical note in the approval modal
+let noteFor = null;     // the case that note belongs to, so it cannot follow a patient
+let noteSteered = false;// whether the last draft was steered by the provider's own text
+let replyDraft = "";    // the AI-suggested reply sitting in the compose box
+const onlyEligible = (ids) => ids.filter((id) => ELIGIBLE_IDS.includes(id));
+
+/* Columns. This DIVERGES from MA's grid deliberately (Devin msg 2073): the
+   primary medication is now numbered Med 1 so it reads in the same series as
+   Med 2/3/4, and it gains a name column, which MA never had. MA showed a dose
+   and a plan but never said WHICH drug, so a Semaglutide and a Tirzepatide row
+   were indistinguishable at a glance. */
+const QUEUE_COLS = ["Triage","Queue Time","Full Name","ID VER","Sex","Age","BMI","On GLP",
+  "Med 1 Req","Med 1 Dose","Med 1 Term","Titrate?","Med 2 Req","Med 3 Req","Med 4 Req","Company",
+  "Allergies","STD ZOF","Video Visit","Batch Eligibility"];
+
+/* The column header asks a question, "Titrate?", and the CELL answers it with
+   Titrate or Hold (Devin msg 2077). The stored value stays "Titration"/"Hold":
+   prefillMonths() branches on it, the intake answer dosePlan carries it, and the
+   case summary reads it inside a sentence where "Standard titration" is the
+   correct clinical word. So this is a display label over an internal value, the
+   same separation already used for question slugs. */
+const PLAN_LABEL = { Titration:"Titrate", Hold:"Hold" };
+const planLabel = (p) => PLAN_LABEL[p] || p;
+
+function renderQueue(filter){
+  // The rows on screen for THIS view. Everything below counts against these,
+  // never the whole queue, so "2 batch-eligible" means two of what you can see.
+  const rows = QUEUE.filter(typeof filter === "function" ? filter : () => true);
+  const eligibleHere = rows.filter((r) => r.batch === "Eligible").map((r) => r.id);
+  const sel = onlyEligible(selected).filter((id) => eligibleHere.includes(id));
+  const allSel = eligibleHere.length > 0 && eligibleHere.every((id) => sel.includes(id));
+  const blocked = rows.length - eligibleHere.length;
+
+  if(rows.length === 0){
+    return '<section class="panel"><div class="stub"><strong>Nothing in this queue</strong>'
+      + 'No case currently matches this filter.</div></section>';
+  }
+
+  let h = '<section class="panel queue-panel">'
+    + '<div class="panel-heading"><div><div class="eyebrow">Provider review queue</div>'
+    + '<h2>Fast review, full context one click away</h2>'
+    + '<p>Desktop grid uses fictitious patients. Triage classification and operational workflow holds are separate axes.</p></div>'
+    + '<div class="queue-actions"><button class="button-secondary">Filters</button>'
+    + '<button class="button-primary" id="preflight"'+(sel.length===0?" disabled":"")+'>Run batch preflight ('+sel.length+')</button>'
+    + '</div></div>'
+    + '<div class="queue-toolbar"><div class="queue-count"><strong>'+sel.length+'</strong> selected · '
+    + '<span>'+eligibleHere.length+' batch-eligible · '+blocked+' rows blocked from selection</span></div>'
+    + '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">'
+    + '<label class="density"><input type="checkbox" id="compact"'+(compact?" checked":"")+' /> Compact columns</label>'
+    + '<label class="select-all"><input type="checkbox" id="selectAll"'+(allSel?" checked":"")+' /> Select batch-eligible Green cases</label>'
+    + '</div></div>'
+    + '<div class="review-grid-scroll"><table class="review-grid'+(compact?" compact":"")+'"><thead><tr>'
+    + '<th class="pin pin-select"></th><th class="pin pin-triage">Triage</th>'
+    + '<th class="pin pin-time">Queue Time</th><th class="pin pin-name">Full Name</th>'
+    + QUEUE_COLS.slice(3).map((c) => '<th>'+c+'</th>').join("")
+    + '</tr></thead><tbody>';
+
+  for(const r of rows){
+    const eligible = r.batch === "Eligible";
+    const reason = r.batchReason || "Not batch eligible";
+    h += '<tr data-row="'+r.id+'"'+(drawerId===r.id?' class="selected-row"':'')+'>'
+      + '<td class="pin pin-select" data-stop="1"><input type="checkbox" data-check="'+r.id+'"'
+      + (eligible?"":" disabled")+(sel.includes(r.id)?" checked":"")
+      + ' title="'+esc(eligible?"Select "+r.name:reason)+'"'
+      + ' aria-label="'+esc(eligible?"Select "+r.name:"Select "+r.name+", blocked: "+reason)+'" /></td>'
+      + '<td class="pin pin-triage"><span class="pill '+r.triage.toLowerCase()+'">'+r.triage+'</span></td>'
+      + '<td class="pin pin-time">'+r.queue+'</td>'
+      + '<td class="pin pin-name"><button class="patient-link">'+esc(r.name)+'</button></td>'
+      + '<td><span class="pill '+(r.idv==="Y"?"green":"red")+'">'+r.idv+'</span></td>'
+      + '<td>'+r.sex+'</td><td>'+r.age+'</td><td>'+r.bmi+'</td><td>'+r.onGlp+'</td>'
+      + '<td>'+esc(r.product)+'</td><td>'+esc(r.dose)+'</td><td>'+r.term+'</td><td>'+planLabel(r.plan)+'</td>'
+      + '<td>'+r.med2+'</td><td>'+r.med3+'</td><td>'+r.med4+'</td>'
+      + '<td>'+esc(r.company)+'</td>'
+      + '<td>'+(r.allergy==="Y"
+          ? '<span class="allergy-detail-wrap" data-stop="1"><button type="button" class="allergy-flag">Y · &#9432;</button>'
+            + '<span role="tooltip" class="allergy-tooltip">'+esc(r.allergyDetail||"")+'</span></span>'
+          : "N")+'</td>'
+      + '<td>'+r.zofran+'</td>'
+      + '<td><span class="pill '+(r.video==="Clear"?"green":"yellow")+'">'+r.video+'</span></td>'
+      + '<td class="batch-cell"><span class="pill '+batchTone(r.batch)+'">'+r.batch+'</span>'
+      + (r.batchReason?'<div class="batch-reason">'+esc(r.batchReason)+'</div>':'')+'</td></tr>';
+  }
+  h += '</tbody></table></div>';
+
+  if(submitted){
+    const s = QUEUE.find((r) => r.id === submitted);
+    h += '<div class="notice queue-notice" id="submitNote">Decision recorded for '+esc(s.name)
+      + ' in this preview only, nothing was submitted. In production this posts one decision per '
+      + 'requested medication, then the approved lines are what seed the order.</div>';
+  }
+
+  if(showPreflight){
+    h += '<div class="notice queue-notice">Demo only, nothing is submitted. In production this calls '
+      + '<code class="audit-verb">POST /v1/cases/batch/preflight</code>: every selected case is revalidated '
+      + 'independently against true state (latest intake version, triage, holds, provider eligibility, catalog) '
+      + 'and only a passed preflight can seed a batch draft.</div>';
+  }
+  h += '</section>';
+
+  // The drawer must show a case that is actually in this view. Switching views
+  // otherwise leaves the previous view's patient open underneath the new grid.
+  const d = rows.find((r) => r.id === drawerId) || rows[0];
+  if(d) h += renderDrawer(d);
+  h += renderApproval();
+  return h;
+}
+
+const sel = (name, value, opts, extra) =>
+  '<select data-f="'+name+'"'+(extra||"")+'>'
+  + (value ? "" : '<option value="">Select...</option>')
+  + opts.map((o) => '<option'+(o===value?" selected":"")+'>'+esc(o)+'</option>').join("")
+  + '</select>';
+
+/* A 1M term keeps a single Dosage field. A 3M or 4M term becomes one dose per
+   month (M1..Mn), because that IS the titration: the whole point of a multi
+   month script is that the strength changes as it goes. */
+function renderDoseFields(d, approving, dis){
+  const opts = DOSAGES[d.medication] || [];
+  const n = monthsIn(d.term);
+  const bad = (v) => approving && !v ? " bad" : "";
+
+  if(n === 1){
+    return '<div class="field'+bad(d.months[0])+'"><label>Dosage <span class="req">*</span></label>'
+      + sel("month0", d.months[0] || "", opts, dis) + '</div>';
+  }
+
+  let h = '<div class="months"><div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
+    + '<span class="months-note">'+n+' month term, one dose per month</span></div>'
+    + '<div class="months-grid">';
+  for(let i = 0; i < n; i++){
+    h += '<div class="field'+bad(d.months[i])+'"><label>M'+(i+1)+'</label>'
+      + sel("month"+i, d.months[i] || "", opts, dis) + '</div>';
+  }
+  return h + '</div></div>';
+}
+
+function renderApproval(){
+  if(!approvalFor) return "";
+  const row = QUEUE.find((r) => r.id === approvalFor);
+  const meds = requestedMeds(row);
+  const m = meds.find((x) => x.key === activeMed) || meds[0];
+  const d = decisions[m.key];
+  const done = meds.filter(medComplete).length;
+  const ready = approvalReady(row);
+  const termChanged = d.term !== m.term;
+  const initials = row.name.split(" ").map((p) => p[0]).join("").slice(0,2).toUpperCase();
+  const clean = row.triage === "Green";
+
+  let h = '<div class="modal-back" id="modalBack"><div class="modal" role="dialog" aria-modal="true" aria-label="Case review">'
+    + '<div class="modal-head"><h2>Case Review for</h2>'
+    + '<div class="modal-who"><div class="modal-avatar">'+initials+'</div>'
+    + '<div class="modal-demo">'+row.age+' / '+row.sex+' / '+esc(row.company)
+    + '<span>'+esc(row.name)+' · case '+row.id+'</span></div></div>'
+    + '<dl class="modal-facts">'
+    + '<div><dt>Triage</dt><dd><span class="pill '+row.triage.toLowerCase()+'">'+row.triage+'</span></dd></div>'
+    + '<div><dt>Drug allergies</dt><dd>'+(row.allergy==="Y"?esc(row.allergyDetail||"Yes"):"None reported")+'</dd></div>'
+    + '<div><dt>Video visit</dt><dd>'+row.video+'</dd></div>'
+    + '</dl></div>';
+
+  h += '<div class="modal-body"><div class="modal-left">'
+    + '<dl class="rx-meta">'
+    + '<div><dt>Time in queue</dt><dd>'+row.queue+'</dd></div>'
+    + '<div><dt>Visit type</dt><dd>'+(row.video==="Required"?"Synchronous, video":"Asynchronous")+'</dd></div>'
+    + '<div><dt>Requested term</dt><dd>'+TERM_LABEL[row.term]+'</dd></div>'
+    + '<div><dt>ID verified</dt><dd>'+(row.idv==="Y"?"Yes":"No")+'</dd></div>'
+    + '</dl>'
+    + '<div class="flags-panel'+(clean?" clean":"")+'">'
+    + '<p class="flags-title">'+esc(row.protocolVersion)+': '+row.findings.filter(f=>f[0]!=="green").length
+    + ' flag(s), triage '+row.triage+'</p><div class="flags-grid">'
+    + '<div><dt>Age</dt><dd>'+row.age+'</dd></div>'
+    + '<div><dt>Sex</dt><dd>'+row.sex+'</dd></div>'
+    + '<div><dt>BMI</dt><dd>'+row.bmi+'</dd></div>'
+    + '<div><dt>On GLP-1</dt><dd>'+(row.onGlp==="Y"?"Yes":"No")+'</dd></div>'
+    + '<div><dt>Requested dose</dt><dd>'+esc(row.dose)+'</dd></div>'
+    + '<div><dt>Plan</dt><dd>'+planLabel(row.plan)+'</dd></div>'
+    + '<div><dt>Storefront</dt><dd>'+esc(row.company)+'</dd></div>'
+    + '<div><dt>Batch</dt><dd>'+row.batch+(row.batchReason?", "+esc(row.batchReason):"")+'</dd></div>'
+    + '</div></div></div>';
+
+  // Right: one tab per requested medication, then that medication's decision.
+  h += '<div class="modal-right"><div class="med-tabs">'
+    + meds.map((x) => {
+        const st = decisions[x.key].decision;
+        return '<button class="med-tab'+(x.key===activeMed?" active":"")+'" data-med="'+x.key+'">'
+          + '<span class="dot '+(st||"")+'"></span>'+esc(x.name)+" · "+decisions[x.key].term
+          + (x.primary?"":" (add-on)")+'</button>';
+      }).join("")
+    + '</div>';
+
+  h += '<div class="decision-row">'
+    + ['approve','deny','none'].map((k) =>
+        '<button class="decision-btn '+k+(d.decision===k?" on":"")+'" data-dec="'+k+'">'
+        + (k==="approve"?"Approve":k==="deny"?"Deny":"None")+'</button>').join("")
+    + '</div>';
+
+  const approving = d.decision === "approve";
+  const dis = approving ? "" : " disabled";
+  const bad = (v) => approving && !v ? " bad" : "";
+
+  /* Paired into rows rather than one tall single-column stack. On a 4-month case
+     the stack overran the modal and the last fields were only reachable by
+     scrolling the panel (Devin msg 2079). Pairing recovers that height, so the
+     tallest case fits without a scroll. */
+  h += '<div class="field-row">'
+    + '<div class="field'+bad(d.product)+'"><label>Product selection <span class="req">*</span></label>'
+    + sel("product", d.product, [d.product].filter(Boolean), dis) + '</div>'
+    + '<div class="field'+bad(d.medication)+'"><label>Medication <span class="req">*</span></label>'
+    + sel("medication", d.medication, Object.keys(DOSAGES), dis) + '</div>'
+    + '</div>'
+    + renderDoseFields(d, approving, dis)
+    + '<div class="field-row">'
+    + '<div class="field'+bad(d.freq)+'"><label>Administration frequency <span class="req">*</span></label>'
+    + sel("freq", d.freq, FREQUENCIES, dis) + '</div>'
+    + '<div class="field'+bad(d.term)+'"><label>Duration <span class="req">*</span></label>'
+    + sel("term", TERM_LABEL[d.term] || "", TERMS.map((t) => TERM_LABEL[t]), dis) + '</div>'
+    + '</div>'
+    + (termChanged && approving
+        ? '<p class="term-warn">Duration differs from the '+TERM_LABEL[m.term]+' the storefront sold. This is allowed, but it will not match the order.</p>'
+        : '')
+    + '<div class="field-row">'
+    + '<div class="field'+bad(d.refills)+'"><label>Refills <span class="req">*</span></label>'
+    + sel("refills", d.refills, REFILLS, dis) + '</div>'
+    + '<div class="check-stack">'
+    + '<label class="check-line"><input type="checkbox" data-f="custom"'+(d.custom?" checked":"")+dis+' /> Use custom dosage</label>'
+    + '<label class="check-line"><input type="checkbox" data-f="startToday"'+(d.startToday?" checked":"")+dis+' /> Start date: today</label>'
+    + '</div></div>';
+
+  if(d.decision === "deny") h += '<p class="action-reason">Denied. No prescription is created for this medication.</p>';
+  if(d.decision === "none") h += '<p class="action-reason">Marked none. This medication is left undecided on the order.</p>';
+
+  h += '</div></div>';
+
+  // Clinical note. The model drafts, the provider owns it.
+  h += '<div class="note-block"><div class="note-head">'
+    + '<div><div class="subheading">Clinical note</div>'
+    + '<span class="pill neutral">AI draft · provider edits and signs</span></div>'
+    + '<button class="button-secondary" id="genNote">'+(noteText?"Regenerate":"Draft with AI")+'</button></div>'
+    + '<textarea class="note-area" id="noteArea" data-f="note" rows="4" placeholder="Write the basics or your instructions here, then draft with AI. What you write is used, not replaced.">'
+    + esc(noteText) + '</textarea>'
+    + '<p class="ai-honesty">'
+    + (noteSteered ? 'Your text is kept and used as the steer, then this case\'s recorded answers and your decisions are composed around it. '
+                   : 'Composed from this case\'s recorded answers and your decisions. ')
+    + 'No model ran in this preview, and nothing is signed or sent until you submit.</p></div>';
+
+  h += '<div class="modal-foot">'
+    + '<div class="foot-status"><strong>'+done+' of '+meds.length+'</strong> medication'+(meds.length===1?"":"s")+' decided'
+    + (ready?"":", finish the rest to submit")+'</div>'
+    + '<div class="foot-actions"><button class="button-secondary" id="modalCancel">Cancel</button>'
+    + '<button class="button-primary" id="modalSubmit"'+(ready?"":" disabled")+'>Submit decision</button></div>'
+    + '</div>';
+
+  return h + '</div></div>';
+}
+
+function renderDrawer(d){
+  const eligible = d.batch === "Eligible";
+  let h = '<section class="panel quick-review">'
+    + '<div class="panel-heading"><div><div class="eyebrow">Quick review · '+d.id+'</div>'
+    + '<h2>'+esc(d.name)+'</h2><p>'+esc(d.company)+' · Request '+d.term+' · '+esc(d.dose)+'</p></div>'
+    + '<div class="quick-pills"><span class="pill '+d.triage.toLowerCase()+'">'+d.triage+'</span>'
+    + '<span class="pill '+batchTone(d.batch)+'">'+d.batch+'</span></div></div>'
+    + '<div class="quick-review-grid">';
+
+  // 1. AI draft summary
+  h += '<div><div class="subheading">AI draft summary</div>'
+    + '<div class="ai-draft-chip"><span class="pill neutral">AI draft · provider-assist only</span></div>'
+    // Chips name the QUESTION this line came from, in words. The slug stays on
+    // the element as data-key for the record, never on screen.
+    + '<ul class="summary-list">'
+    + d.summary.map(([text,keys]) => '<li>'+esc(text)
+        + (keys.length?'<span class="source-keys">'
+            + keys.map((k)=>'<span class="source-key" data-key="'+k+'">'+esc(labelOf(k))+'</span>').join("")
+            + '</span>':'')
+        + '</li>').join("")
+    + '</ul>'
+    + '<p class="ai-honesty">Deterministic placeholder, no model ran. Statements are composed only from the '
+    + 'recorded intake answers. The draft never approves, prescribes, or sends anything.</p>'
+    + '<button class="button-secondary" id="srcToggle">'+(showSource?"Hide source answers":"View source answers")+'</button>';
+  if(showSource){
+    // The full intake, grouped, showing the question the patient was asked and
+    // what they answered. Empty answers are shown as "not answered" rather than
+    // dropped, because a blank is itself information to a reviewer.
+    const answers = d.sourceAnswers || {};
+    const seen = new Set();
+    h += '<div class="answer-sheet">';
+    for(const group of GROUP_ORDER){
+      const keys = Object.keys(answers).filter((k) => (QUESTIONS[k] || {}).group === group);
+      if(!keys.length) continue;
+      const isConsent = group === "Consents";
+      h += '<div class="answer-group"><div class="subheading">'+group+'</div><dl>';
+      for(const k of keys){
+        seen.add(k);
+        const val = answers[k] === "" || answers[k] == null ? "Not answered" : String(answers[k]);
+        const agreed = /^(agreed|yes)$/i.test(val);
+        h += '<div class="qa'+(isConsent?" consent":"")+'">'
+          + '<dt>'+esc(questionOf(k))+'</dt>'
+          + '<dd>'+(isConsent
+              ? '<span class="pill '+(agreed?"green":"red")+'">'+(agreed?"Agreed":esc(val))+'</span>'
+              : esc(val))+'</dd></div>';
+      }
+      h += '</dl></div>';
+    }
+    // Anything not mapped to a group still has to appear, de-slugged.
+    const rest = Object.keys(answers).filter((k) => !seen.has(k));
+    if(rest.length){
+      h += '<div class="answer-group"><div class="subheading">Other</div><dl>'
+        + rest.map((k) => '<div class="qa"><dt>'+esc(questionOf(k))+'</dt><dd>'+esc(String(answers[k] || "Not answered"))+'</dd></div>').join("")
+        + '</dl></div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+
+  // 2. Triage and findings
+  h += '<div><div class="subheading">Triage and findings</div>'
+    + '<p class="protocol-version">'+esc(d.protocolVersion)+' · classification '+d.triage+'</p>'
+    + '<ul class="finding-list">'
+    + d.findings.map(([tone,text]) => '<li><span class="finding-dot '+tone+'"></span> '+esc(text)+'</li>').join("")
+    + '</ul>'
+    + '<div class="subheading holds-heading">Active workflow holds</div>'
+    + (d.holds.length
+        ? '<ul class="holds-list">'+d.holds.map((x)=>'<li><code class="audit-verb">'+x+'</code></li>').join("")+'</ul>'
+        : '<p class="no-holds">No active workflow holds.</p>')
+    + '</div>';
+
+  // 3. Provider actions
+  h += '<div><div class="subheading">Provider actions</div>'
+    + '<button class="button-primary full-width" id="openApproval"'+(eligible?"":' disabled title="'+esc(d.batchReason||"Not batch eligible")+'"')+'>Review and approve</button>'
+    + '<button class="button-secondary full-width">Request information</button>'
+    + '<button class="button-danger full-width">Reject</button>'
+    + (eligible?'':'<p class="action-reason">'+esc(d.batchReason||"")+'</p>')
+    + '</div>';
+
+  return h + '</div></section>';
+}
+
+/* The banner at the top of every scoped screen. Three states, because there are
+   three genuinely different situations and collapsing them is the bug this whole
+   surface exists to make visible. */
+function renderScopeNote(){
+  const s = ADMIN_SCOPES[adminScope];
+  if(isSuperAdmin()){
+    return '<div class="scope-note"><span class="sn-ico">\u{1F513}</span><div class="sn-body">'
+      + '<strong>Super admin · unrestricted</strong>'
+      + 'No clinician filter is applied. In the app this is <b>visibleClinicianIds() returning null</b>, '
+      + 'and the query is returned untouched.</div></div>';
+  }
+  const mine = visibleDoctors();
+  if(mine.length === 0){
+    return '<div class="scope-note blocked"><span class="sn-ico">\u{26D4}</span><div class="sn-body">'
+      + '<strong>Doctor Admin over nobody · sees nothing</strong>'
+      + 'This admin has been assigned no doctors, so every scoped list is empty. That is deliberate. '
+      + '<b>An admin assigned nobody must see nothing, not everything</b>, and the natural-looking '
+      + '<b>if (! $ids) return $query;</b> would do the opposite and hand them the whole platform. '
+      + 'Server-side this is an empty whereIn resolving to <b>0 = 1</b>.</div></div>';
+  }
+  return '<div class="scope-note restricted"><span class="sn-ico">\u{1F512}</span><div class="sn-body">'
+    + '<strong>Doctor Admin · scoped to '+mine.length+' doctors</strong>'
+    + 'Filtered to <b>'+mine.join('</b> and <b>')+'</b>. Unassigned rows are not shown either: they belong to no '
+    + 'doctor, and <b>whereIn(clinician_id, ids)</b> does not match a null. Platform configuration and every '
+    + 'integration are gone from the sidebar, matching the <b>role:super_admin</b> middleware in routes/web.php.'
+    + '</div></div>';
+}
+
+/* ---------------------------------------------------------------------------
+   Medications, grouped into category sections (Devin msg 2144).
+
+   TERMINOLOGY ONLY. The model is still Offering, the table is still offerings,
+   and the partner endpoint is still /api/partner/offerings. What changed is
+   every word a human reads. Renaming the code and the API would break the
+   storefront integrations that call that endpoint today, and it is a separate
+   decision from what this screen is called.
+
+   The last group is the one that earns its place: `category_id` was added to
+   offerings in a LATER migration (2026_06_29_000006), so it is nullable and
+   rows predating it have no category. If uncategorised medications were simply
+   dropped from a grouped view, they would vanish from the catalog screen while
+   still being prescribable. They get their own section instead.
+   --------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   ONE DRUG, MANY VARIANTS, MANY PARTNERS (Devin msg 2145).
+
+   "Should be a drug, variants, and you should be able to add to multiple
+   partners to not have to replicate items."
+
+   THE PROBLEM IS REAL AND IT IS IN THE SCHEMA. offerings.partner_id is a
+   non-nullable foreign key and Offering::partner() is a belongsTo, so an
+   offering belongs to exactly ONE storefront. Selling Semaglutide through three
+   partners today means three rows, each carrying its own available_states,
+   is_controlled_substance and dosespot_medication_id. Those are clinical facts
+   about the DRUG, not about the storefront, and duplicating them means they can
+   drift: the same drug controlled under one partner and not another.
+
+   The variants already exist here and are already load-bearing: CATALOG holds
+   the ordered dose ladder, and prefillMonths() walks it one step per month for
+   titration. This screen therefore READS CATALOG rather than defining a second
+   list, so there is one catalog in this preview and not two that can disagree.
+
+   WHAT SPLITS WHERE is the decision this screen puts in front of you, and it is
+   the whole design:
+     per DRUG    name, category, form, the variant ladder, controlled-substance
+                 flag, pharmacy ids, clinical rules. One source of truth.
+     per PARTNER price, active, approval state. A storefront can be mid-approval
+                 on a drug another storefront is already selling.
+   --------------------------------------------------------------------------- */
+const PARTNERS_ALL = ["Northstar Health","Vitality Direct","Meridian Wellness"];
+
+/* Category, form and per-partner state for each drug already in CATALOG. Kept
+   deliberately small: Devin is sending the real list (msg 2145), and inventing a
+   catalog now would only have to be thrown away. */
+const DRUG_META = {
+  Semaglutide: { category:"Weight Loss", form:"Injectable", controlled:false,
+    partners:{ "Northstar Health":"Approved", "Vitality Direct":"Approved", "Meridian Wellness":"Pending" } },
+  Tirzepatide: { category:"Weight Loss", form:"Injectable", controlled:false,
+    partners:{ "Vitality Direct":"Approved", "Northstar Health":"Pending" } },
+  "NAD+":      { category:"Anti-Aging", form:"Injectable", controlled:false,
+    partners:{ "Northstar Health":"Pending" } },
+  Zofran:      { category:null, form:"Oral", controlled:false,
+    partners:{ "Northstar Health":"Approved", "Vitality Direct":"Approved" } }
+};
+
+const CATEGORY_ORDER = ["Weight Loss","Anti-Aging","Hormone Therapy","Sexual Health"];
+
+function approvalTone(s){ return s === "Approved" ? "green" : s === "Pending" ? "yellow" : "neutral"; }
+
+/* ---------------------------------------------------------------------------
+   READ-ONLY FOR A DOCTOR ADMIN, and this is not a style choice.
+
+   Merging Products & Levels into Medications moved the drug ladder and the
+   combination rules out of a super-admin-only Configuration section onto a
+   screen in Management, which a Doctor Admin can open. Left alone, that merge
+   would have quietly widened who can change the catalog.
+
+   The seeder already answers it: admin holds `view offerings` and does NOT hold
+   create, update or delete. So a Doctor Admin sees the catalog and cannot act on
+   it, and every editing affordance is gated rather than the whole screen. Hiding
+   the screen would be wrong the other way: they need to know what is
+   prescribable to run their doctors.
+   --------------------------------------------------------------------------- */
+function canEditCatalog(){ return portal !== "admin" || isSuperAdmin(); }
+
+function renderMedications(){
+  const editable = canEditCatalog();
+  const drugs = Object.keys(CATALOG);
+  const byCategory = {};
+  for(const c of CATEGORY_ORDER) byCategory[c] = [];
+  const uncategorised = [];
+
+  for(const name of drugs){
+    const meta = DRUG_META[name];
+    if(!meta) continue;
+    (meta.category ? byCategory[meta.category] : uncategorised).push(name);
+  }
+
+  const variantTotal = drugs.reduce((n,d) => n + CATALOG[d].levels.length, 0);
+  let h = '<div class="cat-summary">'
+    + '<div><strong>'+drugs.length+'</strong> drugs · <strong>'+variantTotal+'</strong> variants across '
+    + CATEGORY_ORDER.length+' categories</div>'
+    + (uncategorised.length ? '<span class="pill red">'+uncategorised.length+' uncategorised</span>'
+                            : '<span class="pill green">all categorised</span>')
+    + (editable ? '<button class="button-primary">Add drug</button>'
+                : '<span class="pill neutral read-only-tag">View only · you hold view offerings, not update</span>')
+    + '</div>';
+
+  const drugCard = (name) => {
+    const meta = DRUG_META[name];
+    const p = CATALOG[name];
+    const assigned = Object.entries(meta.partners);
+    return '<div class="drug" data-drug="'+esc(name)+'">'
+      + '<div class="drug-head"><div><strong>'+esc(name)+'</strong>'
+      + '<span class="pill neutral">'+esc(p.kind)+'</span>'
+      + '<span class="pill neutral">'+esc(meta.form)+'</span></div>'
+      + (editable ? '<button class="button-secondary">Edit drug</button>' : '')
+      + '</div>'
+
+      /* The variant ladder. Same data the approval screen titrates along, so a
+         level added here is a level a provider can prescribe. */
+      + '<div class="drug-row"><span class="subheading">Variants</span>'
+      + '<div class="ladder">'
+      + p.levels.map((l,i) => '<div class="rung"><span class="rung-n">'+(i+1)+'</span>'+esc(l)+'</div>')
+          .join('<span class="rung-arrow">&rarr;</span>')
+      + '</div></div>'
+
+      /* Allowed combinations, folded in from the old Products & Levels screen
+         (Devin msg 2149, "merge to variant"). It belongs on the drug: it is a
+         clinical rule about what may be prescribed alongside it, and it was the
+         only thing that screen held which this one did not. */
+      + '<div class="drug-row"><span class="subheading">Combines with</span>'
+      + '<div class="partner-chips">'
+      + (p.combos.length
+          ? p.combos.map((c) => '<span class="pill">'+esc(c)+'</span>').join("")
+          : '<span class="no-holds">None. This drug is an add-on itself.</span>')
+      + '</div></div>'
+
+      /* Assignment, not duplication: the same drug listed against each partner
+         that sells it, with approval per partner. */
+      + '<div class="drug-row"><span class="subheading">Sold by <span class="cat-count">'+assigned.length+'</span></span>'
+      + '<div class="partner-chips">'
+      + assigned.map(([pt,st]) => '<span class="partner-chip">'+esc(pt)
+          + '<span class="pill '+approvalTone(st)+'">'+esc(st)+'</span></span>').join("")
+      + (editable
+          ? PARTNERS_ALL.filter((pt) => !meta.partners[pt])
+              .map((pt) => '<button class="partner-chip add">+ '+esc(pt)+'</button>').join("")
+          : "")
+      + '</div></div></div>';
+  };
+
+  for(const cat of CATEGORY_ORDER){
+    const list = byCategory[cat];
+    h += '<div class="panel cat-panel" data-category="'+esc(cat)+'">'
+      + '<div class="panel-heading"><div><h2>'+esc(cat)+' <span class="cat-count">'+list.length+'</span></h2>'
+      + '<p>'+(list.length ? 'Drugs in this category and the storefronts selling them.'
+                           : 'Category exists with nothing mapped to it yet.')+'</p></div>'
+      + '<span class="pill '+(list.length ? "green" : "yellow")+'">'+(list.length ? "Active" : "Empty")+'</span></div>'
+      + (list.length ? list.map(drugCard).join("")
+        /* An empty category is shown, never hidden. Hiding it makes a
+           half-finished setup look like a finished one. */
+        : '<div class="empty-scope">No drugs in this category yet.</div>')
+      + '</div>';
+  }
+
+  if(uncategorised.length){
+    h += '<div class="panel cat-panel" data-category="Uncategorised">'
+      + '<div class="panel-heading"><div><h2>Uncategorised <span class="cat-count">'+uncategorised.length+'</span></h2>'
+      + '<p>category_id is nullable and was added to offerings in a later migration, so a drug can be '
+      + 'prescribable while belonging to no category. Shown here rather than dropped from the screen.</p></div>'
+      + '<span class="pill red">Needs a category</span></div>'
+      + uncategorised.map(drugCard).join("") + '</div>';
+  }
+
+  h += '<div class="perm-note"><b>This shape is a proposal, not what the schema does today.</b> '
+     + 'Right now <b>offerings.partner_id</b> is a non-nullable foreign key, so one offering belongs to one '
+     + 'storefront and selling a drug through three partners means three rows. Each copy carries its own '
+     + 'available_states, is_controlled_substance and pharmacy ids, which are facts about the drug rather '
+     + 'than the storefront, so they can drift apart. Getting to the screen above needs a drug table, a '
+     + 'variant table and a drug/partner pivot, with price, active and approval living on the pivot.'
+     + '<br><br><b>Terminology is only the label.</b> These stay Offering records and the partner endpoint '
+     + 'stays <b>/api/partner/offerings</b>. Renaming the route would break every storefront integration '
+     + 'calling it today, and that is a separate decision from what the screen is called.</div>';
+  return h;
+}
+
+/* The permission matrix, read straight out of RolesAndPermissionsSeeder. */
+const PERMISSION_MATRIX = [
+  ["Cases · view, create, update, delete", true, true],
+  ["Cases · assign, approve, cancel", true, true],
+  ["Patients · view, create, update, delete", true, true],
+  ["Clinical notes and messages", true, true],
+  ["Orders · view and update", true, true],
+  ["Offerings · view", true, true],
+  ["manage clinicians", true, true],
+  ["manage partners · storefronts and their Healthie credentials", true, false],
+  ["manage webhooks · outbound integrations", true, false],
+  ["manage system · settings, catalog, triage rules, AI instructions", true, false],
+  ["manage admins · who is an admin, and which doctors they are over", true, false]
+];
+
+function renderPermissions(){
+  return '<div class="panel">'
+    + '<div class="panel-heading"><div><h2>Permission by tier</h2>'
+    + '<p>Every row is a permission string in RolesAndPermissionsSeeder.</p></div></div>'
+    + '<div class="tbl-scroll"><table class="tbl perm-tbl"><thead><tr>'
+    + '<th>Permission</th><th>Super Admin</th><th>Doctor Admin</th></tr></thead><tbody>'
+    + PERMISSION_MATRIX.map(([label,su,ad]) =>
+        '<tr><td>'+esc(label)+'</td>'
+        + '<td class="'+(su?"yes":"no")+'">'+(su?"Yes":"No")+'</td>'
+        + '<td class="'+(ad?"yes":"no")+'">'+(ad?"Yes":"No")+'</td></tr>').join("")
+    + '</tbody></table></div>'
+    + '<div class="perm-note"><b>Before this, the admin role was granted Permission::all()</b>, which made it '
+    + 'identical to super_admin: the two roles existed but meant nothing. The four No rows are the difference. '
+    + 'Anything that reaches outside MEDAXIS is on that list.'
+    + '<br><br><b>Re-running the seeder is a live permission change.</b> syncPermissions REPLACES a role’s '
+    + 'permissions, so it demotes every existing admin from full access to scoped access. That is the intended '
+    + 'change, but it should be run knowingly rather than incidentally.'
+    + '<br><br><b>Where the catalog sits now:</b> Products &amp; Levels was merged into Medications, so the drug '
+    + 'ladder and combination rules moved from a super-admin-only Configuration screen onto one a Doctor Admin '
+    + 'can open. Rather than widen who can change the catalog, Medications is <b>read-only</b> for a Doctor '
+    + 'Admin: they hold <b>view offerings</b> and not create, update or delete, so they see what is prescribable '
+    + 'and every editing control is withheld. Note this is enforced in the preview by role, whereas the app has '
+    + 'no offering routes under <b>role:super_admin</b> today, so the server side of that split still has to be '
+    + 'written.</div>'
+    + '</div>';
+}
+
+function renderView(){
+  const v = VIEWS[view];
+  if(!v){
+    document.getElementById("view").innerHTML =
+      '<div class="panel"><div class="stub"><strong>Not built in this preview yet</strong>'
+      + 'This screen exists in the app but has not been mocked here. Tell me and I will add it.</div></div>';
+    return;
+  }
+  let h = '<div class="page-head"><div class="eyebrow">'+v.eyebrow+'</div><h1>'+v.title+'</h1><p>'+v.sub+'</p></div>';
+
+  if(v.scoped){ h += renderScopeNote(v); }
+
+  /* metrics may be a literal or a function of the current tier. */
+  const metrics = typeof v.metrics === "function" ? v.metrics() : v.metrics;
+  if(metrics){
+    h += '<div class="metric-grid">' + metrics.map(m =>
+      '<div class="metric"><div class="eyebrow">'+m[0]+'</div><div class="metric-value">'+m[1]+'</div><div class="metric-note">'+m[2]+'</div></div>'
+    ).join("") + '</div>';
+  }
+
+  if(v.queue){ h += renderQueue(v.queue); }
+  if(v.routing){ h += renderRouting(); }
+  if(v.chat){ h += renderMessages(); }
+  if(v.permissions){ h += renderPermissions(); }
+  if(v.medications){ h += renderMedications(); }
+
+  if(v.doc){
+    h += '<div class="panel"><div class="panel-heading"><div><h2>Endpoints</h2>'
+      + '<p>Paths match the routes in routes/api.php.</p></div></div>'
+      + '<div class="endpoints">' + v.doc.map(d =>
+          '<div class="endpoint"><div><span class="method">'+d[0]+'</span><code>'+d[1]+'</code></div>'
+          + '<p>'+d[2]+'</p></div>').join("")
+      + '</div></div>';
+  }
+
+  if(v.table){
+    /* On a scoped screen the rows shown are the rows this tier may see. The
+       "Showing N of M" counter reports BOTH numbers so the filtering is legible
+       rather than silent: a Doctor Admin should be able to tell that a shorter
+       list is scoping working, not data missing. */
+    const all     = v.table.rows;
+    const visible = v.scoped ? scopeRows(all, v.table.owners) : all.map((r,i) => [r,i]);
+    const mineNow = visibleDoctors();
+    const counter = !v.scoped || isSuperAdmin()
+      ? 'Showing <strong>'+visible.length+'</strong> of '+all.length
+      : mineNow.length === 0
+        ? 'Showing <strong>0</strong> of '+all.length+' · you are not over any doctors'
+        : 'Showing <strong>'+visible.length+'</strong> of '+all.length+' · filtered to your doctors';
+
+    h += '<div class="panel">'
+      + '<div class="panel-heading"><div><h2>'+v.table.title+'</h2><p>Columns match the live app.</p></div>'
+      + '<button class="button sec">Export</button></div>'
+      + '<div class="toolbar"><div>'+counter+'</div>'
+      + '<div><button class="button sec">Filter</button></div></div>'
+      + '<div class="tbl-scroll"><table class="tbl"><thead><tr>'
+      + v.table.cols.map(c => '<th>'+c+'</th>').join("")
+      + '</tr></thead><tbody>'
+      + (visible.length
+          ? visible.map(([r]) => '<tr>'+r.map(c => '<td>'+cell(c)+'</td>').join("")+'</tr>').join("")
+          : '<tr><td colspan="'+v.table.cols.length+'" class="empty-scope">'
+            + 'Nothing visible to this admin. They are not over any doctors yet.</td></tr>')
+      + '</tbody></table></div></div>';
+  }
+
+  h += '<div class="note">Design preview only. Layout, palette and the collapsible sidebar are the proposal; '
+     + 'data is fictional and nothing here is wired to the real application.</div>';
+
+  document.getElementById("view").innerHTML = h;
+  window.scrollTo(0,0);
+}
+
+/* ------------------------------------------------------------------ events */
+document.getElementById("roles").addEventListener("click", e => {
+  const b = e.target.closest("[data-portal]"); if(!b) return;
+  portal = b.dataset.portal;
+  view = PORTALS[portal].nav[0].id;
+  ensureViewAllowed();
+  renderRoles(); renderScopes(); renderNav(); renderView();
+});
+
+document.getElementById("scopes").addEventListener("click", e => {
+  const b = e.target.closest("[data-scope]"); if(!b) return;
+  adminScope = b.dataset.scope;
+  /* Switching down a tier can strand you on a screen that tier cannot open, so
+     walk the view back to something reachable before re-rendering. */
+  ensureViewAllowed();
+  renderScopes(); renderNav(); renderView();
+});
+
+document.getElementById("nav").addEventListener("click", e => {
+  const link = e.target.closest("[data-view]");
+  if(link){
+    view = link.dataset.view;
+    renderNav(); renderView();
+    app.classList.remove("mobile-open");
+    return;
+  }
+  const sec = e.target.closest("[data-section]");
+  if(sec){
+    const i = sec.dataset.section;
+    const nowClosed = !sec.classList.contains("closed");
+    sec.classList.toggle("closed", nowClosed);
+    document.querySelector('[data-group="'+i+'"]').classList.toggle("closed", nowClosed);
+    openState[skey(i)] = !nowClosed;   // remember it across re-renders
+  }
+});
+
+/* Queue interactions. Delegated off the view container because the whole grid
+   is re-rendered on every state change. */
+document.getElementById("view").addEventListener("click", (e) => {
+  const check = e.target.closest("[data-check]");
+  if(check){
+    const id = check.dataset.check;
+    if(!ELIGIBLE_IDS.includes(id)) return;              // refuse, not just disable
+    selected = onlyEligible(selected.includes(id) ? selected.filter((x) => x !== id) : selected.concat(id));
+    renderView(); return;
+  }
+  if(e.target.id === "selectAll"){
+    const all = ELIGIBLE_IDS.every((id) => selected.includes(id));
+    selected = all ? [] : ELIGIBLE_IDS.slice();
+    renderView(); return;
+  }
+  if(e.target.id === "preflight"){ showPreflight = true; renderView(); return; }
+  if(e.target.id === "srcToggle"){ showSource = !showSource; renderView(); return; }
+  if(e.target.id === "compact"){ compact = !compact; renderView(); return; }
+  const th = e.target.closest("[data-thread]");
+  if(th){ thread = th.dataset.thread; replyDraft = ""; renderView(); return; }
+  const tone = e.target.closest("[data-tone]");
+  if(tone){
+    replyDraft = draftReply(THREADS.find((x) => x.id === thread), tone.dataset.tone);
+    renderView();
+    const box = document.getElementById("composeBox");
+    if(box){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    return;
+  }
+  if(e.target.id === "genNote"){
+    // Read the box itself, not just the last input event, so nothing the
+    // provider has typed can be lost between typing and clicking.
+    const box = document.getElementById("noteArea");
+    const typed = box ? box.value : noteText;
+    noteSteered = String(typed).trim().length > 0;
+    noteText = draftNote(QUEUE.find((r) => r.id === approvalFor), decisions, typed);
+    renderView(); return;
+  }
+
+  // Approval modal
+  if(e.target.id === "openApproval"){ openApproval(drawerId); renderView(); return; }
+  if(e.target.id === "modalCancel" || e.target.id === "modalBack"){ approvalFor = null; renderView(); return; }
+  if(e.target.id === "modalSubmit"){ submitted = approvalFor; approvalFor = null; renderView(); return; }
+  const tab = e.target.closest("[data-med]");
+  if(tab){ activeMed = tab.dataset.med; renderView(); return; }
+  const dec = e.target.closest("[data-dec]");
+  if(dec){ decisions[activeMed].decision = dec.dataset.dec; renderView(); return; }
+  if(e.target.closest("[data-stop]")) return;           // checkbox + allergy cells never open the drawer
+  const row = e.target.closest("[data-row]");
+  if(row){ drawerId = row.dataset.row; showSource = false; renderView(); }
+});
+
+/* Field edits inside the approval modal. Changing the medication invalidates a
+   dosage that belonged to the previous one, so it is cleared rather than left
+   pointing at a strength the new drug does not have. */
+document.getElementById("view").addEventListener("change", (e) => {
+  const f = e.target.dataset ? e.target.dataset.f : null;
+  if(!f || !approvalFor) return;
+  const d = decisions[activeMed];
+  if(f === "note"){ noteText = e.target.value; return; }   // no re-render, keep the caret
+  if(e.target.type === "checkbox"){ d[f] = e.target.checked; }
+  else if(f === "term"){
+    const hit = TERMS.find((t) => TERM_LABEL[t] === e.target.value) || e.target.value;
+    d.term = hit;
+    // Shrinking drops the months that no longer exist. Growing CONTINUES the
+    // ladder from the last month already set, rather than leaving a hole: a
+    // titration carries on stepping up, a hold repeats.
+    const want = monthsIn(hit);
+    d.months = d.months.slice(0, want);
+    const levels = (CATALOG[d.medication] || {}).levels || [];
+    while(d.months.length < want){
+      const last = d.months[d.months.length - 1] || "";
+      const li = levels.indexOf(last);
+      d.months.push(li < 0 ? "" : (d.plan === "Hold" ? last : levels[Math.min(li + 1, levels.length - 1)]));
+    }
+  }
+  else if(f.startsWith("month")){
+    d.months[Number(f.slice(5))] = e.target.value;
+  }
+  else {
+    d[f] = e.target.value;
+    // A dose from the previous drug is not a valid dose for the new one.
+    if(f === "medication"){
+      const ok = DOSAGES[e.target.value] || [];
+      d.months = d.months.map((x) => ok.includes(x) ? x : "");
+    }
+  }
+  renderView();
+});
+
+document.getElementById("toggle").addEventListener("click", () => {
+  if(window.matchMedia("(max-width:820px)").matches) app.classList.toggle("mobile-open");
+  else app.classList.toggle("collapsed");
+});
+
+renderRoles(); renderScopes(); renderNav(); renderView();
+</script>
+</body>
+</html>

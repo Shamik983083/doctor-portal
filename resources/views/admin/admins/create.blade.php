@@ -13,10 +13,6 @@
                 <div class="ma-sub">The new user will be able to log in immediately.</div>
             </div>
             <div class="card-body">
-                @if($errors->any())
-                    <div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>
-                @endif
-
                 <form method="POST" action="{{ route('admin.admins.store') }}">
                     @csrf
 

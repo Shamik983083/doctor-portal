@@ -19,6 +19,8 @@ class Patient extends Model
         'city', 'state', 'zip', 'country', 'status',
         'dosespot_patient_id', 'email_opt_in', 'sms_opt_in',
         'id_verified_status', 'id_verified_at', 'settings',
+        // E19: optional secondary clinician collaborating on this patient's care
+        'collaborating_clinician_id',
     ];
 
     protected $casts = [
@@ -38,6 +40,43 @@ class Patient extends Model
     public function partner() { return $this->belongsTo(Partner::class); }
     public function user() { return $this->belongsTo(User::class); }
     public function cases() { return $this->hasMany(PatientCase::class); }
+    public function collaboratingClinician() { return $this->belongsTo(Clinician::class, 'collaborating_clinician_id'); }
+
+    /**
+     * Restrict to patients this admin may see (Devin msg 2117).
+     *
+     * A Doctor Admin sees a patient only if that patient has at least one case
+     * belonging to one of their doctors. Patient records are PHI, so an admin
+     * over nobody sees nobody, and a patient whose cases all sit with other
+     * doctors is invisible.
+     *
+     * See PatientCase::scopeVisibleTo for why an empty id list must stay empty
+     * rather than being read as "no restriction".
+     *
+     * TRACKS THE CASE SCOPE, DELIBERATELY. Since a Doctor Admin can now see
+     * unassigned cases, they must also be able to see the PATIENT behind one,
+     * otherwise the intake queue lists a case whose patient record 404s and the
+     * admin cannot act on what they were just shown. Same three outcomes, same
+     * load-bearing grouping, same empty-list-sees-nothing guarantee.
+     */
+    public function scopeVisibleTo($query, ?User $user)
+    {
+        $ids = $user?->visibleClinicianIds();
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        if ($ids === []) {
+            return $query->whereHas('cases', fn ($q) => $q->whereIn('clinician_id', $ids));
+        }
+
+        return $query->whereHas('cases', fn ($q) => $q->where(function ($w) use ($ids) {
+            $w->whereIn('clinician_id', $ids)
+              ->orWhereNull('clinician_id');
+        }));
+    }
+
     public function subscriptions() { return $this->hasMany(PatientSubscription::class); }
     public function vouchers() { return $this->hasMany(Voucher::class); }
     public function messages() { return $this->hasMany(Message::class); }

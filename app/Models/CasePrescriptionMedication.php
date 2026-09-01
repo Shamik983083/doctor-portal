@@ -12,8 +12,12 @@ class CasePrescriptionMedication extends Model
 
     protected $fillable = [
         'case_prescription_id', 'offering_id', 'name',
-        'compound_formula', 'refills', 'quantity',
-        'days_supply', 'dispense_unit', 'days_until_dispense',
+        'compound_formula', 'dosing', 'refills', 'quantity',
+        'days_supply', 'dispense_unit', 'days_until_dispense', 'sig',
+    ];
+
+    protected $casts = [
+        'dosing' => 'array',
     ];
 
     public function prescription() { return $this->belongsTo(CasePrescription::class, 'case_prescription_id'); }

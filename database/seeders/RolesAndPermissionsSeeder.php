@@ -36,8 +36,37 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $perm]);
         }
 
+        /*
+         * TWO TIERS (Devin msg 2117). Before this, `admin` was granted
+         * Permission::all(), which made it identical to `super_admin`: the two
+         * roles existed but meant nothing. A Doctor Admin now gets operational
+         * permissions over the doctors they are over, and NOT the ones that
+         * configure the platform or reach outside it.
+         *
+         * Withheld from admin, deliberately, and held only by super_admin:
+         *   manage partners  - storefronts and their Healthie credentials
+         *   manage webhooks  - an outbound integration
+         *   manage system    - settings, catalog, triage rules, AI instructions
+         *   manage admins    - who is an admin, and which doctors they are over
+         *
+         * "All API integrations etc should be a super admin function." Anything
+         * that reaches outside MEDAXIS is on that list.
+         *
+         * NOTE FOR WHOEVER RUNS THIS: syncPermissions REPLACES the role's
+         * permissions, so re-running this seeder DEMOTES existing admins from
+         * full access to scoped access. That is the intended change, but it is a
+         * live permission change and should be run knowingly, not incidentally.
+         */
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
-        $adminRole->syncPermissions(Permission::all());
+        $adminRole->syncPermissions([
+            'view cases', 'create cases', 'update cases', 'delete cases',
+            'assign cases', 'approve cases', 'cancel cases',
+            'view patients', 'create patients', 'update patients', 'delete patients',
+            'view offerings',
+            'view orders', 'update orders',
+            'add clinical notes', 'send messages',
+            'manage clinicians',
+        ]);
 
         $clinicianRole = Role::firstOrCreate(['name' => 'clinician']);
         $clinicianRole->syncPermissions([
@@ -57,6 +86,21 @@ class RolesAndPermissionsSeeder extends Seeder
             'view offerings',
             'view orders',
             'manage webhooks',
+        ]);
+
+        /*
+         * Support staff triage the support queue: they see cases in the support
+         * state, communicate with patients, and escalate to a clinician. They
+         * cannot prescribe, cannot touch routing, and cannot see or manage the
+         * platform configuration.
+         *
+         * Intentionally separate from the syncPermissions blocks above: re-running
+         * this seeder must not accidentally demote admin/clinician permissions
+         * while adding this new role.
+         */
+        $supportStaffRole = Role::firstOrCreate(['name' => 'support_staff']);
+        $supportStaffRole->syncPermissions([
+            'view cases', 'view patients', 'send messages',
         ]);
     }
 }

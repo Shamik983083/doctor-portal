@@ -127,6 +127,118 @@ $hasLicenses = count($licenseInfo) > 0;
                     <label class="form-label fw-semibold">Max Daily Cases</label>
                     <input type="number" name="max_daily_cases" class="form-control" min="1" max="999"
                            value="{{ old('max_daily_cases', $clinician->max_daily_cases) }}">
+                    <small class="text-muted">Overall daily ceiling. Blank means no limit.</small>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            {{-- Capacity controls (Devin msgs 2248/2250) --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-3">Capacity</h6>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Accepting New Cases</label>
+                    <div class="form-check form-switch mt-2">
+                        <input type="hidden" name="accepting_new_cases" value="0">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="acceptingNew" name="accepting_new_cases" value="1"
+                               {{ old('accepting_new_cases', $clinician->accepting_new_cases ? '1' : '0') === '1' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="acceptingNew">Books open</label>
+                    </div>
+                    <small class="text-muted">Off = books full. Stops NEW patients. Their own check-ins still come through.</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Max Daily New Cases</label>
+                    <input type="number" name="max_daily_new_cases" class="form-control" min="1" max="999"
+                           value="{{ old('max_daily_new_cases', $clinician->max_daily_new_cases) }}">
+                    <small class="text-muted">First visits per day. Blank means no limit. Check-ins do not count.</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Max Open Cases</label>
+                    <input type="number" name="max_open_cases" class="form-control" min="1" max="999"
+                           value="{{ old('max_open_cases', $clinician->max_open_cases) }}">
+                    <small class="text-muted">Total open, non-terminal cases. Blank means no limit.</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Refill Alert Threshold</label>
+                    <input type="number" name="daily_refill_alert_threshold" class="form-control" min="1" max="999"
+                           value="{{ old('daily_refill_alert_threshold', $clinician->daily_refill_alert_threshold) }}">
+                    <small class="text-muted">Alerts the doctor admin past this many check-ins in a day. Never blocks.</small>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            {{-- The eligibility gate, doctor side (Devin msg 2308). What this
+                 doctor will take: which product categories, and which kinds of
+                 visit. Both are hard blocks, and neither is overridden by
+                 continuity, so unticking a category also stops that doctor's own
+                 returning patients on that category. --}}
+            <h6 class="text-muted text-uppercase small fw-semibold mb-1">What this doctor accepts</h6>
+            <p class="text-muted small mb-3">
+                Both of these block cases outright. A doctor is never given a case in a category they
+                do not accept, including check-ins from patients they have treated before.
+            </p>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Product categories</label>
+                @if($categories->isEmpty())
+                    <div class="alert alert-warning small mb-0">
+                        No categories exist yet. Add them under Categories first.
+                    </div>
+                @else
+                    <div class="row">
+                        @foreach($categories as $category)
+                            <div class="col-md-3 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="category_{{ $category->id }}"
+                                           name="accepted_categories[]" value="{{ $category->id }}"
+                                           {{ in_array($category->id, old('accepted_categories', $acceptedCategoryIds)) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="category_{{ $category->id }}">
+                                        {{ $category->name }}
+                                    </label>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <small class="text-muted">
+                        None ticked means this doctor receives no cases at all.
+                    </small>
+                @endif
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label fw-semibold">Visit types</label>
+                    <div class="form-check">
+                        <input type="hidden" name="accepts_async_visits" value="0">
+                        <input class="form-check-input" type="checkbox" id="acceptsAsync"
+                               name="accepts_async_visits" value="1"
+                               {{ old('accepts_async_visits', $clinician->accepts_async_visits ? '1' : '0') === '1' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="acceptsAsync">Asynchronous review</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="hidden" name="accepts_sync_visits" value="0">
+                        <input class="form-check-input" type="checkbox" id="acceptsSync"
+                               name="accepts_sync_visits" value="1"
+                               {{ old('accepts_sync_visits', $clinician->accepts_sync_visits ? '1' : '0') === '1' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="acceptsSync">Synchronous video visit</label>
+                    </div>
+                    <small class="text-muted">
+                        Whether a case needs video is decided by the patient's state, not here.
+                    </small>
+                </div>
+                <div class="col-md-8 mb-3">
+                    <label class="form-label fw-semibold">Booking link</label>
+                    <input type="url" name="scheduling_link" class="form-control" maxlength="500"
+                           placeholder="https://calendly.com/..."
+                           value="{{ old('scheduling_link', $clinician->scheduling_link) }}">
+                    <small class="text-muted">
+                        Where a patient books a live visit. Required for synchronous cases: without
+                        it, a video case cannot be assigned to this doctor even with the box ticked,
+                        because the patient would have no way to book.
+                    </small>
                 </div>
             </div>
 
@@ -165,9 +277,6 @@ $hasLicenses = count($licenseInfo) > 0;
                         @endforeach
                     </div>
                 </div>
-                @error('license_info')
-                    <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ $message }}</div>
-                @enderror
                 <div id="stateError" class="text-danger small mt-1" style="display:none">
                     <i class="bi bi-exclamation-circle me-1"></i>Please select at least one licensed state.
                 </div>

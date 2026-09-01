@@ -7,9 +7,25 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">All Offerings</h6>
+        {{--
+            READ IS OPEN TO BOTH ADMIN TIERS, WRITE IS SUPER ADMIN ONLY.
+
+            The routes were gated (role:super_admin on create/store/update/
+            destroy/toggle-status/approve/reject) but this view was not, so a
+            Doctor Admin was shown a full editing UI in which every control
+            403'd. Same standard the sidebar already sets: hidden rather than
+            shown and 403'd, so nobody is offered a dead link.
+
+            A Doctor Admin still needs to SEE the catalog to run their doctors,
+            so the page and the row link stay open and only the controls are
+            wrapped. This mirrors RolesAndPermissionsSeeder, which grants the
+            `admin` role the single permission `view offerings`.
+        --}}
+        @role('super_admin')
         <a href="{{ route('admin.offerings.create') }}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i>New Offering
         </a>
+        @endrole
     </div>
     <div class="card-header bg-light border-top-0">
         <form class="d-flex gap-2 flex-wrap">
@@ -86,6 +102,8 @@
                             @endif
                         </td>
                         <td>
+                            {{-- The badge is the same either way; only super admin can click it. --}}
+                            @role('super_admin')
                             <form method="POST" action="{{ route('admin.offerings.toggle-status', $offering->id) }}" class="d-inline">
                                 @csrf @method('PATCH')
                                 <button type="submit" class="btn btn-sm border-0 p-0">
@@ -94,8 +112,14 @@
                                     </span>
                                 </button>
                             </form>
+                            @else
+                            <span class="badge {{ $offering->is_active ? 'bg-success' : 'bg-secondary' }}">
+                                {{ $offering->is_active ? 'Active' : 'Inactive' }}
+                            </span>
+                            @endrole
                         </td>
                         <td class="text-nowrap">
+                            @role('super_admin')
                             @if($offering->approval_status === 'pending')
                                 <form method="POST" action="{{ route('admin.offerings.approve', $offering->id) }}" class="d-inline">
                                     @csrf
@@ -131,12 +155,23 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                             @endif
+                            @endrole
+
+                            {{-- Open to both tiers. For a Doctor Admin the detail
+                                 page is read-only, so this is View, not Edit. --}}
+                            @role('super_admin')
                             <a href="{{ route('admin.offerings.show', $offering->id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            @else
+                            <a href="{{ route('admin.offerings.show', $offering->id) }}" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+                            @endrole
+
+                            @role('super_admin')
                             <form method="POST" action="{{ route('admin.offerings.destroy', $offering->id) }}"
                                   class="d-inline" onsubmit="return confirm('Delete {{ addslashes($offering->name) }}?')">
                                 @csrf @method('DELETE')
                                 <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
                             </form>
+                            @endrole
                         </td>
                     </tr>
                     @empty

@@ -1,7 +1,14 @@
 @extends('layouts.admin')
 
-@section('title', 'Case — ' . substr($case->uuid, 0, 8))
-@section('page-title', 'Case — ' . substr($case->uuid, 0, 8))
+@section('title', 'Case Preview')
+@section('page-title')
+<style>
+.case-preview-title { display:inline-flex; align-items:baseline; gap:7px; }
+.case-preview-title .label { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:.65rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:#94a3b8; }
+.case-preview-title .word  { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:1.05rem; font-weight:700; letter-spacing:-.01em; color:#1e293b; line-height:1; }
+</style>
+<span class="case-preview-title"><span class="label">Case</span><span class="word">Preview</span></span>
+@endsection
 
 @section('content')
 <div class="mb-3 d-flex justify-content-between align-items-center">
@@ -19,47 +26,97 @@
     {{-- Left sidebar --}}
     <div class="col-lg-4">
 
-        {{-- Status & Assignment --}}
-        <div class="card mb-3">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Case Info</h6></div>
-            <div class="card-body small">
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th>Status</th><td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td></tr>
+        {{-- Case Info --}}
+        <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-body p-0">
+                {{-- Header row --}}
+                <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom">
+                    <span class="fw-semibold text-secondary" style="font-size:.7rem;letter-spacing:.07em;text-transform:uppercase">Case Info</span>
+                    <span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span>
+                </div>
+                <div class="px-3 py-2" style="font-size:.82rem">
+                    {{-- Visit type + IDs --}}
                     @if($case->visit_type)
-                    <tr>
-                        <th>Visit Type</th>
-                        <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size:.75rem">{{ $case->visit_type }}</span></td>
-                    </tr>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Visit type</span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">{{ $case->visit_type }}</span>
+                    </div>
                     @endif
-                    <tr><th>Partner</th><td>{{ $case->partner->name ?? '—' }}</td></tr>
-                    <tr><th>Clinician</th><td>{{ $case->clinician?->full_name ?? '—' }}</td></tr>
-                    <tr><th>Created</th><td>{{ $case->created_at->format('M d, Y H:i') }}</td></tr>
-                    @if($case->assigned_at)<tr><th>Assigned</th><td>{{ $case->assigned_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->support_at)<tr><th>Support since</th><td>{{ $case->support_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->approved_at)<tr><th>Approved</th><td>{{ $case->approved_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->completed_at)<tr><th>Completed</th><td>{{ $case->completed_at->format('M d, Y H:i') }}</td></tr>@endif
-                    @if($case->cancelled_at)<tr><th>Cancelled</th><td>{{ $case->cancelled_at->format('M d, Y H:i') }}</td></tr>@endif
-                </table>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Partner</span>
+                        <span class="fw-medium text-end" style="max-width:60%">{{ $case->partner->name ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Clinician</span>
+                        <span class="fw-medium text-end" style="max-width:60%">{{ $case->clinician?->full_name ?? '—' }}</span>
+                    </div>
+                    {{-- Timestamps --}}
+                    <div class="border-top pt-2 mt-1" style="font-size:.78rem">
+                        @php
+                            $timestamps = [
+                                'Created'      => $case->created_at,
+                                'Assigned'     => $case->assigned_at,
+                                'Support since'=> $case->support_at,
+                                'Approved'     => $case->approved_at,
+                                'Completed'    => $case->completed_at,
+                                'Cancelled'    => $case->cancelled_at,
+                            ];
+                        @endphp
+                        @foreach($timestamps as $label => $ts)
+                            @if($ts)
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">{{ $label }}</span>
+                                <span class="text-body-secondary">{{ $ts->format('M d, Y H:i') }}</span>
+                            </div>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
             </div>
         </div>
 
         {{-- Patient --}}
-        <div class="card mb-3">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-person-circle me-2"></i>Patient</h6></div>
-            <div class="card-body small">
-                <h6 class="mb-1">{{ $case->patient->full_name }}</h6>
-                <p class="text-muted mb-2">{{ $case->patient->email }}</p>
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th>DOB</th><td>{{ $case->patient->date_of_birth?->format('M d, Y') ?? '—' }}</td></tr>
-                    <tr><th>State</th><td>{{ $case->patient_state ?? $case->patient->state ?? '—' }}</td></tr>
-                    <tr><th>Phone</th><td>{{ $case->patient->phone ?? '—' }}</td></tr>
-                    <tr>
-                        <th>Height</th>
-                        <td>{{ $case->patient->height ? (int)floor($case->patient->height/12)."' ".round(fmod($case->patient->height,12)).'"' : '—' }}</td>
-                    </tr>
-                    <tr><th>Weight</th><td>{{ $case->patient->weight ? number_format($case->patient->weight,1).' lbs' : '—' }}</td></tr>
-                    <tr><th>BMI</th><td>{{ $case->patient->bmi ? number_format($case->patient->bmi,1) : '—' }}</td></tr>
-                </table>
+        <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bi bi-person-circle text-secondary fs-5"></i>
+                        <div>
+                            <div class="fw-semibold" style="font-size:.95rem">{{ $case->patient->full_name }}</div>
+                            <div class="text-muted" style="font-size:.78rem">{{ $case->patient->email }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-3 py-2" style="font-size:.82rem">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">DOB</span>
+                        <span>{{ $case->patient->date_of_birth?->format('M d, Y') ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">State</span>
+                        <span>{{ $case->patient_state ?? $case->patient->state ?? '—' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Phone</span>
+                        <span>{{ $case->patient->phone ?? '—' }}</span>
+                    </div>
+                    <div class="border-top pt-2 mt-1">
+                        <div class="row g-2 text-center">
+                            <div class="col-4">
+                                <div class="fw-semibold">{{ $case->patient->height ? (int)floor($case->patient->height/12)."'".round(fmod($case->patient->height,12)).'"' : '—' }}</div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Height</div>
+                            </div>
+                            <div class="col-4 border-start border-end">
+                                <div class="fw-semibold">{{ $case->patient->weight ? number_format($case->patient->weight,1) : '—' }}</div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">lbs</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="fw-semibold">{{ $case->patient->bmi ? number_format($case->patient->bmi,1) : '—' }}</div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">BMI</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -298,6 +355,19 @@
                                     <span><span class="text-muted">Days Until Dispense:</span> {{ $med->days_until_dispense }}</span>
                                 @endif
                             </div>
+                            @if(!empty($med->dosing['months']))
+                            <div class="mt-2 d-flex flex-column gap-1">
+                                @foreach($med->dosing['months'] as $mi => $dose)
+                                <div class="d-flex align-items-baseline gap-2 small">
+                                    <span class="fw-bold text-primary" style="min-width:24px;font-size:11px">M{{ $mi + 1 }}</span>
+                                    <span>{{ $dose }}</span>
+                                    @if(!empty($med->dosing['sigs'][$mi]))
+                                        <span class="text-muted">— {{ $med->dosing['sigs'][$mi] }}</span>
+                                    @endif
+                                </div>
+                                @endforeach
+                            </div>
+                            @endif
                         </div>
                         @endforeach
                         @endif
@@ -314,16 +384,40 @@
             {{-- Clinical Notes --}}
             <div class="tab-pane fade" id="tab-notes">
                 @forelse($case->clinicalNotes->sortByDesc('created_at') as $note)
-                <div class="card mb-2 {{ $note->is_private ? 'border-warning' : '' }}">
+                <div class="card mb-2">
                     <div class="card-body py-2 px-3">
                         <div class="d-flex justify-content-between mb-1">
                             <small class="fw-semibold">
                                 {{ $note->clinician->full_name ?? 'Unknown' }}
                                 &bull; <span class="text-muted">{{ ucfirst($note->type) }}</span>
+                                @if($note->is_private)<span class="badge bg-secondary ms-1" style="font-size:.65rem">Private</span>@endif
                             </small>
                             <small class="text-muted">{{ $note->created_at->diffForHumans() }}</small>
                         </div>
+                        @php
+                            $nd = null;
+                            if (in_array($note->type, ['soap','progress'])) {
+                                $dec = json_decode($note->note, true);
+                                if (is_array($dec)) $nd = $dec;
+                            }
+                        @endphp
+                        @if($nd && $note->type === 'soap')
+                        <div class="small" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Subjective</span><p class="mb-0">{{ $nd['s'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Objective</span><p class="mb-0">{{ $nd['o'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Assessment</span><p class="mb-0">{{ $nd['a'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Plan</span><p class="mb-0">{{ $nd['p'] ?? '' }}</p></div>
+                        </div>
+                        @elseif($nd && $note->type === 'progress')
+                        <div class="small" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Current Status</span><p class="mb-0">{{ $nd['status'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Changes Since Last Visit</span><p class="mb-0">{{ $nd['changes'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Treatment Response</span><p class="mb-0">{{ $nd['response'] ?? '' }}</p></div>
+                            <div><span class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Next Steps</span><p class="mb-0">{{ $nd['next'] ?? '' }}</p></div>
+                        </div>
+                        @else
                         <p class="mb-0 small">{{ $note->note }}</p>
+                        @endif
                     </div>
                 </div>
                 @empty
@@ -377,22 +471,32 @@
                         $msgDate   = $msg->created_at->format('Y-m-d');
                         $isClinic  = $msg->sender_type === 'clinician';
                         $isPatient = $msg->sender_type === 'patient';
+                        $isAdmin   = $msg->sender_type === 'admin';
 
                         if ($isClinic) {
                             $avatarBg  = '#4361ee';
                             $avatarTxt = '#fff';
                             $avatarStr = $initials($clinicianName);
                             $name      = $clinicianName;
+                            $alignRight = false;
+                        } elseif ($isAdmin) {
+                            $avatarBg  = '#6f42c1';
+                            $avatarTxt = '#fff';
+                            $avatarStr = $initials($msg->user?->name ?? 'Admin');
+                            $name      = $msg->user?->name ?? 'Admin';
+                            $alignRight = true;
                         } elseif ($isPatient) {
                             $avatarBg  = '#2dc653';
                             $avatarTxt = '#fff';
                             $avatarStr = $initials($patientName);
                             $name      = $patientName;
+                            $alignRight = false;
                         } else {
                             $avatarBg  = '#6c757d';
                             $avatarTxt = '#fff';
                             $avatarStr = 'SY';
                             $name      = 'System';
+                            $alignRight = false;
                         }
                     @endphp
 
@@ -409,7 +513,7 @@
                     @endif
 
                     {{-- Message row --}}
-                    <div class="d-flex align-items-end gap-2 mb-3 {{ $isClinic ? 'flex-row-reverse' : '' }}">
+                    <div class="d-flex align-items-end gap-2 mb-3 {{ $alignRight ? 'flex-row-reverse' : '' }}">
 
                         {{-- Avatar --}}
                         <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold"
@@ -421,9 +525,12 @@
                         {{-- Bubble + meta --}}
                         <div style="max-width:68%;">
                             {{-- Name + time --}}
-                            <div class="d-flex align-items-baseline gap-1 mb-1 {{ $isClinic ? 'justify-content-end' : '' }}">
+                            <div class="d-flex align-items-baseline gap-1 mb-1 {{ $alignRight ? 'justify-content-end' : '' }}">
                                 <span style="font-size:.72rem;font-weight:600;color:#495057;">{{ $name }}</span>
                                 <span style="font-size:.67rem;color:#adb5bd;">{{ $msg->created_at->format('H:i') }}</span>
+                                @if($isAdmin)
+                                    <span style="font-size:.62rem;color:#6f42c1;font-weight:500;">internal</span>
+                                @endif
                                 @if($isPatient)
                                     @if($msg->is_read)
                                         <i class="bi bi-check2-all" style="font-size:.72rem;color:#4361ee;"
@@ -436,7 +543,14 @@
                             </div>
 
                             {{-- Bubble --}}
-                            @if($isClinic)
+                            @if($isAdmin)
+                            <div style="background:#6f42c1;color:#fff;padding:10px 14px;
+                                        border-radius:14px 3px 14px 14px;
+                                        font-size:.875rem;line-height:1.5;word-break:break-word;
+                                        box-shadow:0 2px 8px rgba(111,66,193,.2);">
+                                {{ $msg->body }}
+                            </div>
+                            @elseif($isClinic)
                             <div style="background:#4361ee;color:#fff;padding:10px 14px;
                                         border-radius:16px 4px 16px 16px;
                                         font-size:.875rem;line-height:1.5;word-break:break-word;
@@ -459,9 +573,9 @@
                             </div>
                             @endif
 
-                            {{-- Channel badge --}}
-                            @if($msg->channel && $msg->channel !== 'portal')
-                            <div class="mt-1 {{ $isClinic ? 'text-end' : '' }}"
+                            {{-- Channel badge (skip 'portal' and 'internal' — already labelled above) --}}
+                            @if($msg->channel && !in_array($msg->channel, ['portal','internal']))
+                            <div class="mt-1 {{ $alignRight ? 'text-end' : '' }}"
                                  style="font-size:.65rem;color:#adb5bd;">
                                 via {{ $msg->channel }}
                             </div>
@@ -471,6 +585,55 @@
                     @endforeach
                 </div>
                 @endif
+
+                {{-- Internal: Message Clinician --}}
+                <div class="d-flex align-items-center gap-2 mt-4 mb-3">
+                    <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                    <span style="font-size:.66rem;color:#9b6dff;white-space:nowrap;font-weight:700;letter-spacing:.07em;text-transform:uppercase;">
+                        <i class="bi bi-shield-lock me-1"></i>Internal Channel
+                    </span>
+                    <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
+                </div>
+
+                @if($case->clinician_id)
+                <div class="rounded-3 p-3" style="background:#f8f0ff;border:1px solid rgba(111,66,193,.2);">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fw-semibold" style="font-size:.82rem;color:#6f42c1;">
+                            <i class="bi bi-chat-square-text me-1"></i>Message Clinician
+                        </span>
+                        <span class="text-muted" style="font-size:.72rem;">
+                            To: <strong>{{ $case->clinician->full_name }}</strong>
+                            &middot; not visible to patient
+                        </span>
+                    </div>
+                    <form method="POST" action="{{ route('admin.messages.send') }}">
+                        @csrf
+                        <input type="hidden" name="case_uuid" value="{{ $case->uuid }}">
+                        <div class="mb-2">
+                            <textarea name="body" rows="3" required maxlength="5000"
+                                      class="form-control form-control-sm"
+                                      placeholder="Write an internal note to the clinician…"
+                                      style="resize:vertical;border-color:rgba(111,66,193,.3);"></textarea>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span class="text-muted" style="font-size:.7rem;">
+                                <i class="bi bi-eye-slash me-1"></i>Only visible to you and the clinician
+                            </span>
+                            <button type="submit" class="btn btn-sm px-3"
+                                    style="background:#6f42c1;color:#fff;border:none;">
+                                <i class="bi bi-send me-1"></i>Send Message
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                @else
+                <div class="rounded-3 px-3 py-2 d-flex align-items-center gap-2"
+                     style="background:#f8f9fa;border:1px solid #e9ecef;font-size:.8rem;">
+                    <i class="bi bi-person-x text-muted"></i>
+                    <span class="text-muted">No clinician assigned — assign one from the left panel to enable internal messaging.</span>
+                </div>
+                @endif
+
             </div>
 
             {{-- Files --}}
@@ -570,8 +733,17 @@
                     $from = $event->payload['from'] ?? null;
                     $to   = $event->payload['to']   ?? null;
 
-                    if ($event->event_type === 'clinician_reassigned') {
-                        return ['label' => 'Clinician reassigned', 'color' => 'bg-primary'];
+                    $typeMap = [
+                        'clinician_reassigned'          => ['Clinician reassigned',           'bg-primary'],
+                        'prescription.confirmed'        => ['Prescription confirmed',          'bg-success'],
+                        'prescription.document.generated' => ['Prescription document generated', 'bg-info text-dark'],
+                        'pharmacy.dispatch.preview'     => ['Pharmacy dispatch (preview)',     'bg-warning text-dark'],
+                        'pharmacy.dispatch.queued'      => ['Sent to pharmacy',                'bg-success'],
+                        'ehr_record_built'              => ['EHR record built',                'style:background-color:#6f42c1;color:#fff'],
+                        'ehr.push.queued'               => ['Sent to EHR',                    'style:background-color:#6f42c1;color:#fff'],
+                    ];
+                    if (isset($typeMap[$event->event_type])) {
+                        return ['label' => $typeMap[$event->event_type][0], 'color' => $typeMap[$event->event_type][1]];
                     }
 
                     $map = [
@@ -581,6 +753,7 @@
                         'assigned→support'    => ['Sent to support',             'bg-warning text-dark'],
                         'support→assigned'    => ['Returned to clinician',       'bg-primary'],
                         'assigned→approved'   => ['Case approved',               'bg-success'],
+                        'approved→completed'  => ['Prescription confirmed · case completed', 'bg-success'],
                         'approved→processing' => ['Sent to pharmacy',            'bg-success'],
                         'processing→completed'=> ['Case completed',              'bg-success'],
                         'assigned→cancelled'  => ['Case cancelled',              'bg-danger'],
@@ -617,7 +790,11 @@
                         {{ $event->created_at->format('M d, H:i') }}
                     </div>
                     <div>
+                        @if(str_starts_with($color, 'style:'))
+                        <span class="badge mb-1" style="{{ substr($color, 6) }}">{{ $label }}</span>
+                        @else
                         <span class="badge {{ $color }} mb-1">{{ $label }}</span>
+                        @endif
                         <div class="small text-muted">{{ $actorLabel($event) }}</div>
                         @if($event->notes)
                             <p class="small mb-0 mt-1 text-body">{{ $event->notes }}</p>

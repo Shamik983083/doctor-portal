@@ -34,9 +34,15 @@
                     <tr><th class="text-muted">Created</th><td>{{ $partner->created_at->format('M d, Y') }}</td></tr>
                 </table>
             </div>
-            <div class="card-footer d-flex gap-2">
+            <div class="card-footer d-flex gap-2 flex-wrap">
                 <a href="{{ route('admin.partners.edit', $partner->id) }}" class="btn btn-outline-primary btn-sm flex-fill">
                     <i class="bi bi-pencil me-1"></i>Edit
+                </a>
+                <a href="{{ route('admin.partners.product-plans.index', $partner->id) }}" class="btn btn-outline-secondary btn-sm flex-fill">
+                    <i class="bi bi-grid me-1"></i>Product Plans
+                </a>
+                <a href="{{ route('admin.guide.webhooks', ['partner_id' => $partner->id]) }}" class="btn btn-outline-secondary btn-sm flex-fill">
+                    <i class="bi bi-broadcast-pin me-1"></i>Webhook Guide
                 </a>
                 <form method="POST" action="{{ route('admin.partners.destroy', $partner->id) }}" onsubmit="return confirm('Are you sure you want to delete this partner? This cannot be undone.')" class="d-inline flex-fill">
                     @csrf
@@ -84,21 +90,8 @@
                         <small class="text-muted">Send this as <code>client_secret</code> in token requests.</small>
                     </div>
 
-                    {{-- Webhook Secret --}}
-                    <div class="mb-3">
-                        <label class="form-label small text-muted fw-semibold mb-1">Webhook Signing Secret</label>
-                        <div class="input-group input-group-sm">
-                            <input type="password" class="form-control font-monospace bg-light"
-                                   id="webhookSecret" value="{{ $partner->webhook_secret }}" readonly>
-                            <button class="btn btn-outline-secondary" onclick="toggleWebhook()" title="Show/Hide" id="webhookToggleBtn">
-                                <i class="bi bi-eye" id="webhookEyeIcon"></i>
-                            </button>
-                            <button class="btn btn-outline-secondary" onclick="copyField('webhookSecret')" title="Copy">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                        </div>
-                        <small class="text-muted">Used to verify incoming webhook signatures.</small>
-                    </div>
+                    {{-- partner.webhook_secret is a legacy field never reached in signing
+                         (webhook.secret always takes priority). Hidden to avoid confusion. --}}
 
                     {{-- Token endpoint --}}
                     <div class="mb-3">
@@ -212,6 +205,25 @@
                                     @else
                                         <span class="text-secondary">{{ ucfirst($wh->status) }}</span>
                                     @endif
+                                </div>
+                                {{-- Signing secret: this is what X-Webhook-Signature is computed from --}}
+                                <div class="mt-1 d-flex align-items-center gap-1">
+                                    <span class="text-muted" style="font-size:.7rem;white-space:nowrap">Signing secret:</span>
+                                    <input type="password"
+                                           id="whsec-{{ $wh->id }}"
+                                           class="form-control form-control-sm font-monospace py-0 border-0 bg-transparent"
+                                           style="font-size:.7rem;width:160px;letter-spacing:.05em"
+                                           value="{{ $wh->secret }}" readonly>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-secondary"
+                                            onclick="var f=document.getElementById('whsec-{{ $wh->id }}');f.type=f.type==='password'?'text':'password'"
+                                            title="Show/hide">
+                                        <i class="bi bi-eye" style="font-size:.8rem"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-secondary"
+                                            onclick="navigator.clipboard.writeText('{{ $wh->secret }}').then(function(){var b=event.target.closest('button');b.innerHTML='<i class=\'bi bi-check\' style=\'font-size:.8rem\'></i>';setTimeout(function(){b.innerHTML='<i class=\'bi bi-clipboard\' style=\'font-size:.8rem\'></i>';},1500);})"
+                                            title="Copy">
+                                        <i class="bi bi-clipboard" style="font-size:.8rem"></i>
+                                    </button>
                                 </div>
                             </div>
                             <div class="text-nowrap ms-2">
@@ -360,16 +372,5 @@ function toggleSecret() {
     }
 }
 
-function toggleWebhook() {
-    const el = document.getElementById('webhookSecret');
-    const icon = document.getElementById('webhookEyeIcon');
-    if (el.type === 'password') {
-        el.type = 'text';
-        icon.className = 'bi bi-eye-slash';
-    } else {
-        el.type = 'password';
-        icon.className = 'bi bi-eye';
-    }
-}
 </script>
 @endsection

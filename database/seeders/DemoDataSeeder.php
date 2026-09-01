@@ -45,7 +45,29 @@ class DemoDataSeeder extends Seeder
                 'specialty'       => 'General Medicine',
                 'credentials'     => 'MD',
                 'is_available'    => true,
-                'licensed_states' => ['CA', 'NY', 'TX', 'FL', 'WA'],
+                /*
+                 * WRONG SHAPE UNTIL NOW, AND IT MATTERED.
+                 *
+                 * This was a flat `['CA','NY','TX','FL','WA']`. Every reader of
+                 * this column does `collect($states)->pluck('state')`, which on
+                 * a flat list yields [null, null, ...] and matches no state at
+                 * all. So the demo clinician has always been licensed NOWHERE
+                 * by `isLicensedInState()`, despite the column looking correct.
+                 *
+                 * It went unnoticed because CaseAutoAssigner falls back to an
+                 * unlicensed clinician when nobody matches, so cases still got
+                 * routed. Once the licence gate is sealed that fallback goes and
+                 * this doctor is blocked from every case, which would read as
+                 * the seal being broken rather than the fixture being wrong.
+                 *
+                 * The shape below is what the admin UI writes, in
+                 * ClinicianController::store().
+                 */
+                'licensed_states' => array_map(fn ($s) => [
+                    'state'          => $s,
+                    'license_number' => 'MD-' . $s . '-12345',
+                    'expiry_date'    => '2027-12-31',
+                ], ['CA', 'NY', 'TX', 'FL', 'WA']),
                 'max_daily_cases' => 20,
             ]
         );

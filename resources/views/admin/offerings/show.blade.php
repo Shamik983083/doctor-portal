@@ -70,6 +70,8 @@
                     @if($offering->approvedBy)
                         <p class="text-muted small mb-2">By {{ $offering->approvedBy->name }}<br>{{ $offering->approved_at?->format('M j, Y g:i A') }}</p>
                     @endif
+                    {{-- Status is readable by both tiers; acting on it is super admin only. --}}
+                    @role('super_admin')
                     <button class="btn btn-sm btn-outline-danger w-100"
                             data-bs-toggle="modal" data-bs-target="#rejectModal"
                             data-action="{{ route('admin.offerings.reject', $offering->id) }}"
@@ -77,6 +79,7 @@
                             data-note="">
                         <i class="bi bi-x-circle me-1"></i>Revoke Approval
                     </button>
+                    @endrole
                 @elseif($offering->approval_status === 'rejected')
                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 mb-2 d-block text-start p-2">
                         <i class="bi bi-x-circle me-1"></i>Rejected
@@ -88,6 +91,7 @@
                         </div>
                     @endif
                     <p class="text-muted small mb-2">Partner can edit and re-submit.</p>
+                    @role('super_admin')
                     @if(!$hasQuestionnaires)
                         <div class="alert alert-warning py-2 mb-2" style="font-size:.8rem;">
                             <i class="bi bi-exclamation-triangle me-1"></i>
@@ -109,11 +113,13 @@
                             <i class="bi bi-pencil me-1"></i>Edit Note
                         </button>
                     </div>
+                    @endrole
                 @else
                     <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 mb-2 d-block text-start p-2">
                         <i class="bi bi-clock me-1"></i>Pending Admin Review
                     </span>
                     <p class="text-muted small mb-2">Not visible to clinicians until approved.</p>
+                    @role('super_admin')
                     @if(!$hasQuestionnaires)
                         <div class="alert alert-warning py-2 mb-2" style="font-size:.8rem;">
                             <i class="bi bi-exclamation-triangle me-1"></i>
@@ -135,6 +141,7 @@
                             <i class="bi bi-x-lg me-1"></i>Reject
                         </button>
                     </div>
+                    @endrole
                 @endif
             </div>
         </div>
@@ -182,6 +189,7 @@
                                 <span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size:.62rem">Optional</span>
                             @endif
                         </div>
+                        @role('super_admin')
                         <form method="POST"
                               action="{{ route('admin.offerings.questionnaires.detach', [$offering->id, $q->id]) }}"
                               onsubmit="return confirm('Remove {{ addslashes($q->name) }}?')">
@@ -190,6 +198,7 @@
                                 <i class="bi bi-x-lg" style="font-size:.75rem"></i>
                             </button>
                         </form>
+                        @endrole
                     </li>
                     @endforeach
                 </ul>
@@ -197,6 +206,7 @@
 
             {{-- Add questionnaire --}}
             @php $attachable = $allQuestionnaires->whereNotIn('id', $offering->questionnaires->pluck('id')); @endphp
+            @role('super_admin')
             @if($attachable->isNotEmpty())
             <div class="card-footer px-3 py-2 bg-light border-top">
                 <p class="text-muted mb-1" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Attach Questionnaire</p>
@@ -222,20 +232,27 @@
                 </form>
             </div>
             @endif
+            @endrole
         </div>
     </div>
 
-    {{-- Right: Edit form --}}
+    {{-- Right: Edit form (read-only for a Doctor Admin, see the fieldset below) --}}
     <div class="col-lg-9">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Edit Offering</h6>
+                <h6 class="mb-0">
+                    @role('super_admin')Edit Offering
+                    @else Offering Details
+                    @endrole
+                </h6>
                 <div class="d-flex gap-2">
+                    @role('super_admin')
                     <form method="POST" action="{{ route('admin.offerings.destroy', $offering->id) }}"
                           onsubmit="return confirm('Delete {{ addslashes($offering->name) }}?')">
                         @csrf @method('DELETE')
                         <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
                     </form>
+                    @endrole
                     <a href="{{ route('admin.offerings.index') }}" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-arrow-left me-1"></i>Back to list
                     </a>
@@ -244,6 +261,21 @@
             <div class="card-body">
                 <form method="POST" action="{{ route('admin.offerings.update', $offering->id) }}">
                     @csrf @method('PUT')
+
+                    {{--
+                        A Doctor Admin needs to READ the catalog to run their
+                        doctors, so the fields stay on the page rather than being
+                        hidden. `fieldset disabled` makes every input inside
+                        non-editable and, because disabled inputs are not
+                        submitted, it also removes any way to post from here.
+                        The submit button is dropped below as well, so this is
+                        belt and braces over a route that already 403s.
+                    --}}
+                    @role('super_admin')
+                    <fieldset>
+                    @else
+                    <fieldset disabled>
+                    @endrole
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Basic Information</h6>
 
@@ -275,8 +307,9 @@
                         </div>
                     </div>
 
-                    <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Pharmacy & Integration</h6>
+                    {{-- Pharmacy & Integration heading commented out — no live integration yet --}}
 
+                    {{-- Pharmacy Type, DoseSpot Medication ID, Boothwyn Compound ID commented out — not wired to any live integration yet
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Pharmacy Type <span class="text-danger">*</span></label>
@@ -300,6 +333,7 @@
                                    value="{{ old('boothwyn_compound_id', $offering->boothwyn_compound_id) }}">
                         </div>
                     </div>
+                    --}}
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Prescription &amp; Dispensing</h6>
 
@@ -311,31 +345,20 @@
                     </div>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Refills <span class="text-danger">*</span></label>
                             <input type="number" name="refills" min="0" class="form-control"
                                    value="{{ old('refills', $offering->refills) }}" placeholder="0" required>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
                             <input type="number" name="quantity" min="0" step="0.01" class="form-control"
                                    value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00" required>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
                             <input type="number" name="days_supply" min="0" class="form-control"
                                    value="{{ old('days_supply', $offering->days_supply) }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Dispense Unit <span class="text-danger">*</span></label>
-                            <input type="text" name="dispense_unit" class="form-control"
-                                   value="{{ old('dispense_unit', $offering->dispense_unit) }}"
-                                   placeholder="e.g. Each, Vial, mL" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Days Until Dispense <span class="text-muted fw-normal">(opt)</span></label>
-                            <input type="number" name="days_until_dispense" min="0" class="form-control"
-                                   value="{{ old('days_until_dispense', $offering->days_until_dispense) }}">
                         </div>
                     </div>
 
@@ -346,6 +369,46 @@
                         <div class="form-text">Sent to the pharmacy and included in the medication label.</div>
                     </div>
 
+                    {{-- SIG instructions: per-level when offering has levels, global otherwise --}}
+                    @if(!empty($offering->levels))
+                        @php $offeringLevels = $offering->levels; @endphp
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                SIG Instructions by Level
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"
+                                      style="font-size:.65rem;font-weight:600">{{ count($offeringLevels) }} levels</span>
+                            </label>
+                            <p class="form-text mb-2">
+                                Enter patient-facing SIG instructions for each dosing level. When a clinician selects a level in the prescribe form, the corresponding SIG will auto-fill.
+                            </p>
+                            <div class="d-flex flex-column gap-2">
+                                @foreach($offeringLevels as $idx => $level)
+                                <div class="d-flex align-items-center gap-3 p-2 rounded border"
+                                     style="background:var(--bs-gray-100,#f8f9fa)">
+                                    <div style="min-width:160px;flex-shrink:0">
+                                        <div class="fw-bold text-primary" style="font-size:.875rem">{{ $level['label'] ?? 'Level '.($idx+1) }}</div>
+                                        <div class="text-muted" style="font-size:.75rem">{{ $level['formula'] ?? '' }}</div>
+                                    </div>
+                                    <input type="text"
+                                           name="levels_sigs[{{ $idx }}]"
+                                           class="form-control form-control-sm"
+                                           value="{{ old('levels_sigs.'.$idx, $level['sig'] ?? '') }}"
+                                           placeholder="e.g. Inject 0.25 mL subcutaneously once weekly">
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @else
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">SIG <span class="text-muted fw-normal">(opt)</span></label>
+                            <input type="text" name="sig" class="form-control"
+                                   value="{{ old('sig', $offering->sig) }}"
+                                   placeholder="e.g. Take 1 capsule orally once daily">
+                            <div class="form-text">Default patient-facing SIG instructions for this offering.</div>
+                        </div>
+                    @endif
+
+                    {{-- Pharmacy Name and Pharmacy Notes commented out — no live integration yet
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Pharmacy Name <span class="text-muted fw-normal">(opt)</span></label>
@@ -360,6 +423,7 @@
                         <textarea name="pharmacy_notes" class="form-control" rows="2"
                                   placeholder="e.g. Bill to partner, Ship to Patient">{{ old('pharmacy_notes', $offering->pharmacy_notes) }}</textarea>
                     </div>
+                    --}}
 
                     <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">
                         State Availability
@@ -423,6 +487,9 @@
                         </div>
                     </div>
 
+                    </fieldset>
+
+                    @role('super_admin')
                     @if(!$hasQuestionnaires)
                         <div class="alert alert-warning py-2 mb-3" style="font-size:.85rem;">
                             <i class="bi bi-exclamation-triangle me-1"></i>
@@ -435,6 +502,14 @@
                         </button>
                         <a href="{{ route('admin.offerings.index') }}" class="btn btn-outline-secondary">Cancel</a>
                     </div>
+                    @else
+                    <div class="d-flex gap-2 pt-2 border-top">
+                        <span class="text-muted small align-self-center">
+                            <i class="bi bi-lock me-1"></i>Read only. The catalog is managed by a super admin.
+                        </span>
+                        <a href="{{ route('admin.offerings.index') }}" class="btn btn-sm btn-outline-secondary ms-auto">Back to list</a>
+                    </div>
+                    @endrole
                 </form>
             </div>
         </div>

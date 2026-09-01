@@ -21,7 +21,11 @@ class TriageBackfill extends Command
     public function handle(TriageClassifier $classifier): int
     {
         $query = PatientCase::query()
-            ->with(['patient', 'caseOfferings.offering', 'caseQuestions', 'clinicalNotes'])
+            ->with([
+                'patient',
+                'questionnaireResponses.questionnaire',
+                'questionnaireResponses.answers.question',
+            ])
             ->when(! $this->option('all'), fn ($q) => $q->whereNull('triage'));
 
         $total = (clone $query)->count();

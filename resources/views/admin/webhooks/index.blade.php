@@ -6,7 +6,13 @@
 @section('content')
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h6 class="mb-0">Delivery Log</h6>
+        <div class="d-flex align-items-center gap-2">
+            <h6 class="mb-0">Delivery Log</h6>
+            <span id="live-indicator" class="badge bg-success d-none" style="font-size:.7rem">
+                <span class="spinner-grow spinner-grow-sm me-1" style="width:.5rem;height:.5rem"></span>
+                Live · refreshing in <span id="live-countdown">5</span>s
+            </span>
+        </div>
         <form class="d-flex gap-2 flex-wrap" method="GET">
             <select name="partner_id" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
                 <option value="">All Partners</option>
@@ -90,8 +96,7 @@
                                 @if($delivery->response_body)
                                 <button type="button" class="btn btn-sm btn-outline-secondary py-0"
                                         data-bs-toggle="modal" data-bs-target="#payloadModal"
-                                        data-payload="{{ e(json_encode($delivery->payload, JSON_PRETTY_PRINT)) }}"
-                                        data-response="{{ e($delivery->response_body) }}"
+                                        data-uuid="{{ $delivery->uuid }}"
                                         data-event="{{ $delivery->event_type }}">
                                     <i class="bi bi-eye"></i>
                                 </button>
@@ -123,6 +128,17 @@
     @endif
 </div>
 
+{{-- Delivery data embedded as JSON to avoid HTML-encoding issues with quotes and newlines --}}
+@php
+$whDeliveryData = $deliveries->getCollection()->map(fn($d) => [
+    'uuid'     => $d->uuid,
+    'event'    => $d->event_type,
+    'payload'  => $d->payload,
+    'response' => $d->response_body,
+])->values()->toArray();
+@endphp
+<script id="wh-delivery-data" type="application/json">{!! json_encode($whDeliveryData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}</script>
+
 {{-- Payload / Response Modal --}}
 <div class="modal fade" id="payloadModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -144,11 +160,56 @@
 
 @section('scripts')
 <script>
-document.getElementById('payloadModal').addEventListener('show.bs.modal', function (e) {
-    const btn = e.relatedTarget;
-    document.getElementById('modalEventType').textContent = btn.dataset.event;
-    document.getElementById('modalPayload').textContent   = btn.dataset.payload;
-    document.getElementById('modalResponse').textContent  = btn.dataset.response;
-});
+(function () {
+    // ── Modal data ────────────────────────────────────────────────────────
+    const raw  = document.getElementById('wh-delivery-data');
+    const list = raw ? JSON.parse(raw.textContent) : [];
+    const map  = {};
+    list.forEach(function (d) { map[d.uuid] = d; });
+
+    document.getElementById('payloadModal').addEventListener('show.bs.modal', function (e) {
+        const btn  = e.relatedTarget;
+        const uuid = btn.dataset.uuid;
+        const d    = map[uuid] || {};
+
+        document.getElementById('modalEventType').textContent = d.event || btn.dataset.event || '';
+
+        document.getElementById('modalPayload').textContent =
+            d.payload ? JSON.stringify(d.payload, null, 2) : '';
+
+        var resp = d.response || '';
+        try { resp = JSON.stringify(JSON.parse(resp), null, 2); } catch (_) {}
+        document.getElementById('modalResponse').textContent = resp;
+    });
+
+    // ── Live auto-refresh ─────────────────────────────────────────────────
+    // Check if any row has a status that is still in-flight
+    var activeStatuses = ['pending', 'retrying'];
+    var rows = document.querySelectorAll('table tbody tr');
+    var hasActive = false;
+    rows.forEach(function (row) {
+        var badge = row.querySelector('.badge');
+        if (badge && activeStatuses.indexOf(badge.textContent.trim().toLowerCase()) !== -1) {
+            hasActive = true;
+        }
+    });
+
+    if (hasActive) {
+        var indicator  = document.getElementById('live-indicator');
+        var countdown  = document.getElementById('live-countdown');
+        var seconds    = 5;
+        indicator.classList.remove('d-none');
+
+        var timer = setInterval(function () {
+            seconds--;
+            countdown.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(timer);
+                // Preserve current query string so filters stay active
+                window.location.reload();
+            }
+        }, 1000);
+    }
+})();
 </script>
 @endsection

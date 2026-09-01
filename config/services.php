@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    // F20: Karen automated-outreach service. Set KAREN_ENABLED=true in .env
+    // when a real implementation is ready to replace the mock stub.
+    'karen' => [
+        'enabled' => env('KAREN_ENABLED', false),
+    ],
+
 ];

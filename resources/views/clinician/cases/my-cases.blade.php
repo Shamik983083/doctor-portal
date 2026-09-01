@@ -1,272 +1,136 @@
-@extends('layouts.clinician')
+@extends('layouts.clinician-exact')
 
 @section('title', 'My Cases')
 @section('page-title', 'My Cases')
 
-@section('content')
-<div class="ma-surface">
+{{--
+    My Cases. The preview calls this "the same grid, filtered to yours" (Devin msg
+    2283), so it renders the identical _review-grid partial as the Case Queue; the
+    only difference is the data (cases assigned to me) and the status tabs above.
+--}}
 
-    {{-- Tab cards --}}
-    @php
-        $tabs = [
-            'active'    => ['label' => 'Active',    'icon' => 'bi-activity',      'color' => '#0d6efd', 'bg' => '#eff6ff'],
-            'completed' => ['label' => 'Completed', 'icon' => 'bi-check-circle',  'color' => '#198754', 'bg' => '#f0fdf4'],
-            'cancelled' => ['label' => 'Cancelled', 'icon' => 'bi-x-circle',      'color' => '#6c757d', 'bg' => '#f8f9fa'],
-            'all'       => ['label' => 'All cases', 'icon' => 'bi-grid',          'color' => '#00897b', 'bg' => '#f0fdf9'],
-        ];
-    @endphp
-    <div class="mc-tab-strip">
-        @foreach($tabs as $key => $meta)
-        @php $isActive = $tab === $key; @endphp
-        <a href="{{ route('clinician.cases.my-cases', array_merge(request()->except('tab','page'), ['tab' => $key])) }}"
-           class="mc-tab-card {{ $isActive ? 'active' : '' }}"
-           style="border-left-color:{{ $meta['color'] }};{{ $isActive ? 'background:'.$meta['bg'].';' : '' }}">
-            <div class="mc-tab-card-icon" style="color:{{ $meta['color'] }}"><i class="bi {{ $meta['icon'] }}"></i></div>
-            <div class="mc-tab-card-label">{{ $meta['label'] }}</div>
-            <div class="mc-tab-card-count" style="color:{{ $isActive ? $meta['color'] : '#343a40' }}">{{ number_format($counts[$key]) }}</div>
-        </a>
-        @endforeach
-    </div>
-
-    {{-- Main card --}}
-    <div class="card">
-        <div class="card-header">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <div>
-                    <div class="ma-eyebrow">Case history</div>
-                    <div class="ma-title">
-                        @if($tab === 'active')    Active cases
-                        @elseif($tab === 'completed') Completed cases
-                        @elseif($tab === 'cancelled') Cancelled cases
-                        @else All cases
-                        @endif
-                    </div>
-                    <div class="ma-sub">{{ number_format($counts[$tab]) }} {{ $counts[$tab] === 1 ? 'case' : 'cases' }} found.</div>
-                </div>
-            </div>
-            <form action="{{ route('clinician.cases.my-cases') }}" method="GET" class="row g-2 align-items-center">
-                <input type="hidden" name="tab" value="{{ $tab }}">
-                <div class="col">
-                    <input type="text" name="search" class="form-control form-control-sm"
-                           placeholder="Search patient name…" value="{{ request('search') }}">
-                </div>
-                <div class="col-auto">
-                    <select name="triage" class="form-select form-select-sm" onchange="this.form.submit()">
-                        <option value="">All Triage</option>
-                        @foreach(['red' => 'Red', 'yellow' => 'Yellow', 'green' => 'Green'] as $val => $lbl)
-                            <option value="{{ $val }}" {{ request('triage') == $val ? 'selected' : '' }}>{{ $lbl }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-auto d-flex gap-1">
-                    <button type="submit" class="btn btn-sm btn-primary">Search</button>
-                    @if(request()->anyFilled(['search','triage']))
-                        <a href="{{ route('clinician.cases.my-cases', ['tab' => $tab]) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
-                    @endif
-                </div>
-            </form>
-        </div>
-
-        <div class="card-body p-0" style="overflow:visible">
-            <div class="table-responsive" style="overflow-x:auto;min-height:1px">
-                <table class="table mc-case-table mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width:4px;padding:0"></th>
-                            <th>Patient</th>
-                            <th>Triage</th>
-                            <th>Offerings</th>
-                            <th>Company</th>
-                            <th>Submitted</th>
-                            <th>Status</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($cases as $case)
-                        @php
-                            $currentClinicianId = Auth::user()->clinician?->id;
-                            $isMine  = $case->clinician_id && $case->clinician_id === $currentClinicianId;
-                            $isOpen  = in_array($case->status, ['waiting','assigned','support','approved','processing']);
-
-                            // Left stripe colour
-                            $stripe = match(true) {
-                                $case->status === 'waiting'                         => '#0d6efd',
-                                in_array($case->status, ['assigned','support'])     => '#fd7e14',
-                                in_array($case->status, ['approved','processing'])  => '#0dcaf0',
-                                $case->status === 'completed'                       => '#198754',
-                                default                                             => '#adb5bd',
-                            };
-
-                            // Smart action button
-                            if ($case->status === 'waiting') {
-                                $btnLabel  = 'Claim';
-                                $btnClass  = 'btn-primary';
-                                $btnUrl    = route('clinician.cases.show', $case->uuid);
-                                $btnIcon   = 'bi-hand-index';
-                            } elseif ($case->status === 'assigned' && $isMine) {
-                                $btnLabel  = 'Review';
-                                $btnClass  = 'btn-primary';
-                                $btnUrl    = route('clinician.cases.show', $case->uuid);
-                                $btnIcon   = 'bi-arrow-right';
-                            } elseif (in_array($case->status, ['support','approved','processing']) && $isMine) {
-                                $btnLabel  = 'Review';
-                                $btnClass  = 'btn-outline-primary';
-                                $btnUrl    = route('clinician.cases.show', $case->uuid);
-                                $btnIcon   = 'bi-arrow-right';
-                            } elseif ($case->status === 'completed') {
-                                $btnLabel  = 'View';
-                                $btnClass  = 'btn-outline-success';
-                                $btnUrl    = route('clinician.cases.show', $case->uuid);
-                                $btnIcon   = 'bi-eye';
-                            } elseif ($case->status === 'cancelled') {
-                                $btnLabel  = 'View';
-                                $btnClass  = 'btn-outline-secondary';
-                                $btnUrl    = route('clinician.cases.show', $case->uuid);
-                                $btnIcon   = 'bi-eye';
-                            } else {
-                                $btnLabel  = 'View';
-                                $btnClass  = 'btn-outline-secondary';
-                                $btnUrl    = route('clinician.cases.show', $case->uuid);
-                                $btnIcon   = 'bi-eye';
-                            }
-                        @endphp
-                        <tr class="mc-row">
-                            <td class="mc-stripe p-0" style="background:{{ $stripe }};width:4px;min-width:4px"></td>
-                            <td>
-                                <div class="fw-semibold">{{ $case->patient?->full_name ?? 'N/A' }}</div>
-                                <div class="mc-meta">
-                                    {{ strtoupper(substr($case->patient?->gender ?? '', 0, 1)) ?: '—' }}
-                                    @if($case->patient?->age) · {{ $case->patient->age }} yrs @endif
-                                    @if(!is_null($case->patient?->bmi)) · BMI {{ number_format($case->patient->bmi, 1) }} @endif
-                                </div>
-                                @if($case->unread_messages_count > 0)
-                                    <span class="ma-pill accent mt-1">{{ $case->unread_messages_count }} new msg</span>
-                                @endif
-                            </td>
-                            <td>
-                                @if($isOpen)
-                                    <x-triage-pill :case="$case" />
-                                @else
-                                    <span class="mc-triage-closed">—</span>
-                                @endif
-                            </td>
-                            <td>
-                                @foreach($case->caseOfferings->take(2) as $co)
-                                    <span class="ma-pill neutral">{{ $co->offering->name ?? '?' }}</span>
-                                @endforeach
-                            </td>
-                            <td class="text-muted small">{{ $case->partner?->name ?? '—' }}</td>
-                            <td>
-                                <div class="small">{{ $case->created_at->format('M d, Y') }}</div>
-                                <div class="mc-meta">{{ $case->created_at->diffForHumans(null, true) }} ago</div>
-                            </td>
-                            <td>
-                                <span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span>
-                                @if($case->status === 'assigned' && $isMine)
-                                    <div class="mc-meta mt-1">Assigned to you</div>
-                                @elseif($case->status === 'assigned' && !$isMine)
-                                    <div class="mc-meta mt-1">Other clinician</div>
-                                @endif
-                            </td>
-                            <td class="text-end">
-                                <a href="{{ $btnUrl }}" class="btn btn-sm {{ $btnClass }}">
-                                    <i class="bi {{ $btnIcon }} me-1"></i>{{ $btnLabel }}
-                                </a>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="8" class="text-center text-muted py-5">
-                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                                No {{ $tab !== 'all' ? $tab : '' }} cases found.
-                            </td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        @if($cases->hasPages())
-        <div class="card-footer">{{ $cases->links() }}</div>
-        @endif
-    </div>
-
+@section('view')
+<div class="page-head">
+    <div class="eyebrow">Tasks</div>
+    <h1>My Cases</h1>
+    <p>Cases assigned to you. Same grid as the queue, filtered to yours.</p>
 </div>
+
+{{-- Status tabs --}}
+<div class="mc-tabs">
+    @foreach(['active' => 'Active', 'escalations' => 'My Escalations', 'support' => 'Support thread open', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'all' => 'All cases'] as $key => $label)
+        <a href="{{ route('clinician.cases.my-cases', array_merge(request()->except('tab','escalation_sub','page'), ['tab' => $key])) }}"
+           class="mc-tab {{ $tab === $key ? 'active' : '' }}">
+            {{ $label }} <span class="mc-tab-count">{{ number_format($counts[$key]) }}</span>
+        </a>
+    @endforeach
+</div>
+
+{{-- D15: sub-filter chips — only shown on the My Escalations tab --}}
+@if($tab === 'escalations')
+@php
+    $escSubDefs = [
+        \App\Models\PatientCase::ESCALATION_SUPPORT         => ['label' => 'Storefront Support', 'icon' => 'bi-headset'],
+        \App\Models\PatientCase::ESCALATION_DOCTOR_ADMIN    => ['label' => 'Doctor Admin',        'icon' => 'bi-person-badge'],
+        \App\Models\PatientCase::ESCALATION_CLIENT_RESPONSE => ['label' => 'Client Response',     'icon' => 'bi-clock'],
+    ];
+@endphp
+<div class="esc-sub-tabs">
+    <span class="esc-sub-label">Filter by type</span>
+    <a href="{{ route('clinician.cases.my-cases', array_merge(request()->except('escalation_sub','page'), ['tab' => 'escalations'])) }}"
+       class="esc-chip {{ is_null($escalationSub) ? 'active' : '' }}">
+        All <span class="esc-chip-count">{{ number_format($counts['escalations']) }}</span>
+    </a>
+    @foreach($escSubDefs as $key => $def)
+    <a href="{{ route('clinician.cases.my-cases', array_merge(request()->except('escalation_sub','page'), ['tab' => 'escalations', 'escalation_sub' => $key])) }}"
+       class="esc-chip {{ $escalationSub === $key ? 'active' : '' }}">
+        <i class="bi {{ $def['icon'] }}"></i>
+        {{ $def['label'] }}
+        <span class="esc-chip-count">{{ number_format($escalationCounts[$key]) }}</span>
+    </a>
+    @endforeach
+</div>
+@endif
+
+@php
+// D15: compute the active display count (filtered when a sub is chosen, total otherwise).
+$activeEscalationCount = ($tab === 'escalations' && $escalationSub)
+    ? ($escalationCounts[$escalationSub] ?? 0)
+    : $counts['escalations'];
+
+$escSubLabelMap = [
+    \App\Models\PatientCase::ESCALATION_SUPPORT         => 'escalated to storefront support',
+    \App\Models\PatientCase::ESCALATION_DOCTOR_ADMIN    => 'escalated to Doctor Admin',
+    \App\Models\PatientCase::ESCALATION_CLIENT_RESPONSE => 'awaiting client response',
+];
+$escSubLabel = $escalationSub ? ($escSubLabelMap[$escalationSub] ?? 'escalated to support') : 'escalated to support';
+
+$tabTitle = match($tab) {
+    'active'      => 'Active cases',
+    'escalations' => 'My Escalations',
+    'support'     => 'Support thread open',
+    'completed'   => 'Completed cases',
+    'cancelled'   => 'Cancelled cases',
+    default       => 'All cases',
+};
+
+$tabCount = (int) ($counts[(string)$tab] ?? 0);
+$tabSub = match($tab) {
+    'escalations' => number_format($activeEscalationCount) . ' ' . ($activeEscalationCount === 1 ? 'case' : 'cases') . ' ' . $escSubLabel . '.',
+    'support'     => number_format($counts['support']) . ' ' . ($counts['support'] === 1 ? 'case' : 'cases') . ' with unread messages in the support thread.',
+    default       => number_format($tabCount) . ' ' . ($tabCount === 1 ? 'case' : 'cases') . ' assigned to you.',
+};
+@endphp
+
+@include('clinician.cases._review-grid', [
+    'cases'   => $cases,
+    'eyebrow' => 'My cases',
+    'title'   => $tabTitle,
+    'sub'     => $tabSub,
+])
 @endsection
 
 @section('scripts')
 <style>
-/* ── Tab cards ────────────────────────────────────────────────── */
-.mc-tab-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: .85rem;
-    margin-bottom: 1.25rem;
-}
-.mc-tab-card {
-    display: flex;
-    flex-direction: column;
-    padding: .85rem 1rem;
-    background: var(--ma-surface, #fff);
-    border: 1px solid var(--ma-border, #e5e7eb);
-    border-left: 4px solid transparent;
-    border-radius: var(--ma-radius, .5rem);
-    box-shadow: var(--ma-shadow, 0 1px 3px rgba(0,0,0,.06));
-    text-decoration: none;
-    color: inherit;
-    transition: box-shadow .15s, transform .1s;
-}
-.mc-tab-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); transform: translateY(-1px); }
-.mc-tab-card.active { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-.mc-tab-card-icon { font-size: .95rem; margin-bottom: .35rem; opacity: .7; }
-.mc-tab-card-label {
-    font-size: .68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: #6c757d;
-    margin-bottom: .2rem;
-}
-.mc-tab-card-count { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
+    .mc-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+    .mc-tab {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line);
+        background: #fff; color: var(--muted); font-weight: 680; font-size: 13px;
+    }
+    .mc-tab:hover { color: var(--ink); background: #f4f7fc; }
+    .mc-tab.active { background: var(--blue-bg); color: var(--accent-ink); border-color: transparent; }
+    .mc-tab-count {
+        background: #eef2f7; color: var(--muted); border-radius: 999px;
+        padding: 1px 8px; font-size: 11px; font-weight: 730; font-variant-numeric: tabular-nums;
+    }
+    .mc-tab.active .mc-tab-count { background: #c7d2fe; color: var(--accent-ink); }
 
-/* ── Table ────────────────────────────────────────────────────── */
-.mc-case-table thead th {
-    font-size: .72rem;
-    font-weight: 700;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    color: #6c757d;
-    border-bottom: 1px solid #dee2e6;
-    padding: .6rem .75rem;
-    white-space: nowrap;
-}
-.mc-case-table tbody .mc-row td {
-    vertical-align: middle;
-    padding: .75rem .75rem;
-    border-bottom: 1px solid #f1f3f5;
-}
-.mc-case-table tbody .mc-row:last-child td { border-bottom: none; }
-.mc-case-table tbody .mc-row:hover td { background: #f8fafc; }
-.mc-stripe { border-radius: 3px 0 0 3px; }
-.mc-meta { font-size: .72rem; color: #9ca3af; margin-top: .1rem; }
-.mc-triage-closed { color: #ced4da; font-size: .85rem; }
-
-@media (prefers-color-scheme: dark) {
-    .mc-tab-card { background: #1f2937; border-color: #374151; }
-    .mc-tab-card-label { color: #9ca3af; }
-    .mc-tab-card-count { color: #f3f4f6; }
-    .mc-case-table thead th { color: #9ca3af; border-bottom-color: #374151; }
-    .mc-case-table tbody .mc-row td { border-bottom-color: #1f2937; }
-    .mc-case-table tbody .mc-row:hover td { background: #1f2937; }
-    .mc-meta { color: #6b7280; }
-}
-:root[data-theme="dark"] .mc-tab-card { background: #1f2937; border-color: #374151; }
-:root[data-theme="dark"] .mc-tab-card-label { color: #9ca3af; }
-:root[data-theme="dark"] .mc-case-table thead th { color: #9ca3af; border-bottom-color: #374151; }
-:root[data-theme="dark"] .mc-case-table tbody .mc-row td { border-bottom-color: #1f2937; }
-:root[data-theme="dark"] .mc-case-table tbody .mc-row:hover td { background: #1f2937; }
-:root[data-theme="light"] .mc-tab-card { background: #fff; }
+    /* D15: escalation sub-filter chips */
+    .esc-sub-tabs {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        margin: -10px 0 18px; padding: 10px 14px;
+        background: #f8f9fc; border: 1px solid var(--line);
+        border-radius: 10px;
+    }
+    .esc-sub-label {
+        font-size: 11px; font-weight: 700; letter-spacing: .04em;
+        text-transform: uppercase; color: var(--muted); margin-right: 4px;
+    }
+    .esc-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line);
+        background: #fff; color: var(--muted); font-size: 12px; font-weight: 600;
+        text-decoration: none; transition: background .12s, color .12s, border-color .12s;
+    }
+    .esc-chip:hover { color: var(--ink); background: #eef2f7; }
+    .esc-chip.active {
+        background: #fef3c7; color: #92400e; border-color: #fbbf24;
+    }
+    .esc-chip-count {
+        background: #e5e7eb; color: var(--muted); border-radius: 999px;
+        padding: 1px 7px; font-size: 11px; font-weight: 730; font-variant-numeric: tabular-nums;
+    }
+    .esc-chip.active .esc-chip-count { background: #fde68a; color: #92400e; }
 </style>
 @endsection

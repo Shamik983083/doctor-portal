@@ -104,7 +104,7 @@
                                 @endif
                             </td>
                             <td>
-                                @foreach($case->caseOfferings->take(2) as $co)
+                                @foreach($case->caseOfferings as $co)
                                     <span class="ma-pill neutral">{{ $co->offering?->name ?? '?' }}</span>
                                 @endforeach
                             </td>

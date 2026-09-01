@@ -32,19 +32,23 @@ $totalCases = array_sum($donutData);
 
     {{-- Metric row --}}
     <div class="ma-metric-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); margin-bottom:1rem;">
+        @if($stats['partners'] !== null)
         <a href="{{ route('admin.partners.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Partners</div><div class="ma-metric-value">{{ $stats['partners'] }}</div></div>
         </a>
+        @endif
+        @if($stats['patients'] !== null)
         <a href="{{ route('admin.patients.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Patients</div><div class="ma-metric-value">{{ $stats['patients'] }}</div></div>
         </a>
+        @endif
         <a href="{{ route('admin.clinicians.index') }}" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Clinicians</div><div class="ma-metric-value">{{ $stats['clinicians'] }}</div></div>
         </a>
-        <a href="{{ route('admin.cases.index') }}" class="text-decoration-none">
+        <a href="{{ route('admin.cases.index') }}?active=1" class="text-decoration-none">
             <div class="ma-metric accent"><div class="ma-metric-label">Active Cases</div><div class="ma-metric-value">{{ $stats['active_cases'] }}</div></div>
         </a>
-        <a href="{{ route('admin.cases.index') }}?status=assigned" class="text-decoration-none">
+        <a href="{{ route('admin.cases.index') }}?sla_risk=1" class="text-decoration-none">
             <div class="ma-metric {{ $stats['sla_at_risk'] > 0 ? 'warn' : '' }}">
                 <div class="ma-metric-label">At SLA Risk</div>
                 <div class="ma-metric-value">{{ $stats['sla_at_risk'] }}</div>
@@ -52,6 +56,14 @@ $totalCases = array_sum($donutData);
         </a>
         <a href="{{ route('admin.cases.index') }}?status=completed" class="text-decoration-none">
             <div class="ma-metric"><div class="ma-metric-label">Completed</div><div class="ma-metric-value">{{ $stats['completed_today'] }}</div></div>
+        </a>
+        {{-- First visits vs check-ins. These two sum to the case total, because
+             both read the is_refill column rather than the visit_type fallback. --}}
+        <a href="{{ route('admin.cases.index') }}?case_type=new" class="text-decoration-none">
+            <div class="ma-metric"><div class="ma-metric-label">First Visits</div><div class="ma-metric-value">{{ $stats['first_visits'] }}</div></div>
+        </a>
+        <a href="{{ route('admin.cases.index') }}?case_type=refill" class="text-decoration-none">
+            <div class="ma-metric"><div class="ma-metric-label">Check-ins</div><div class="ma-metric-value">{{ $stats['refills'] }}</div></div>
         </a>
     </div>
 

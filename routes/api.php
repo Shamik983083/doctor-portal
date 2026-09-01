@@ -17,11 +17,14 @@ Route::post('/partner/auth/token', [AuthController::class, 'token']);
 // Protected Partner API
 Route::prefix('partner')->middleware('partner.auth')->group(function () {
 
-    // Patients — read-only; patients are created by the external system via case submission
+    // Patients
     Route::prefix('patients')->group(function () {
         Route::get('/', [PatientController::class, 'index']);
+        Route::post('/', [PatientController::class, 'store']);
         Route::get('/by-external-id/{externalId}', [PatientController::class, 'showByExternalId']);
         Route::get('/{id}', [PatientController::class, 'show']);
+        Route::patch('/{id}', [PatientController::class, 'update']);
+        Route::delete('/{id}', [PatientController::class, 'destroy']);
     });
 
     // Questionnaires — read-only; lets partners discover question IDs before submitting cases
@@ -38,7 +41,11 @@ Route::prefix('partner')->middleware('partner.auth')->group(function () {
         Route::get('/{id}', [CaseController::class, 'show']);
         Route::post('/{id}/cancel', [CaseController::class, 'cancel']);
         Route::post('/{id}/hold', [CaseController::class, 'setHold']);
+        // Clinical intake push (Devin msg 2258): the storefront sends the
+        // medication detail that feeds the provider review queue columns.
+        Route::post('/{id}/clinical', [CaseController::class, 'updateClinical']);
         Route::post('/{id}/support', [CaseController::class, 'support']);
+        Route::post('/{id}/return-to-clinician', [CaseController::class, 'returnToClinician']);
         Route::get('/{id}/events', [CaseController::class, 'events']);
         Route::get('/{id}/messages', [MessageController::class, 'index']);
         Route::post('/{id}/messages', [MessageController::class, 'store']);

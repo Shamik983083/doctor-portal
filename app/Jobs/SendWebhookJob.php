@@ -39,7 +39,11 @@ class SendWebhookJob implements ShouldQueue
         $payload  = $delivery->payload;
         $payload['event'] = $delivery->event_type;
         $jsonBody = json_encode($payload);
-        $signature = hash_hmac('sha256', $jsonBody, $partner->webhook_secret ?? '');
+        // Sign with the per-webhook secret returned at registration time.
+        // The legacy partner-level webhook_secret is kept as a fallback so
+        // deliveries created before this change continue to verify correctly.
+        $signingKey = $webhook->secret ?? $partner->webhook_secret ?? '';
+        $signature  = hash_hmac('sha256', $jsonBody, $signingKey);
 
         $delivery->increment('attempts');
         $delivery->update(['last_attempted_at' => now(), 'status' => WebhookDelivery::STATUS_RETRYING]);
@@ -52,13 +56,17 @@ class SendWebhookJob implements ShouldQueue
         ]);
 
         try {
+            // Send the exact $jsonBody we signed — withBody() ensures the raw
+            // bytes on the wire match what hash_hmac ran over. Passing an array
+            // to ->post() would form-encode it, producing a different body and
+            // an always-failing signature on the partner side.
             $response = Http::timeout(10)
                 ->withHeaders([
-                    'Content-Type'       => 'application/json',
                     'X-Webhook-Signature' => "sha256={$signature}",
-                    'X-Event-Type'       => $delivery->event_type,
+                    'X-Event-Type'        => $delivery->event_type,
                 ])
-                ->post($webhook->url, $payload);
+                ->withBody($jsonBody, 'application/json')
+                ->post($webhook->url);
 
             $contentType = $response->header('Content-Type') ?? '';
             if (str_contains($contentType, 'text/html')) {

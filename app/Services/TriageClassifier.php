@@ -3,21 +3,18 @@
 namespace App\Services;
 
 use App\Models\PatientCase;
-use App\Models\TriageRule;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 
 /**
- * Slice B — Triage classifier.
+ * Triage classifier — questionnaire-disqualifier edition (triage-v2).
  *
- * Rules are loaded from the `triage_rules` DB table (managed via the admin
- * Triage Rule Set page). Falls back to config/triage.php static thresholds
- * when the table is empty or unavailable (graceful pre-migration degradation).
+ * Classification sources (in evaluation order):
+ *  1. Questionnaire disqualifiers — any QuestionnaireAnswer with is_disqualified=true → RED
+ *  2. Identity verification        — config/triage.php id_verification block
+ *  3. Workflow hold                — case.hold_status flag
  *
- * Identity-verification and workflow-hold rules remain config-only because
- * they involve multi-value set logic that doesn't fit a simple threshold row.
- *
- * Ordering guarantee: RED dominates YELLOW dominates GREEN.
+ * RED dominates YELLOW dominates GREEN. All matching signals are recorded as
+ * reasons regardless of the final band. The classifier never approves,
+ * prescribes, or blocks a case — it only assigns a review-priority band.
  */
 class TriageClassifier
 {
@@ -29,14 +26,13 @@ class TriageClassifier
 
     /**
      * Classify a case. Returns:
-     *   ['level' => 'green|yellow|red', 'reasons' => [...], 'ruleset' => 'triage-v1']
+     *   ['level' => 'green|yellow|red', 'reasons' => [...], 'ruleset' => 'triage-v2']
      */
     public function classify(PatientCase $case): array
     {
         $cfg     = config('triage');
         $level   = self::GREEN;
         $reasons = [];
-        $db      = $this->loadDbRules();
 
         $bump = function (string $to, string $reason) use (&$level, &$reasons) {
             if (self::RANK[$to] > self::RANK[$level]) {
@@ -47,52 +43,14 @@ class TriageClassifier
 
         $patient = $case->patient;
 
-        // ── BMI ─────────────────────────────────────────────────────────
-        $bmi = $patient?->bmi;
-        if ($bmi !== null) {
-            $bmiRules = $db->where('type', 'bmi_threshold');
-            if ($bmiRules->isNotEmpty()) {
-                foreach ($bmiRules as $rule) {
-                    if ($this->evalNumeric((float) $bmi, $rule->operator, (float) $rule->value)) {
-                        $bump($rule->triage_result, "{$rule->label}: BMI {$bmi}");
-                    }
-                }
-            } else {
-                // config fallback
-                if ($bmi >= $cfg['bmi']['red_at_or_above']) {
-                    $bump(self::RED, "BMI_CRITICAL: BMI {$bmi} at/above " . $cfg['bmi']['red_at_or_above']);
-                } elseif ($bmi >= $cfg['bmi']['yellow_at_or_above']) {
-                    $bump(self::YELLOW, "BMI_HIGH: BMI {$bmi} at/above " . $cfg['bmi']['yellow_at_or_above']);
-                } elseif ($bmi <= $cfg['bmi']['yellow_at_or_below']) {
-                    $bump(self::YELLOW, "BMI_LOW: BMI {$bmi} at/below " . $cfg['bmi']['yellow_at_or_below']);
-                }
-            }
-        }
+        // ── Questionnaire disqualifiers ──────────────────────────────────────
+        // Any answer where is_disqualified=true (set at intake by the form
+        // controller or partner API) maps to an immediate RED signal.
+        $this->evaluateQuestionnaireDisqualifiers($case, $bump);
 
-        // ── Age ─────────────────────────────────────────────────────────
-        $age = $patient?->age ?? $patient?->date_of_birth?->age;
-        if ($age !== null) {
-            $ageRules = $db->where('type', 'age_threshold');
-            if ($ageRules->isNotEmpty()) {
-                foreach ($ageRules as $rule) {
-                    if ($this->evalNumeric((float) $age, $rule->operator, (float) $rule->value)) {
-                        $bump($rule->triage_result, "{$rule->label}: age {$age}");
-                    }
-                }
-            } else {
-                // config fallback
-                if ($age < $cfg['age']['red_below']) {
-                    $bump(self::RED, "MINOR: patient age {$age} below " . $cfg['age']['red_below']);
-                } elseif ($age >= $cfg['age']['yellow_at_or_above']) {
-                    $bump(self::YELLOW, "GERIATRIC: patient age {$age} at/above " . $cfg['age']['yellow_at_or_above']);
-                }
-            }
-        }
-
-        // ── Identity verification (config only — multi-value set logic) ──
-        // null/empty = status never provided → treated as unverified (Yellow).
-        $idStatus  = strtolower((string) ($patient?->id_verified_status ?? ''));
-        $idLabel   = $idStatus === '' ? 'not provided' : $idStatus;
+        // ── Identity verification (config only — multi-value set logic) ──────
+        $idStatus = strtolower((string) ($patient?->id_verified_status ?? ''));
+        $idLabel  = $idStatus === '' ? 'not provided' : $idStatus;
         if (! in_array($idStatus, $cfg['id_verification']['cleared'], true)) {
             if (in_array($idStatus, $cfg['id_verification']['failed_values'], true)) {
                 $bump($cfg['id_verification']['failed_to'], "ID_FAILED: identity verification returned '{$idLabel}'");
@@ -101,58 +59,9 @@ class TriageClassifier
             }
         }
 
-        // ── Workflow hold (config only) ──────────────────────────────────
+        // ── Workflow hold (config only) ──────────────────────────────────────
         if ($case->hold_status) {
             $bump($cfg['hold_is_at_least'], 'ON_HOLD: case carries a workflow hold');
-        }
-
-        // ── Elevated offerings ───────────────────────────────────────────
-        $offeringNames = $case->relationLoaded('caseOfferings')
-            ? $case->caseOfferings->map(fn ($co) => strtolower((string) $co->offering?->name))->all()
-            : $case->offerings->map(fn ($o) => strtolower((string) $o->name))->all();
-
-        $offeringRules = $db->where('type', 'offering');
-        if ($offeringRules->isNotEmpty()) {
-            foreach ($offeringRules as $rule) {
-                $needle = strtolower((string) $rule->value);
-                foreach ($offeringNames as $name) {
-                    if ($name !== '' && str_contains($name, $needle)) {
-                        $bump($rule->triage_result, "{$rule->label}: offering matches '{$rule->value}'");
-                        break;
-                    }
-                }
-            }
-        } else {
-            // config fallback
-            foreach ($cfg['elevated_offerings'] as $needle) {
-                foreach ($offeringNames as $name) {
-                    if ($name !== '' && str_contains($name, $needle)) {
-                        $bump(self::YELLOW, "ELEVATED_RX: offering matches '{$needle}'");
-                        break 2;
-                    }
-                }
-            }
-        }
-
-        // ── Free-text red-flag scan ──────────────────────────────────────
-        $haystack     = strtolower($this->collectText($case));
-        $keywordRules = $db->where('type', 'keyword');
-        if ($keywordRules->isNotEmpty()) {
-            foreach ($keywordRules as $rule) {
-                $needle = strtolower((string) $rule->value);
-                if ($needle !== '' && str_contains($haystack, $needle)) {
-                    $bump($rule->triage_result, "{$rule->label}: intake mentions '{$rule->value}'");
-                }
-            }
-        } else {
-            // config fallback
-            foreach (['red' => self::RED, 'yellow' => self::YELLOW] as $band => $to) {
-                foreach ($cfg['red_flag_keywords'][$band] as $needle) {
-                    if ($needle !== '' && str_contains($haystack, $needle)) {
-                        $bump($to, strtoupper($band) . "_FLAG: intake mentions '{$needle}'");
-                    }
-                }
-            }
         }
 
         return [
@@ -180,63 +89,37 @@ class TriageClassifier
     }
 
     // ────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ────────────────────────────────────────────────────────────────────────
 
-    private function evalNumeric(float $actual, string $operator, float $threshold): bool
+    /**
+     * Scan all questionnaire responses linked to this case for disqualifying
+     * answers. Each answer record carries is_disqualified=true when the patient
+     * selected an option flagged is_disqualify in the question's options JSON.
+     *
+     * Lazy-loads the needed relationships if they were not already eager-loaded
+     * by the caller (CaseStateMachine, backfill command, IDV re-triage, etc.).
+     */
+    private function evaluateQuestionnaireDisqualifiers(PatientCase $case, callable $bump): void
     {
-        return match ($operator) {
-            'gte'  => $actual >= $threshold,
-            'lte'  => $actual <= $threshold,
-            'gt'   => $actual > $threshold,
-            'lt'   => $actual < $threshold,
-            default => false,
-        };
-    }
-
-    /** Load active DB rules, cached for 5 minutes. Falls back to empty collection on error. */
-    private function loadDbRules(): Collection
-    {
-        try {
-            return Cache::remember('triage_rules_active', 300, function () {
-                return TriageRule::where('is_active', true)
-                    ->orderBy('sort_order')
-                    ->orderBy('id')
-                    ->get();
-            });
-        } catch (\Throwable) {
-            return collect();
+        if (! $case->relationLoaded('questionnaireResponses')) {
+            $case->load([
+                'questionnaireResponses.questionnaire',
+                'questionnaireResponses.answers.question',
+            ]);
         }
-    }
 
-    private function collectText(PatientCase $case): string
-    {
-        $parts = [];
+        foreach ($case->questionnaireResponses as $response) {
+            $qName = $response->questionnaire?->name ?? 'Questionnaire';
 
-        if ($case->relationLoaded('questionnaireResponses')) {
-            foreach ($case->questionnaireResponses as $resp) {
-                foreach ($resp->answers ?? [] as $answer) {
-                    $parts[] = (string) ($answer->answer ?? $answer->value ?? '');
-                    $parts[] = (string) ($answer->question_text ?? '');
+            foreach ($response->answers as $answer) {
+                if (! $answer->is_disqualified) {
+                    continue;
                 }
+
+                $qKey = $answer->question?->key ?? ('q' . $answer->question_id);
+                $val  = (string) ($answer->answer ?? '');
+
+                $bump(self::RED, "DISQ:{$qName}:{$qKey}:{$val}");
             }
         }
-
-        if ($case->relationLoaded('caseQuestions')) {
-            foreach ($case->caseQuestions as $q) {
-                $parts[] = (string) ($q->answer ?? '');
-                $parts[] = (string) ($q->question ?? '');
-            }
-        }
-
-        if ($case->relationLoaded('clinicalNotes')) {
-            foreach ($case->clinicalNotes as $note) {
-                $parts[] = (string) ($note->note ?? '');
-            }
-        }
-
-        $parts[] = (string) $case->support_note;
-
-        return implode(' ', array_filter($parts));
     }
 }

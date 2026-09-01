@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Doctor Portal')</title>
+    <title>@yield('title', 'MEDAXIS')</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <!-- Resolve CDN DNS before the parser hits the stylesheet requests -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -17,18 +17,41 @@
             --topbar-h:  52px;
         }
 
-        /* ── Base ───────────────────────────────────────────── */
-        body { background: #f6f8fb; }
+        /* ── Base ───────────────────────────────────────────────
+           Fonts and palette matched to the design preview
+           (docs/design-preview/index.html, served at /medaxis-preview/), so the
+           whole portal reads as one system (Devin msg 2256: "I want it all to
+           look like that ... the font styling everything to match"). System
+           font stack, so nothing is fetched from a CDN. */
+        body {
+            color: #172033;
+            background: radial-gradient(circle at top left, #fff 0, #f5f7fb 42%, #f3f6fb 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, ui-sans-serif, system-ui, sans-serif;
+            font-size: 15px;
+            line-height: 1.47;
+            letter-spacing: -.006em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-variant-numeric: tabular-nums;
+        }
+        h1, h2, h3, h4, h5, h6, .sidebar-brand {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", Inter, sans-serif;
+            letter-spacing: -.01em;
+        }
 
-        /* ── Sidebar ────────────────────────────────────────── */
+        /* ── Sidebar (light, matching the preview) ──────────────
+           Was a dark rail; now light across the whole portal. Admin, clinician
+           and partner all share this shell, so lighting it here lights all
+           three, which is what Devin asked for. */
         .sidebar {
             width: var(--sidebar-w);
             position: fixed;
             top: 0; bottom: 0; left: 0;
             overflow-y: auto;
             overflow-x: hidden;
-            background: #0f172a;
-            color: #94a3b8;
+            background: #ffffff;
+            color: #475569;
+            border-right: 1px solid #e5e9f0;
             z-index: 1045;
             display: flex;
             flex-direction: column;
@@ -38,46 +61,49 @@
         }
 
         .sidebar .nav-link {
-            color: #94a3b8;
-            padding: .38rem .9rem;
-            border-radius: 5px;
+            color: #475569;
+            padding: .42rem .9rem;
+            border-radius: 8px;
             margin: 1px 8px;
-            font-size: .82rem;
+            font-size: .84rem;
             font-weight: 500;
             transition: background .15s, color .15s;
-            border-left: 2px solid transparent;
             display: flex;
             align-items: center;
         }
-        .sidebar .nav-link:hover  { background: rgba(255,255,255,.08); color: #e2e8f0; }
-        .sidebar .nav-link.active { background: rgba(59,130,246,.14); color: #60a5fa; border-left-color: #3b82f6; }
+        .sidebar .nav-link:hover  { background: #f1f5f9; color: #0f172a; }
+        .sidebar .nav-link.active { background: #e0e7ff; color: #1e293b; font-weight: 600; }
         .sidebar .nav-link i      { width: 18px; text-align: center; margin-right: .4rem; font-size: .88rem; flex-shrink: 0; }
-        .sidebar .nav-link.sub    { font-size: .78rem; padding-left: 2.2rem; color: #64748b; }
-        .sidebar .nav-link.sub:hover  { color: #cbd5e1; }
-        .sidebar .nav-link.sub.active { color: #60a5fa; }
+        .sidebar .nav-link.sub    { font-size: .8rem; padding-left: 2.2rem; color: #64748b; }
+        .sidebar .nav-link.sub:hover  { color: #0f172a; }
+        .sidebar .nav-link.sub.active { color: #1e293b; background: #eef2ff; }
 
         .sidebar-brand {
             font-size: 1rem;
             font-weight: 700;
-            color: #fff;
+            color: #0f172a;
             padding: 1rem;
             display: flex;
             align-items: center;
             text-decoration: none;
-            border-bottom: 1px solid rgba(255,255,255,.07);
+            border-bottom: 1px solid #eef1f6;
             flex-shrink: 0;
         }
 
-        .sidebar-section {
-            padding: .65rem 1.1rem .15rem;
-            font-size: .59rem;
+        .sidebar-section, .sidebar-section-toggle {
+            padding: .8rem 1.1rem .2rem;
+            font-size: .62rem;
             text-transform: uppercase;
-            letter-spacing: .1em;
-            color: rgba(255,255,255,.3);
-            font-weight: 600;
+            letter-spacing: .08em;
+            color: #94a3b8;
+            font-weight: 700;
             display: block;
+            background: none;
+            border: 0;
+            width: 100%;
+            text-align: left;
         }
-        .sidebar hr { border-color: rgba(255,255,255,.07); margin: .3rem 0; }
+        .sidebar hr { border-color: #eef1f6; margin: .3rem 0; }
 
         /* ── Overlay (mobile only) ──────────────────────────── */
         .sidebar-overlay {
@@ -164,7 +190,7 @@
             }
         }
 
-        /* ── Sidebar collapsible group toggles ──────────────── */
+        /* ── Sidebar collapsible group toggles (light) ──────── */
         .sidebar-section-toggle {
             background: none;
             border: none;
@@ -173,15 +199,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: .65rem 1.1rem .15rem;
-            font-size: .59rem;
+            padding: .8rem 1.1rem .2rem;
+            font-size: .62rem;
             text-transform: uppercase;
-            letter-spacing: .1em;
-            color: rgba(255,255,255,.3);
-            font-weight: 600;
+            letter-spacing: .08em;
+            color: #94a3b8;
+            font-weight: 700;
             transition: color .15s;
         }
-        .sidebar-section-toggle:hover { color: rgba(255,255,255,.55); }
+        .sidebar-section-toggle:hover { color: #64748b; }
         .sidebar-chevron {
             font-size: .6rem;
             opacity: .45;
@@ -200,6 +226,7 @@
 
     {{-- MA-DOCPORTAL design system promoted to global shell (O0.1) --}}
     <x-ma-styles />
+    @stack('head')
 </head>
 <body>
 
@@ -211,7 +238,8 @@
     {{-- ── Sidebar ── --}}
     <nav class="sidebar" id="adminSidebar" aria-label="Main navigation">
         <a class="sidebar-brand" href="/">
-            <i class="bi bi-heart-pulse-fill me-2 text-danger"></i> Doctor Portal
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#1e3a5f;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;margin-right:10px">M</span>
+            MEDAXIS
         </a>
         @yield('sidebar-nav')
     </nav>
@@ -298,6 +326,16 @@
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show">
                     <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
+            @if(session('warning'))
+                {{-- Controllers have flashed 'warning' since the routing screen
+                     shipped and there was no block for it here, so those messages
+                     were dropped. The pool refusal path depends on this one
+                     reaching the doctor. --}}
+                <div class="alert alert-warning alert-dismissible fade show">
+                    <i class="bi bi-exclamation-triangle me-2"></i>{{ session('warning') }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif

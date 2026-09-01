@@ -189,6 +189,14 @@ class QuestionnaireFormController extends Controller
                         ]
                     );
 
+                    // E19: copy the partner's collaborating clinician default onto the
+                    // patient if they do not already have one. One SELECT inside the
+                    // transaction is acceptable; this path runs once per form submit.
+                    $partnerRecord = Partner::find($partnerId);
+                    if ($partnerRecord?->collaborating_clinician_id && !$patient->collaborating_clinician_id) {
+                        $patient->update(['collaborating_clinician_id' => $partnerRecord->collaborating_clinician_id]);
+                    }
+
                     $caseRef = PatientCase::create([
                         'partner_id'    => $partnerId,
                         'patient_id'    => $patient->id,
@@ -220,12 +228,24 @@ class QuestionnaireFormController extends Controller
             }
         }
 
+        /*
+         * Emitted raw into a <script> block in forms/result.blade.php, on the
+         * one PUBLIC unauthenticated page in the app. Plain json_encode leaves
+         * "<" and "/" alone, so a "</script>" sequence inside any encoded value
+         * closes the block early and everything after it parses as HTML.
+         *
+         * The values here are system or admin controlled today, so this is
+         * hardening rather than a live hole, but the flags cost nothing and this
+         * is the page an anonymous visitor reaches. JSON_HEX_* escapes to
+         * \u00XX, which JavaScript parses back to exactly the same string, so
+         * the payload the receiving window sees is byte-for-byte unchanged.
+         */
         $postMessagePayload = json_encode([
             'event'           => 'questionnaire_completed',
             'response_token'  => $response->token,
             'disqualified'    => $isDisqualified,
             'disqualified_on' => $disqualifiedOn,
-        ]);
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
         return view('forms.result', [
             'status'             => $isDisqualified ? 'disqualified' : 'success',

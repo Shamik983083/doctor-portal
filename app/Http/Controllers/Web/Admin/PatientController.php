@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Clinician;
 use App\Models\Patient;
 use App\Models\Partner;
 use Illuminate\Http\Request;
@@ -11,7 +12,10 @@ class PatientController extends Controller
 {
     public function index(Request $request)
     {
-        $patients = Patient::with('partner')
+        // Patient records are PHI. A Doctor Admin sees a patient only if that
+        // patient has a case with one of their doctors (Devin msg 2117).
+        $patients = Patient::visibleTo($request->user())
+            ->with('partner')
             ->withCount('cases')
             ->when($request->input('search'), function ($q, $search) {
                 $q->where(function ($q) use ($search) {
@@ -32,18 +36,43 @@ class PatientController extends Controller
 
     public function show(int $id)
     {
-        $patient = Patient::with([
+        // Scoped on the detail page too: a scoped list with an open detail view
+        // is one guessed id away from being no protection at all.
+        $patient = Patient::visibleTo(auth()->user())->with([
             'partner',
+            'collaboratingClinician.user',
             'cases' => fn($q) => $q->with(['clinician.user', 'caseOfferings.offering'])->latest(),
             'orders.pharmacy', 'files', 'tags',
         ])->findOrFail($id);
 
-        return view('admin.patients.show', compact('patient'));
+        $clinicians = Clinician::with('user')
+            ->where('status', 'active')
+            ->get()
+            ->sortBy(fn($c) => $c->full_name)
+            ->values();
+
+        return view('admin.patients.show', compact('patient', 'clinicians'));
+    }
+
+    public function updateCollaboratingClinician(Request $request, int $id)
+    {
+        $patient = Patient::visibleTo(auth()->user())->findOrFail($id);
+
+        $request->validate([
+            'collaborating_clinician_id' => 'nullable|exists:clinicians,id',
+        ]);
+
+        $patient->update([
+            'collaborating_clinician_id' => $request->input('collaborating_clinician_id') ?: null,
+        ]);
+
+        return redirect()->route('admin.patients.show', $patient->id)
+            ->with('success', 'Collaborating clinician updated.');
     }
 
     public function destroy(int $id)
     {
-        $patient = Patient::findOrFail($id);
+        $patient = Patient::visibleTo(auth()->user())->findOrFail($id);
         $patient->delete();
 
         return redirect()->route('admin.patients.index')

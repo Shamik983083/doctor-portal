@@ -12,11 +12,6 @@
 <form method="POST" action="{{ route('partner.offerings.store') }}">
     @csrf
 
-    @if($errors->any())
-        <div class="alert alert-danger mb-4">
-            <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-        </div>
-    @endif
 
     <div class="row g-4">
         <!-- Left column -->

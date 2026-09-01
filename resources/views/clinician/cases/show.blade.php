@@ -1,885 +1,1106 @@
-@extends('layouts.clinician')
+@extends('layouts.clinician-exact')
 
 @section('title', 'Case Review')
-@section('page-title', 'Case Review — ' . substr($case->uuid, 0, 8))
+@section('page-title', 'Case Review')
 
-@section('content')
-<x-ma-styles />
-<div class="row g-4 ma-surface">
+{{--
+    Case detail, rebuilt pixel-to-the-design-system on the exact shell (Devin msgs
+    2296/2298): panels, preview tabs, pills, and the chat matching the Messages
+    screen's bubbles. Vanilla tabs and modals (no Bootstrap here). All the real
+    functionality is preserved: the 7 tabs, the real-time Echo chat with a polling
+    fallback, add-note, file upload/download/delete, escalate and decline, and the
+    Approve and review opening as a modal like the grid.
+--}}
 
-    {{-- Triage banner --}}
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body d-flex flex-wrap align-items-center gap-3">
-                <div>
-                    <div class="ma-eyebrow">Triage classification</div>
-                    <div class="d-flex align-items-center gap-2 mt-1">
-                        <x-triage-pill :case="$case" />
-                        <span class="ma-sub mb-0">{{ $case->triageMeaning() }}</span>
-                    </div>
-                </div>
-                @if(!empty($case->triage_reasons))
-                <div class="ms-auto" style="max-width:65%">
-                    <div class="ma-eyebrow mb-1">Signals ({{ $case->triage_ruleset }})</div>
-                    <div class="d-flex flex-wrap gap-1">
-                        @foreach($case->triage_reasons as $reason)
-                            <span class="ma-pill neutral" title="{{ $reason }}">{{ \Illuminate\Support\Str::before($reason, ':') }}</span>
-                        @endforeach
-                    </div>
-                </div>
-                @endif
-            </div>
-        </div>
+@php
+    $initials = fn ($name) => strtoupper(collect(explode(' ', trim($name ?: '')))->map(fn($p) => mb_substr($p, 0, 1))->take(2)->implode(''));
+    $clinicianName = $case->clinician?->user->name ?? 'You';
+    $patientName   = $case->patient?->full_name ?? 'Patient';
+@endphp
+
+@section('view')
+<div class="page-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+    <div>
+        <div class="eyebrow">Clinician</div>
+        <h1>Case Review for {{ $patientName }}</h1>
+        <p>{{ $case->partner?->name ?? '-' }} · case {{ $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, '') }}</p>
     </div>
+    @if(in_array($case->status, ['waiting', 'assigned']))
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        @if($case->status === 'waiting')
+        <form method="POST" action="{{ route('clinician.cases.assign', $case->uuid) }}">@csrf
+            <button class="button-primary">Claim case</button>
+        </form>
+        @endif
+        @if($case->status === 'assigned')
+        <a class="button-primary" href="{{ route('clinician.cases.prescribe.form', $case->uuid) }}" data-review-url="{{ route('clinician.cases.prescribe.form', $case->uuid) }}?modal=1">Approve &amp; prescribe</a>
+        <button type="button" class="button-secondary" data-open-modal="doctorAdminModal">Escalate to Doctor Admin</button>
+        <button type="button" class="button-secondary" data-open-modal="supportModal">Escalate to support</button>
+        <button type="button" class="button-danger" data-open-modal="cancelModal">Decline</button>
+        @endif
+    </div>
+    @endif
+</div>
 
-    {{-- Left: Patient + Case Info --}}
-    <div class="col-lg-4">
-        <div class="card mb-3">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-person-circle me-2"></i>Patient</h6></div>
-            <div class="card-body">
-                <h5 class="mb-1">{{ $case->patient->full_name }}</h5>
-                <p class="text-muted mb-2">{{ $case->patient->email }}</p>
-                <table class="table table-sm table-borderless small mb-0">
-                    <tr><th>DOB</th><td>{{ $case->patient->date_of_birth?->format('M d, Y') ?? '—' }}</td></tr>
-                    <tr><th>Gender</th><td>{{ ucfirst($case->patient->gender ?? '—') }}</td></tr>
-                    <tr><th>State</th><td>{{ $case->patient_state ?? $case->patient->state ?? '—' }}</td></tr>
-                    <tr><th>Phone</th><td>{{ $case->patient->phone ?? '—' }}</td></tr>
-                    <tr>
-                        <th>Height</th>
-                        <td>{{ $case->patient->height ? (int)floor($case->patient->height/12)."' ".round(fmod($case->patient->height,12)).'"' : '—' }}</td>
-                    </tr>
-                    <tr><th>Weight</th><td>{{ $case->patient->weight ? number_format($case->patient->weight,1).' lbs' : '—' }}</td></tr>
-                    <tr><th>BMI</th><td>{{ $case->patient->bmi ? number_format($case->patient->bmi,1) : '—' }}</td></tr>
-                </table>
+<section class="panel" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 20px">
+        <div>
+            <div class="eyebrow">Triage classification</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+                <span class="pill {{ $case->triage }}">{{ ucfirst($case->triage ?? 'unclassified') }}</span>
+                <span style="color:var(--muted);font-size:13px">{{ $case->triageMeaning() }}</span>
             </div>
         </div>
-
-        <div class="card mb-3">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Case Info</h6></div>
-            <div class="card-body small">
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th>Status</th><td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td></tr>
-                    @if($case->visit_type)
-                    <tr>
-                        <th>Visit Type</th>
-                        <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size:.75rem">{{ $case->visit_type }}</span></td>
-                    </tr>
-                    @endif
-                    <tr><th>Partner</th><td>{{ $case->partner->name }}</td></tr>
-                    <tr><th>Clinician</th><td>{{ $case->clinician?->full_name ?? '—' }}</td></tr>
-                    <tr><th>Chargeable</th><td>{{ $case->is_chargeable ? 'Yes' : 'No' }}</td></tr>
-                    <tr><th>Created</th><td>{{ $case->created_at->format('M d, Y H:i') }}</td></tr>
-                    @if($case->assigned_at)<tr><th>Assigned</th><td>{{ $case->assigned_at->format('M d, Y H:i') }}</td></tr>@endif
-                </table>
-            </div>
-        </div>
-
-        {{-- Case Actions --}}
-        @if(in_array($case->status, ['waiting', 'assigned']))
-        <div class="card">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Actions</h6></div>
-            <div class="card-body d-grid gap-2">
-                @if($case->status === 'waiting')
-                <form method="POST" action="{{ route('clinician.cases.assign', $case->uuid) }}">
-                    @csrf
-                    <button class="btn btn-warning w-100"><i class="bi bi-hand-index me-1"></i>Claim Case</button>
-                </form>
-                @endif
-
-                @if($case->status === 'assigned')
-                <a href="{{ route('clinician.cases.prescribe.form', $case->uuid) }}" class="btn btn-success">
-                    <i class="bi bi-clipboard2-pulse me-1"></i>Approve &amp; Prescribe
-                </a>
-                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#supportModal">
-                    <i class="bi bi-headset me-1"></i>Escalate to Support
-                </button>
-                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal">
-                    <i class="bi bi-x-lg me-1"></i>Decline Case
-                </button>
-                @endif
+        @if(!empty($case->triage_reasons))
+        <div style="margin-left:auto;max-width:60%">
+            <div class="eyebrow" style="margin-bottom:4px">Signals ({{ $case->triage_ruleset }})</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+                @foreach($case->triage_reasons as $reason)
+                    <span class="pill neutral" title="{{ $reason }}">{{ \Illuminate\Support\Str::before($reason, ':') }}</span>
+                @endforeach
             </div>
         </div>
         @endif
     </div>
+</section>
 
-    {{-- Right: Tabs --}}
-    <div class="col-lg-8">
-        <ul class="nav nav-tabs mb-3" id="caseTabs">
-            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-offerings">Offerings</a></li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#tab-prescriptions">
-                    Prescriptions
-                    @if($case->casePrescriptions->count())
-                        <span class="badge bg-success">{{ $case->casePrescriptions->count() }}</span>
-                    @endif
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#tab-questionnaires">
-                    Questionnaires
-                    @if($case->questionnaireResponses->count())
-                        <span class="badge bg-primary">{{ $case->questionnaireResponses->count() }}</span>
-                    @endif
-                </a>
-            </li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-notes">Notes <span class="badge bg-secondary">{{ $case->clinicalNotes->count() }}</span></a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-messages">Messages
-    @if($unreadMessageCount > 0)
-        <span class="badge bg-warning text-dark">{{ $unreadMessageCount }} new</span>
-    @elseif($case->messages->count() > 0)
-        <span class="badge bg-secondary">{{ $case->messages->count() }}</span>
-    @endif
-</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-files">Files <span class="badge bg-secondary">{{ $case->files->count() }}</span></a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-timeline">Timeline</a></li>
-        </ul>
+<div class="case-grid">
+    {{-- Left: patient + case info --}}
+    <div>
+        <section class="panel" style="margin-bottom:16px">
+            <div class="panel-heading"><div><h2>{{ $patientName }}</h2><p>{{ $case->patient?->email }}</p></div></div>
+            <dl class="rx-meta" style="padding:0 20px 16px">
+                <div><dt>DOB</dt><dd>{{ $case->patient?->date_of_birth?->format('M d, Y') ?? '-' }}</dd></div>
+                <div><dt>Gender</dt><dd>{{ ucfirst($case->patient?->gender ?? '-') }}</dd></div>
+                <div><dt>State</dt><dd>{{ $case->patient_state ?? $case->patient?->state ?? '-' }}</dd></div>
+                <div><dt>Phone</dt><dd>{{ $case->patient?->phone ?? '-' }}</dd></div>
+                <div><dt>Height</dt><dd>{{ $case->patient?->height ? (int)floor($case->patient->height/12)."' ".round(fmod($case->patient->height,12)).'"' : '-' }}</dd></div>
+                <div><dt>Weight</dt><dd>{{ $case->patient?->weight ? number_format($case->patient->weight,1).' lbs' : '-' }}</dd></div>
+                <div><dt>BMI</dt><dd>{{ $case->patient?->bmi ? number_format($case->patient->bmi,1) : '-' }}</dd></div>
+            </dl>
+        </section>
 
-        <div class="tab-content">
-            {{-- Offerings --}}
-            <div class="tab-pane fade show active" id="tab-offerings">
-                @forelse($case->caseOfferings as $co)
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <h6 class="mb-1">{{ $co->offering->name }}</h6>
-                                <small class="text-muted">{{ ucfirst($co->offering->type ?? '') }} &bull; Qty: {{ $co->quantity }}</small>
-                            </div>
-                            <span class="badge badge-status-{{ $co->status }}">{{ ucfirst($co->status) }}</span>
-                        </div>
-                        @if($co->dosage)<p class="small mb-0 mt-1"><strong>Dosage:</strong> {{ $co->dosage }}</p>@endif
-                        @if($co->frequency)<p class="small mb-0"><strong>Frequency:</strong> {{ $co->frequency }}</p>@endif
-                    </div>
-                </div>
-                @empty
-                <p class="text-muted">No offerings attached.</p>
-                @endforelse
-            </div>
-
-            {{-- Prescriptions --}}
-            <div class="tab-pane fade" id="tab-prescriptions">
-                @forelse($case->casePrescriptions->sortByDesc('prescribed_at') as $rx)
-                <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="fw-semibold">Prescription</span>
-                            <small class="text-muted ms-2">by {{ $rx->clinician->full_name ?? '—' }}</small>
-                        </div>
-                        <small class="text-muted">{{ $rx->prescribed_at->format('M d, Y H:i') }}</small>
-                    </div>
-                    <div class="card-body pb-2">
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <p class="text-muted small fw-semibold mb-1 text-uppercase" style="font-size:.7rem;">Diagnoses</p>
-                                <p class="small mb-0" style="white-space:pre-line;">{{ $rx->diagnoses }}</p>
-                            </div>
-                            @if($rx->directions)
-                            <div class="col-md-6">
-                                <p class="text-muted small fw-semibold mb-1 text-uppercase" style="font-size:.7rem;">Directions</p>
-                                <p class="small mb-0" style="white-space:pre-line;">{{ $rx->directions }}</p>
-                            </div>
-                            @endif
-                            @if($rx->medical_necessity)
-                            <div class="col-12">
-                                <p class="text-muted small fw-semibold mb-1 text-uppercase" style="font-size:.7rem;">Medical Necessity</p>
-                                <p class="small mb-0" style="white-space:pre-line;">{{ $rx->medical_necessity }}</p>
-                            </div>
-                            @endif
-                        </div>
-
-                        @if($rx->medications->count())
-                        <p class="text-muted small fw-semibold mb-2 text-uppercase" style="font-size:.7rem;">Medications</p>
-                        @foreach($rx->medications as $med)
-                        <div class="border rounded p-3 mb-2 bg-light">
-                            <div class="fw-semibold mb-1">{{ $med->name }}</div>
-                            @if($med->compound_formula)
-                                <div class="small text-muted mb-2">{{ $med->compound_formula }}</div>
-                            @endif
-                            <div class="d-flex flex-wrap gap-3 small">
-                                @if($med->refills !== null)
-                                    <span><span class="text-muted">Refills:</span> {{ $med->refills }}</span>
-                                @endif
-                                @if($med->quantity !== null)
-                                    <span><span class="text-muted">Qty:</span> {{ $med->quantity }}</span>
-                                @endif
-                                @if($med->days_supply !== null)
-                                    <span><span class="text-muted">Days Supply:</span> {{ $med->days_supply }}</span>
-                                @endif
-                                @if($med->dispense_unit)
-                                    <span><span class="text-muted">Unit:</span> {{ $med->dispense_unit }}</span>
-                                @endif
-                                @if($med->days_until_dispense !== null)
-                                    <span><span class="text-muted">Days Until Dispense:</span> {{ $med->days_until_dispense }}</span>
-                                @endif
-                            </div>
-                        </div>
-                        @endforeach
+        <section class="panel">
+            <div class="panel-heading"><div><h2>Case info</h2></div></div>
+            <dl class="rx-meta" style="padding:0 20px 16px">
+                <div><dt>Status</dt><dd><span class="pill {{ in_array($case->status, ['completed','approved','processing']) ? 'green' : (in_array($case->status, ['cancelled']) ? 'red' : ($case->status === 'support' ? 'yellow' : 'neutral')) }}">{{ ucfirst($case->status) }}</span></dd></div>
+                @if($case->escalation_target)
+                <div>
+                    <dt>Escalation</dt>
+                    <dd>
+                        <span class="pill yellow">{{ $case->escalationLabel() }}</span>
+                        @if($case->support_note)
+                        <span style="display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4">{{ \Illuminate\Support\Str::limit($case->support_note, 120) }}</span>
                         @endif
-                    </div>
+                    </dd>
                 </div>
-                @empty
-                <div class="text-center text-muted py-5">
-                    <i class="bi bi-clipboard2-pulse fs-2 d-block mb-2 opacity-25"></i>
-                    No prescription submitted yet.
+                @endif
+                @if($case->visit_type)<div><dt>Visit type</dt><dd>{{ $case->visit_type }}</dd></div>@endif
+                <div><dt>Partner</dt><dd>{{ $case->partner?->name }}</dd></div>
+                <div><dt>Clinician</dt><dd>{{ $case->clinician?->full_name ?? '-' }}</dd></div>
+                <div><dt>Chargeable</dt><dd>{{ $case->is_chargeable ? 'Yes' : 'No' }}</dd></div>
+                <div><dt>Created</dt><dd>{{ $case->created_at->format('M d, Y H:i') }}</dd></div>
+                @if($case->assigned_at)<div><dt>Assigned</dt><dd>{{ $case->assigned_at->format('M d, Y H:i') }}</dd></div>@endif
+            </dl>
+        </section>
+    </div>
+
+    {{-- Right: tabs --}}
+    <div>
+        <div class="case-tabs" role="tablist">
+            <button class="case-tab active" data-tab="offerings">Offerings</button>
+            <button class="case-tab" data-tab="prescriptions">Prescriptions @if($case->casePrescriptions->count())<span class="pill green">{{ $case->casePrescriptions->count() }}</span>@endif</button>
+            <button class="case-tab" data-tab="questionnaires">Questionnaires @if($case->questionnaireResponses->count())<span class="pill neutral">{{ $case->questionnaireResponses->count() }}</span>@endif</button>
+            <button class="case-tab" data-tab="notes">Notes <span class="pill neutral">{{ $case->clinicalNotes->count() }}</span></button>
+            <button class="case-tab" data-tab="messages">Messages @if($unreadMessageCount > 0)<span class="pill yellow">{{ $unreadMessageCount }}</span>@elseif($case->messages->count())<span class="pill neutral">{{ $case->messages->count() }}</span>@endif</button>
+            @if($case->support_at && $case->escalation_target === 'support')
+            @php $unreadEscalation = $case->messages->where('channel','escalation')->where('direction','inbound')->where('is_read',false)->count(); @endphp
+            <button class="case-tab" data-tab="escalation" id="escalationTab">
+                <i class="bi bi-headset" style="font-size:.8rem;"></i> Support Thread
+                @if($unreadEscalation > 0)<span class="pill yellow">{{ $unreadEscalation }}</span>@endif
+            </button>
+            @endif
+            <button class="case-tab" data-tab="files">Files <span class="pill neutral">{{ $case->files->count() }}</span></button>
+            <button class="case-tab" data-tab="timeline">Timeline</button>
+        </div>
+
+        {{-- Offerings --}}
+        <div class="case-pane" data-pane="offerings">
+            @forelse($case->caseOfferings as $co)
+            <section class="panel" style="margin-bottom:10px"><div style="padding:14px 18px">
+                <div style="display:flex;justify-content:space-between;gap:12px">
+                    <div><strong>{{ $co->offering->name }}</strong><div style="color:var(--muted);font-size:12px">{{ ucfirst($co->offering->type ?? '') }} · Qty: {{ $co->quantity }}</div></div>
+                    <span class="pill neutral">{{ ucfirst($co->status) }}</span>
                 </div>
-                @endforelse
-            </div>
+                @if($co->dosage)<div style="font-size:13px;margin-top:6px"><strong>Dosage:</strong> {{ $co->dosage }}</div>@endif
+                @if($co->frequency)<div style="font-size:13px"><strong>Frequency:</strong> {{ $co->frequency }}</div>@endif
+            </div></section>
+            @empty
+            <p class="ai-honesty">No offerings attached.</p>
+            @endforelse
+        </div>
 
-
-            {{-- Questionnaires --}}
-            <div class="tab-pane fade" id="tab-questionnaires">
-                @forelse($case->questionnaireResponses as $response)
-                <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="fw-semibold">{{ $response->questionnaire->name ?? 'Questionnaire' }}</span>
-                            <small class="text-muted ms-2">
-                                {{ ($response->completed_at ?? $response->created_at)->format('M d, Y H:i') }}
-                            </small>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            @if($response->is_disqualified)
-                                <span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Disqualified</span>
-                                @if($response->disqualified_on)
-                                    <small class="text-danger">trigger: {{ $response->disqualified_on }}</small>
-                                @endif
-                            @else
-                                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Qualified</span>
-                            @endif
-                        </div>
-                    </div>
-                    @forelse($response->answers as $answer)
-                    @php
-                        $qText   = $answer->question_text;
-                        $isLong  = mb_strlen($qText) > 200;
-                        $preview = $isLong ? mb_substr($qText, 0, 200) : $qText;
-                        $decoded = json_decode($answer->answer, true);
-                    @endphp
-                    <div class="d-flex px-3 py-2 {{ !$loop->last ? 'border-bottom' : '' }}
-                                {{ $answer->is_disqualified ? 'bg-danger bg-opacity-5' : '' }}">
-                        <div class="text-muted small" style="min-width:45%; max-width:45%; padding-right:1rem; line-height:1.4;">
-                            @if($isLong)
-                                <span class="q-preview">{{ $preview }}<span class="text-muted">…</span></span>
-                                <span class="q-full d-none">{{ $qText }}</span>
-                                <br>
-                                <button type="button"
-                                        class="btn btn-link btn-sm p-0 mt-1 q-toggle"
-                                        style="font-size:.72rem;">
-                                    Show more
-                                </button>
-                            @else
-                                {{ $qText }}
-                            @endif
-                            @if($answer->is_disqualified)
-                                <span class="badge bg-danger ms-1" style="font-size:.6rem">
-                                    <i class="bi bi-slash-circle"></i> Disqualifying
+        {{-- Prescriptions — only confirmed ones; drafts are in-progress --}}
+        <div class="case-pane" data-pane="prescriptions" hidden>
+            @php $confirmedRx = $case->casePrescriptions->where('review_status', '!=', 'draft')->sortByDesc('prescribed_at'); @endphp
+            @forelse($confirmedRx as $rx)
+            <section class="panel" style="margin-bottom:12px">
+                <div class="panel-heading">
+                    <div><h2>Prescription</h2><p>by {{ $rx->clinician->full_name ?? '-' }} · {{ $rx->prescribed_at->format('M d, Y H:i') }}</p></div>
+                    <span class="pill green">Confirmed</span>
+                </div>
+                <div style="padding:0 20px 16px">
+                    <div class="subheading" style="margin:12px 0 6px">Diagnoses</div>
+                    @if($rx->diagnosesCodes->isNotEmpty())
+                        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
+                            @foreach($rx->diagnosesCodes->sortBy('sort_order') as $d)
+                                <span style="display:inline-flex;align-items:center;gap:4px;background:var(--blue-soft,#e8f0fe);color:var(--blue,#1a56db);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:500">
+                                    {{ $d->icd_code }} <span style="font-weight:400;color:var(--muted)">{{ $d->description }}</span>
                                 </span>
-                            @endif
+                            @endforeach
                         </div>
-                        <div class="small fw-semibold">
-                            @if(is_array($decoded))
-                                {{ implode(', ', $decoded) }}
-                            @elseif($answer->answer !== '' && $answer->answer !== null)
-                                {{ $answer->answer }}
-                            @else
-                                <span class="text-muted fst-italic">—</span>
-                            @endif
-                        </div>
-                    </div>
-                    @empty
-                    <p class="text-muted small px-3 py-2 mb-0">No answers recorded.</p>
-                    @endforelse
-                </div>
-                @empty
-                <div class="text-center text-muted py-5">
-                    <i class="bi bi-ui-checks fs-2 d-block mb-2 opacity-25"></i>
-                    No questionnaire responses linked to this case.
-                </div>
-                @endforelse
-            </div>
-
-            {{-- Clinical Notes --}}
-            <div class="tab-pane fade" id="tab-notes">
-                <form method="POST" action="{{ route('clinician.cases.notes.store', $case->uuid) }}" class="mb-4">
-                    @csrf
-                    <div class="mb-2">
-                        <select name="type" class="form-select form-select-sm w-auto d-inline-block">
-                            <option value="general">General</option>
-                            <option value="soap">SOAP</option>
-                            <option value="progress">Progress</option>
-                        </select>
-                    </div>
-                    <textarea name="note" class="form-control mb-2" rows="3" placeholder="Add clinical note..." required></textarea>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-primary btn-sm">Add Note</button>
-                        <div class="form-check align-self-center">
-                            <input type="checkbox" name="is_private" class="form-check-input" id="private">
-                            <label class="form-check-label small" for="private">Private</label>
-                        </div>
-                    </div>
-                </form>
-                @forelse($case->clinicalNotes->sortByDesc('created_at') as $note)
-                <div class="card mb-2 {{ $note->is_private ? 'border-warning' : '' }}">
-                    <div class="card-body py-2 px-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small class="fw-semibold">{{ $note->clinician->full_name ?? 'Unknown' }} &bull; <span class="text-muted">{{ ucfirst($note->type) }}</span></small>
-                            <small class="text-muted">{{ $note->created_at->diffForHumans() }} {{ $note->is_private ? '🔒' : '' }}</small>
-                        </div>
-                        <p class="mb-0 small">{{ $note->note }}</p>
-                    </div>
-                </div>
-                @empty
-                <p class="text-muted">No notes yet.</p>
-                @endforelse
-            </div>
-
-            {{-- Messages --}}
-            <div class="tab-pane fade" id="tab-messages">
-                @php
-                    $msgs          = $case->messages->sortBy('created_at');
-                    $clinicianName = $case->clinician?->user->name ?? 'You';
-                    $patientName   = $case->patient->full_name ?? 'Patient';
-                    $lastMsgId     = $msgs->last()?->id ?? 0;
-
-                    $initials = function(string $name): string {
-                        $parts = explode(' ', trim($name));
-                        return strtoupper(substr($parts[0],0,1) . (isset($parts[1]) ? substr($parts[1],0,1) : ''));
-                    };
-                @endphp
-
-                {{-- Thread --}}
-                <div id="clinThread"
-                     data-last-id="{{ $lastMsgId }}"
-                     data-poll-url="{{ route('clinician.cases.messages.poll', $case->uuid) }}"
-                     data-patient-name="{{ $patientName }}"
-                     data-patient-initials="{{ $initials($patientName) }}"
-                     data-clinician-initials="{{ $initials($clinicianName) }}"
-                     style="max-height:420px; overflow-y:auto; background:#f8f9fc;
-                            border-radius:12px; padding:16px 12px; scroll-behavior:smooth; margin-bottom:16px;">
-
-                    @if($msgs->isEmpty())
-                    <div id="clinThreadEmpty" class="text-center text-muted py-5">
-                        <i class="bi bi-chat-dots" style="font-size:2.5rem;opacity:.2"></i>
-                        <p class="mt-3 mb-0 small">No messages on this case yet.</p>
-                    </div>
+                    @elseif($rx->diagnoses)
+                        <p style="font-size:13px;margin-bottom:12px;color:var(--ink)">{{ $rx->diagnoses }}</p>
                     @else
-                    @php $prevDate = null; @endphp
-                    @foreach($msgs as $msg)
-                    @php
-                        $msgDate   = $msg->created_at->format('Y-m-d');
-                        $isClinic  = $msg->sender_type === 'clinician';
-                        $isPatient = $msg->sender_type === 'patient';
-
-                        if ($isClinic) {
-                            $avatarBg  = '#4361ee';
-                            $avatarStr = $initials($clinicianName);
-                            $name      = 'You';
-                        } elseif ($isPatient) {
-                            $avatarBg  = '#2dc653';
-                            $avatarStr = $initials($patientName);
-                            $name      = $patientName;
-                        } else {
-                            $avatarBg  = '#6c757d';
-                            $avatarStr = 'SY';
-                            $name      = 'System';
-                        }
-                    @endphp
-
-                    {{-- Date separator --}}
-                    @if($msgDate !== $prevDate)
-                    @php $prevDate = $msgDate; @endphp
-                    <div class="d-flex align-items-center gap-2 my-3" data-date="{{ $msgDate }}">
-                        <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
-                        <span style="font-size:.7rem;color:#adb5bd;white-space:nowrap;font-weight:500;letter-spacing:.04em;text-transform:uppercase;">
-                            {{ $msg->created_at->isToday() ? 'Today' : ($msg->created_at->isYesterday() ? 'Yesterday' : $msg->created_at->format('M j, Y')) }}
-                        </span>
-                        <hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">
-                    </div>
+                        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">No diagnoses recorded.</p>
                     @endif
 
-                    {{-- Message row --}}
-                    <div class="d-flex align-items-end gap-2 mb-3 {{ $isClinic ? 'flex-row-reverse' : '' }}">
-                        <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold"
-                             style="width:34px;height:34px;background:{{ $avatarBg }};color:#fff;font-size:.68rem;letter-spacing:.02em;">
-                            {{ $avatarStr }}
-                        </div>
-                        <div style="max-width:68%;">
-                            <div class="d-flex align-items-baseline gap-1 mb-1 {{ $isClinic ? 'justify-content-end' : '' }}">
-                                <span style="font-size:.72rem;font-weight:600;color:#495057;">{{ $name }}</span>
-                                <span style="font-size:.67rem;color:#adb5bd;">{{ $msg->created_at->format('H:i') }}</span>
+                    @if($rx->medical_necessity)
+                        <div class="subheading" style="margin-bottom:4px">Medical necessity</div>
+                        <p style="font-size:13px;margin-bottom:12px">{{ $rx->medical_necessity }}</p>
+                    @endif
+
+                    @if($rx->medications->count())
+                    <div class="subheading" style="margin:0 0 8px">Medications</div>
+                    @foreach($rx->medications as $med)
+                    <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px">
+                        <strong style="font-size:14px">{{ $med->name }}</strong>
+                        @if($med->compound_formula)<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">{{ $med->compound_formula }}</div>@endif
+                        @if($med->sig)<div style="font-size:13px;margin:4px 0"><strong style="color:var(--muted)">SIG:</strong> {{ $med->sig }}</div>@endif
+                        <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-top:4px">
+                            @if($med->refills !== null)<span>Refills: {{ $med->refills }}</span>@endif
+                            @if($med->quantity !== null)<span>Qty: {{ $med->quantity }}</span>@endif
+                            @if($med->days_supply !== null)<span>Days supply: {{ $med->days_supply }}</span>@endif
+                            @if($med->dispense_unit)<span>Unit: {{ $med->dispense_unit }}</span>@endif
+                            @if(!empty($med->dosing['months']))
+                            <div style="flex-basis:100%;margin-top:4px;display:flex;flex-direction:column;gap:2px">
+                                @foreach($med->dosing['months'] as $mi => $dose)
+                                    <div style="display:flex;align-items:baseline;gap:6px;font-size:12px">
+                                        <span style="font-weight:700;color:var(--accent-ink);min-width:24px;font-size:11px">M{{ $mi + 1 }}</span>
+                                        <span>{{ $dose }}</span>
+                                        @if(!empty($med->dosing['sigs'][$mi]))
+                                            <span style="color:var(--muted)">— {{ $med->dosing['sigs'][$mi] }}</span>
+                                        @endif
+                                    </div>
+                                @endforeach
                             </div>
-                            @if($isClinic)
-                            <div style="background:#4361ee;color:#fff;padding:10px 14px;border-radius:16px 4px 16px 16px;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 2px 8px rgba(67,97,238,.2);">{{ $msg->body }}</div>
-                            @elseif($isPatient)
-                            <div style="background:#fff;color:#212529;padding:10px 14px;border-radius:4px 16px 16px 16px;border:1px solid #e9ecef;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 1px 4px rgba(0,0,0,.06);">{{ $msg->body }}</div>
-                            @else
-                            <div style="background:#f1f3f5;color:#495057;padding:8px 12px;border-radius:8px;border:1px dashed #dee2e6;font-size:.8rem;line-height:1.5;word-break:break-word;">{{ $msg->body }}</div>
-                            @endif
+                        @endif
                         </div>
                     </div>
                     @endforeach
                     @endif
                 </div>
+            </section>
+            @empty
+            <div class="stub"><strong>No prescription yet</strong>No prescription has been confirmed for this case.</div>
+            @endforelse
 
-                <div class="input-group" id="clinMsgForm">
-                    <input type="text" id="clinMsgInput" class="form-control" placeholder="Type a message..." required
-                           onkeydown="if(event.key==='Enter'){event.preventDefault();clinSendMessage();}">
-                    <button class="btn btn-primary" onclick="clinSendMessage()"><i class="bi bi-send"></i></button>
-                </div>
+            @php $draftRx = $case->casePrescriptions->where('review_status', 'draft'); @endphp
+            @if($draftRx->isNotEmpty() && $case->status === 'assigned')
+            <div style="margin-top:8px;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;display:flex;align-items:center;gap:10px">
+                <i class="bi bi-clock-history" style="color:#c2410c"></i>
+                <div style="flex:1;font-size:13px;color:#7c2d12">Draft prescription pending review.</div>
+                <a class="button-primary" style="padding:5px 12px;font-size:12px" href="{{ route('clinician.cases.prescribe.review', $case->uuid) }}">Review draft</a>
             </div>
+            @endif
+        </div>
 
-            {{-- Files --}}
-            <div class="tab-pane fade" id="tab-files">
+        {{-- Questionnaires --}}
+        <div class="case-pane" data-pane="questionnaires" hidden>
+            @forelse($case->questionnaireResponses as $response)
+            <section class="panel" style="margin-bottom:12px">
+                <div class="panel-heading">
+                    <div><h2>{{ $response->questionnaire->name ?? 'Questionnaire' }}</h2><p>{{ ($response->completed_at ?? $response->created_at)->format('M d, Y H:i') }}</p></div>
+                    <div class="quick-pills">
+                        @if($response->is_disqualified)<span class="pill red">Disqualified</span>@else<span class="pill green">Qualified</span>@endif
+                    </div>
+                </div>
+                <div class="qa-sheet" style="padding:0 8px 12px;margin:0">
+                    @forelse($response->answers as $answer)
+                        @php $decoded = json_decode($answer->answer, true); @endphp
+                        <div class="qa {{ $answer->is_disqualified ? 'consent' : '' }}">
+                            <dt>{{ $answer->question_text }}</dt>
+                            <dd>@if(is_array($decoded)){{ implode(', ', $decoded) }}@elseif(filled($answer->answer)){{ $answer->answer }}@else <span style="color:var(--muted)">-</span>@endif</dd>
+                        </div>
+                    @empty
+                        <p class="ai-honesty" style="padding:8px 12px">No answers recorded.</p>
+                    @endforelse
+                </div>
+            </section>
+            @empty
+            <div class="stub"><strong>No questionnaires</strong>No questionnaire responses are linked to this case.</div>
+            @endforelse
+        </div>
 
-                {{-- Upload form --}}
-                <div class="card mb-3">
-                    <div class="card-header py-2"><h6 class="mb-0"><i class="bi bi-upload me-2"></i>Upload File</h6></div>
-                    <div class="card-body">
-                        <form method="POST"
-                              action="{{ route('clinician.cases.files.store', $case->uuid) }}"
-                              enctype="multipart/form-data"
-                              class="row g-2 align-items-end">
+        {{-- Notes --}}
+        <div class="case-pane" data-pane="notes" hidden>
+            <section class="panel" style="margin-bottom:12px"><div style="padding:16px 18px">
+                <form method="POST" action="{{ route('clinician.cases.notes.store', $case->uuid) }}">@csrf
+                    {{-- Controls bar: type selector + private toggle --}}
+                    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+                        <div class="field" style="min-width:160px;flex:0 0 auto">
+                            <label>Type</label>
+                            <select name="type" id="noteType">
+                                <option value="general">General</option>
+                                <option value="soap">SOAP</option>
+                                <option value="progress">Progress</option>
+                            </select>
+                        </div>
+                        <label class="check-line" style="padding-bottom:2px">
+                            <input type="checkbox" name="is_private" value="1"> Private note
+                        </label>
+                    </div>
+
+                    {{-- General (free-form) --}}
+                    <div id="note-fields-general">
+                        <textarea name="note" class="note-area" rows="4" placeholder="Add a clinical note." required></textarea>
+                    </div>
+
+                    {{-- SOAP --}}
+                    <div id="note-fields-soap" hidden>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                            <div class="field">
+                                <label>Subjective <span class="note-hint">patient-reported</span></label>
+                                <textarea name="soap_s" class="note-area" rows="3" placeholder="Pain, complaints, history…"></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Objective <span class="note-hint">measurable findings</span></label>
+                                <textarea name="soap_o" class="note-area" rows="3" placeholder="Vitals, exam, lab results…"></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Assessment <span class="note-hint">diagnosis</span></label>
+                                <textarea name="soap_a" class="note-area" rows="3" placeholder="Diagnosis or differential…"></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Plan <span class="note-hint">treatment</span></label>
+                                <textarea name="soap_p" class="note-area" rows="3" placeholder="Medications, referrals, follow-up…"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Progress --}}
+                    <div id="note-fields-progress" hidden>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                            <div class="field">
+                                <label>Current Status</label>
+                                <textarea name="prog_status" class="note-area" rows="3" placeholder="Patient's current clinical status…"></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Changes Since Last Visit</label>
+                                <textarea name="prog_changes" class="note-area" rows="3" placeholder="Improvements, regressions…"></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Treatment Response</label>
+                                <textarea name="prog_response" class="note-area" rows="3" placeholder="Response to current treatment…"></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Next Steps</label>
+                                <textarea name="prog_next" class="note-area" rows="3" placeholder="Interventions, referrals, goals…"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+                        <button class="button-primary">Add note</button>
+                    </div>
+                </form>
+            </div></section>
+            @php
+                $myClinicianId = Auth::user()->clinician?->id;
+            @endphp
+            @forelse($case->clinicalNotes->filter(fn($n) => !$n->is_private || $n->clinician_id === $myClinicianId)->sortByDesc('created_at') as $note)
+            <section class="panel" style="margin-bottom:8px;{{ $note->is_private ? 'border-color:#e5c07a' : '' }}"><div style="padding:12px 16px">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                    <strong>{{ $note->clinician->full_name ?? 'Unknown' }} <span style="color:var(--muted)">· {{ ucfirst($note->type) }}</span></strong>
+                    <span style="color:var(--muted)">{{ $note->created_at->diffForHumans() }} {{ $note->is_private ? '· private' : '' }}</span>
+                </div>
+                @php
+                    $nd = null;
+                    if (in_array($note->type, ['soap','progress'])) {
+                        $dec = json_decode($note->note, true);
+                        if (is_array($dec)) $nd = $dec;
+                    }
+                @endphp
+                @if($nd && $note->type === 'soap')
+                <div style="font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px">
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Subjective</span><p style="margin:2px 0 0">{{ $nd['s'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Objective</span><p style="margin:2px 0 0">{{ $nd['o'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Assessment</span><p style="margin:2px 0 0">{{ $nd['a'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Plan</span><p style="margin:2px 0 0">{{ $nd['p'] ?? '' }}</p></div>
+                </div>
+                @elseif($nd && $note->type === 'progress')
+                <div style="font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px">
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Current Status</span><p style="margin:2px 0 0">{{ $nd['status'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Changes Since Last Visit</span><p style="margin:2px 0 0">{{ $nd['changes'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Treatment Response</span><p style="margin:2px 0 0">{{ $nd['response'] ?? '' }}</p></div>
+                    <div><span style="font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Next Steps</span><p style="margin:2px 0 0">{{ $nd['next'] ?? '' }}</p></div>
+                </div>
+                @else
+                <div style="font-size:13px">{{ $note->note }}</div>
+                @endif
+            </div></section>
+            @empty
+            <p class="ai-honesty">No notes yet.</p>
+            @endforelse
+        </div>
+
+        {{-- Messages: same chat style as the Messages screen --}}
+        <div class="case-pane" data-pane="messages" hidden>
+            <section class="panel chat" style="min-height:auto">
+                <div class="chat-head">
+                    <span class="msg-avatar big">{{ $initials($patientName) }}</span>
+                    <div><strong>{{ $patientName }}</strong><span>{{ $case->partner?->name ?? '' }}</span></div>
+                    <div style="margin-left:auto;">
+                        @if($case->escalation_target === 'support' && $case->support_at)
+                        <span style="font-size:.75rem;background:#fef3c7;color:#92400e;border-radius:6px;padding:4px 10px;font-weight:600;cursor:pointer;"
+                              onclick="document.querySelector('[data-tab=\'escalation\']')?.click()" title="Go to support thread">
+                            <i class="bi bi-headset"></i> Support thread open
+                        </span>
+                        @else
+                        <button type="button" class="button-secondary" id="caseFwdBtn"
+                                onclick="openCaseFwdModal()"
+                                style="font-size:.8rem;padding:5px 12px;">
+                            <i class="bi bi-send"></i> Forward to Support
+                        </button>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Forward-to-support modal --}}
+                @php
+                    $fwdMsgs = $case->messages->where('direction','inbound')->where('channel','portal')->sortBy('created_at')->values();
+                @endphp
+                <div id="caseFwdModal" class="fwd-modal-overlay" style="display:none;">
+                    <div class="fwd-modal-box">
+                        <div class="fwd-modal-head">
+                            <h3>Forward to Support</h3>
+                            <p>Select one or more patient messages to share with the support team, then add an optional note.</p>
+                            <button type="button" class="fwd-close-btn" onclick="closeCaseFwdModal()" aria-label="Close">&times;</button>
+                        </div>
+                        <form method="POST" action="{{ route('clinician.cases.forward-to-support', $case->uuid) }}"
+                              onsubmit="return compileCaseFwdMsg(this)"
+                              style="display:flex;flex-direction:column;overflow:hidden;flex:1;min-height:0;">
                             @csrf
-                            <div class="col-md-5">
-                                <label class="form-label small fw-semibold mb-1">File <span class="text-danger">*</span></label>
-                                <input type="file" name="file" class="form-control form-control-sm"
-                                       accept=".pdf,.jpg,.jpeg,.png" required>
-                                <div class="form-text">PDF, JPG or PNG — max 10 MB</div>
+                            <input type="hidden" name="quoted_message" id="caseFwdQuotedInput">
+                            <div class="fwd-msg-section">
+                                <div class="fwd-msg-section-head">
+                                    <span class="fwd-msg-section-label">
+                                        Patient Messages
+                                        <span class="fwd-count-badge" id="caseFwdCount" style="display:none;"></span>
+                                    </span>
+                                    @if($fwdMsgs->count() > 1)
+                                    <button type="button" class="fwd-select-all-btn" id="caseFwdSelectAll"
+                                            onclick="fwdToggleAll('caseFwdMsgList','caseFwdSelectAll','caseFwdCount')">Select all</button>
+                                    @endif
+                                </div>
+                                <div class="fwd-msg-list" id="caseFwdMsgList">
+                                    @forelse($fwdMsgs as $msg)
+                                    <label class="fwd-msg-item"
+                                           data-body="{{ e($msg->body) }}"
+                                           data-time="{{ $msg->created_at->format('M j, g:i A') }}">
+                                        <input type="checkbox" class="fwd-check"
+                                               onchange="fwdCheckChange('caseFwdMsgList','caseFwdCount','caseFwdSelectAll')">
+                                        <div class="fwd-msg-content">
+                                            <span class="fwd-msg-time">{{ $msg->created_at->format('M j, g:i A') }}</span>
+                                            <span class="fwd-msg-body">{{ $msg->body }}</span>
+                                        </div>
+                                    </label>
+                                    @empty
+                                    <div class="fwd-empty-state">
+                                        <i class="bi bi-chat-text" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:.35;"></i>
+                                        No patient messages yet. Add a note below to open the support thread.
+                                    </div>
+                                    @endforelse
+                                </div>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-semibold mb-1">Type</label>
-                                <select name="type" class="form-select form-select-sm">
-                                    <option value="other">Other</option>
-                                    <option value="lab_result">Lab Result</option>
-                                    <option value="id_doc">ID Document</option>
-                                    <option value="consent">Consent</option>
-                                    <option value="medical_necessity">Medical Necessity</option>
-                                    <option value="intake">Intake</option>
-                                </select>
+                            <div class="fwd-note-section">
+                                <label>Your note to support <span style="color:var(--muted,#64748b);font-weight:400;">(optional)</span></label>
+                                <textarea name="note" class="fwd-note-textarea" rows="2"
+                                          placeholder="Add context or a specific question for the support team…"></textarea>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-semibold mb-1">Notes</label>
-                                <input type="text" name="notes" class="form-control form-control-sm" placeholder="Optional note">
-                            </div>
-                            <div class="col-md-1">
-                                <button type="submit" class="btn btn-primary btn-sm w-100">
-                                    <i class="bi bi-upload"></i>
+                            <div class="fwd-error-msg" id="caseFwdError">Please select at least one message, or add a note.</div>
+                            <div class="fwd-footer">
+                                <button type="button" class="fwd-cancel-btn" onclick="closeCaseFwdModal()">Cancel</button>
+                                <button type="submit" class="fwd-submit-btn">
+                                    <i class="bi bi-send-fill"></i> Open Support Thread
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
+                <div class="chat-scroll" id="clinThread" style="max-height:440px"
+                     data-last-id="{{ $case->messages->sortBy('created_at')->last()?->id ?? 0 }}"
+                     data-poll-url="{{ route('clinician.cases.messages.poll', $case->uuid) }}">
+                    @php $lastSide = null; @endphp
+                    @forelse($case->messages->sortBy('created_at') as $msg)
+                        @php
+                            $side      = ($msg->direction === 'outbound') ? 'me' : 'them';
+                            $isSystem  = in_array($msg->sender_type, ['system', 'admin']);
+                        @endphp
+                        @if($side !== $lastSide)
+                            <div class="chat-time" data-date="{{ $msg->created_at->format('Y-m-d') }}">
+                                {{ $msg->created_at->format('M j, g:i A') }}
+                            </div>
+                            @php $lastSide = $side; @endphp
+                        @endif
+                        <div class="bubble-row {{ $side }}">
+                            <div class="bubble {{ $side }}"
+                                 @if($isSystem) style="background:#6f42c1;" @endif>
+                                @if($isSystem)
+                                    <span style="display:block;font-size:.65em;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:3px;letter-spacing:.02em;">SYSTEM</span>
+                                @endif
+                                {{ $msg->body }}
+                            </div>
+                        </div>
+                    @empty
+                        <div class="chat-time" id="clinThreadEmpty">No messages on this case yet. Send the first one below.</div>
+                    @endforelse
+                </div>
+                <div class="chat-compose">
+                    <input type="text" id="clinMsgInput" placeholder="Message" aria-label="Message" autocomplete="off"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();clinSendMessage();}">
+                    <button type="button" class="chat-send" aria-label="Send" onclick="clinSendMessage()">&uarr;</button>
+                </div>
+            </section>
+        </div>
 
-                {{-- File list --}}
-                @forelse($case->files->sortByDesc('created_at') as $file)
-                <div class="d-flex align-items-center gap-3 border rounded px-3 py-2 mb-2 bg-white">
-                    <i class="bi bi-{{ str_ends_with($file->original_name, '.pdf') ? 'file-earmark-pdf text-danger' : 'file-earmark-image text-primary' }} fs-5 flex-shrink-0"></i>
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="fw-semibold small text-truncate">{{ $file->original_name }}</div>
-                        <div class="text-muted" style="font-size:.72rem;">
-                            {{ ucfirst(str_replace('_', ' ', $file->type)) }}
-                            &bull; {{ number_format($file->size / 1024, 1) }} KB
-                            &bull; {{ $file->created_at->format('M d, Y H:i') }}
-                            &bull; <span class="badge
-                                @if($file->status === 'processed') bg-success
-                                @elseif($file->status === 'failed') bg-danger
-                                @elseif($file->status === 'processing') bg-warning text-dark
-                                @else bg-secondary
-                                @endif" style="font-size:.65rem;">{{ ucfirst($file->status) }}</span>
-                            @if($file->notes) &bull; {{ $file->notes }} @endif
+        {{-- Support Thread (clinician ↔ partner escalation chat) --}}
+        @if($case->support_at && $case->escalation_target === 'support')
+        <div class="case-pane" data-pane="escalation" id="escalationPane" hidden>
+            <section class="panel" style="min-height:auto;margin-bottom:12px;">
+                <div style="padding:14px 18px 10px;">
+                    {{-- Status banner --}}
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        @if($case->escalation_target === 'support')
+                            <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:6px;">
+                                <i class="bi bi-hourglass-split me-1"></i>Support Thread Active
+                            </span>
+                        @else
+                            <span class="badge" style="background:#dcfce7;color:#166534;font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:6px;">
+                                <i class="bi bi-check-circle me-1"></i>Thread Closed
+                            </span>
+                        @endif
+                        <span class="text-muted" style="font-size:.72rem;">
+                            Opened {{ $case->support_at->format('M j, Y') }} — private thread with {{ $case->partner?->name ?? 'the partner' }}
+                        </span>
+                    </div>
+
+                    {{-- The clinician's original escalation note --}}
+                    @if($case->support_note)
+                    <div class="mb-3 p-3" style="background:#fff8ec;border-left:3px solid #f59e0b;border-radius:8px;font-size:.82rem;">
+                        <div class="fw-semibold mb-1" style="font-size:.7rem;color:#92400e;text-transform:uppercase;letter-spacing:.06em;">
+                            <i class="bi bi-flag-fill me-1"></i>Your escalation note
+                        </div>
+                        {{ $case->support_note }}
+                    </div>
+                    @endif
+
+                    {{-- Escalation message thread --}}
+                    <div id="escalationClinThread" style="max-height:380px;overflow-y:scroll;overflow-x:hidden;padding-right:4px;margin-bottom:12px;">
+                        @php $escalationMessages = $case->messages->where('channel','escalation')->sortBy('created_at'); @endphp
+                        @forelse($escalationMessages as $msg)
+                        @php $isMine = $msg->sender_type === 'clinician'; @endphp
+                        <div class="bubble-row {{ $isMine ? 'me' : 'them' }}" data-escmsg-id="{{ $msg->id }}" style="margin-bottom:8px;">
+                            @if(!$isMine)
+                            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px;padding-left:4px;">
+                                {{ $case->partner?->name ?? 'Support Team' }}
+                            </div>
+                            @endif
+                            <div class="bubble {{ $isMine ? 'me' : 'them' }}"
+                                 style="{{ !$isMine ? 'background:#f1f5f9;color:#1e293b;' : '' }}">
+                                {{ $msg->body }}
+                            </div>
+                            <div style="font-size:.65rem;color:#94a3b8;text-align:{{ $isMine ? 'right' : 'left' }};margin-top:2px;padding:0 4px;">
+                                {{ $msg->created_at->format('M j, g:i A') }}
+                            </div>
+                        </div>
+                        @empty
+                        <div class="text-muted text-center py-3" id="escalationClinEmpty" style="font-size:.82rem;">
+                            No replies yet. The partner will be notified and can reply here.
+                        </div>
+                        @endforelse
+                    </div>
+
+                    {{-- Compose box — open while escalation_target=support --}}
+                    @if($case->escalation_target === 'support')
+                    <div class="chat-compose" id="escalationClinCompose" style="border-top:1px solid #e2e8f0;padding-top:10px;">
+                        <input type="text" id="escalationClinInput"
+                               placeholder="Reply to {{ $case->partner?->name ?? 'support' }}…"
+                               aria-label="Escalation reply"
+                               autocomplete="off"
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();clinSendEscalation();}">
+                        <button type="button" class="chat-send" aria-label="Send escalation reply"
+                                onclick="clinSendEscalation()">&uarr;</button>
+                    </div>
+                    @else
+                    <div class="p-2 px-3 rounded" style="background:#f1f5f9;font-size:.78rem;color:#64748b;">
+                        <i class="bi bi-lock-fill me-1"></i>Thread closed — read-only archive.
+                    </div>
+                    @endif
+                </div>
+            </section>
+        </div>
+        @endif
+
+        {{-- Files --}}
+        <div class="case-pane" data-pane="files" hidden>
+            <section class="panel" style="margin-bottom:12px"><div style="padding:16px 18px">
+                <div class="subheading" style="margin-bottom:10px">Upload file</div>
+                <form method="POST" action="{{ route('clinician.cases.files.store', $case->uuid) }}" enctype="multipart/form-data">@csrf
+                    <div class="field-row">
+                        <div class="field"><label>File</label><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required></div>
+                        <div class="field"><label>Type</label>
+                            <select name="type"><option value="other">Other</option><option value="lab_result">Lab result</option><option value="id_doc">ID document</option><option value="consent">Consent</option><option value="medical_necessity">Medical necessity</option><option value="intake">Intake</option></select>
                         </div>
                     </div>
-                    <div class="d-flex gap-2 flex-shrink-0">
-                        @if($file->status !== 'failed')
-                            @if(in_array($file->mime_type, ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']))
-                            <a href="{{ route('clinician.cases.files.preview', [$case->uuid, $file->uuid]) }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2" title="View">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                            @endif
-                        <a href="{{ route('clinician.cases.files.download', [$case->uuid, $file->uuid]) }}" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Download">
-                            <i class="bi bi-download"></i>
-                        </a>
-                        @endif
-                        <form method="POST" action="{{ route('clinician.cases.files.destroy', [$case->uuid, $file->uuid]) }}"
-                              onsubmit="return confirm('Delete this file?')">
-                            @csrf @method('DELETE')
-                            <button class="btn btn-outline-danger btn-sm py-0 px-2" title="Delete">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
+                    <div class="field-row">
+                        <div class="field"><label>Note</label><input type="text" name="notes" placeholder="Optional note"></div>
+                        <div class="field" style="display:flex;align-items:flex-end"><button class="button-primary">Upload</button></div>
                     </div>
+                    <div class="ai-honesty">PDF, JPG or PNG, max 10 MB.</div>
+                </form>
+            </div></section>
+            @forelse($case->files->sortByDesc('created_at') as $file)
+            <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px;background:#fff">
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:650;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $file->original_name }}</div>
+                    <div style="color:var(--muted);font-size:12px">{{ ucfirst(str_replace('_', ' ', $file->type)) }} · {{ number_format($file->size / 1024, 1) }} KB · {{ $file->created_at->format('M d, Y H:i') }} · <span class="pill {{ $file->status === 'processed' ? 'green' : ($file->status === 'failed' ? 'red' : 'neutral') }}">{{ ucfirst($file->status) }}</span></div>
                 </div>
-                @empty
-                <div class="text-center text-muted py-5">
-                    <i class="bi bi-folder2-open fs-2 d-block mb-2 opacity-25"></i>
-                    No files attached to this case yet.
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                    @if($file->status !== 'failed')
+                        @if(in_array($file->mime_type, ['image/png','image/jpeg','image/jpg','image/webp','application/pdf']))
+                        <a class="button-secondary" style="padding:4px 10px" target="_blank" href="{{ route('clinician.cases.files.preview', [$case->uuid, $file->uuid]) }}">View</a>
+                        @endif
+                        <a class="button-secondary" style="padding:4px 10px" href="{{ route('clinician.cases.files.download', [$case->uuid, $file->uuid]) }}">Download</a>
+                    @endif
+                    <form method="POST" action="{{ route('clinician.cases.files.destroy', [$case->uuid, $file->uuid]) }}" onsubmit="return confirm('Delete this file?')">@csrf @method('DELETE')
+                        <button class="button-danger" style="padding:4px 10px">Delete</button>
+                    </form>
                 </div>
-                @endforelse
             </div>
+            @empty
+            <div class="stub"><strong>No files</strong>No files are attached to this case yet.</div>
+            @endforelse
+        </div>
 
-            {{-- Timeline --}}
-            <div class="tab-pane fade" id="tab-timeline">
-                @php
+        {{-- Timeline --}}
+        <div class="case-pane" data-pane="timeline" hidden>
+            @php
                 $eventLabel = function($event) {
-                    $from = $event->payload['from'] ?? null;
-                    $to   = $event->payload['to']   ?? null;
-
-                    if ($event->event_type === 'clinician_reassigned') {
-                        return ['label' => 'Clinician reassigned', 'color' => 'bg-primary'];
-                    }
-
+                    $from = $event->payload['from'] ?? null; $to = $event->payload['to'] ?? null;
+                    if ($event->event_type === 'clinician_reassigned') return ['Clinician reassigned', 'neutral'];
                     $map = [
-                        'created→waiting'      => ['Case submitted',             'bg-info text-dark'],
-                        'waiting→assigned'     => ['Case assigned to clinician', 'bg-primary'],
-                        'created→assigned'     => ['Case assigned to clinician', 'bg-primary'],
-                        'assigned→support'     => ['Sent to support',            'bg-warning text-dark'],
-                        'support→assigned'     => ['Returned to clinician',      'bg-primary'],
-                        'assigned→approved'    => ['Case approved',              'bg-success'],
-                        'approved→processing'  => ['Sent to pharmacy',           'bg-success'],
-                        'processing→completed' => ['Case completed',             'bg-success'],
-                        'assigned→cancelled'   => ['Case cancelled',             'bg-danger'],
-                        'waiting→cancelled'    => ['Case cancelled',             'bg-danger'],
-                        'support→cancelled'    => ['Case cancelled',             'bg-danger'],
-                        'approved→cancelled'   => ['Case cancelled',             'bg-danger'],
-                        'created→cancelled'    => ['Case cancelled',             'bg-danger'],
+                        'created→waiting'=>['Case submitted','neutral'],'waiting→assigned'=>['Case assigned','neutral'],
+                        'created→assigned'=>['Case assigned','neutral'],'assigned→support'=>['Sent to support','yellow'],
+                        'support→assigned'=>['Returned to clinician','neutral'],'assigned→approved'=>['Case approved','green'],
+                        'approved→processing'=>['Sent to pharmacy','green'],'processing→completed'=>['Case completed','green'],
+                        'assigned→cancelled'=>['Case cancelled','red'],'waiting→cancelled'=>['Case cancelled','red'],
+                        'support→cancelled'=>['Case cancelled','red'],'approved→cancelled'=>['Case cancelled','red'],'created→cancelled'=>['Case cancelled','red'],
                     ];
-
-                    $key = $from . '→' . $to;
-                    if (isset($map[$key])) {
-                        return ['label' => $map[$key][0], 'color' => $map[$key][1]];
-                    }
-
-                    $label = $to ? ucfirst($from) . ' → ' . ucfirst($to) : ucfirst(str_replace('_', ' ', $event->event_type));
-                    return ['label' => $label, 'color' => 'bg-secondary'];
+                    $key = $from.'→'.$to;
+                    if (isset($map[$key])) return $map[$key];
+                    return [$to ? ucfirst($from).' -> '.ucfirst($to) : ucfirst(str_replace('_',' ',$event->event_type)), 'neutral'];
                 };
-
-                $actorLabel = function($event) {
-                    return match($event->actor_type) {
-                        'admin'     => 'Admin',
-                        'clinician' => 'Clinician',
-                        'partner'   => 'Partner',
-                        default     => 'System',
-                    };
-                };
-                @endphp
-
-                @forelse($case->events->sortByDesc('created_at') as $event)
-                @php [$label, $color] = array_values($eventLabel($event)); @endphp
-                <div class="d-flex gap-3 mb-3 pb-3 border-bottom">
-                    <div class="text-muted text-nowrap" style="min-width:110px; font-size:.75rem; padding-top:2px;">
-                        {{ $event->created_at->format('M d, H:i') }}
-                    </div>
+                $actorLabel = fn($e) => match($e->actor_type) { 'admin'=>'Admin','clinician'=>'Clinician','partner'=>'Partner', default=>'System' };
+            @endphp
+            @forelse($case->events->sortByDesc('created_at') as $event)
+                @php [$label, $tone] = $eventLabel($event); @endphp
+                <div style="display:flex;gap:14px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)">
+                    <div style="color:var(--muted);font-size:12px;min-width:110px">{{ $event->created_at->format('M d, H:i') }}</div>
                     <div>
-                        <span class="badge {{ $color }} mb-1">{{ $label }}</span>
-                        <div class="small text-muted">{{ $actorLabel($event) }}</div>
-                        @if($event->notes)
-                            <p class="small mb-0 mt-1 text-body">{{ $event->notes }}</p>
-                        @endif
+                        <span class="pill {{ $tone }}">{{ $label }}</span>
+                        <div style="color:var(--muted);font-size:12px;margin-top:4px">{{ $actorLabel($event) }}</div>
+                        @if($event->notes)<div style="font-size:13px;margin-top:4px">{{ $event->notes }}</div>@endif
                     </div>
                 </div>
-                @empty
-                <p class="text-muted">No timeline events.</p>
-                @endforelse
+            @empty
+            <p class="ai-honesty">No timeline events.</p>
+            @endforelse
+        </div>
+    </div>
+</div>
+
+{{-- Escalate / Decline modals (vanilla .modal-back overlays) --}}
+<div class="modal-back" id="doctorAdminModal" hidden>
+    <div class="modal" style="width:min(520px,94vw);padding:0">
+        <form method="POST" action="{{ route('clinician.cases.doctor-admin-escalate', $case->uuid) }}">@csrf
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0">
+                <strong style="font-size:14px;letter-spacing:-.02em">Escalate to Doctor Admin</strong>
+                <button type="button" data-close-modal aria-label="Close" style="display:grid;place-items:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:17px;cursor:pointer">&times;</button>
             </div>
-
-        </div>
+            <div style="padding:18px 20px">
+                <p style="color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55">Flags this case for your supervising Doctor Admin. The case moves to support status and your Doctor Admin is notified immediately.</p>
+                <div class="field"><label>Reason <span class="req">*</span></label><textarea name="reason" class="note-area" rows="4" required placeholder="Describe what you need from your Doctor Admin."></textarea></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);background:#fbfcfe;border-radius:0 0 20px 20px">
+                <button type="button" class="button-secondary" data-close-modal>Cancel</button><button class="button-primary">Escalate</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="modal-back" id="supportModal" hidden>
+    <div class="modal" style="width:min(520px,94vw);padding:0">
+        <form method="POST" action="{{ route('clinician.cases.support', $case->uuid) }}">@csrf
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0">
+                <strong style="font-size:14px;letter-spacing:-.02em">Escalate to support</strong>
+                <button type="button" data-close-modal aria-label="Close" style="display:grid;place-items:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:17px;cursor:pointer">&times;</button>
+            </div>
+            <div style="padding:18px 20px">
+                <p style="color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55">Moves the case to Support and makes it visible to the partner so they can add information.</p>
+                <div class="field"><label>Support note <span class="req">*</span></label><textarea name="support_note" class="note-area" rows="4" required placeholder="What is needed from the partner?"></textarea></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);background:#fbfcfe;border-radius:0 0 20px 20px">
+                <button type="button" class="button-secondary" data-close-modal>Cancel</button><button class="button-primary">Escalate</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="modal-back" id="cancelModal" hidden>
+    <div class="modal" style="width:min(520px,94vw);padding:0">
+        <form method="POST" action="{{ route('clinician.cases.cancel', $case->uuid) }}">@csrf
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0">
+                <strong style="font-size:14px;letter-spacing:-.02em">Decline case</strong>
+                <button type="button" data-close-modal aria-label="Close" style="display:grid;place-items:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:17px;cursor:pointer">&times;</button>
+            </div>
+            <div style="padding:18px 20px">
+                <div class="field">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <label style="margin:0">Reason <span class="req">*</span></label>
+                        <button type="button" id="draftRejectionBtn" class="button-secondary" style="padding:3px 10px;font-size:12px">Draft with AI</button>
+                    </div>
+                    <textarea name="reason" id="rejectionReason" class="note-area" rows="4" required placeholder="Reason for declining."></textarea>
+                    <p class="ai-honesty" id="rejectionNotice" hidden style="margin-top:6px"></p>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);background:#fbfcfe;border-radius:0 0 20px 20px">
+                <button type="button" class="button-secondary" data-close-modal>Go back</button><button class="button-danger">Decline</button>
+            </div>
+        </form>
     </div>
 </div>
 
-{{-- Support Modal --}}
-<div class="modal fade" id="supportModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="POST" action="{{ route('clinician.cases.support', $case->uuid) }}">
-                @csrf
-                <div class="modal-header">
-                    <h5 class="modal-title text-warning"><i class="bi bi-headset me-2"></i>Escalate to Support</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted small">This will move the case to <strong>Support</strong> status and make it visible to the partner so they can provide additional information.</p>
-                    <div class="mb-3">
-                        <label class="form-label">Support Note <span class="text-danger">*</span></label>
-                        <textarea name="support_note" class="form-control" rows="4"
-                            placeholder="Describe what information is needed from the partner..." required></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning">Escalate to Support</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-{{-- Cancel Modal --}}
-<div class="modal fade" id="cancelModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="POST" action="{{ route('clinician.cases.cancel', $case->uuid) }}">
-                @csrf
-                <div class="modal-header"><h5 class="modal-title text-danger"><i class="bi bi-x-circle me-2"></i>Decline Case</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Reason <span class="text-danger">*</span></label>
-                        <textarea name="reason" class="form-control" rows="3" placeholder="Reason for declining..." required></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Go Back</button>
-                    <button type="submit" class="btn btn-danger">Decline Case</button>
-                </div>
-            </form>
-        </div>
+{{-- Review-and-approve modal host (same pop-up as the grid) --}}
+<div class="modal-back" id="reviewOverlay" hidden>
+    <div class="modal" style="width:min(1080px,94vw);height:88vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:20px 20px 0 0;flex-shrink:0"><strong style="font-size:15px;letter-spacing:-.02em;color:var(--ink)">Review and approve</strong><button type="button" id="reviewClose" aria-label="Close" style="display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:18px;line-height:1;cursor:pointer" onmouseover="this.style.background='#f4f7fc';this.style.color='var(--ink)'" onmouseout="this.style.background='#fff';this.style.color='var(--muted)'">&times;</button></div>
+        <iframe id="reviewFrame" title="Review and approve" style="flex:1;width:100%;border:0"></iframe>
     </div>
 </div>
 @endsection
 
 @section('scripts')
+<style>
+    .case-grid { display:grid; grid-template-columns:340px minmax(0,1fr); gap:16px; align-items:start; }
+    @media (max-width:1000px){ .case-grid { grid-template-columns:1fr; } }
+    .case-tabs { display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:16px; }
+    .case-tab { border:0; border-bottom:2px solid transparent; background:none; color:var(--muted); font-weight:680; font-size:13px; padding:9px 12px; display:inline-flex; align-items:center; gap:6px; }
+    .case-tab:hover { color:var(--ink); }
+    .case-tab.active { color:var(--accent-ink); border-bottom-color:var(--accent); }
+    .case-pane[hidden] { display:none; }
+    .modal-back[hidden] { display:none; }
+    .chat .chat-scroll { border-radius:0; }
+    #note-fields-general[hidden], #note-fields-soap[hidden], #note-fields-progress[hidden] { display:none; }
+    .note-hint { text-transform:none; letter-spacing:0; font-weight:400; font-size:10px; color:var(--muted); margin-left:5px; }
+    /* ── Forward-to-support modal ───────────────────────────────── */
+    .fwd-modal-overlay { position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px; }
+    .fwd-modal-box { background:var(--surface,#fff);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.18);max-width:520px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden; }
+    .fwd-modal-head { padding:20px 22px 14px;border-bottom:1px solid var(--line,#e2e8f0);position:relative;flex-shrink:0; }
+    .fwd-modal-head h3 { font-size:1rem;font-weight:700;margin:0 0 3px;color:var(--ink,#1e293b); }
+    .fwd-modal-head p { font-size:.78rem;color:var(--muted,#64748b);margin:0;line-height:1.45; }
+    .fwd-close-btn { position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted,#64748b);line-height:1;padding:3px 7px;border-radius:6px; }
+    .fwd-close-btn:hover { background:var(--line,#f1f5f9);color:var(--ink,#1e293b); }
+    .fwd-msg-section { padding:14px 22px 0;flex-shrink:0; }
+    .fwd-msg-section-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:8px; }
+    .fwd-msg-section-label { font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted,#64748b); }
+    .fwd-count-badge { display:inline-block;margin-left:6px;font-size:.68rem;background:#e0e7ff;color:#3730a3;border-radius:20px;padding:1px 8px;font-weight:700; }
+    .fwd-select-all-btn { font-size:.73rem;color:#4361ee;background:none;border:none;cursor:pointer;padding:0;font-weight:500; }
+    .fwd-select-all-btn:hover { text-decoration:underline; }
+    .fwd-msg-list { max-height:210px;overflow-y:auto;border:1px solid var(--line,#e2e8f0);border-radius:10px; }
+    .fwd-msg-item { display:flex;align-items:flex-start;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .12s;user-select:none; }
+    .fwd-msg-item:last-child { border-bottom:none; }
+    .fwd-msg-item:hover { background:#f8fafc; }
+    .fwd-msg-item.fwd-selected { background:#eff6ff;border-left:3px solid #4361ee; }
+    .fwd-check { width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:#4361ee;cursor:pointer; }
+    .fwd-msg-content { flex:1;min-width:0; }
+    .fwd-msg-time { display:block;font-size:.68rem;color:var(--muted,#64748b);margin-bottom:2px; }
+    .fwd-msg-body { display:block;font-size:.82rem;color:var(--ink,#1e293b);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; }
+    .fwd-empty-state { padding:20px;text-align:center;color:var(--muted,#64748b);font-size:.82rem; }
+    .fwd-note-section { padding:12px 22px 0;flex-shrink:0; }
+    .fwd-note-section label { font-size:.78rem;font-weight:600;display:block;margin-bottom:5px;color:var(--ink,#1e293b); }
+    .fwd-note-textarea { width:100%;border:1px solid var(--line,#e2e8f0);border-radius:8px;padding:8px 10px;font-size:.82rem;resize:none;background:var(--surface,#fff);color:var(--ink,#1e293b);box-sizing:border-box; }
+    .fwd-note-textarea:focus { outline:none;border-color:#4361ee;box-shadow:0 0 0 3px rgba(67,97,238,.12); }
+    .fwd-error-msg { margin:8px 22px 0;padding:8px 12px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:.78rem;color:#dc2626;display:none; }
+    .fwd-footer { padding:14px 22px 18px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--line,#e2e8f0);flex-shrink:0;margin-top:12px; }
+    .fwd-cancel-btn { padding:8px 18px;border:1px solid var(--line,#e2e8f0);border-radius:8px;background:none;cursor:pointer;font-size:.83rem;color:var(--ink,#1e293b); }
+    .fwd-cancel-btn:hover { background:#f8fafc; }
+    .fwd-submit-btn { padding:8px 18px;border:none;border-radius:8px;background:#4361ee;color:#fff;font-weight:600;cursor:pointer;font-size:.83rem;display:flex;align-items:center;gap:6px; }
+    .fwd-submit-btn:hover { background:#3451d1; }
+</style>
 <script>
-// Auto-activate tab or open modal when arriving via URL hash
-document.addEventListener('DOMContentLoaded', function () {
-    const hash = window.location.hash;
-    if (!hash) return;
+    // Note type switcher — shows the matching field group and toggles required.
+    (function () {
+        var sel = document.getElementById('noteType');
+        if (!sel) return;
+        var groups = { general: 'note-fields-general', soap: 'note-fields-soap', progress: 'note-fields-progress' };
+        function switchType(type) {
+            Object.keys(groups).forEach(function (k) {
+                var el = document.getElementById(groups[k]);
+                if (!el) return;
+                var active = k === type;
+                el.hidden = !active;
+                el.querySelectorAll('textarea').forEach(function (t) { t.required = active; });
+            });
+        }
+        sel.addEventListener('change', function () { switchType(this.value); });
+        switchType(sel.value);
+    })();
 
-    if (hash === '#supportModal' || hash === '#cancelModal') {
-        const el = document.querySelector(hash);
-        if (el) { bootstrap.Modal.getOrCreateInstance(el).show(); }
-        history.replaceState(null, '', window.location.pathname);
-        return;
-    }
+    // Vanilla tabs. Fires a custom event so the chat can start/stop polling.
+    (function () {
+        var tabs  = document.querySelectorAll('.case-tab');
+        var panes = document.querySelectorAll('.case-pane');
+        function show(name) {
+            tabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-tab') === name); });
+            panes.forEach(function (p) { p.hidden = p.getAttribute('data-pane') !== name; });
+            document.dispatchEvent(new CustomEvent('case-tab', { detail: name }));
+        }
+        tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.getAttribute('data-tab')); }); });
+        // Deep link: #tab-messages etc. opens that tab.
+        var h = (window.location.hash || '').replace('#tab-', '');
+        if (h) { var m = document.querySelector('.case-tab[data-tab="' + h + '"]'); if (m) show(h); }
+    })();
 
-    // Tab hashes: #tab-messages, #tab-prescriptions, #tab-questionnaires, etc.
-    const tabLink = document.querySelector('a[href="' + hash + '"][data-bs-toggle="tab"]');
-    if (tabLink) {
-        bootstrap.Tab.getOrCreateInstance(tabLink).show();
-        history.replaceState(null, '', window.location.pathname);
-    }
-});
+    // Vanilla modals.
+    (function () {
+        function open(id) { var m = document.getElementById(id); if (m) m.removeAttribute('hidden'); }
+        function close(m) { if (m) m.setAttribute('hidden', ''); }
+        document.addEventListener('click', function (e) {
+            var o = e.target.closest('[data-open-modal]'); if (o) { open(o.getAttribute('data-open-modal')); return; }
+            var c = e.target.closest('[data-close-modal]'); if (c) { close(c.closest('.modal-back')); return; }
+            if (e.target.classList && e.target.classList.contains('modal-back')) close(e.target);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') document.querySelectorAll('.modal-back:not([hidden])').forEach(close);
+        });
+    })();
 
-document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.q-toggle');
-    if (!btn) return;
-    var row     = btn.closest('.text-muted');
-    var preview = row.querySelector('.q-preview');
-    var full    = row.querySelector('.q-full');
-    var expanded = full.classList.contains('d-none');
-    preview.classList.toggle('d-none', expanded);
-    full.classList.toggle('d-none', !expanded);
-    btn.textContent = expanded ? 'Hide' : 'Show more';
-});
+    // Review-and-approve modal (iframe of the prescribe form, bare).
+    (function () {
+        var overlay = document.getElementById('reviewOverlay');
+        var frame   = document.getElementById('reviewFrame');
+        if (!overlay || !frame) return;
+        function open(url) { frame.src = url; overlay.removeAttribute('hidden'); document.body.style.overflow = 'hidden'; }
+        function close(reload) { overlay.setAttribute('hidden', ''); frame.src = 'about:blank'; document.body.style.overflow = ''; if (reload) window.location.reload(); }
+        document.addEventListener('click', function (e) {
+            var link = e.target.closest('[data-review-url]'); if (!link) return;
+            e.preventDefault(); open(link.getAttribute('data-review-url'));
+        });
+        window.addEventListener('message', function (e) { if (e.data === 'close-review') close(false); });
+        frame.addEventListener('load', function () {
+            var href; try { href = frame.contentWindow.location.href; } catch (err) { return; }
+            if (!href || href === 'about:blank') return;
+            if (href.indexOf('modal=1') === -1 && href.indexOf('/clinician/cases/') !== -1) close(true);
+        });
+        document.getElementById('reviewClose').addEventListener('click', function () { close(false); });
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false); });
+    })();
 </script>
 
-<script src="https://js.pusher.com/8.0/pusher.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/2.2.4/echo.iife.min.js"></script>
+<script>
+// A9: AI draft on rejection — fills the decline-reason textarea with a template
+(function () {
+    var btn    = document.getElementById('draftRejectionBtn');
+    var area   = document.getElementById('rejectionReason');
+    var notice = document.getElementById('rejectionNotice');
+    if (!btn || !area) return;
+
+    btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.textContent = 'Drafting…';
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+        fetch('{{ route('clinician.cases.draft-rejection', $case->uuid) }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf ? csrf.getAttribute('content') : '',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({}),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.text) { area.value = d.text; }
+            if (notice && d && d.notice) { notice.textContent = d.notice; notice.removeAttribute('hidden'); }
+            btn.textContent = 'Re-draft';
+            btn.disabled = false;
+        })
+        .catch(function () {
+            btn.textContent = 'Draft with AI';
+            btn.disabled = false;
+        });
+    });
+})();
+</script>
 
 <script>
 (function () {
+    // ── Forward-to-support modal (Messages tab) ──────────────────────
+    var caseFwdModal = document.getElementById('caseFwdModal');
+
+    // Shared helpers exposed globally so inline onclick handlers can reach them.
+    window.fwdCheckChange = function (listId, countId, selectAllId) {
+        var list = document.getElementById(listId);
+        if (!list) return;
+        var all     = list.querySelectorAll('.fwd-check');
+        var checked = list.querySelectorAll('.fwd-check:checked');
+        all.forEach(function (cb) {
+            cb.closest('.fwd-msg-item').classList.toggle('fwd-selected', cb.checked);
+        });
+        var countEl = document.getElementById(countId);
+        if (countEl) {
+            countEl.style.display = checked.length > 0 ? '' : 'none';
+            countEl.textContent   = checked.length + ' selected';
+        }
+        var saBtn = document.getElementById(selectAllId);
+        if (saBtn && all.length > 0) {
+            saBtn.textContent = checked.length === all.length ? 'Deselect all' : 'Select all';
+        }
+    };
+
+    window.fwdToggleAll = function (listId, selectAllId, countId) {
+        var list = document.getElementById(listId);
+        if (!list) return;
+        var all        = list.querySelectorAll('.fwd-check');
+        var allChecked = list.querySelectorAll('.fwd-check:checked').length === all.length;
+        all.forEach(function (cb) { cb.checked = !allChecked; });
+        window.fwdCheckChange(listId, countId, selectAllId);
+    };
+
+    window.compileCaseFwdMsg = function (form) {
+        var list       = document.getElementById('caseFwdMsgList');
+        var hiddenInp  = document.getElementById('caseFwdQuotedInput');
+        var errorEl    = document.getElementById('caseFwdError');
+        var noteField  = form.querySelector('[name="note"]');
+        var note       = noteField ? noteField.value.trim() : '';
+        var selected   = list ? list.querySelectorAll('.fwd-check:checked') : [];
+
+        if (selected.length === 0 && !note) {
+            if (errorEl) errorEl.style.display = '';
+            return false;
+        }
+        if (errorEl) errorEl.style.display = 'none';
+
+        var quoted = '';
+        selected.forEach(function (cb) {
+            var item = cb.closest('.fwd-msg-item');
+            quoted += '[' + (item.dataset.time || '') + ']\n"' + (item.dataset.body || '') + '"\n\n';
+        });
+        if (hiddenInp) hiddenInp.value = quoted.trim();
+        return true;
+    };
+
+    window.openCaseFwdModal = function () {
+        if (caseFwdModal) { caseFwdModal.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+    };
+
+    window.closeCaseFwdModal = function () {
+        if (!caseFwdModal) return;
+        caseFwdModal.style.display = 'none';
+        document.body.style.overflow = '';
+        var list = document.getElementById('caseFwdMsgList');
+        if (list) {
+            list.querySelectorAll('.fwd-check:checked').forEach(function (cb) {
+                cb.checked = false;
+                cb.closest('.fwd-msg-item').classList.remove('fwd-selected');
+            });
+            window.fwdCheckChange('caseFwdMsgList', 'caseFwdCount', 'caseFwdSelectAll');
+        }
+        var err = document.getElementById('caseFwdError');
+        if (err) err.style.display = 'none';
+    };
+
+    if (caseFwdModal) {
+        caseFwdModal.addEventListener('click', function (e) {
+            if (e.target === caseFwdModal) window.closeCaseFwdModal();
+        });
+    }
+})();
+
+(function () {
     var thread = document.getElementById('clinThread');
     if (!thread) return;
+    var caseId = {{ $case->id }};
 
-    var patientName = thread.dataset.patientName;
-    var patientInit = thread.dataset.patientInitials;
-    var clinicInit  = thread.dataset.clinicianInitials;
-    var caseId      = {{ $case->id }};
-
-    function scrollToBottom() {
-        thread.scrollTop = thread.scrollHeight;
-    }
-
-    function hasSeparatorForDate(dateStr) {
-        return !!thread.querySelector('[data-date="' + dateStr + '"]');
-    }
-
-    function escape(str) {
-        var d = document.createElement('div');
-        d.appendChild(document.createTextNode(str));
-        return d.innerHTML;
-    }
-
-    function buildSeparator(dateStr, label) {
-        return '<div class="d-flex align-items-center gap-2 my-3" data-date="' + escape(dateStr) + '">' +
-            '<hr class="flex-grow-1 my-0" style="border-color:#dee2e6;">' +
-            '<span style="font-size:.7rem;color:#adb5bd;white-space:nowrap;font-weight:500;letter-spacing:.04em;text-transform:uppercase;">' + escape(label) + '</span>' +
-            '<hr class="flex-grow-1 my-0" style="border-color:#dee2e6;"></div>';
-    }
-
+    function scrollToBottom() { thread.scrollTop = thread.scrollHeight; }
+    function esc(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
     function buildBubble(msg) {
-        var isClinic  = msg.sender_type === 'clinician';
-        var isPatient = msg.sender_type === 'patient';
-        var avatarBg, avatarStr, name, bubbleStyle, flexDir, metaJustify;
-
-        if (isClinic) {
-            avatarBg     = '#4361ee'; avatarStr = clinicInit; name = 'You';
-            bubbleStyle  = 'background:#4361ee;color:#fff;padding:10px 14px;border-radius:16px 4px 16px 16px;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 2px 8px rgba(67,97,238,.2);';
-            flexDir      = 'flex-row-reverse'; metaJustify = 'justify-content-end';
-        } else if (isPatient) {
-            avatarBg     = '#2dc653'; avatarStr = patientInit; name = patientName;
-            bubbleStyle  = 'background:#fff;color:#212529;padding:10px 14px;border-radius:4px 16px 16px 16px;border:1px solid #e9ecef;font-size:.875rem;line-height:1.5;word-break:break-word;box-shadow:0 1px 4px rgba(0,0,0,.06);';
-            flexDir      = ''; metaJustify = '';
-        } else {
-            avatarBg     = '#6c757d'; avatarStr = 'SY'; name = 'System';
-            bubbleStyle  = 'background:#f1f3f5;color:#495057;padding:8px 12px;border-radius:8px;border:1px dashed #dee2e6;font-size:.8rem;line-height:1.5;word-break:break-word;';
-            flexDir      = ''; metaJustify = '';
-        }
-
-        return '<div class="d-flex align-items-end gap-2 mb-3 ' + flexDir + '">' +
-            '<div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-semibold" style="width:34px;height:34px;background:' + avatarBg + ';color:#fff;font-size:.68rem;letter-spacing:.02em;">' + escape(avatarStr) + '</div>' +
-            '<div style="max-width:68%;">' +
-                '<div class="d-flex align-items-baseline gap-1 mb-1 ' + metaJustify + '">' +
-                    '<span style="font-size:.72rem;font-weight:600;color:#495057;">' + escape(name) + '</span>' +
-                    '<span style="font-size:.67rem;color:#adb5bd;">' + escape(msg.time) + '</span>' +
-                '</div>' +
-                '<div style="' + bubbleStyle + '">' + escape(msg.body) + '</div>' +
-            '</div></div>';
+        var isSystem = (msg.sender_type === 'system' || msg.sender_type === 'admin');
+        var side     = (msg.direction === 'outbound') ? 'me' : 'them';
+        var style    = isSystem ? ' style="background:#6f42c1"' : '';
+        var label    = isSystem ? '<span style="display:block;font-size:.65em;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:3px;letter-spacing:.02em">SYSTEM</span>' : '';
+        return '<div class="bubble-row ' + side + '"><div class="bubble ' + side + '"' + style + '>' + label + esc(msg.body) + '</div></div>';
     }
-
     function appendMessage(msg) {
-        var empty = document.getElementById('clinThreadEmpty');
-        if (empty) empty.remove();
-
-        if (!hasSeparatorForDate(msg.date)) {
-            thread.insertAdjacentHTML('beforeend', buildSeparator(msg.date, msg.date_label));
-        }
+        var empty = document.getElementById('clinThreadEmpty'); if (empty) empty.remove();
         thread.insertAdjacentHTML('beforeend', buildBubble(msg));
         scrollToBottom();
     }
 
-    // ── AJAX send message ──────────────────────────────────
     window.clinSendMessage = function () {
-        var input = document.getElementById('clinMsgInput');
-        if (!input) return;
-        var body = input.value.trim();
-        if (!body) return;
-
+        var input = document.getElementById('clinMsgInput'); if (!input) return;
+        var body = input.value.trim(); if (!body) return;
         input.value = '';
-
-        // Optimistic: show the bubble immediately
-        var now = new Date();
-        var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-        var dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
-        appendMessage({ body: body, sender_type: 'clinician', time: timeStr, date: dateStr, date_label: 'Today' });
-
+        appendMessage({ body: body, sender_type: 'clinician' });
         fetch("{{ route('clinician.cases.messages.store', $case->uuid) }}", {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
             body: JSON.stringify({ body: body }),
-        })
-        .then(function (r) {
-            if (!r.ok) r.text().then(function (t) { console.error('[Chat] Send error:', t); });
-        })
-        .catch(function (err) { console.error('[Chat] Send failed:', err); });
+        }).catch(function (err) { console.error('[Chat] Send failed:', err); });
     };
 
-    // ── Echo real-time ─────────────────────────────────────
-    var EchoConstructor = null;
-    if (typeof Echo === 'object' && typeof Echo.default === 'function') {
-        EchoConstructor = Echo.default;
-    } else if (typeof Echo === 'function') {
-        EchoConstructor = Echo;
-    }
+    // ── Escalation thread send + append ──────────────────────────────────
+    (function () {
+        var escThread  = document.getElementById('escalationClinThread');
+        var escInput   = document.getElementById('escalationClinInput');
+        if (!escThread || !escInput) return;
 
-    if (EchoConstructor) {
-        window.Pusher = Pusher;
+        var escSendUrl = "{{ route('clinician.cases.messages.store', $case->uuid) }}";
+        var csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
 
-        window.Echo = new EchoConstructor({
-            broadcaster: 'pusher',
-            key: "{{ config('reverb.apps.apps.0.key') }}",
-            wsHost: "{{ config('reverb.apps.apps.0.options.host') }}",
-            wsPort: {{ config('reverb.apps.apps.0.options.port') }},
-            wssPort: {{ config('reverb.apps.apps.0.options.port') }},
-            disableStats: true,
-            forceTLS: {{ config('reverb.apps.apps.0.options.useTLS') }},
-            cluster: 'mt1',
-            enabledTransports: ['ws', 'wss'],
-            authEndpoint: "/broadcasting/auth",
-            auth: {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'X-Requested-With': 'XMLHttpRequest'
+        function appendEscMsg(msg) {
+            var empty = document.getElementById('escalationClinEmpty');
+            if (empty) empty.remove();
+
+            var isMine = msg.sender_type === 'clinician';
+            var wrap   = document.createElement('div');
+            wrap.className = 'bubble-row ' + (isMine ? 'me' : 'them');
+            wrap.style.marginBottom = '8px';
+            if (msg.id) wrap.dataset.escmsgId = msg.id;
+
+            var senderLabel = isMine ? '' :
+                '<div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px;padding-left:4px;">{{ $case->partner?->name ?? "Support Team" }}</div>';
+            var bubbleStyle = isMine ? '' : 'background:#f1f5f9;color:#1e293b;';
+            var timeAlign   = isMine ? 'right' : 'left';
+            var timeStr     = msg.time || new Date().toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+
+            wrap.innerHTML = senderLabel +
+                '<div class="bubble ' + (isMine ? 'me' : 'them') + '" style="' + bubbleStyle + '">' +
+                    msg.body.replace(/</g,'&lt;').replace(/\n/g,'<br>') +
+                '</div>' +
+                '<div style="font-size:.65rem;color:#94a3b8;text-align:' + timeAlign + ';margin-top:2px;padding:0 4px;">' + timeStr + '</div>';
+
+            escThread.appendChild(wrap);
+            escThread.scrollTop = escThread.scrollHeight;
+        }
+
+        window.clinSendEscalation = function () {
+            var body = escInput.value.trim();
+            if (!body) return;
+            escInput.value = '';
+            appendEscMsg({ body: body, sender_type: 'clinician' });
+            fetch(escSendUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({ body: body }),
+            }).catch(function (err) { console.error('[Escalation] Send failed:', err); });
+        };
+
+        // Listen for partner replies via Echo or fallback poll.
+        if (window.Echo) {
+            window.Echo.private('case.' + caseId).listen('.CaseMessageSent', function (e) {
+                if (e.channel === 'escalation' && e.sender_type === 'partner') {
+                    appendEscMsg({ body: e.body, sender_type: 'partner', time: e.time });
+                    // Remove unread badge from tab if open
+                    var tab = document.getElementById('escalationTab');
+                    if (tab) { var pill = tab.querySelector('.pill'); if (pill) pill.remove(); }
                 }
+            });
+        } else {
+            // Fallback: poll every 8s when escalation tab is active.
+            var escLastId = 0;
+            escThread.querySelectorAll('[data-escmsg-id]').forEach(function (el) {
+                var id = parseInt(el.dataset.escmsgId, 10);
+                if (id > escLastId) escLastId = id;
+            });
+            var escPollUrl = '{{ route("clinician.cases.messages.poll", $case->uuid) }}?channel=escalation';
+            var escInterval = null;
+            function isEscTab() { var p = document.getElementById('escalationPane'); return p && !p.hidden; }
+            function escPoll() {
+                if (!isEscTab()) return;
+                fetch(escPollUrl + '&after=' + escLastId, { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (!data || !data.messages) return;
+                        data.messages.forEach(function (msg) {
+                            if (msg.sender_type === 'partner') {
+                                appendEscMsg({ body: msg.body, sender_type: 'partner' });
+                                escLastId = msg.id;
+                            }
+                        });
+                    }).catch(function () {});
             }
+            document.addEventListener('case-tab', function (e) {
+                if (e.detail === 'escalation') { escPoll(); escInterval = setInterval(escPoll, 8000); }
+                else { clearInterval(escInterval); escInterval = null; }
+            });
+        }
+
+        // Scroll to bottom when tab opens.
+        document.addEventListener('case-tab', function (e) {
+            if (e.detail === 'escalation') escThread.scrollTop = escThread.scrollHeight;
         });
 
-        window.Echo.private('case.' + caseId)
-            .listen('.CaseMessageSent', function (e) {
-                // Skip own clinician messages (already shown optimistically)
-                if (e.sender_type === 'clinician') return;
+        // Auto-open escalation tab if URL has #escalation anchor.
+        if (window.location.hash === '#escalation') {
+            var escTabBtn = document.querySelector('[data-tab="escalation"]');
+            if (escTabBtn) escTabBtn.click();
+        }
+    })();
 
-                var created = new Date(e.created_at);
-                var timeStr = created.getHours().toString().padStart(2, '0') + ':' + created.getMinutes().toString().padStart(2, '0');
-                var dateStr = created.getFullYear() + '-' + (created.getMonth()+1).toString().padStart(2, '0') + '-' + created.getDate().toString().padStart(2, '0');
-                var dateLabel = isToday(created) ? 'Today' : (isYesterday(created) ? 'Yesterday' : created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
-
-                appendMessage({
-                    body: e.body,
-                    sender_type: e.sender_type,
-                    time: timeStr,
-                    date: dateStr,
-                    date_label: dateLabel,
-                });
-            });
-
-        console.log('[Chat] Echo subscribed to case.' + caseId);
+    // Echo is initialised globally by the layout; subscribe to this case's channel here.
+    if (window.Echo) {
+        window.Echo.private('case.' + caseId).listen('.CaseMessageSent', function (e) {
+            if (e.sender_type === 'clinician') return;
+            appendMessage({ body: e.body, sender_type: e.sender_type });
+        });
     } else {
-        // Fallback to polling if Echo not available
-        console.warn('[Chat] Echo not available, falling back to polling');
         fallbackPolling();
     }
 
-    function isToday(d) {
-        var t = new Date();
-        return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
-    }
-    function isYesterday(d) {
-        var t = new Date(); t.setDate(t.getDate() - 1);
-        return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
-    }
-
-    // ── Fallback polling (if Echo fails to load) ───────────
     function fallbackPolling() {
         var pollUrl = thread.dataset.pollUrl;
         var lastId  = parseInt(thread.dataset.lastId, 10) || 0;
         var interval = null;
-
-        function isMessagesTabActive() {
-            var pane = document.getElementById('tab-messages');
-            return pane && pane.classList.contains('active') && pane.classList.contains('show');
-        }
-
+        function isMessagesTab() { var p = document.querySelector('[data-pane="messages"]'); return p && !p.hidden; }
         function poll() {
-            if (!isMessagesTabActive() || document.visibilityState !== 'visible') return;
+            if (!isMessagesTab() || document.visibilityState !== 'visible') return;
             fetch(pollUrl + '?after=' + lastId)
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (data) {
-                    if (!data || !data.messages || data.messages.length === 0) return;
+                    if (!data || !data.messages || !data.messages.length) return;
                     data.messages.forEach(function (msg) { appendMessage(msg); lastId = msg.id; });
                     thread.dataset.lastId = lastId;
-                })
-                .catch(function () {});
+                }).catch(function () {});
         }
-
-        function startPolling() { if (!interval) { poll(); interval = setInterval(poll, 5000); } }
-        function stopPolling() { if (interval) { clearInterval(interval); interval = null; } }
-
-        var tabLink = document.querySelector('a[href="#tab-messages"]');
-        if (tabLink) {
-            tabLink.addEventListener('shown.bs.tab', function () { scrollToBottom(); startPolling(); });
-            tabLink.addEventListener('hidden.bs.tab', stopPolling);
-        }
-        document.addEventListener('visibilitychange', function () {
-            if (document.visibilityState === 'hidden') stopPolling();
-            else if (isMessagesTabActive()) startPolling();
-        });
-        if (isMessagesTabActive()) { scrollToBottom(); startPolling(); }
+        function start() { if (!interval) { poll(); interval = setInterval(poll, 5000); } }
+        function stop() { if (interval) { clearInterval(interval); interval = null; } }
+        document.addEventListener('case-tab', function (e) { if (e.detail === 'messages') { scrollToBottom(); start(); } else stop(); });
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') stop(); else if (isMessagesTab()) start(); });
+        if (isMessagesTab()) start();
     }
 
-    // ── Initial scroll ─────────────────────────────────────
+    // Scroll on first open of the messages tab.
+    document.addEventListener('case-tab', function (e) { if (e.detail === 'messages') scrollToBottom(); });
     scrollToBottom();
 })();
 </script>

@@ -28,11 +28,16 @@ class VirusScanService
             return true;
         }
 
+        if (!$this->isFunctionCallable('exec')) {
+            Log::info('VirusScan: exec() disabled — skipping scan for ' . basename($storagePath));
+            return true;
+        }
+
         $command    = escapeshellcmd($clamscan) . ' --no-summary --stdout ' . escapeshellarg($absolutePath);
         $output     = [];
         $exitCode   = 0;
 
-        exec($command . ' 2>&1', $output, $exitCode);
+        \exec($command . ' 2>&1', $output, $exitCode);
 
         // clamscan exit codes: 0 = clean, 1 = infected found, 2 = error
         if ($exitCode === 1) {
@@ -52,20 +57,32 @@ class VirusScanService
 
     private function findClamscan(): ?string
     {
-        foreach (['clamscan', '/usr/bin/clamscan', '/usr/local/bin/clamscan', 'C:\\ClamAV\\clamscan.exe'] as $candidate) {
-            $test = shell_exec('which ' . escapeshellarg($candidate) . ' 2>/dev/null')
-                 ?? shell_exec('where ' . escapeshellarg($candidate) . ' 2>NUL');
+        $canShellExec = $this->isFunctionCallable('shell_exec');
 
-            if ($test && trim($test) !== '') {
-                return $candidate;
+        foreach (['clamscan', '/usr/bin/clamscan', '/usr/local/bin/clamscan', 'C:\\ClamAV\\clamscan.exe'] as $candidate) {
+            if ($canShellExec) {
+                $test = \shell_exec('which ' . escapeshellarg($candidate) . ' 2>/dev/null')
+                     ?? \shell_exec('where ' . escapeshellarg($candidate) . ' 2>NUL');
+
+                if ($test && trim($test) !== '') {
+                    return $candidate;
+                }
             }
 
-            // On Windows "where" check
             if (PHP_OS_FAMILY === 'Windows' && file_exists($candidate)) {
                 return $candidate;
             }
         }
 
         return null;
+    }
+
+    private function isFunctionCallable(string $func): bool
+    {
+        if (!function_exists($func)) {
+            return false;
+        }
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        return !in_array($func, $disabled, true);
     }
 }

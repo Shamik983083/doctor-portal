@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\PatientCase;
 use App\Models\Partner;
+use App\Models\PartnerProductPlan;
 use App\Models\Questionnaire;
 use App\Models\PatientFile;
 use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireQuestion;
 use App\Models\QuestionnaireResponse;
 use App\Services\CaseStateMachine;
+use App\Services\CheckInQuestionnaireResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -47,7 +49,7 @@ class CaseController extends Controller
             'patient.gender'                                  => 'nullable|in:male,female,other',
             'patient.height'                                  => 'required|numeric|min:0',
             'patient.weight'                                  => 'required|numeric|min:0',
-            'patient.bmi'                                     => 'required|numeric|min:0',
+            'patient.bmi'                                     => 'required|numeric|min:0|max:999.99',
             'patient.address'                                 => 'nullable|string',
             'patient.city'                                    => 'nullable|string',
             'patient.state'                                   => 'nullable|string|size:2',
@@ -57,13 +59,55 @@ class CaseController extends Controller
             'patient.id_verified_at'                          => 'nullable|date',
             'external_id'                                     => 'nullable|string|max:255',
             'visit_type'                                      => 'nullable|string|max:100',
+            /*
+             * Re-bill / check-in, NOT a pharmacy refill (Devin msg 2246). Set it
+             * and the case routes back to the doctor who treated this patient
+             * before, and counts as a check-in rather than a first visit in
+             * reporting.
+             *
+             * Optional, and false is the safe default: a check-in arriving
+             * unflagged just routes normally, whereas a first visit wrongly
+             * flagged would be handed to a doctor on the strength of a history
+             * that does not apply. Partners not sending it yet may still be
+             * picked up by the visit_type fallback, see
+             * PatientCase::isRefillRequest().
+             */
+            'is_refill'                                       => 'nullable|boolean',
             'hold_status'                                     => 'boolean',
             'is_chargeable'                                   => 'boolean',
             'patient_state'                                   => 'nullable|string|size:2',
             'metadata'                                        => 'nullable|array',
+            /*
+             * Clinical intake block (Devin msg 2258, "they send to us", "exact
+             * format" from the design preview). Populates the provider review
+             * queue's medication columns. Every field optional: a storefront can
+             * send all of it, some, or none, and the queue shows a dash for
+             * anything missing rather than a fabricated value. See
+             * PatientCase::queueClinical() and docs/integrations/STOREFRONT-INTAKE.md.
+             */
+            'clinical_intake'                                 => 'nullable|array',
+            'clinical_intake.product'                         => 'nullable|string|max:120',
+            'clinical_intake.dose'                            => 'nullable|string|max:60',
+            'clinical_intake.term'                            => 'nullable|string|max:30',
+            'clinical_intake.plan'                            => 'nullable|string|max:40',
+            'clinical_intake.med2'                            => 'nullable|string|max:120',
+            'clinical_intake.med3'                            => 'nullable|string|max:120',
+            'clinical_intake.med4'                            => 'nullable|string|max:120',
+            'clinical_intake.onGlp'                           => 'nullable|string|max:8',
+            'clinical_intake.zofran'                          => 'nullable|string|max:8',
+            'clinical_intake.allergy'                         => 'nullable|string|max:8',
+            'clinical_intake.allergyDetail'                   => 'nullable|string|max:500',
+            'clinical_intake.video'                           => 'nullable|string|max:20',
+            'clinical_intake.protocolVersion'                 => 'nullable|string|max:60',
+            'clinical_intake.findings'                        => 'nullable|array',
+            'clinical_intake.summary'                         => 'nullable|array',
+            'clinical_intake.sourceAnswers'                   => 'nullable|array',
             'offerings'                                       => 'nullable|array',
-            'offerings.*.offering_id'                         => 'string',
+            'offerings.*.offering_id'                         => 'nullable|string',
+            'offerings.*.product_key'                         => 'nullable|string|max:120',
+            'offerings.*.month_frequency'                     => 'nullable|integer|min:1|max:24',
             'offerings.*.quantity'                            => 'integer|min:1',
+            'offerings.*.bundle_group'                        => 'nullable|string|max:100',
             // Simplified flat answers (new path — questionnaire derived from offering)
             'answers'                                         => 'nullable|array',
             'answers.*.slug'                                  => 'required_with:answers|string|max:120',
@@ -80,6 +124,108 @@ class CaseController extends Controller
         $partner     = $this->partner($request);
         $patientData = $data['patient'];
 
+        // ── Pre-resolve offerings (Path A + Path B fan-out) ──────────────────
+        // Done before questionnaire resolution so buildResponsesFromOfferings
+        // always receives valid offering UUIDs regardless of which path was used.
+        //
+        // Path A (legacy): offering_id sent directly — one item in, one item out.
+        // Path B (new):    product_key + month_frequency → ALL matching plan rows
+        //                  are resolved. One submitted item fans out to N offerings,
+        //                  each becoming its own case_offering row. This is the
+        //                  one-to-many model: e.g. "semaglutide" 3M resolves to
+        //                  SNAC, B12, and B6 variants simultaneously.
+        //
+        // $expandedOfferings replaces $data['offerings'] before questionnaire
+        // resolution. $resolvedOfferings[i] is the Offering model at position i
+        // in $expandedOfferings — reused by the transaction block so offerings are
+        // never queried twice.
+        $effectiveState    = $data['patient_state'] ?? $patientData['state'] ?? null;
+        $expandedOfferings = [];
+        $resolvedOfferings = [];
+
+        foreach ($data['offerings'] ?? [] as $offeringData) {
+
+            // Path B: product_key + month_frequency → first matching plan offering only.
+            // Both bundle and non-bundle use the same resolution: one case_offering row
+            // per submitted entry. The clinician's prescribe form dropdown lets them
+            // switch to any offering in the same drug family.
+            if (!empty($offeringData['product_key']) && !empty($offeringData['month_frequency'])) {
+                $plan = PartnerProductPlan::where('partner_id', $partner->id)
+                    ->where('product_key', $offeringData['product_key'])
+                    ->where('month_frequency', (int) $offeringData['month_frequency'])
+                    ->first();
+
+                if (!$plan) {
+                    return response()->json([
+                        'message' => "No product plan found for product_key \"{$offeringData['product_key']}\" with month_frequency {$offeringData['month_frequency']}.",
+                        'errors'  => ['offerings' => ["Product plan not found: product_key \"{$offeringData['product_key']}\", month_frequency {$offeringData['month_frequency']}."]],
+                    ], 422);
+                }
+
+                $offering = $partner->accessibleOfferings()
+                    ->where('offerings.id', $plan->offering_id)
+                    ->first();
+
+                if (!$offering) {
+                    return response()->json([
+                        'message' => "No accessible offering found for product_key \"{$offeringData['product_key']}\" with month_frequency {$offeringData['month_frequency']}.",
+                        'errors'  => ['offerings' => ["Offering for \"{$offeringData['product_key']}\" ({$offeringData['month_frequency']}M) is inaccessible for this partner."]],
+                    ], 422);
+                }
+
+                // State availability gate
+                if ($effectiveState && !$offering->isAvailableInState($effectiveState)) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."]],
+                    ], 422);
+                }
+
+                // Category gate (unroutable without a category)
+                if ($offering->category_id === null) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" has no product category configured and cannot be routed. Contact the platform administrator.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" has no product category configured."]],
+                    ], 422);
+                }
+
+                $entry                = $offeringData;
+                $entry['offering_id'] = $offering->uuid;
+                $expandedOfferings[]  = $entry;
+                $resolvedOfferings[]  = $offering;
+
+            // Path A (legacy): direct offering_id — one item in, one item out
+            } elseif (!empty($offeringData['offering_id'])) {
+                $offering = $partner->accessibleOfferings()
+                    ->where('offerings.uuid', $offeringData['offering_id'])
+                    ->first();
+
+                if (!$offering) continue; // unresolved — silently skip (mirrors prior behaviour)
+
+                // State availability gate
+                if ($effectiveState && !$offering->isAvailableInState($effectiveState)) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."]],
+                    ], 422);
+                }
+
+                // Category gate
+                if ($offering->category_id === null) {
+                    return response()->json([
+                        'message' => "Offering \"{$offering->name}\" has no product category configured and cannot be routed. Contact the platform administrator.",
+                        'errors'  => ['offerings' => ["Offering \"{$offering->name}\" has no product category configured."]],
+                    ], 422);
+                }
+
+                $expandedOfferings[] = $offeringData;
+                $resolvedOfferings[] = $offering;
+            }
+        }
+
+        $data['offerings'] = $expandedOfferings;
+        // ─────────────────────────────────────────────────────────────────────
+
         // ── Resolve questionnaire responses ───────────────────────────────────
         // Path A (new): flat top-level `answers` array — derive questionnaires
         //   from the submitted offerings via the offering_questionnaire pivot.
@@ -90,7 +236,8 @@ class CaseController extends Controller
             $data['questionnaire_responses'] = $this->buildResponsesFromOfferings(
                 $data['answers'],
                 $data['offerings'] ?? [],
-                $partner
+                $partner,
+                (bool) ($data['is_refill'] ?? false)
             );
         } elseif (!empty($data['questionnaire_responses'])) {
             $expanded = [];
@@ -143,28 +290,6 @@ class CaseController extends Controller
         unset($data['answers']);
         // ─────────────────────────────────────────────────────────────────────
 
-        // ── Offering state availability check ────────────────────────────────
-        // Reject before touching the DB if any requested offering is not
-        // available in the patient's state. patient_state wins over patient.state
-        // because the API caller may override it for telehealth visit purposes.
-        $effectiveState = $data['patient_state'] ?? $patientData['state'] ?? null;
-        if ($effectiveState && !empty($data['offerings'])) {
-            foreach ($data['offerings'] as $offeringData) {
-                $offering = $partner->offerings()
-                    ->where('uuid', $offeringData['offering_id'])
-                    ->first();
-                if ($offering && !$offering->isAvailableInState($effectiveState)) {
-                    return response()->json([
-                        'message' => "Offering \"{$offering->name}\" is not available in state {$effectiveState}.",
-                        'errors'  => [
-                            'offerings' => ["Offering \"{$offering->name}\" is not available in state {$effectiveState}."],
-                        ],
-                    ], 422);
-                }
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────────
-
         // Deduplicate patient by external_id then email
         $patient = null;
         if (!empty($patientData['external_id'])) {
@@ -179,15 +304,24 @@ class CaseController extends Controller
             $patient->update($patientData);
         }
 
-        if (($data['external_id'] ?? null) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
+        // E19: copy the partner's collaborating clinician default onto the patient
+        // if the patient does not already have one. Never overwrites an existing
+        // assignment — the partner default is a first-time convenience, not a rule.
+        if ($partner->collaborating_clinician_id && !$patient->collaborating_clinician_id) {
+            $patient->update(['collaborating_clinician_id' => $partner->collaborating_clinician_id]);
+        }
+
+        if (($data['external_id'] ?? null) && empty($data['is_refill']) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
             return response()->json(['message' => 'Case with this external_id already exists.'], 409);
         }
 
-        $case = DB::transaction(function () use ($data, $partner, $patient, $request) {
+        $case = DB::transaction(function () use ($data, $partner, $patient, $request, $resolvedOfferings) {
             $case = $partner->cases()->create([
                 'patient_id'    => $patient->id,
                 'external_id'   => $data['external_id'] ?? null,
                 'visit_type'    => $data['visit_type'] ?? null,
+                'is_refill'     => $data['is_refill'] ?? false,
+                'clinical_intake' => $data['clinical_intake'] ?? null,
                 'hold_status'   => $data['hold_status'] ?? false,
                 'is_chargeable' => $data['is_chargeable'] ?? true,
                 'patient_state' => $data['patient_state'] ?? $patient->state,
@@ -195,18 +329,19 @@ class CaseController extends Controller
                 'status'        => PatientCase::STATUS_CREATED,
             ]);
 
-            // Attach offerings
+            // Attach offerings — use pre-resolved map; no extra queries
             $attachedOfferingsIds = [];
             if (!empty($data['offerings'])) {
-                foreach ($data['offerings'] as $offeringData) {
-                    $offering = $partner->offerings()
-                        ->where('uuid', $offeringData['offering_id'])
-                        ->first();
+                foreach ($data['offerings'] as $idx => $offeringData) {
+                    $offering = $resolvedOfferings[$idx] ?? null;
                     if ($offering) {
                         $case->caseOfferings()->create([
-                            'offering_id' => $offering->id,
-                            'quantity'    => $offeringData['quantity'] ?? 1,
-                            'price'       => $offeringData['price'] ?? $offering->price,
+                            'offering_id'     => $offering->id,
+                            'quantity'        => $offeringData['quantity'] ?? 1,
+                            'price'           => $offeringData['price'] ?? $offering->price,
+                            'month_frequency' => isset($offeringData['month_frequency']) ? (int) $offeringData['month_frequency'] : null,
+                            'product_key'     => $offeringData['product_key'] ?? null,
+                            'bundle_group'    => $offeringData['bundle_group'] ?? null,
                         ]);
                         $attachedOfferingsIds[] = $offering->id;
                     }
@@ -223,9 +358,24 @@ class CaseController extends Controller
 
                 $missing = array_diff($requiredQUuids, $submittedQUuids);
                 if ($missing) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'questionnaire_responses' => 'Required questionnaires not submitted: ' . implode(', ', $missing),
-                    ]);
+                    $missingQuestionnaires = Questionnaire::with(['questions' => function ($q) {
+                        $q->where('is_active', true)->where('is_required', true);
+                    }])->whereIn('uuid', $missing)->get()->map(function ($questionnaire) {
+                        return [
+                            'questionnaire_id'   => $questionnaire->uuid,
+                            'questionnaire_name' => $questionnaire->name,
+                            'questions'          => $questionnaire->questions->map(fn ($q) => [
+                                'key'      => $q->slug,
+                                'question' => $q->question,
+                                'type'     => $q->type,
+                            ])->values()->toArray(),
+                        ];
+                    })->values()->toArray();
+
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                        'message'                => 'Required questionnaires not submitted.',
+                        'missing_questionnaires' => $missingQuestionnaires,
+                    ], 422));
                 }
             }
 
@@ -343,10 +493,54 @@ class CaseController extends Controller
     public function show(Request $request, string $id)
     {
         $case = $this->partner($request)->cases()
-            ->with(['patient', 'clinician.user', 'caseOfferings.offering', 'caseQuestions', 'diseases', 'orders', 'clinicalNotes', 'tags'])
+            ->with(['patient', 'clinician.user', 'caseOfferings.offering', 'caseQuestions', 'diseases', 'orders', 'clinicalNotes', 'tags', 'casePrescription.medications', 'casePrescription.diagnosesCodes'])
             ->where('uuid', $id)->firstOrFail();
 
         return response()->json($case);
+    }
+
+    /**
+     * Push (or replace) the clinical intake block for a case (Devin msg 2258).
+     *
+     * POST /api/partner/cases/{id}/clinical. For storefronts that learn the
+     * medication detail after the case is already created, or want to update it,
+     * rather than only at create time. Partner-scoped through $this->partner(),
+     * so a storefront can only write to its own cases.
+     *
+     * REPLACES the block wholesale rather than merging: the storefront owns this
+     * data and the queue should reflect exactly what they last sent, not a merge
+     * of two intake snapshots. Same field set and same optionality as create.
+     */
+    public function updateClinical(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'clinical_intake'                 => 'required|array',
+            'clinical_intake.product'         => 'nullable|string|max:120',
+            'clinical_intake.dose'            => 'nullable|string|max:60',
+            'clinical_intake.term'            => 'nullable|string|max:30',
+            'clinical_intake.plan'            => 'nullable|string|max:40',
+            'clinical_intake.med2'            => 'nullable|string|max:120',
+            'clinical_intake.med3'            => 'nullable|string|max:120',
+            'clinical_intake.med4'            => 'nullable|string|max:120',
+            'clinical_intake.onGlp'           => 'nullable|string|max:8',
+            'clinical_intake.zofran'          => 'nullable|string|max:8',
+            'clinical_intake.allergy'         => 'nullable|string|max:8',
+            'clinical_intake.allergyDetail'   => 'nullable|string|max:500',
+            'clinical_intake.video'           => 'nullable|string|max:20',
+            'clinical_intake.protocolVersion' => 'nullable|string|max:60',
+            'clinical_intake.findings'        => 'nullable|array',
+            'clinical_intake.summary'         => 'nullable|array',
+            'clinical_intake.sourceAnswers'   => 'nullable|array',
+        ]);
+
+        $case = $this->partner($request)->cases()->where('uuid', $id)->firstOrFail();
+
+        $case->update(['clinical_intake' => $data['clinical_intake']]);
+
+        return response()->json([
+            'message' => 'Clinical intake updated.',
+            'case'    => $case->fresh(['patient', 'caseOfferings.offering']),
+        ]);
     }
 
     public function showByExternalId(Request $request, string $externalId)
@@ -394,6 +588,33 @@ class CaseController extends Controller
         return response()->json($case->fresh());
     }
 
+    public function returnToClinician(Request $request, string $id)
+    {
+        $request->validate(['partner_note' => 'required|string|max:1000']);
+
+        $case = $this->partner($request)->cases()
+            ->where('uuid', $id)
+            ->whereNotNull('support_at')
+            ->where('status', 'support')
+            ->firstOrFail();
+
+        $partnerNote = $request->input('partner_note');
+
+        $this->stateMachine->returnToClinicianFromSupport($case, $partnerNote);
+
+        if ($case->clinician_id) {
+            \App\Models\ClinicalNote::create([
+                'case_id'      => $case->id,
+                'clinician_id' => $case->clinician_id,
+                'type'         => 'general',
+                'note'         => 'Support response: ' . $partnerNote,
+                'is_private'   => false,
+            ]);
+        }
+
+        return response()->json(['message' => 'Case returned to clinician.', 'case' => $case->fresh()]);
+    }
+
     public function events(Request $request, string $id)
     {
         $case = $this->partner($request)->cases()->where('uuid', $id)->firstOrFail();
@@ -406,27 +627,66 @@ class CaseController extends Controller
      * each slug against the questionnaires attached to the submitted offerings.
      * Returns the same structure the downstream pipeline expects, with
      * question_id already set and answers already split by questionnaire.
+     *
+     * For refill cases ($isRefill = true) check-in questionnaires are indexed
+     * first so their slugs win over clinical ones. If no check-in questionnaire
+     * is configured anywhere, the clinical questionnaire is used as a fallback —
+     * refills never break.
      */
-    private function buildResponsesFromOfferings(array $rawAnswers, array $offeringsData, Partner $partner): array
+    private function buildResponsesFromOfferings(array $rawAnswers, array $offeringsData, Partner $partner, bool $isRefill = false): array
     {
         if (empty($rawAnswers) || empty($offeringsData)) return [];
 
         $offeringUuids = array_column($offeringsData, 'offering_id');
 
-        $offerings = $partner->offerings()
-            ->whereIn('uuid', $offeringUuids)
-            ->with([
-                'questionnaires.questions'                     => fn($q) => $q->where('is_active', true),
-                'questionnaires.linkedQuestionnaire.questions' => fn($q) => $q->where('is_active', true),
-            ])
+        $eagerLoads = [
+            'questionnaires.questions'                     => fn($q) => $q->where('is_active', true),
+            'questionnaires.linkedQuestionnaire.questions' => fn($q) => $q->where('is_active', true),
+        ];
+
+        // For refill cases, also load the category's check-in questionnaire and
+        // its questions so we can prioritise check-in slugs over clinical ones.
+        if ($isRefill) {
+            $eagerLoads['category.checkInQuestionnaire.questions'] = fn($q) => $q->where('is_active', true);
+        }
+
+        $offerings = $partner->accessibleOfferings()
+            ->whereIn('offerings.uuid', $offeringUuids)
+            ->with($eagerLoads)
             ->get();
 
         $slugToQuestion    = []; // slug => QuestionnaireQuestion
         $idToQuestionnaire = []; // question_id => Questionnaire
         $seenIds           = [];
 
+        // Pass 1 (refill only): index check-in questionnaire questions first so
+        // they win when a slug exists in both the check-in and clinical forms.
+        if ($isRefill) {
+            foreach ($offerings as $offering) {
+                // Per-offering check-in (highest priority)
+                foreach ($offering->questionnaires->where('purpose', 'check_in') as $questionnaire) {
+                    if (! $questionnaire->is_active || in_array($questionnaire->id, $seenIds)) continue;
+                    $seenIds[] = $questionnaire->id;
+                    foreach ($questionnaire->questions as $q) {
+                        if ($q->slug) $slugToQuestion[$q->slug] = $q;
+                        $idToQuestionnaire[$q->id] = $questionnaire;
+                    }
+                }
+                // Category default check-in
+                $catQ = $offering->category?->checkInQuestionnaire;
+                if ($catQ && $catQ->is_active && ! in_array($catQ->id, $seenIds)) {
+                    $seenIds[] = $catQ->id;
+                    foreach ($catQ->questions as $q) {
+                        if ($q->slug) $slugToQuestion[$q->slug] = $q;
+                        $idToQuestionnaire[$q->id] = $catQ;
+                    }
+                }
+            }
+        }
+
+        // Pass 2: index clinical questionnaires (always; serves as fallback for refills)
         foreach ($offerings as $offering) {
-            foreach ($offering->questionnaires as $questionnaire) {
+            foreach ($offering->questionnaires->where('purpose', '!=', 'check_in') as $questionnaire) {
                 // Index linked questionnaire questions first (e.g. Standard Intake 1)
                 $linked = $questionnaire->linkedQuestionnaire;
                 if ($linked && !in_array($linked->id, $seenIds)) {
