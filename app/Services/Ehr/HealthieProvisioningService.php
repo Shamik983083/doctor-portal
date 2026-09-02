@@ -149,11 +149,13 @@ class HealthieProvisioningService
 
         [$firstName, $lastName] = $this->splitName($user->name);
 
+        // Healthie calls all providers "dietitian" internally regardless of specialty.
         $input = array_filter([
             'first_name' => $firstName,
             'last_name'  => $lastName ?: null,
             'email'      => $user->email,
             'password'   => Str::random(12) . 'A1!',
+            'role'       => 'dietitian',
         ], fn ($v) => $v !== null && $v !== '');
 
         $response = $this->graphql(
