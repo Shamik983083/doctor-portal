@@ -2,6 +2,7 @@
 
 namespace App\Services\Ehr;
 
+use App\Models\ClinicianHealthieMapping;
 use App\Models\PartnerEhrSetting;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -207,6 +208,24 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         }
         GQL;
 
+        // Resolve the Healthie provider ID for this specific clinician in this
+        // sub-org. Dynamic lookup takes precedence over the static default so
+        // that each doctor's prescriptions land under their own Healthie account,
+        // not a shared default. Falls back to default_provider_id when no mapping
+        // row exists yet (e.g. provisioning job still pending).
+        $clinicianId = $payload['encounter']['clinician_id'] ?? null;
+        $partnerId   = $payload['company']['partner_id'] ?? null;
+        $resolvedProviderId = null;
+
+        if ($clinicianId && $partnerId) {
+            $resolvedProviderId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
+                ->where('partner_id', $partnerId)
+                ->where('status', 'synced')
+                ->value('healthie_user_id');
+        }
+
+        $resolvedProviderId = $resolvedProviderId ?: ($this->settings->default_provider_id ?: null);
+
         // Build input and strip nulls/empty-strings. dont_send_welcome is kept
         // explicitly — it is a boolean and must not be stripped by the filter.
         $input = array_filter([
@@ -217,7 +236,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             'dob'               => $payload['patient']['date_of_birth'] ?? null,
             'gender'            => $payload['patient']['gender'] ?? null,
             'record_identifier' => $namespacedKey,
-            'dietitian_id'      => $this->settings->default_provider_id ?: null,
+            'dietitian_id'      => $resolvedProviderId,
             'user_group_id'     => $this->settings->default_group_id ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 

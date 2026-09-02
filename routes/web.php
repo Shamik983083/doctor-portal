@@ -206,6 +206,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/priority', [AdminClinicianController::class, 'priorityIndex'])->name('priority');
         Route::patch('/reorder', [AdminClinicianController::class, 'reorder'])->name('reorder');
         Route::patch('/{id}/case-load', [AdminClinicianController::class, 'updateCaseLoad'])->name('case-load');
+        Route::post('/{id}/resync-healthie', [AdminClinicianController::class, 'resyncHealthie'])->name('resync-healthie');
         Route::get('/{id}', [AdminClinicianController::class, 'show'])->name('show');
         Route::get('/{id}/edit', [AdminClinicianController::class, 'edit'])->name('edit');
         Route::put('/{id}', [AdminClinicianController::class, 'update'])->name('update');

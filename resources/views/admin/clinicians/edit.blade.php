@@ -338,11 +338,80 @@ $hasLicenses = count($licenseInfo) > 0;
                 </p>
             </div>
 
+            {{-- Healthie provisioning scope --}}
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Healthie Scope</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="is_global" value="1" id="is_global"
+                        {{ $clinician->is_global ? 'checked' : '' }}>
+                    <label class="form-check-label" for="is_global">
+                        Global clinician — provisioned into every Healthie-enabled storefront automatically
+                    </label>
+                </div>
+                <div class="form-text text-muted">
+                    Unchecked means this clinician is storefront-scoped (full partner assignment coming with the compliance branch).
+                </div>
+            </div>
+
             <div class="d-flex gap-2 mt-2">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
                 <a href="{{ route('admin.clinicians.show', $clinician->id) }}" class="btn btn-outline-secondary">Cancel</a>
             </div>
         </form>
+
+        {{-- Healthie sync status (read-only, outside the main form) --}}
+        @if(auth()->user()->isSuperAdmin())
+        <div class="mt-4 pt-3 border-top">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Healthie Sub-org Sync Status</h6>
+                <form method="POST" action="{{ route('admin.clinicians.resync-healthie', $clinician->id) }}">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-repeat me-1"></i>Re-sync to Healthie
+                    </button>
+                </form>
+            </div>
+
+            @if($healthieMappings->isEmpty())
+                <p class="text-muted small mb-0">No Healthie mappings yet. Provisioning runs asynchronously after save — check back shortly.</p>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-sm small mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Storefront</th>
+                                <th>Healthie User ID</th>
+                                <th>Org ID</th>
+                                <th>Status</th>
+                                <th>Last Error</th>
+                                <th>Synced At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($healthieMappings as $map)
+                            <tr>
+                                <td>{{ $map->partner->name ?? '—' }}</td>
+                                <td>{{ $map->healthie_user_id ?? '—' }}</td>
+                                <td>{{ $map->healthie_org_id ?? '—' }}</td>
+                                <td>
+                                    @if($map->status === 'synced')
+                                        <span class="badge bg-success">synced</span>
+                                    @elseif($map->status === 'failed')
+                                        <span class="badge bg-danger">failed</span>
+                                    @else
+                                        <span class="badge bg-secondary">pending</span>
+                                    @endif
+                                </td>
+                                <td class="text-danger">{{ $map->last_error ? Str::limit($map->last_error, 80) : '—' }}</td>
+                                <td>{{ $map->synced_at?->format('M d, H:i') ?? '—' }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+        @endif
     </div>
 </div>
 @endsection

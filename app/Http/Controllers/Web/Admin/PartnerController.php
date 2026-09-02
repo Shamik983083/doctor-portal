@@ -3,14 +3,17 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProvisionAllCliniciansForPartnerJob;
 use App\Models\Clinician;
 use App\Models\Partner;
 use App\Models\PartnerEhrSetting;
 use App\Models\User;
+use App\Services\Ehr\HealthieProvisioningService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Passport\ClientRepository;
@@ -70,6 +73,9 @@ class PartnerController extends Controller
         $partner = Partner::create($partnerData);
 
         $this->saveHealthieSettings($partner, $request);
+
+        // Auto-create Healthie sub-org if API key was provided at creation time.
+        $this->maybeCreateHealthieSubOrg($partner);
 
         // Create Passport client for this partner
         $clientRepo = app(ClientRepository::class);
@@ -214,6 +220,10 @@ class PartnerController extends Controller
             'sandbox_validated' => $request->boolean('healthie_sandbox_validated'),
         ]);
 
+        // Fallback: if sub-org creation was missed at create time (e.g. API key
+        // was not filled in then), create it now that credentials are present.
+        $this->maybeCreateHealthieSubOrg($partner);
+
         return redirect()->route('admin.partners.index')
             ->with('success', 'Partner updated.')
             ->with('warning', $this->healthieConfigWarning($partner));
@@ -319,6 +329,52 @@ class PartnerController extends Controller
         $webhook->delete();
 
         return redirect()->route('admin.partners.show', $partner->id)->with('success', 'Webhook deleted.');
+    }
+
+    /**
+     * Create a Healthie sub-org for this partner if:
+     *   - they have an API key saved (credentials exist), AND
+     *   - they do NOT already have an organization_id (hasn't been created yet).
+     *
+     * On success: stores the returned org ID and dispatches provider provisioning.
+     * On failure: logs the error and flashes a warning — the partner record is
+     * still saved; admin can trigger a retry by saving EHR settings again.
+     */
+    private function maybeCreateHealthieSubOrg(Partner $partner): void
+    {
+        $settings = PartnerEhrSetting::where('partner_id', $partner->id)
+            ->where('provider', 'healthie')
+            ->first();
+
+        // No credentials yet, or org already exists — nothing to do.
+        if (! $settings || empty($settings->api_key) || ! empty($settings->organization_id)) {
+            return;
+        }
+
+        // Parent API key required for sub-org creation.
+        if (empty(config('ehr.healthie.parent_api_key'))) {
+            return;
+        }
+
+        try {
+            $service = app(HealthieProvisioningService::class);
+            $orgId   = $service->createSubOrganization($partner);
+
+            $settings->update(['organization_id' => $orgId]);
+
+            // Provision all active global clinicians into the new sub-org.
+            ProvisionAllCliniciansForPartnerJob::dispatch($partner->id);
+        } catch (\Throwable $e) {
+            Log::warning('HealthieProvisioning: sub-org creation failed', [
+                'partner_id' => $partner->id,
+                'error'      => $e->getMessage(),
+            ]);
+
+            session()->flash('healthie_warning',
+                'Partner saved, but Healthie sub-org creation failed: ' . $e->getMessage()
+                . ' — save the partner\'s EHR settings again to retry.'
+            );
+        }
     }
 
     /**

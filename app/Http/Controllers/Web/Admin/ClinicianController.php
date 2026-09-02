@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProvisionClinicianInHealthieJob;
 use App\Models\Clinician;
+use App\Models\ClinicianHealthieMapping;
+use App\Models\PartnerEhrSetting;
 use App\Models\PatientCase;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -38,6 +41,7 @@ class ClinicianController extends Controller
             'npi'                       => 'required|string',
             'specialty'                 => 'nullable|string',
             'credentials'               => 'required|in:MD,DO,NP,PA',
+            'is_global'                 => 'nullable|boolean',
             'license_info'              => 'required|array|min:1',
             'license_info.*.state'      => 'required|string|size:2',
             'license_info.*.number'     => 'required|string|max:100',
@@ -66,6 +70,7 @@ class ClinicianController extends Controller
             'specialty'       => $data['specialty'] ?? null,
             'credentials'     => $data['credentials'] ?? null,
             'licensed_states' => $licensedStates,
+            'is_global'       => $request->boolean('is_global', true),
         ]);
 
         /*
@@ -79,6 +84,10 @@ class ClinicianController extends Controller
             $actor->managedClinicians()->syncWithoutDetaching([$clinician->id]);
         }
 
+        // Provision into Healthie sub-orgs asynchronously so the UI doesn't block
+        // on N API calls. The job fans out across all configured partners.
+        ProvisionClinicianInHealthieJob::dispatch($clinician);
+
         return redirect()->route('admin.clinicians.index')->with('success', 'Clinician created.');
     }
 
@@ -91,7 +100,7 @@ class ClinicianController extends Controller
     public function edit(int $id)
     {
         $clinician = Clinician::visibleTo(auth()->user())
-            ->with(['user', 'acceptedCategories'])
+            ->with(['user', 'acceptedCategories', 'healthieMappings.partner'])
             ->findOrFail($id);
 
         // The eligibility gate's doctor side (Devin msg 2308). Only active
@@ -105,7 +114,27 @@ class ClinicianController extends Controller
             'clinician'            => $clinician,
             'categories'           => $categories,
             'acceptedCategoryIds'  => $clinician->acceptedCategories->pluck('id')->all(),
+            'healthieMappings'     => $clinician->healthieMappings,
         ]);
+    }
+
+    /**
+     * Force re-sync this clinician into all Healthie sub-orgs.
+     * Resets failed/pending mappings so the job retries them.
+     */
+    public function resyncHealthie(int $id)
+    {
+        $clinician = Clinician::visibleTo(auth()->user())->findOrFail($id);
+
+        // Reset failed rows so the job doesn't skip them.
+        ClinicianHealthieMapping::where('clinician_id', $clinician->id)
+            ->where('status', ClinicianHealthieMapping::STATUS_FAILED)
+            ->update(['status' => ClinicianHealthieMapping::STATUS_PENDING, 'last_error' => null]);
+
+        ProvisionClinicianInHealthieJob::dispatch($clinician);
+
+        return redirect()->route('admin.clinicians.edit', $clinician->id)
+            ->with('success', 'Healthie re-sync queued. Refresh in a few seconds to see updated status.');
     }
 
     public function update(Request $request, int $id)
@@ -131,6 +160,7 @@ class ClinicianController extends Controller
             // The eligibility gate, doctor side (Devin msg 2308).
             'accepted_categories'   => 'nullable|array',
             'accepted_categories.*' => 'integer|exists:offering_categories,id',
+            'is_global'             => 'nullable|boolean',
             'accepts_async_visits'  => 'nullable|boolean',
             'accepts_sync_visits'   => 'nullable|boolean',
             'scheduling_link'       => 'nullable|url|max:500',
@@ -175,6 +205,7 @@ class ClinicianController extends Controller
             // book, which is why this is validated as a real URL.
             'scheduling_link'              => $data['scheduling_link'] ?? null,
             'licensed_states' => $licensedStates,
+            'is_global'       => $request->boolean('is_global', true),
         ]);
 
         /*
@@ -184,6 +215,10 @@ class ClinicianController extends Controller
          * fail-closed reading, matching how blank licensure now behaves.
          */
         $clinician->acceptedCategories()->sync($data['accepted_categories'] ?? []);
+
+        // Re-provision into Healthie in case is_global changed or new partners
+        // were configured since the last sync. Skips already-synced mappings.
+        ProvisionClinicianInHealthieJob::dispatch($clinician);
 
         return redirect()->route('admin.clinicians.show', $clinician->id)
             ->with('success', 'Clinician updated successfully.');

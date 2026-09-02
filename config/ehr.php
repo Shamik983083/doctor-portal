@@ -36,6 +36,12 @@ return [
         'endpoint' => env('HEALTHIE_ENDPOINT', 'https://staging-api.gethealthie.com/graphql'),
         'api_key'  => env('HEALTHIE_API_KEY'),
         'timeout'  => (int) env('HEALTHIE_TIMEOUT', 30),
+
+        // Parent org API key used to create sub-organizations.
+        // This is the master Healthie account's key, separate from per-partner keys.
+        // Required only for auto sub-org provisioning; per-partner pushes use
+        // the key stored in partner_ehr_settings.
+        'parent_api_key' => env('HEALTHIE_PARENT_API_KEY'),
     ],
 
     // Outbox retry policy, matching the pharmacy dispatch job's posture.

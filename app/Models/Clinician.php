@@ -27,6 +27,8 @@ class Clinician extends Model
         'cases_last_viewed_at',
         // B3: set when a case auto-releases due to a missed deadline; blocks pool pulls until it clears.
         'pool_cooldown_until',
+        // Healthie provisioning: global clinicians are synced into every enabled sub-org automatically.
+        'is_global',
     ];
 
     protected $casts = [
@@ -37,6 +39,7 @@ class Clinician extends Model
         'accepts_sync_visits' => 'boolean',
         'pool_cooldown_until' => 'datetime',
         'cases_last_viewed_at' => 'datetime',
+        'is_global' => 'boolean',
     ];
 
     /**
@@ -163,6 +166,7 @@ class Clinician extends Model
     public function cases() { return $this->hasMany(PatientCase::class); }
     public function clinicalNotes() { return $this->hasMany(ClinicalNote::class); }
     public function messages() { return $this->hasMany(Message::class); }
+    public function healthieMappings() { return $this->hasMany(ClinicianHealthieMapping::class); }
 
     public function getFullNameAttribute(): string
     {

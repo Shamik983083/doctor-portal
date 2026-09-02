@@ -224,11 +224,14 @@ class EhrRecordService
             ], fn ($v) => $v !== null),
 
             'encounter' => [
-                'visit_type'  => $case->visit_type,
-                'status'      => $case->status,
-                'approved_at' => optional($case->approved_at)->toIso8601String(),
-                'triage'      => $case->triage,
-                'clinician'   => [
+                'visit_type'   => $case->visit_type,
+                'status'       => $case->status,
+                'approved_at'  => optional($case->approved_at)->toIso8601String(),
+                'triage'       => $case->triage,
+                // clinician_id is carried so the adapter can look up the dynamic
+                // Healthie user ID for this clinician in this partner's sub-org.
+                'clinician_id' => $case->clinician_id,
+                'clinician'    => [
                     'name' => $case->clinician?->full_name,
                     'npi'  => $case->clinician?->npi,
                 ],
