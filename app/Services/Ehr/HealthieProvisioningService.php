@@ -190,6 +190,98 @@ class HealthieProvisioningService
     }
 
     /**
+     * Create a Healthie sub-organisation for a sub-storefront AND an admin user for it,
+     * using real owner details supplied by the tenant portal at registration time.
+     *
+     * Generates a random password, creates the sub-org (which simultaneously creates
+     * the admin user), then returns both the org ID and the password so the caller
+     * can hand them back to the tenant portal in the API response.
+     *
+     * The password is NOT stored anywhere in this system — it must be relayed by the
+     * tenant portal to the new user (email, display, etc.). If they lose it, a
+     * Healthie password-reset flow must be used.
+     *
+     * Returns: ['org_id' => string, 'temporary_password' => string]
+     */
+    public function createSubOrgWithOwner(
+        SubStorefront $subStorefront,
+        PartnerEhrSetting $partnerSettings,
+        string $firstName,
+        string $lastName,
+        string $email,
+    ): array {
+        $apiKey   = $partnerSettings->api_key;
+        $endpoint = $partnerSettings->endpoint ?: config('ehr.healthie.endpoint');
+
+        if (empty($apiKey)) {
+            throw new RuntimeException(
+                "Cannot create Healthie sub-org for sub-storefront [{$subStorefront->id}]: "
+                . "partner [{$subStorefront->partner_id}] has no Healthie API key configured."
+            );
+        }
+
+        $mutation = <<<'GQL'
+        mutation CreateSubOrganization($input: createOrganizationInput!) {
+            createOrganization(input: $input) {
+                organization {
+                    id
+                    name
+                }
+                messages {
+                    field
+                    message
+                }
+            }
+        }
+        GQL;
+
+        $password = Str::random(10) . 'A1!';
+
+        $response = $this->graphql($mutation, [
+            'input' => [
+                'email'                     => $email,
+                'first_name'                => $firstName,
+                'last_name'                 => $lastName ?: 'Admin',
+                'password'                  => $password,
+                'create_as_suborganization' => true,
+                'organization_email'        => $email,
+                'organization_info'         => [
+                    'name' => $subStorefront->name,
+                ],
+            ],
+        ], $apiKey, $endpoint, $partnerSettings->authorization_shard);
+
+        $json  = $response->json();
+
+        if (! empty($json['errors'])) {
+            $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
+            throw new RuntimeException("Healthie sub-org creation failed for sub-storefront [{$subStorefront->name}]: {$msg}");
+        }
+
+        $orgId = $json['data']['createOrganization']['organization']['id'] ?? null;
+
+        if (! $orgId) {
+            $fieldErrors = $json['data']['createOrganization']['messages'] ?? [];
+            $detail      = implode('; ', array_map(
+                fn ($m) => ($m['field'] ?? '?') . ': ' . ($m['message'] ?? '?'),
+                $fieldErrors
+            ));
+            throw new RuntimeException("Healthie returned no organization ID for sub-storefront [{$subStorefront->name}]. {$detail}");
+        }
+
+        Log::info('HealthieProvisioning: sub-org created with owner', [
+            'sub_storefront_id' => $subStorefront->id,
+            'org_id'            => $orgId,
+            'owner_email'       => $email,
+        ]);
+
+        return [
+            'org_id'             => (string) $orgId,
+            'temporary_password' => $password,
+        ];
+    }
+
+    /**
      * Find or create a Healthie provider inside a sub-storefront's Healthie sub-org.
      *
      * Uses the sub-storefront's own credentials (api_key, endpoint, organization_id).
