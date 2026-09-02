@@ -110,17 +110,18 @@ class HealthieProvisioningService
     }
 
     /**
-     * Find or create a Healthie provider user in the given partner's sub-org.
+     * Find or create a Healthie provider in the given partner's sub-org.
      *
-     * Authenticated as the sub-org using the partner's own API key.
-     * First checks if a user with this email already exists to stay idempotent.
+     * Uses createOrganizationMembership which creates the provider account AND
+     * adds them to the org in a single call — signUp alone cannot target a specific
+     * sub-org. If the provider already exists in this sub-org, returns their ID.
      * Returns the Healthie user ID.
      */
     public function provisionClinician(Clinician $clinician, PartnerEhrSetting $settings): string
     {
-        if (empty($settings->api_key) || empty($settings->endpoint)) {
+        if (empty($settings->api_key) || empty($settings->endpoint) || empty($settings->organization_id)) {
             throw new RuntimeException(
-                "Partner [{$settings->partner_id}] has no Healthie API key or endpoint. "
+                "Partner [{$settings->partner_id}] is missing Healthie API key, endpoint, or organization_id. "
                 . 'Configure those fields before provisioning providers.'
             );
         }
@@ -134,10 +135,13 @@ class HealthieProvisioningService
         }
 
         $mutation = <<<'GQL'
-        mutation CreateProvider($input: signUpInput!) {
-            signUp(input: $input) {
-                user {
+        mutation CreateOrgMember($input: createOrganizationMembershipInput!) {
+            createOrganizationMembership(input: $input) {
+                organizationMembership {
                     id
+                    user {
+                        id
+                    }
                 }
                 messages {
                     field
@@ -149,21 +153,17 @@ class HealthieProvisioningService
 
         [$firstName, $lastName] = $this->splitName($user->name);
 
-        // Healthie calls all providers "dietitian" internally regardless of specialty.
-        // phone_number is required by Healthie for dietitian accounts; fall back to a
-        // placeholder until the Clinician model gains its own phone column.
-        $input = array_filter([
-            'first_name'   => $firstName,
-            'last_name'    => $lastName ?: null,
-            'email'        => $user->email,
-            'password'     => Str::random(12) . 'A1!',
-            'role'         => 'dietitian',
-            'phone_number' => $clinician->phone ?? $user->phone ?? '0000000000',
-        ], fn ($v) => $v !== null && $v !== '');
-
         $response = $this->graphql(
             $mutation,
-            ['input' => $input],
+            ['input' => array_filter([
+                'email'             => $user->email,
+                'first_name'        => $firstName,
+                'last_name'         => $lastName ?: null,
+                'password'          => Str::random(12) . 'A1!',
+                'org_role'          => 'dietitian',
+                'organization_id'   => $settings->organization_id,
+                'send_invite_email' => false,
+            ], fn ($v) => $v !== null && $v !== '')],
             $settings->api_key,
             $settings->endpoint,
             $settings->authorization_shard
@@ -179,66 +179,38 @@ class HealthieProvisioningService
             );
         }
 
-        $userId = $json['data']['signUp']['user']['id'] ?? null;
+        $membership  = $json['data']['createOrganizationMembership']['organizationMembership'] ?? null;
+        $userId      = $membership['user']['id'] ?? null;
+        $fieldErrors = $json['data']['createOrganizationMembership']['messages'] ?? [];
 
         if (! $userId) {
-            $fieldErrors = $json['data']['signUp']['messages'] ?? [];
-            $detail      = implode('; ', array_map(
+            // "Already a member" arrives as a field error — look them up instead of failing.
+            foreach ($fieldErrors as $fe) {
+                if (str_contains(strtolower($fe['message'] ?? ''), 'already')) {
+                    $found = $this->findProviderByEmail($user->email, $settings);
+                    if ($found) {
+                        return $found;
+                    }
+                }
+            }
+
+            $detail = implode('; ', array_map(
                 fn ($m) => ($m['field'] ?? '?') . ': ' . ($m['message'] ?? '?'),
                 $fieldErrors
             ));
             throw new RuntimeException(
-                "Healthie returned no user ID after signUp for clinician [{$clinician->id}]. {$detail}"
+                "Healthie returned no user ID after createOrganizationMembership for clinician [{$clinician->id}]. {$detail}"
             );
         }
+
+        Log::info('HealthieProvisioning: clinician provisioned into org', [
+            'clinician_id' => $clinician->id,
+            'partner_id'   => $settings->partner_id,
+            'healthie_id'  => $userId,
+            'org_id'       => $settings->organization_id,
+        ]);
 
         return (string) $userId;
-    }
-
-    /**
-     * Add an existing Healthie user to an organisation as a provider member.
-     *
-     * Idempotent: "already a member" responses are silently absorbed so
-     * re-running provisioning never fails on an already-synced clinician.
-     */
-    public function addProviderToOrg(string $healthieUserId, string $orgId, PartnerEhrSetting $settings): void
-    {
-        $mutation = <<<'GQL'
-        mutation AddProviderToOrg($input: createOrganizationMembershipInput!) {
-            createOrganizationMembership(input: $input) {
-                organizationMembership {
-                    id
-                }
-                messages {
-                    field
-                    message
-                }
-            }
-        }
-        GQL;
-
-        $response = $this->graphql(
-            $mutation,
-            ['input' => ['user_id' => $healthieUserId, 'organization_id' => $orgId, 'role' => 'provider']],
-            $settings->api_key,
-            $settings->endpoint,
-            $settings->authorization_shard
-        );
-
-        $json = $response->json();
-
-        if (! empty($json['errors'])) {
-            $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
-
-            // "Already a member" is not a real failure — provisioning re-runs must be idempotent.
-            if (str_contains(strtolower($msg), 'already')) {
-                return;
-            }
-
-            throw new RuntimeException(
-                "Failed to add Healthie user [{$healthieUserId}] to org [{$orgId}]: {$msg}"
-            );
-        }
     }
 
     /**

@@ -66,10 +66,6 @@ class ProvisionClinicianInHealthieJob implements ShouldQueue
         try {
             $healthieUserId = $service->provisionClinician($this->clinician, $settings);
 
-            if (! empty($settings->organization_id)) {
-                $service->addProviderToOrg($healthieUserId, $settings->organization_id, $settings);
-            }
-
             $mapping->fill([
                 'healthie_user_id' => $healthieUserId,
                 'healthie_org_id'  => $settings->organization_id,
