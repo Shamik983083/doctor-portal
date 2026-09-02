@@ -218,9 +218,10 @@ class HealthieProvisioningService
      */
     private function findProviderByEmail(string $email, PartnerEhrSetting $settings): ?string
     {
+        // type: "Provider" is required — without it Healthie returns only patients.
         $query = <<<'GQL'
         query FindProvider($keywords: String) {
-            users(keywords: $keywords, offset: 0, should_paginate: false) {
+            users(keywords: $keywords, offset: 0, should_paginate: false, type: "Provider") {
                 id
                 email
             }
