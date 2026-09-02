@@ -71,6 +71,7 @@ Content-Type: application/json
   "hold_status":    false,
   "is_refill":      false,
   "metadata":       { "source": "patient-portal" },
+  "sub_storefront_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
 
   "offerings": [
     { "product_key": "semaglutide", "month_frequency": 12, "quantity": 1 }
@@ -136,6 +137,7 @@ Content-Type: application/json
 | `hold_status` | — | boolean | `true` = case sits on hold until you release it via `POST /{uuid}/hold`. Default `false`. |
 | `is_refill` | — | boolean | `true` = refill / check-in. See [Refill Cases](#refill--check-in-cases). Default `false`. |
 | `metadata` | — | object | Free-form JSON stored verbatim on the case. Not used clinically. |
+| `sub_storefront_id` | — | UUID string | UUID of the sub-storefront this case belongs to. Obtain from your admin portal. Must belong to your partner account and have `status: active`. When present, the case is segregated under that sub-storefront's Healthie sub-org and all webhook events include this ID. Omit for cases that are not sub-storefront-specific. |
 
 ---
 
@@ -379,7 +381,7 @@ The portal sends a `POST` to your URL with `Content-Type: application/json` for 
 | `order_status_changed` | Order status updated |
 | `tracking_number_changed` | Shipping tracking number added |
 
-All payloads include at minimum: `case_id` (UUID), `patient_id` (UUID), `status`, and `timestamp` (Unix).
+All payloads include at minimum: `case_id` (UUID), `patient_id` (UUID), `status`, `timestamp` (Unix), and `sub_storefront_id` (UUID string, or `null` when the case is not tied to a sub-storefront).
 
 The `prescription_written` payload additionally includes:
 ```json

@@ -57,6 +57,9 @@ class Partner extends Model
     public function webhooks() { return $this->hasMany(Webhook::class); }
     public function vouchers() { return $this->hasMany(Voucher::class); }
 
+    /** Sub-storefronts (tenants) that belong to this partner. */
+    public function subStorefronts() { return $this->hasMany(SubStorefront::class); }
+
     /** Per-company EHR credentials. One row per provider; there is no shared credential. */
     public function ehrSettings() { return $this->hasMany(PartnerEhrSetting::class); }
     public function healthieSettings() { return $this->hasOne(PartnerEhrSetting::class)->where('provider', 'healthie'); }

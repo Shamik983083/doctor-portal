@@ -14,7 +14,7 @@ class PatientCase extends Model
     protected $table = 'cases';
 
     protected $fillable = [
-        'uuid', 'partner_id', 'patient_id', 'clinician_id', 'external_id',
+        'uuid', 'partner_id', 'sub_storefront_id', 'patient_id', 'clinician_id', 'external_id',
         'status', 'hold_status', 'is_chargeable', 'charge_amount',
         'support_note', 'support_at', 'cancellation_reason', 'patient_state', 'visit_type',
         'is_refill',
@@ -277,6 +277,7 @@ class PatientCase extends Model
     }
 
     public function partner() { return $this->belongsTo(Partner::class); }
+    public function subStorefront() { return $this->belongsTo(SubStorefront::class); }
     public function patient() { return $this->belongsTo(Patient::class); }
     public function clinician() { return $this->belongsTo(Clinician::class); }
     public function caseOfferings() { return $this->hasMany(CaseOffering::class, 'case_id'); }

@@ -11,6 +11,7 @@ use App\Models\PatientFile;
 use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireQuestion;
 use App\Models\QuestionnaireResponse;
+use App\Models\SubStorefront;
 use App\Services\CaseStateMachine;
 use App\Services\CheckInQuestionnaireResolver;
 use Illuminate\Http\Request;
@@ -75,6 +76,7 @@ class CaseController extends Controller
             'is_refill'                                       => 'nullable|boolean',
             'hold_status'                                     => 'boolean',
             'is_chargeable'                                   => 'boolean',
+            'sub_storefront_id'                               => 'nullable|string|uuid',
             'patient_state'                                   => 'nullable|string|size:2',
             'metadata'                                        => 'nullable|array',
             /*
@@ -315,12 +317,28 @@ class CaseController extends Controller
             return response()->json(['message' => 'Case with this external_id already exists.'], 409);
         }
 
-        $case = DB::transaction(function () use ($data, $partner, $patient, $request, $resolvedOfferings) {
+        $subStorefront = null;
+        if (!empty($data['sub_storefront_id'])) {
+            $subStorefront = SubStorefront::where('uuid', $data['sub_storefront_id'])
+                ->where('partner_id', $partner->id)
+                ->where('status', 'active')
+                ->first();
+
+            if (!$subStorefront) {
+                return response()->json([
+                    'message' => 'sub_storefront_id does not belong to this partner or is not active.',
+                    'errors'  => ['sub_storefront_id' => ['Invalid sub-storefront.']],
+                ], 422);
+            }
+        }
+
+        $case = DB::transaction(function () use ($data, $partner, $patient, $request, $resolvedOfferings, $subStorefront) {
             $case = $partner->cases()->create([
-                'patient_id'    => $patient->id,
-                'external_id'   => $data['external_id'] ?? null,
-                'visit_type'    => $data['visit_type'] ?? null,
-                'is_refill'     => $data['is_refill'] ?? false,
+                'patient_id'      => $patient->id,
+                'external_id'     => $data['external_id'] ?? null,
+                'visit_type'      => $data['visit_type'] ?? null,
+                'is_refill'       => $data['is_refill'] ?? false,
+                'sub_storefront_id' => $subStorefront?->id,
                 'clinical_intake' => $data['clinical_intake'] ?? null,
                 'hold_status'   => $data['hold_status'] ?? false,
                 'is_chargeable' => $data['is_chargeable'] ?? true,

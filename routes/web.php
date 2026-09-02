@@ -10,6 +10,7 @@ use App\Http\Controllers\Web\Admin\CaseController as AdminCaseController;
 use App\Http\Controllers\Web\Admin\PatientController as AdminPatientController;
 use App\Http\Controllers\Web\Admin\PartnerController as AdminPartnerController;
 use App\Http\Controllers\Web\Admin\PartnerProductPlanController as AdminPartnerProductPlanController;
+use App\Http\Controllers\Web\Admin\SubStorefrontController as AdminSubStorefrontController;
 use App\Http\Controllers\Web\Admin\ClinicianController as AdminClinicianController;
 use App\Http\Controllers\Web\Admin\OfferingController as AdminOfferingController;
 use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCategoryController;
@@ -185,6 +186,13 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::delete('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'destroyWebhook'])->name('webhooks.destroy');
         Route::delete('/{id}', [AdminPartnerController::class, 'destroy'])->name('destroy');
         Route::get('/{id}/healthie-lookup', [AdminPartnerController::class, 'healthieLookup'])->name('healthie-lookup');
+        // Sub-storefronts: tenant-level Healthie sub-orgs nested under a partner
+        Route::get('/{partnerId}/sub-storefronts', [AdminSubStorefrontController::class, 'index'])->name('sub-storefronts.index');
+        Route::get('/{partnerId}/sub-storefronts/create', [AdminSubStorefrontController::class, 'create'])->name('sub-storefronts.create');
+        Route::post('/{partnerId}/sub-storefronts', [AdminSubStorefrontController::class, 'store'])->name('sub-storefronts.store');
+        Route::get('/{partnerId}/sub-storefronts/{subStorefront}/edit', [AdminSubStorefrontController::class, 'edit'])->name('sub-storefronts.edit');
+        Route::put('/{partnerId}/sub-storefronts/{subStorefront}', [AdminSubStorefrontController::class, 'update'])->name('sub-storefronts.update');
+        Route::delete('/{partnerId}/sub-storefronts/{subStorefront}', [AdminSubStorefrontController::class, 'destroy'])->name('sub-storefronts.destroy');
         // Product plans (one-to-many product_key ↔ offering mapping)
         Route::get('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'index'])->name('product-plans.index');
         Route::post('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'store'])->name('product-plans.store');

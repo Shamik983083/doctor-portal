@@ -4,6 +4,7 @@ namespace App\Services\Ehr;
 
 use App\Models\ClinicianHealthieMapping;
 use App\Models\PartnerEhrSetting;
+use App\Models\SubStorefront;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -55,7 +56,44 @@ use RuntimeException;
  */
 class HealthieEhrAdapter implements EhrGatewayAdapter
 {
+    /**
+     * When non-null, this adapter is operating in sub-storefront mode: clinician
+     * mapping lookups use sub_storefront_id instead of partner_id.
+     * Credentials (api_key, endpoint, etc.) are already baked into $settings.
+     */
+    public ?int $subStorefrontId = null;
+
     public function __construct(private PartnerEhrSetting $settings) {}
+
+    /**
+     * Build an adapter from a sub-storefront's own Healthie credentials.
+     *
+     * Creates a synthetic PartnerEhrSetting from the sub-storefront's fields so
+     * all downstream credential access flows through the same $this->settings path.
+     * The $settings->partner_id is the sub-storefront's parent partner, preserving
+     * the assertPayloadBelongsToThisCompany() check.
+     */
+    public static function forSubStorefront(SubStorefront $subStorefront): self
+    {
+        $settings             = new PartnerEhrSetting();
+        $settings->partner_id = $subStorefront->partner_id;
+        $settings->provider   = 'healthie';
+        // Assign decrypted values; the encrypted cast stores them correctly in-memory
+        $settings->api_key               = $subStorefront->healthie_api_key;
+        $settings->endpoint              = $subStorefront->healthie_endpoint;
+        $settings->authorization_shard   = $subStorefront->healthie_authorization_shard;
+        $settings->organization_id       = $subStorefront->healthie_organization_id;
+        $settings->default_provider_id   = $subStorefront->healthie_default_provider_id;
+        $settings->note_form_id          = $subStorefront->healthie_note_form_id;
+        $settings->default_group_id      = $subStorefront->healthie_default_group_id;
+        $settings->is_enabled            = $subStorefront->healthie_is_enabled;
+        $settings->sandbox_validated     = $subStorefront->healthie_sandbox_validated;
+
+        $instance                  = new self($settings);
+        $instance->subStorefrontId = $subStorefront->id;
+
+        return $instance;
+    }
 
     public function key(): string { return 'healthie'; }
 
@@ -217,11 +255,21 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         $partnerId   = $payload['company']['partner_id'] ?? null;
         $resolvedProviderId = null;
 
-        if ($clinicianId && $partnerId) {
-            $resolvedProviderId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
-                ->where('partner_id', $partnerId)
-                ->where('status', 'synced')
-                ->value('healthie_user_id');
+        if ($clinicianId) {
+            if ($this->subStorefrontId) {
+                // Sub-storefront mode: look up the mapping that was provisioned into this specific sub-org.
+                $resolvedProviderId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
+                    ->where('sub_storefront_id', $this->subStorefrontId)
+                    ->where('status', 'synced')
+                    ->value('healthie_user_id');
+            } elseif ($partnerId) {
+                // Partner-level mode: look up partner-level mappings (sub_storefront_id IS NULL).
+                $resolvedProviderId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
+                    ->where('partner_id', $partnerId)
+                    ->whereNull('sub_storefront_id')
+                    ->where('status', 'synced')
+                    ->value('healthie_user_id');
+            }
         }
 
         $resolvedProviderId = $resolvedProviderId ?: ($this->settings->default_provider_id ?: null);

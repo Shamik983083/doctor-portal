@@ -25,6 +25,7 @@ class ClinicianHealthieMapping extends Model
     protected $fillable = [
         'clinician_id',
         'partner_id',
+        'sub_storefront_id',
         'healthie_user_id',
         'healthie_org_id',
         'status',
@@ -44,5 +45,10 @@ class ClinicianHealthieMapping extends Model
     public function partner(): BelongsTo
     {
         return $this->belongsTo(Partner::class);
+    }
+
+    public function subStorefront(): BelongsTo
+    {
+        return $this->belongsTo(SubStorefront::class);
     }
 }

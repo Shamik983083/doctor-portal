@@ -127,6 +127,40 @@
             </div>
         </div>
 
+        {{-- Sub-Storefronts --}}
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Sub-Storefronts</h6>
+                <a href="{{ route('admin.partners.sub-storefronts.index', $partner->id) }}" class="btn btn-sm btn-outline-secondary">
+                    Manage
+                </a>
+            </div>
+            @php $subStorefronts = $partner->subStorefronts()->where('status', 'active')->get(); @endphp
+            @if($subStorefronts->isEmpty())
+                <div class="card-body text-center text-muted small py-3">
+                    <i class="bi bi-diagram-3 d-block mb-1 opacity-25"></i>
+                    No sub-storefronts.
+                    <a href="{{ route('admin.partners.sub-storefronts.create', $partner->id) }}" class="d-block mt-1">Create one</a>
+                </div>
+            @else
+                <ul class="list-group list-group-flush">
+                    @foreach($subStorefronts as $sf)
+                    <li class="list-group-item px-3 py-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-semibold small">{{ $sf->name }}</div>
+                            <div class="text-muted" style="font-size:.76rem">{{ $sf->uuid }}</div>
+                        </div>
+                        @if($sf->healthie_organization_id)
+                            <span class="badge bg-success" title="Healthie org provisioned"><i class="bi bi-check-circle-fill"></i></span>
+                        @else
+                            <span class="badge bg-warning text-dark" title="Not provisioned in Healthie"><i class="bi bi-exclamation-circle"></i></span>
+                        @endif
+                    </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+
         {{-- Partner Users --}}
         <div class="card mt-3">
             <div class="card-header d-flex justify-content-between align-items-center">
