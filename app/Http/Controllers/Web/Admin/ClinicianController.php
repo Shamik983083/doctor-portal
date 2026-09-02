@@ -38,6 +38,7 @@ class ClinicianController extends Controller
             'name'                      => 'required|string',
             'email'                     => 'required|email|unique:users',
             'password'                  => 'required|min:8|confirmed',
+            'phone'                     => 'required|string|max:30',
             'npi'                       => 'required|string',
             'specialty'                 => 'nullable|string',
             'credentials'               => 'required|in:MD,DO,NP,PA',
@@ -66,6 +67,7 @@ class ClinicianController extends Controller
 
         $clinician = Clinician::create([
             'user_id'         => $user->id,
+            'phone'           => $data['phone'],
             'npi'             => $data['npi'] ?? null,
             'specialty'       => $data['specialty'] ?? null,
             'credentials'     => $data['credentials'] ?? null,
@@ -145,6 +147,7 @@ class ClinicianController extends Controller
             'name'                 => 'required|string',
             'email'                => 'required|email|unique:users,email,' . $clinician->user_id,
             'password'             => 'nullable|min:8|confirmed',
+            'phone'                => 'required|string|max:30',
             'npi'                  => 'required|string',
             'specialty'            => 'nullable|string',
             'credentials'          => 'required|in:MD,DO,NP,PA',
@@ -186,6 +189,7 @@ class ClinicianController extends Controller
         }
 
         $clinician->update([
+            'phone'           => $data['phone'],
             'npi'             => $data['npi'],
             'specialty'       => $data['specialty'] ?? null,
             'credentials'     => $data['credentials'],

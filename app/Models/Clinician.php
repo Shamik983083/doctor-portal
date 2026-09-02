@@ -29,6 +29,8 @@ class Clinician extends Model
         'pool_cooldown_until',
         // Healthie provisioning: global clinicians are synced into every enabled sub-org automatically.
         'is_global',
+        // Required by Healthie signUp/createOrganizationMembership for provider accounts.
+        'phone',
     ];
 
     protected $casts = [

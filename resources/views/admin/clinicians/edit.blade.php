@@ -68,6 +68,15 @@ $hasLicenses = count($licenseInfo) > 0;
                 </div>
             </div>
 
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">Phone Number <span class="text-danger">*</span></label>
+                    <input type="tel" name="phone" class="form-control @error('phone') is-invalid @enderror"
+                           value="{{ old('phone', $clinician->phone) }}" placeholder="e.g. +1 555 000 0000" required>
+                    @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
             {{-- Optional password change --}}
             <div class="row">
                 <div class="col-md-6 mb-3">
