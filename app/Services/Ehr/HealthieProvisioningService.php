@@ -150,12 +150,15 @@ class HealthieProvisioningService
         [$firstName, $lastName] = $this->splitName($user->name);
 
         // Healthie calls all providers "dietitian" internally regardless of specialty.
+        // phone_number is required by Healthie for dietitian accounts; fall back to a
+        // placeholder until the Clinician model gains its own phone column.
         $input = array_filter([
-            'first_name' => $firstName,
-            'last_name'  => $lastName ?: null,
-            'email'      => $user->email,
-            'password'   => Str::random(12) . 'A1!',
-            'role'       => 'dietitian',
+            'first_name'   => $firstName,
+            'last_name'    => $lastName ?: null,
+            'email'        => $user->email,
+            'password'     => Str::random(12) . 'A1!',
+            'role'         => 'dietitian',
+            'phone_number' => $clinician->phone ?? $user->phone ?? '0000000000',
         ], fn ($v) => $v !== null && $v !== '');
 
         $response = $this->graphql(
