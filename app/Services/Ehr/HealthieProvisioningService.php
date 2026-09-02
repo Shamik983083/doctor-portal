@@ -160,7 +160,6 @@ class HealthieProvisioningService
                 'first_name'        => $firstName,
                 'last_name'         => $lastName ?: null,
                 'password'          => Str::random(12) . 'A1!',
-                'org_role'          => 'dietitian',
                 'organization_id'   => $settings->organization_id,
                 'send_invite_email' => false,
             ], fn ($v) => $v !== null && $v !== '')],
