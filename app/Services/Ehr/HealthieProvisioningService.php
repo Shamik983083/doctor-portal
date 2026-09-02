@@ -8,6 +8,7 @@ use App\Models\PartnerEhrSetting;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -62,7 +63,25 @@ class HealthieProvisioningService
         }
         GQL;
 
-        $response = $this->graphql($mutation, ['input' => ['name' => $partner->name]], $apiKey, $endpoint);
+        // createOrganizationInput has no top-level `name` field.
+        // The org name lives inside organization_info (PrimaryOrganizationInfoInput).
+        // The mutation also creates an admin user for the sub-org, so email/name/password are required.
+        $email = $partner->email ?: ('partner-' . $partner->id . '@axismd.io');
+        [$firstName, $lastName] = $this->splitName($partner->name);
+
+        $response = $this->graphql($mutation, [
+            'input' => [
+                'email'                     => $email,
+                'first_name'                => $firstName,
+                'last_name'                 => $lastName ?: 'Admin',
+                'password'                  => Str::random(12) . 'A1!',
+                'create_as_suborganization' => true,
+                'organization_email'        => $email,
+                'organization_info'         => [
+                    'name' => $partner->name,
+                ],
+            ],
+        ], $apiKey, $endpoint);
         $json     = $response->json();
 
         if (! empty($json['errors'])) {
