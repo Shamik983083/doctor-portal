@@ -153,6 +153,7 @@ class HealthieProvisioningService
             'first_name' => $firstName,
             'last_name'  => $lastName ?: null,
             'email'      => $user->email,
+            'password'   => Str::random(12) . 'A1!',
             'role'       => 'provider',
         ], fn ($v) => $v !== null && $v !== '');
 
