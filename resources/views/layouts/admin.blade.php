@@ -132,10 +132,11 @@
            href="{{ route('admin.guide.glp-api') }}">
             <i class="bi bi-journal-medical"></i> GLP API
         </a>
-        <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}"
+        {{-- Anti-Aging API hidden --}}
+        {{-- <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}"
            href="{{ route('admin.guide.antiaging-api') }}">
             <i class="bi bi-stars"></i> Anti-Aging API
-        </a>
+        </a> --}}
         <a class="nav-link {{ request()->routeIs('admin.guide.nad-api') ? 'active' : '' }}"
            href="{{ route('admin.guide.nad-api') }}">
             <i class="bi bi-capsule"></i> NAD API
