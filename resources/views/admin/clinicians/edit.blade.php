@@ -399,7 +399,18 @@ $hasLicenses = count($licenseInfo) > 0;
                         <tbody>
                             @foreach($healthieMappings as $map)
                             <tr>
-                                <td>{{ $map->partner->name ?? '—' }}</td>
+                                <td>
+                                    @if($map->sub_storefront_id)
+                                        @if($map->subStorefront)
+                                            <div class="fw-semibold">{{ $map->subStorefront->name }}</div>
+                                            <div class="text-muted" style="font-size:.78rem">{{ $map->partner->name ?? '' }}</div>
+                                        @else
+                                            <span class="text-muted fst-italic small">Sub-storefront deleted</span>
+                                        @endif
+                                    @else
+                                        {{ $map->partner->name ?? '(partner deleted)' }}
+                                    @endif
+                                </td>
                                 <td>{{ $map->healthie_user_id ?? '—' }}</td>
                                 <td>{{ $map->healthie_org_id ?? '—' }}</td>
                                 <td>

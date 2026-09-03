@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProvisionAllCliniciansForPartnerJob;
 use App\Models\Clinician;
+use App\Models\ClinicianHealthieMapping;
 use App\Models\Partner;
 use App\Models\PartnerEhrSetting;
 use App\Models\User;
@@ -315,6 +316,11 @@ class PartnerController extends Controller
     public function destroy(int $id)
     {
         $partner = Partner::findOrFail($id);
+
+        // Soft-delete does not fire DB-level FK cascades, so clean up orphan
+        // mapping rows explicitly before the partner record disappears.
+        ClinicianHealthieMapping::where('partner_id', $partner->id)->delete();
+
         $partner->delete();
 
         return redirect()->route('admin.partners.index')

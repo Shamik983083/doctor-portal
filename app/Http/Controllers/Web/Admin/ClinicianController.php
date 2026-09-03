@@ -102,7 +102,7 @@ class ClinicianController extends Controller
     public function edit(int $id)
     {
         $clinician = Clinician::visibleTo(auth()->user())
-            ->with(['user', 'acceptedCategories', 'healthieMappings.partner'])
+            ->with(['user', 'acceptedCategories', 'healthieMappings.partner', 'healthieMappings.subStorefront'])
             ->findOrFail($id);
 
         // The eligibility gate's doctor side (Devin msg 2308). Only active
@@ -112,11 +112,20 @@ class ClinicianController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Filter out orphaned rows whose partner or sub-storefront has since been
+        // soft-deleted. The destroy() methods now clean these up proactively, but
+        // rows created before that fix may still exist in the DB.
+        $healthieMappings = $clinician->healthieMappings->filter(function ($map) {
+            return $map->sub_storefront_id
+                ? $map->subStorefront !== null
+                : $map->partner !== null;
+        });
+
         return view('admin.clinicians.edit', [
             'clinician'            => $clinician,
             'categories'           => $categories,
             'acceptedCategoryIds'  => $clinician->acceptedCategories->pluck('id')->all(),
-            'healthieMappings'     => $clinician->healthieMappings,
+            'healthieMappings'     => $healthieMappings,
         ]);
     }
 

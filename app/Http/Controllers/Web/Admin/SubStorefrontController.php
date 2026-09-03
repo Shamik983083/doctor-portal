@@ -164,6 +164,10 @@ class SubStorefrontController extends Controller
         $partner = Partner::findOrFail($partnerId);
         abort_if($subStorefront->partner_id !== $partner->id, 403);
 
+        // Soft-delete does not fire DB-level FK cascades, so clean up orphan
+        // mapping rows explicitly before the sub-storefront record disappears.
+        ClinicianHealthieMapping::where('sub_storefront_id', $subStorefront->id)->delete();
+
         $subStorefront->delete();
 
         return redirect()
