@@ -315,13 +315,21 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 
         return view('admin.guide.webhooks', compact('partner', 'webhookUrl'));
     })->name('guide.webhooks');
+    // Combined GLP + NAD partner API guide
+    Route::get('/guide/partner-api', function () {
+        $with = ['questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order')];
+        $glpQuestionnaire = \App\Models\Questionnaire::with($with)->where('name', 'GLP Questionnaire')->first();
+        $nadQuestionnaire = \App\Models\Questionnaire::with($with)->where('name', 'NAD Questionnaire')->first();
+        return view('admin.guide.combined-api', compact('glpQuestionnaire', 'nadQuestionnaire'));
+    })->name('guide.partner-api');
+
+    // Legacy routes — kept so old bookmarks and integrations still work
     Route::get('/guide/glp-api', function () {
         $questionnaire = \App\Models\Questionnaire::with([
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
         ])->where('name', 'GLP Questionnaire')->first();
         return view('admin.guide.weightloss-api', compact('questionnaire'));
     })->name('guide.glp-api');
-    // Legacy redirect so old bookmarks still work
     Route::redirect('/guide/weightloss-api', '/admin/guide/glp-api', 301);
 
     Route::get('/guide/antiaging-api', function () {
