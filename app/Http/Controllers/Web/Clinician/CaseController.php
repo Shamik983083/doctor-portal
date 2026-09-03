@@ -61,7 +61,7 @@ class CaseController extends Controller
         // review's "View source answers" can show the full intake (Devin msg
         // 2271) without a query per case.
         $cases = PatientCase::with([
-                'patient', 'partner', 'caseOfferings.offering',
+                'patient', 'partner', 'subStorefront', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
             ])
             ->withCount(['messages as unread_messages_count' => fn ($q) => $q->where('direction', 'inbound')->where('is_read', false),
@@ -182,7 +182,7 @@ class CaseController extends Controller
         // Same eager loads as the queue, so My Cases can render the identical
         // review grid + quick review (Devin msg 2283).
         $base = PatientCase::with([
-                'patient', 'partner', 'caseOfferings.offering',
+                'patient', 'partner', 'subStorefront', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
                 'casePrescription.medications',
             ])
@@ -265,7 +265,7 @@ class CaseController extends Controller
             ->values();
 
         $cases = PatientCase::with([
-                'patient', 'partner', 'caseOfferings.offering',
+                'patient', 'partner', 'subStorefront', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
                 'casePrescription.medications',
             ])

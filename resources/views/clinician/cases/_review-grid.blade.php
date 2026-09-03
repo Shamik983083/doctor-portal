@@ -77,6 +77,7 @@
                     <th>Med 3 Req</th>
                     <th>Med 4 Req</th>
                     <th>Company</th>
+                    <th>Sub-SF</th>
                     <th>Allergies</th>
                     <th>STD ZOF</th>
                     <th>Video Visit</th>
@@ -134,6 +135,15 @@
                         <td>{{ $clin['med4'] }}</td>
                         <td>{{ $case->partner?->name ?? '-' }}</td>
                         <td>
+                            @if($case->subStorefront)
+                                <span class="pill neutral" title="{{ $case->subStorefront->name }}">
+                                    {{ \Illuminate\Support\Str::limit($case->subStorefront->name, 12) }}
+                                </span>
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>
                             @if($clin['allergy'] === 'Y')
                                 <span class="allergy-detail-wrap" data-stop="1">
                                     <button type="button" class="allergy-flag">Y &#9432;</button>
@@ -151,7 +161,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="21"><div class="stub"><strong>Nothing in this queue</strong>No case currently matches this filter.</div></td></tr>
+                    <tr><td colspan="22"><div class="stub"><strong>Nothing in this queue</strong>No case currently matches this filter.</div></td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -282,10 +292,11 @@
         }
 
         return [
-            'id'       => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
-            'name'     => $case->patient?->full_name ?? 'Unknown',
-            'email'    => $case->patient?->email ?? null,
-            'company'  => $case->partner?->name ?? '-',
+            'id'            => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
+            'name'          => $case->patient?->full_name ?? 'Unknown',
+            'email'         => $case->patient?->email ?? null,
+            'company'       => $case->partner?->name ?? '-',
+            'subStorefront' => $case->subStorefront?->name ?? null,
             'term'     => $clin['term'],
             'dose'     => $clin['dose'],
             'triage'   => $case->triage ?? 'unclassified',

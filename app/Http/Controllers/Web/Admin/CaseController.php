@@ -28,7 +28,7 @@ class CaseController extends Controller
         $slaRiskMinutes = (int) Setting::get('sla_review_hours', 24) * 60 * 0.7;
 
         $cases = PatientCase::visibleTo($request->user())
-            ->with(['patient', 'partner', 'clinician.user', 'caseOfferings.offering'])
+            ->with(['patient', 'partner', 'subStorefront', 'clinician.user', 'caseOfferings.offering'])
             ->when($request->input('status'), fn($q, $s) => $q->where('status', $s))
             ->when($request->boolean('active'), fn($q) => $q->whereNotIn('status', ['completed', 'cancelled']))
             ->when($request->input('triage'), fn($q, $t) => $q->where('triage', $t))
