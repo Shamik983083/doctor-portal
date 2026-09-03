@@ -170,6 +170,9 @@ class Clinician extends Model
     public function messages() { return $this->hasMany(Message::class); }
     public function healthieMappings() { return $this->hasMany(ClinicianHealthieMapping::class); }
 
+    /** Sub-storefronts this clinician is explicitly assigned to for routing. */
+    public function subStorefronts() { return $this->belongsToMany(SubStorefront::class, 'clinician_sub_storefront')->withTimestamps(); }
+
     public function getFullNameAttribute(): string
     {
         return trim(($this->credentials ? $this->credentials . ' ' : '') . $this->user->name);

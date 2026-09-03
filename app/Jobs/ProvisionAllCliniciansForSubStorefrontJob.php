@@ -44,8 +44,14 @@ class ProvisionAllCliniciansForSubStorefrontJob implements ShouldQueue
             return;
         }
 
-        $clinicians = Clinician::where('is_global', true)
-            ->where('status', 'active')
+        // Provision global clinicians AND those explicitly assigned to this sub-storefront.
+        $clinicians = Clinician::where('status', 'active')
+            ->where(function ($q) use ($subStorefront) {
+                $q->where('is_global', true)
+                  ->orWhereHas('subStorefronts', fn ($sq) =>
+                      $sq->where('sub_storefronts.id', $subStorefront->id)
+                  );
+            })
             ->get();
 
         foreach ($clinicians as $clinician) {

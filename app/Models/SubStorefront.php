@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -19,6 +20,7 @@ class SubStorefront extends Model
         'name',
         'slug',
         'status',
+        'collaborating_clinician_id',
         'healthie_api_key',
         'healthie_endpoint',
         'healthie_authorization_shard',
@@ -47,6 +49,20 @@ class SubStorefront extends Model
     public function partner(): BelongsTo
     {
         return $this->belongsTo(Partner::class);
+    }
+
+    public function collaboratingClinician(): BelongsTo
+    {
+        return $this->belongsTo(Clinician::class, 'collaborating_clinician_id');
+    }
+
+    /**
+     * Clinicians explicitly assigned to this sub-storefront for case routing.
+     * Global clinicians (is_global = true) are always eligible regardless of this.
+     */
+    public function clinicians(): BelongsToMany
+    {
+        return $this->belongsToMany(Clinician::class, 'clinician_sub_storefront')->withTimestamps();
     }
 
     public function cases(): HasMany

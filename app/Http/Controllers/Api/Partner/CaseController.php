@@ -306,13 +306,6 @@ class CaseController extends Controller
             $patient->update($patientData);
         }
 
-        // E19: copy the partner's collaborating clinician default onto the patient
-        // if the patient does not already have one. Never overwrites an existing
-        // assignment — the partner default is a first-time convenience, not a rule.
-        if ($partner->collaborating_clinician_id && !$patient->collaborating_clinician_id) {
-            $patient->update(['collaborating_clinician_id' => $partner->collaborating_clinician_id]);
-        }
-
         if (($data['external_id'] ?? null) && empty($data['is_refill']) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
             return response()->json(['message' => 'Case with this external_id already exists.'], 409);
         }
@@ -330,6 +323,15 @@ class CaseController extends Controller
                     'errors'  => ['sub_storefront_id' => ['Invalid sub-storefront.']],
                 ], 422);
             }
+        }
+
+        // E19: copy the collaborating clinician default onto the patient if they do
+        // not already have one. Sub-storefront default takes priority over partner
+        // default. Never overwrites an existing assignment.
+        $defaultCollab = $subStorefront?->collaborating_clinician_id
+            ?? $partner->collaborating_clinician_id;
+        if ($defaultCollab && !$patient->collaborating_clinician_id) {
+            $patient->update(['collaborating_clinician_id' => $defaultCollab]);
         }
 
         $case = DB::transaction(function () use ($data, $partner, $patient, $request, $resolvedOfferings, $subStorefront) {

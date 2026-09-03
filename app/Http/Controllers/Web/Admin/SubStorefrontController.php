@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProvisionAllCliniciansForSubStorefrontJob;
+use App\Models\Clinician;
 use App\Models\ClinicianHealthieMapping;
 use App\Models\Partner;
 use App\Models\SubStorefront;
@@ -104,7 +105,12 @@ class SubStorefrontController extends Controller
             ->orderBy('status')
             ->get();
 
-        return view('admin.partners.sub-storefronts.edit', compact('partner', 'subStorefront', 'clinicianMappings'));
+        $allClinicians       = Clinician::with('user')->where('status', 'active')->orderBy('id')->get();
+        $assignedClinicianIds = $subStorefront->clinicians()->pluck('clinicians.id')->flip()->all();
+
+        return view('admin.partners.sub-storefronts.edit', compact(
+            'partner', 'subStorefront', 'clinicianMappings', 'allClinicians', 'assignedClinicianIds'
+        ));
     }
 
     public function update(Request $request, int $partnerId, SubStorefront $subStorefront)
@@ -124,11 +130,25 @@ class SubStorefrontController extends Controller
             'healthie_default_group_id'    => 'nullable|string|max:255',
             'healthie_is_enabled'          => 'nullable|boolean',
             'healthie_sandbox_validated'   => 'nullable|boolean',
+            // Clinician assignment: array of clinician IDs for the routing pool
+            'clinician_ids'                => 'nullable|array',
+            'clinician_ids.*'              => 'integer|exists:clinicians,id',
+            // Must be one of the submitted clinician_ids (or null to clear)
+            'collaborating_clinician_id'   => 'nullable|integer|exists:clinicians,id',
         ]);
+
+        $assignedIds = $data['clinician_ids'] ?? [];
+        $collabId    = $data['collaborating_clinician_id'] ?? null;
+
+        // collaborating_clinician_id must be from the assigned pool (or null)
+        if ($collabId && !in_array((int) $collabId, array_map('intval', $assignedIds), true)) {
+            $collabId = null;
+        }
 
         $subStorefront->fill([
             'name'                         => $data['name'] ?? $subStorefront->name,
             'status'                       => $data['status'] ?? $subStorefront->status,
+            'collaborating_clinician_id'   => $collabId,
             'healthie_endpoint'            => $data['healthie_endpoint'] ?: $subStorefront->healthie_endpoint,
             'healthie_authorization_shard' => $data['healthie_authorization_shard'] ?: $subStorefront->healthie_authorization_shard,
             'healthie_organization_id'     => $data['healthie_organization_id'] ?: $subStorefront->healthie_organization_id,
@@ -146,9 +166,12 @@ class SubStorefrontController extends Controller
 
         $subStorefront->save();
 
+        // Sync the routing pool pivot
+        $subStorefront->clinicians()->sync($assignedIds);
+
         $warning = $this->maybeCreateHealthieSubOrg($subStorefront);
 
-        // If org was just created, kick off clinician provisioning
+        // If org was just created (or already set), kick off clinician provisioning
         if ($subStorefront->healthie_organization_id) {
             ProvisionAllCliniciansForSubStorefrontJob::dispatch($subStorefront->id);
         }
