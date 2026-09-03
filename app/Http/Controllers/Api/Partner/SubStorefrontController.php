@@ -33,6 +33,26 @@ class SubStorefrontController extends Controller
             'email'      => 'required|email|max:255',
         ]);
 
+        // Guard against accidental duplicates: a non-deleted sub-storefront with
+        // the same name already exists for this partner. Return 409 with the
+        // existing record so the caller can use its UUID without creating a second.
+        $existing = SubStorefront::where('partner_id', $partner->id)
+            ->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'message'           => 'A sub-storefront named "' . $existing->name . '" already exists for this partner.',
+                'hint'              => 'Use the sub_storefront_id below in case submissions. If Healthie provisioning failed previously, edit the sub-storefront in the admin portal to set healthie_organization_id manually.',
+                'sub_storefront_id' => $existing->uuid,
+                'name'              => $existing->name,
+                'slug'              => $existing->slug,
+                'status'            => $existing->status,
+                'healthie_organization_id' => $existing->healthie_organization_id,
+            ], 409);
+        }
+
         // Unique slug within this partner (including soft-deleted rows to avoid reuse)
         $slug     = Str::slug($data['name']);
         $existing = SubStorefront::withTrashed()
