@@ -97,6 +97,7 @@
                 @endif
                 @if($case->visit_type)<div><dt>Visit type</dt><dd>{{ $case->visit_type }}</dd></div>@endif
                 <div><dt>Partner</dt><dd>{{ $case->partner?->name }}</dd></div>
+                @if($case->subStorefront)<div><dt>Sub-Storefront</dt><dd>{{ $case->subStorefront->name }}</dd></div>@endif
                 <div><dt>Clinician</dt><dd>{{ $case->clinician?->full_name ?? '-' }}</dd></div>
                 <div><dt>Chargeable</dt><dd>{{ $case->is_chargeable ? 'Yes' : 'No' }}</dd></div>
                 <div><dt>Created</dt><dd>{{ $case->created_at->format('M d, Y H:i') }}</dd></div>

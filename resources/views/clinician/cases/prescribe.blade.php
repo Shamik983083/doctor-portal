@@ -219,6 +219,7 @@
                         <div><dt>Requested dose</dt><dd>{{ $clin['dose'] }}</dd></div>
                         <div><dt>Plan</dt><dd>{{ $clin['plan'] }}</dd></div>
                         <div><dt>Storefront</dt><dd>{{ $case->partner?->name ?? '-' }}</dd></div>
+                        @if($case->subStorefront)<div><dt>Sub-Storefront</dt><dd>{{ $case->subStorefront->name }}</dd></div>@endif
                         <div><dt>Allergies</dt><dd>{{ $clin['allergy'] === 'Y' ? ($clin['allergyDetail'] ?? 'Yes') : 'None reported' }}</dd></div>
                     </div>
                 </div>

@@ -441,7 +441,7 @@ class CaseController extends Controller
     public function show(string $uuid)
     {
         $case = PatientCase::with([
-            'patient', 'partner', 'clinician.user',
+            'patient', 'partner', 'subStorefront', 'clinician.user',
             'caseOfferings.offering',
             'diseases', 'clinicalNotes.clinician.user',
             'orders.pharmacy', 'messages', 'files', 'tags',
@@ -491,7 +491,7 @@ class CaseController extends Controller
     public function prescribeForm(string $uuid)
     {
         $case = PatientCase::with([
-            'patient', 'partner', 'clinician.user',
+            'patient', 'partner', 'subStorefront', 'clinician.user',
             'caseOfferings.offering.category',
         ])->where('uuid', $uuid)->firstOrFail();
 
