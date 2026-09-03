@@ -137,13 +137,14 @@ class SubStorefrontController extends Controller
             'collaborating_clinician_id'   => 'nullable|integer|exists:clinicians,id',
         ]);
 
-        $assignedIds = $data['clinician_ids'] ?? [];
-        $collabId    = $data['collaborating_clinician_id'] ?? null;
+        // Only non-global clinicians go into the pivot — globals are always eligible.
+        $nonGlobalIds = Clinician::whereIn('id', $data['clinician_ids'] ?? [])
+            ->where('is_global', false)
+            ->pluck('id')
+            ->all();
 
-        // collaborating_clinician_id must be from the assigned pool (or null)
-        if ($collabId && !in_array((int) $collabId, array_map('intval', $assignedIds), true)) {
-            $collabId = null;
-        }
+        // Collaborating default may be any active clinician (global or assigned).
+        $collabId = $data['collaborating_clinician_id'] ?? null;
 
         $subStorefront->fill([
             'name'                         => $data['name'] ?? $subStorefront->name,
@@ -166,8 +167,8 @@ class SubStorefrontController extends Controller
 
         $subStorefront->save();
 
-        // Sync the routing pool pivot
-        $subStorefront->clinicians()->sync($assignedIds);
+        // Sync only non-global clinicians into the pivot — globals are always eligible.
+        $subStorefront->clinicians()->sync($nonGlobalIds);
 
         $warning = $this->maybeCreateHealthieSubOrg($subStorefront);
 

@@ -183,9 +183,9 @@
                 </div>
                 <div class="card-body p-0">
                     <p class="px-3 pt-3 pb-2 mb-0 small text-muted">
-                        Tick a clinician to include them in the <strong>routing pool</strong> for cases from this sub-storefront.
-                        Mark one as the <strong>Collaborating Default</strong> to auto-assign them as the secondary clinician on new patients.
-                        Global clinicians are always eligible for routing regardless of this list.
+                        <strong>Global</strong> clinicians are always in the routing pool — their checkbox is locked.
+                        Tick <strong>non-global</strong> clinicians to add them to the pool for this sub-storefront only.
+                        Any clinician (global or assigned) can be set as the <strong>Collaborating Default</strong> — the secondary clinician auto-copied onto new patients.
                     </p>
                     @if($allClinicians->isEmpty())
                         <div class="text-center text-muted py-4 small">No active clinicians found.</div>
@@ -194,55 +194,60 @@
                         <table class="table table-sm table-hover align-middle mb-0 small">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width:2.5rem" class="text-center">Assign</th>
+                                    <th style="width:2.5rem" class="text-center" title="In routing pool for this sub-storefront">Pool</th>
                                     <th>Clinician</th>
-                                    <th style="width:6rem" class="text-center">Global</th>
                                     <th style="width:8rem" class="text-center">Collab Default</th>
                                 </tr>
                             </thead>
                             <tbody id="clinician-assign-table">
                                 @foreach($allClinicians as $cl)
-                                @php $isAssigned = isset($assignedClinicianIds[$cl->id]); @endphp
-                                <tr>
+                                @php
+                                    $isGlobal   = (bool) $cl->is_global;
+                                    $isAssigned = $isGlobal || isset($assignedClinicianIds[$cl->id]);
+                                @endphp
+                                <tr class="{{ $isGlobal ? 'table-primary bg-opacity-25' : '' }}">
                                     <td class="text-center">
-                                        <input type="checkbox"
-                                               class="form-check-input assign-check"
-                                               name="clinician_ids[]"
-                                               value="{{ $cl->id }}"
-                                               id="cl_{{ $cl->id }}"
-                                               {{ $isAssigned ? 'checked' : '' }}
-                                               onchange="syncCollabRadio({{ $cl->id }}, this.checked)">
+                                        @if($isGlobal)
+                                            {{-- Global: always in pool, not stored in pivot --}}
+                                            <input type="checkbox" class="form-check-input" checked disabled
+                                                   title="Global — always eligible for all sub-storefronts">
+                                        @else
+                                            <input type="checkbox"
+                                                   class="form-check-input assign-check"
+                                                   name="clinician_ids[]"
+                                                   value="{{ $cl->id }}"
+                                                   id="cl_{{ $cl->id }}"
+                                                   {{ $isAssigned ? 'checked' : '' }}
+                                                   onchange="syncCollabRadio({{ $cl->id }}, this.checked)">
+                                        @endif
                                     </td>
                                     <td>
-                                        <label for="cl_{{ $cl->id }}" class="mb-0" style="cursor:pointer">
+                                        <label for="{{ $isGlobal ? '' : 'cl_'.$cl->id }}" class="mb-0"
+                                               style="{{ $isGlobal ? '' : 'cursor:pointer' }}">
                                             {{ $cl->full_name }}
-                                            @if($cl->is_global)
-                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1" style="font-size:.65rem">global</span>
+                                            @if($isGlobal)
+                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1" style="font-size:.65rem">
+                                                    <i class="bi bi-globe2"></i> global
+                                                </span>
                                             @endif
                                         </label>
                                     </td>
                                     <td class="text-center">
-                                        @if($cl->is_global)
-                                            <i class="bi bi-check-circle-fill text-primary" title="Global — always eligible"></i>
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-center">
+                                        {{-- Global: radio always enabled. Non-global: enabled only when assigned. --}}
                                         <input type="radio"
                                                class="form-check-input collab-radio"
                                                name="collaborating_clinician_id"
                                                value="{{ $cl->id }}"
                                                id="collab_{{ $cl->id }}"
                                                {{ (int) old('collaborating_clinician_id', $subStorefront->collaborating_clinician_id) === $cl->id ? 'checked' : '' }}
-                                               {{ !$isAssigned ? 'disabled' : '' }}>
+                                               {{ (!$isGlobal && !$isAssigned) ? 'disabled' : '' }}>
                                     </td>
                                 </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                    {{-- Hidden radio to allow clearing the collab default --}}
+                    {{-- Option to clear the collab default --}}
                     <div class="px-3 py-2 border-top small text-muted">
                         <input type="radio" name="collaborating_clinician_id" value="" id="collab_none"
                                class="form-check-input me-1"
