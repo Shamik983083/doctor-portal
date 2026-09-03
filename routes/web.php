@@ -297,7 +297,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
      * Grouped rather than annotated route by route so a new integration added
      * here inherits the restriction instead of relying on someone remembering it.
      */
-    Route::middleware('role:super_admin')->group(function () {
+    Route::middleware('role:admin|super_admin')->group(function () {
 
     // Developer Guide
     Route::get('/guide/messaging', fn() => view('admin.guide.messaging'))->name('guide.messaging');
@@ -340,8 +340,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 
     Route::get('/guide/healthie-ehr', fn() => view('admin.guide.healthie-ehr'))->name('guide.healthie-ehr');
 
-    // EHR Records — integration surface, super admin only (Devin msg 2117)
-    Route::prefix('ehr-records')->name('ehr-records.')->middleware('role:super_admin')->group(function () {
+    // EHR Records
+    Route::prefix('ehr-records')->name('ehr-records.')->group(function () {
         Route::get('/',               [AdminEhrRecordController::class, 'index'])->name('index');
         Route::get('/{uuid}',         [AdminEhrRecordController::class, 'show'])->name('show');
         Route::post('/{uuid}/retry',  [AdminEhrRecordController::class, 'retry'])->name('retry');
@@ -351,11 +351,11 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     Route::get('/settings',  [AdminSettingsController::class, 'index'])->name('settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
 
-    // Audit Log — read-only record of all admin-initiated model changes
-    Route::get('/audit-log', [AdminAuditLogController::class, 'index'])->name('audit-log.index');
+    // Audit Log — read-only record of all admin-initiated model changes (super admin only)
+    Route::get('/audit-log', [AdminAuditLogController::class, 'index'])->middleware('role:super_admin')->name('audit-log.index');
 
-    // All-users roster — one place to see every user across all roles
-    Route::get('/users', [\App\Http\Controllers\Web\Admin\UserRosterController::class, 'index'])->name('users.index');
+    // All-users roster — one place to see every user across all roles (super admin only)
+    Route::get('/users', [\App\Http\Controllers\Web\Admin\UserRosterController::class, 'index'])->middleware('role:super_admin')->name('users.index');
 
     // Triage Rule Set — per-questionnaire disqualifier rules
     Route::prefix('triage-rules')->name('triage-rules.')->group(function () {

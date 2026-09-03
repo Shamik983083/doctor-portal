@@ -113,10 +113,7 @@
     </div>
 
     {{-- ── API & Developer ─────────────────────────────────── --}}
-    {{-- Super admin only: "All API integrations etc should be a super admin
-         function" (Devin msg 2117). The routes enforce it; this keeps a Doctor
-         Admin from being shown links they cannot open. --}}
-    @role('super_admin')
+    @hasanyrole('super_admin|admin')
     <button class="sidebar-section-toggle {{ $apiActive ? '' : 'collapsed' }}"
             type="button"
             data-bs-toggle="collapse"
@@ -169,12 +166,10 @@
         </a>
 
     </div>
-    @endrole
+    @endhasanyrole
 
     {{-- ── Configuration ───────────────────────────────────── --}}
-    {{-- Also super admin only: settings and the triage rule set change clinical
-         behaviour for every doctor, not just one admin's group. --}}
-    @role('super_admin')
+    @hasanyrole('super_admin|admin')
     <button class="sidebar-section-toggle {{ $cfgActive ? '' : 'collapsed' }}"
             type="button"
             data-bs-toggle="collapse"
@@ -214,7 +209,7 @@
         </a>
 
     </div>
-    @endrole
+    @endhasanyrole
 
     {{-- ── Routing operations ──────────────────────────────────
          NOT super-admin gated, unlike the configuration block above. Devin msg
