@@ -295,8 +295,10 @@ class PatientCase extends Model
     public function casePrescription()       { return $this->hasOne(CasePrescription::class, 'case_id')->where('review_status', '!=', 'draft')->latestOfMany('prescribed_at'); }
 
     /**
-     * The most recent completed case for the same patient + partner that produced
-     * a prescription. Returns null if no such case exists.
+     * The most recent completed case that produced a prescription, scoped to the
+     * same patient and — when the current case belongs to a sub-storefront — to
+     * that same sub-storefront. Falls back to partner-level scope when no
+     * sub-storefront is set, preserving the original behaviour.
      *
      * Shared by ContinuityResolver (routing) and the prior-visit panel shown to
      * clinicians on refill cases. Eager-loads everything the panel needs so callers
@@ -315,7 +317,11 @@ class PatientCase extends Model
                 'clinicalNotes' => fn ($q) => $q->orderByDesc('created_at')->limit(1),
             ])
             ->where('patient_id', $case->patient_id)
-            ->where('partner_id', $case->partner_id)
+            ->when(
+                $case->sub_storefront_id,
+                fn ($q) => $q->where('sub_storefront_id', $case->sub_storefront_id),
+                fn ($q) => $q->where('partner_id', $case->partner_id),
+            )
             ->where('id', '!=', $case->id)
             ->where('status', self::STATUS_COMPLETED)
             ->whereNotNull('clinician_id')
