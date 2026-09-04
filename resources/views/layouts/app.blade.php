@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'MEDAXIS')</title>
+    <title>@yield('title', 'AXISmd')</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <!-- Resolve CDN DNS before the parser hits the stylesheet requests -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -238,8 +238,8 @@
     {{-- ── Sidebar ── --}}
     <nav class="sidebar" id="adminSidebar" aria-label="Main navigation">
         <a class="sidebar-brand" href="/">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#1e3a5f;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;margin-right:10px">M</span>
-            MEDAXIS
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#1e3a5f;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;margin-right:10px">A</span>
+            AXISmd
         </a>
         @yield('sidebar-nav')
     </nav>
