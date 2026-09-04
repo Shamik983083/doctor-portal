@@ -569,6 +569,7 @@ Content-Type: application/json
 
   // ── clinical_intake (GLP-1 fields) ───────────────────────────────────────────
   "clinical_intake": {
+    "product":         "Semaglutide",     // product name — matches offering name in DB
     "term":            "3M",              // 1M | 3M | 4M | 6M | 12M — must match month_frequency
     "dose":            "L1 · 2.5 mg",    // requested starting dose (titration level)
     "plan":            "Titration",       // "Titration" | "Starter" | "Maintenance"
@@ -578,6 +579,8 @@ Content-Type: application/json
     "zofran":          "N",              // anti-nausea rider: "Y" | "N"
     "video":           "not required",
     "protocolVersion": "GLP-1 protocol v8",
+    "findings":        [],               // optional — triage flag slugs from your protocol engine
+    "summary":         [],               // optional — human-readable approval summary lines
     "sourceAnswers": {
       "productPick":                  "semaglutide",
       "glp1Allergies":                "No known allergies",
@@ -646,19 +649,23 @@ Content-Type: application/json
 
   // ── clinical_intake (NAD+ fields) ────────────────────────────────────────────
   "clinical_intake": {
+    "product":         "NAD+ (Nicotinamide Adenine Dinucleotide)",  // or "NAD+/Glutathione" for combo
     "term":            "1M",              // 1M | 3M | 6M | 12M
     "dose":            "LVL1 - 500MG",   // NAD dose: "LVL1 - 500MG" | "LVL2 - 1000MG"
                                           // For NAD+/Glutathione: "LVL1 - 500MG/500MG" | "LVL2 - 1000MG/1000MG"
     "plan":            null,              // ← NAD has NO titration plans — omit or null
     // "onGlp" field is NOT used for NAD — omit entirely
-    "allergy":         "N",
-    "allergyDetail":   null,
+    "allergy":         "N",              // known allergy to NAD components: "Y" | "N"
+    "allergyDetail":   null,             // required when allergy = "Y"
+    "zofran":          "N",              // anti-nausea rider — send "Y" if patient needs it, else "N"
     "video":           "not required",
     "protocolVersion": "NAD protocol v1",
+    "findings":        [],               // optional — triage flag slugs from your protocol engine
+    "summary":         [],               // optional — human-readable approval summary lines
     "sourceAnswers": {
-      "heartArrhythmia": "No",
-      "requestedDose":   "500 MG",
-      "deliveryMethod":  "Intramuscular"
+      "heartArrhythmia": "No",           // answer to the cardiac safety screen
+      "requestedDose":   "500 MG",       // patient's selected dose level
+      "deliveryMethod":  "Intramuscular" // "Intramuscular" | "Intravenous"
     }
   },
 
