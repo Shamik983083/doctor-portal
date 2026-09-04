@@ -538,23 +538,35 @@ class CaseController extends Controller
         // Only runs for refill cases; null-safe to never crash if no prior exists.
         $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
 
-        // 4.3: Check-in answers — load regardless of is_refill flag so the dose hint
-        // is always available. Some cases arrive with visit_type = "Synchronous, video"
-        // even though the patient completed a check-in questionnaire.
+        // 4.3: Check-in answers for the panel display — only for detected refill cases.
+        $checkInResponses = collect();
+        if ($case->isRefillRequest()) {
+            $case->loadMissing([
+                'questionnaireResponses.questionnaire',
+                'questionnaireResponses.answers',
+            ]);
+            $checkInResponses = $case->questionnaireResponses
+                ->filter(fn ($r) => $r->completed_at !== null
+                    && $r->questionnaire?->purpose === 'check_in')
+                ->sortByDesc('completed_at')
+                ->values();
+        }
+
+        // Extract dose hint from check-in answers so the prescribe form can auto-select
+        // month dosage levels. Covers cases not flagged as refill but where the patient
+        // still completed a check-in questionnaire (e.g. visit_type "Synchronous, video").
+        // loadMissing is idempotent — free when already loaded for refill cases above.
+        $checkInDoseHint = ['last_dose' => null, 'continuation' => null];
         $case->loadMissing([
             'questionnaireResponses.questionnaire',
             'questionnaireResponses.answers',
         ]);
-        $checkInResponses = $case->questionnaireResponses
-            ->filter(fn ($r) => $r->completed_at !== null
-                && $r->questionnaire?->purpose === 'check_in')
-            ->sortByDesc('completed_at')
-            ->values();
-
-        // Extract dose hint from check-in answers so the prescribe form can auto-select
-        // month dosage levels. Matched by question_text (stored on the answer row).
-        $checkInDoseHint = ['last_dose' => null, 'continuation' => null];
-        foreach ($checkInResponses as $ciResp) {
+        $hintSource = $checkInResponses->isNotEmpty()
+            ? $checkInResponses
+            : $case->questionnaireResponses->filter(
+                fn ($r) => $r->completed_at !== null && $r->questionnaire?->purpose === 'check_in'
+            );
+        foreach ($hintSource as $ciResp) {
             foreach ($ciResp->answers as $ans) {
                 $qt = strtolower($ans->question_text ?? '');
                 if (!$checkInDoseHint['last_dose'] && str_contains($qt, 'last dose')) {
