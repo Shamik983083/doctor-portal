@@ -72,16 +72,17 @@ $totalCases = array_sum($donutData);
         <div class="card-header">
             <div class="ma-eyebrow">Operations</div>
             <div class="ma-title">Storefront workload</div>
-            <div class="ma-sub">Open-case load and triage mix per partner storefront.</div>
+            <div class="ma-sub">Open-case load and triage mix per sub-storefront.</div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead><tr><th>Storefront</th><th>Status</th><th>Open</th><th>Green</th><th>Yellow</th><th>Red</th></tr></thead>
+                    <thead><tr><th>Sub-storefront</th><th>Partner</th><th>Status</th><th>Open</th><th>Green</th><th>Yellow</th><th>Red</th></tr></thead>
                     <tbody>
                         @forelse($storefronts as $s)
                         <tr>
                             <td><strong>{{ $s['name'] }}</strong></td>
+                            <td><small class="text-muted">{{ $s['partner'] }}</small></td>
                             <td><span class="ma-pill {{ $s['status'] === 'active' ? 'green' : 'neutral' }}">{{ ucfirst($s['status']) }}</span></td>
                             <td>{{ $s['open'] }}</td>
                             <td><span class="ma-pill green">{{ $s['green'] }}</span></td>
@@ -89,7 +90,7 @@ $totalCases = array_sum($donutData);
                             <td><span class="ma-pill red">{{ $s['red'] }}</span></td>
                         </tr>
                         @empty
-                        <tr><td colspan="6" class="text-center text-muted py-4">No storefronts configured.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-4">No sub-storefronts configured.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
