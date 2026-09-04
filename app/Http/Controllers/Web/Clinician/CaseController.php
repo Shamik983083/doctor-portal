@@ -538,20 +538,18 @@ class CaseController extends Controller
         // Only runs for refill cases; null-safe to never crash if no prior exists.
         $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
 
-        // 4.3: Check-in answers for the current refill case — the questionnaire
-        // the patient completed for this visit, distinct from the prior-case intake.
-        $checkInResponses = collect();
-        if ($case->isRefillRequest()) {
-            $case->loadMissing([
-                'questionnaireResponses.questionnaire',
-                'questionnaireResponses.answers',
-            ]);
-            $checkInResponses = $case->questionnaireResponses
-                ->filter(fn ($r) => $r->completed_at !== null
-                    && $r->questionnaire?->purpose === 'check_in')
-                ->sortByDesc('completed_at')
-                ->values();
-        }
+        // 4.3: Check-in answers — load regardless of is_refill flag so the dose hint
+        // is always available. Some cases arrive with visit_type = "Synchronous, video"
+        // even though the patient completed a check-in questionnaire.
+        $case->loadMissing([
+            'questionnaireResponses.questionnaire',
+            'questionnaireResponses.answers',
+        ]);
+        $checkInResponses = $case->questionnaireResponses
+            ->filter(fn ($r) => $r->completed_at !== null
+                && $r->questionnaire?->purpose === 'check_in')
+            ->sortByDesc('completed_at')
+            ->values();
 
         // Extract dose hint from check-in answers so the prescribe form can auto-select
         // month dosage levels. Matched by question_text (stored on the answer row).
