@@ -71,6 +71,13 @@
                         <span class="text-muted">Partner</span>
                         <span>{{ $patient->partner->name ?? '—' }}</span>
                     </div>
+                    @php $latestSubSf = $patient->cases->first()?->subStorefront; @endphp
+                    @if($latestSubSf)
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Sub-storefront</span>
+                        <span class="text-end" style="max-width:60%">{{ $latestSubSf->name }}</span>
+                    </div>
+                    @endif
                     <div class="d-flex justify-content-between mb-0">
                         <span class="text-muted">Joined</span>
                         <span>{{ $patient->created_at->format('M d, Y') }}</span>
@@ -197,6 +204,7 @@
                             <tr>
                                 <th>#</th>
                                 <th>Offerings</th>
+                                <th>Sub-storefront</th>
                                 <th>Clinician</th>
                                 <th>Status</th>
                                 <th>Support</th>
@@ -213,6 +221,7 @@
                                         <span class="badge bg-light text-dark border small">{{ $co->offering->name ?? '?' }}</span>
                                     @endforeach
                                 </td>
+                                <td><small class="text-muted">{{ $case->subStorefront?->name ?? '—' }}</small></td>
                                 <td><small>{{ $case->clinician?->full_name ?? '—' }}</small></td>
                                 <td><span class="badge badge-status-{{ $case->status }}">{{ ucfirst($case->status) }}</span></td>
                                 <td>
@@ -229,7 +238,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-5">
+                                <td colspan="8" class="text-center text-muted py-5">
                                     <i class="bi bi-folder2-open fs-2 d-block mb-2"></i>
                                     No cases yet.<br>
                                     <small>Cases are created when a partner submits them via the API.</small>

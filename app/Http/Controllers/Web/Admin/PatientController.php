@@ -15,7 +15,7 @@ class PatientController extends Controller
         // Patient records are PHI. A Doctor Admin sees a patient only if that
         // patient has a case with one of their doctors (Devin msg 2117).
         $patients = Patient::visibleTo($request->user())
-            ->with('partner')
+            ->with(['partner', 'cases' => fn ($q) => $q->with('subStorefront')->latest()])
             ->withCount('cases')
             ->when($request->input('search'), function ($q, $search) {
                 $q->where(function ($q) use ($search) {
@@ -41,7 +41,7 @@ class PatientController extends Controller
         $patient = Patient::visibleTo(auth()->user())->with([
             'partner',
             'collaboratingClinician.user',
-            'cases' => fn($q) => $q->with(['clinician.user', 'caseOfferings.offering'])->latest(),
+            'cases' => fn($q) => $q->with(['clinician.user', 'caseOfferings.offering', 'subStorefront'])->latest(),
             'orders.pharmacy', 'files', 'tags',
         ])->findOrFail($id);
 
