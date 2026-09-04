@@ -552,28 +552,26 @@ class CaseController extends Controller
                 ->values();
         }
 
-        // Extract dose hint from check-in answers so the prescribe form can auto-select
-        // month dosage levels. Covers cases not flagged as refill but where the patient
-        // still completed a check-in questionnaire (e.g. visit_type "Synchronous, video").
+        // Extract dose hint so the prescribe form can auto-select medication + month levels.
+        // Searches ALL completed questionnaire responses (any purpose) so it works for both
+        // new cases (intake form may include prior-dose questions) and refill cases.
         // loadMissing is idempotent — free when already loaded for refill cases above.
         $checkInDoseHint = ['last_dose' => null, 'continuation' => null];
         $case->loadMissing([
             'questionnaireResponses.questionnaire',
             'questionnaireResponses.answers',
         ]);
-        $hintSource = $checkInResponses->isNotEmpty()
-            ? $checkInResponses
-            : $case->questionnaireResponses->filter(
-                fn ($r) => $r->completed_at !== null && $r->questionnaire?->purpose === 'check_in'
-            );
-        foreach ($hintSource as $ciResp) {
-            foreach ($ciResp->answers as $ans) {
+        foreach ($case->questionnaireResponses->filter(fn ($r) => $r->completed_at !== null) as $qResp) {
+            foreach ($qResp->answers as $ans) {
                 $qt = strtolower($ans->question_text ?? '');
                 if (!$checkInDoseHint['last_dose'] && str_contains($qt, 'last dose')) {
                     $checkInDoseHint['last_dose'] = $ans->answer;
                 }
                 if (!$checkInDoseHint['continuation'] && str_contains($qt, 'how would you like to continue')) {
                     $checkInDoseHint['continuation'] = $ans->answer;
+                }
+                if ($checkInDoseHint['last_dose'] && $checkInDoseHint['continuation']) {
+                    break 2;
                 }
             }
         }

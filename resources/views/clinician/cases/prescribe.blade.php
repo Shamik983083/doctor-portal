@@ -702,9 +702,10 @@
         }
 
         // Auto-select the medication dropdown based on the patient's last dose formulation.
-        // Determines whether the last dose was injection or oral, then sets the med
-        // dropdown to the first matching offering of that type and drug family.
-        // Only fires when the dropdown has no value (fresh row, not pre-loaded).
+        // Works for both new and refill cases: injection → injection, oral → oral.
+        // Overrides a pre-loaded offering if a better formulation match is available;
+        // if no matching offering exists in OFFERINGS (e.g. only one formulation loaded),
+        // the selection is left as-is and autoFillMonths handles levels by ordinal position.
         function autoSelectMedication() {
             var hint = CHECK_IN_DOSE_HINT;
             if (!hint || !hint.last_dose || !hint.continuation) return;
@@ -715,7 +716,7 @@
             if (!doseMatch) return;
             var dose = parseFloat(doseMatch[1]);
 
-            // Find the offering whose levels contain this dose value
+            // Try to find the source offering in OFFERINGS by mg value
             var sourceOffering = null;
             for (var oi = 0; oi < OFFERINGS.length && !sourceOffering; oi++) {
                 var oLevels = OFFERINGS[oi].levels;
@@ -729,27 +730,38 @@
                     if (sourceOffering) break;
                 }
             }
-            if (!sourceOffering) return;
 
-            var sn = (sourceOffering.name || '').toLowerCase();
-            var srcIsInjection = sn.indexOf('injection') > -1 || sn.indexOf('b12') > -1
-                              || sn.indexOf('subq') > -1   || sn.indexOf(' sq ') > -1;
-            var srcFam = family(sourceOffering.name);
+            var srcFam, srcIsInjection;
+            if (sourceOffering) {
+                srcFam = family(sourceOffering.name);
+                var sn  = (sourceOffering.name || '').toLowerCase();
+                srcIsInjection = sn.indexOf('injection') > -1 || sn.indexOf('b12') > -1
+                              || sn.indexOf('subq') > -1 || sn.indexOf(' sq ') > -1;
+            } else {
+                // Source offering not in OFFERINGS (cross-formulation: e.g. patient was on
+                // injection but only tablet is loaded). Infer family + type from answer text.
+                var lastLower = (hint.last_dose || '').toLowerCase();
+                if (lastLower.indexOf('semaglutide') > -1)       srcFam = 'semaglutide';
+                else if (lastLower.indexOf('tirzepatide') > -1)  srcFam = 'tirzepatide';
+                else return;
+                // "tablet" / "oral" keyword → oral; otherwise assume injection
+                srcIsInjection = lastLower.indexOf('tablet') === -1 && lastLower.indexOf('oral') === -1;
+            }
 
-            // Find best-match offering: same drug family + same formulation type
+            // Find the best offering in OFFERINGS: same drug family + same formulation type
             var targetOffering = null;
             for (var ti = 0; ti < OFFERINGS.length; ti++) {
                 if (family(OFFERINGS[ti].name) !== srcFam) continue;
                 var tn = (OFFERINGS[ti].name || '').toLowerCase();
                 var tIsInjection = tn.indexOf('injection') > -1 || tn.indexOf('b12') > -1
-                                || tn.indexOf('subq') > -1   || tn.indexOf(' sq ') > -1;
+                                || tn.indexOf('subq') > -1 || tn.indexOf(' sq ') > -1;
                 if (tIsInjection === srcIsInjection) { targetOffering = OFFERINGS[ti]; break; }
             }
-            if (!targetOffering) return;
+            if (!targetOffering) return; // no matching formulation available — leave as-is
 
-            // Apply to any med dropdown that has no selection yet
+            // Apply to all med dropdowns — override if current selection differs
             list.querySelectorAll('[data-f="med"]').forEach(function (sel) {
-                if (!sel.value) {
+                if (String(sel.value) !== String(targetOffering.id)) {
                     sel.value = String(targetOffering.id);
                     sel.dispatchEvent(new Event('change'));
                 }
