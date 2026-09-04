@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', ($direct ? 'Direct — ' : '') . $partner->name . ' — Dashboard')
-@section('page-title', ($direct ? 'Direct · ' : '') . $partner->name)
+@section('title', $subStorefront->name . ' — Dashboard')
+@section('page-title', $subStorefront->name)
 
 @section('content')
 
@@ -10,22 +10,24 @@
     <a href="{{ route('admin.partner-dashboard.index') }}" class="text-muted small text-decoration-none">
         <i class="bi bi-arrow-left me-1"></i>All sub-storefronts
     </a>
-    @unless($user->isSuperAdmin())
-    <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small">
-        <i class="bi bi-person-lock me-1"></i>Scoped to your doctors
-    </span>
-    @endunless
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">{{ $subStorefront->partner?->name }}</span>
+        @unless($user->isSuperAdmin())
+        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small">
+            <i class="bi bi-person-lock me-1"></i>Scoped to your doctors
+        </span>
+        @endunless
+    </div>
 </div>
 
 @if($stats['open'] === 0 && $stats['completed'] === 0 && $stats['cancelled'] === 0)
-{{-- Empty state: partner exists but no cases in this admin's scope --}}
 <div class="card">
     <div class="card-body text-center py-5 text-muted">
         <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
         @if($user->isSuperAdmin())
-            No cases recorded for {{ $partner->name }} yet.
+            No cases recorded for {{ $subStorefront->name }} yet.
         @else
-            No cases from {{ $partner->name }} are visible in your scope.
+            No cases from {{ $subStorefront->name }} are visible in your scope.
             Cases appear here once one of your doctors is assigned to them.
         @endif
     </div>
@@ -34,7 +36,6 @@
 
 {{-- ── Stat cards ─────────────────────────────────────────────────────── --}}
 <div class="row g-3 mb-4">
-    {{-- Open --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100">
             <div class="card-body py-3">
@@ -43,7 +44,6 @@
             </div>
         </div>
     </div>
-    {{-- Waiting --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100">
             <div class="card-body py-3">
@@ -52,7 +52,6 @@
             </div>
         </div>
     </div>
-    {{-- Assigned --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100">
             <div class="card-body py-3">
@@ -61,7 +60,6 @@
             </div>
         </div>
     </div>
-    {{-- Support escalations --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100 {{ $stats['support'] > 0 ? 'border-warning' : '' }}">
             <div class="card-body py-3">
@@ -72,7 +70,6 @@
             </div>
         </div>
     </div>
-    {{-- Completed --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100">
             <div class="card-body py-3">
@@ -81,7 +78,6 @@
             </div>
         </div>
     </div>
-    {{-- Cancelled --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100">
             <div class="card-body py-3">
@@ -90,7 +86,6 @@
             </div>
         </div>
     </div>
-    {{-- First visits --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100">
             <div class="card-body py-3">
@@ -99,7 +94,6 @@
             </div>
         </div>
     </div>
-    {{-- Refills --}}
     <div class="col-6 col-md-3">
         <div class="card text-center h-100">
             <div class="card-body py-3">
@@ -117,7 +111,7 @@
         <div class="card h-100">
             <div class="card-header">
                 <h6 class="mb-0">Provider Workload</h6>
-                <div class="text-muted" style="font-size:.75rem;">Active cases for this partner</div>
+                <div class="text-muted" style="font-size:.75rem;">Active cases for this sub-storefront</div>
             </div>
             <div class="card-body p-0">
                 @if($providerLoads->isEmpty())
@@ -172,7 +166,6 @@
                 @if($total === 0)
                     <p class="text-muted text-center small py-4">No cases yet.</p>
                 @else
-                    {{-- Stacked bar --}}
                     <div class="d-flex rounded overflow-hidden mb-3" style="height:20px;">
                         @foreach($byStatus as $status => $count)
                         @if($count > 0)
@@ -182,7 +175,6 @@
                         @endif
                         @endforeach
                     </div>
-                    {{-- Legend --}}
                     <div class="row g-2">
                         @foreach($byStatus as $status => $count)
                         @if($count > 0)
@@ -208,10 +200,6 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Recent Cases</h6>
-        <a href="{{ route('admin.cases.index', array_filter(['partner_id' => $partner->id])) }}"
-           class="btn btn-sm btn-outline-secondary py-0 px-2 small">
-            View all <i class="bi bi-arrow-right ms-1"></i>
-        </a>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">

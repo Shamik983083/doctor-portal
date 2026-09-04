@@ -452,8 +452,9 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 
     // Per-partner dashboard — operational view scoped to visibleTo(); open to both admin tiers
     Route::prefix('partner-dashboard')->name('partner-dashboard.')->group(function () {
-        Route::get('/',    [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'index'])->name('index');
-        Route::get('/{id}',[\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'show'])->name('show');
+        Route::get('/',           [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'index'])->name('index');
+        Route::get('/sub/{id}',   [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'showSubStorefront'])->name('show-sub');
+        Route::get('/{id}',       [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'show'])->name('show');
     });
 
     // Offering Categories
