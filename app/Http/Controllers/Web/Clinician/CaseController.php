@@ -553,6 +553,21 @@ class CaseController extends Controller
                 ->values();
         }
 
+        // Extract dose hint from check-in answers so the prescribe form can auto-select
+        // month dosage levels. Matched by question_text (stored on the answer row).
+        $checkInDoseHint = ['last_dose' => null, 'continuation' => null];
+        foreach ($checkInResponses as $ciResp) {
+            foreach ($ciResp->answers as $ans) {
+                $qt = strtolower($ans->question_text ?? '');
+                if (!$checkInDoseHint['last_dose'] && str_contains($qt, 'last dose')) {
+                    $checkInDoseHint['last_dose'] = $ans->answer;
+                }
+                if (!$checkInDoseHint['continuation'] && str_contains($qt, 'how would you like to continue')) {
+                    $checkInDoseHint['continuation'] = $ans->answer;
+                }
+            }
+        }
+
         // Pass the requested month_frequency so the prescribe form can pre-select the
         // duration dropdown.
         // Fallback chain (first non-null wins):
@@ -583,7 +598,7 @@ class CaseController extends Controller
 
         return view('clinician.cases.prescribe', compact(
             'case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions',
-            'priorCase', 'checkInResponses', 'requestedMonthFrequency', 'caseOfferingsData'
+            'priorCase', 'checkInResponses', 'checkInDoseHint', 'requestedMonthFrequency', 'caseOfferingsData'
         ));
     }
 

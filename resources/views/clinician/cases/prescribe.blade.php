@@ -289,6 +289,7 @@
     var OFFERINGS = @json($offeringData);
     var CASE_OFFERINGS_DATA = @json($caseOfferingsData);
     var ICD10_SUGGESTIONS = @json($icd10Suggestions ?? []);
+    var CHECK_IN_DOSE_HINT = @json($checkInDoseHint);
 </script>
 <script>
     // C9: ICD-10 chip editor
@@ -610,7 +611,63 @@
                         if (sigInp) sigInp.value = sig;
                     });
                 });
+                // Auto-select levels from check-in dose hint
+                autoFillMonths(wrap, levels);
             }
+        }
+
+        // Auto-select month dosage levels based on check-in answers:
+        //   "What was your last dose?"          → last_dose (e.g. "Semaglutide 0.25 mg")
+        //   "How would you like to continue?"   → continuation answer text
+        //
+        // Continuation rules:
+        //   Same dose          → all months = current level
+        //   Increase dosage    → M1 = current level, ascending each month
+        //   Decrease dosage    → M1 = one level down, ascending each month
+        //   Change / Provider  → no auto-fill
+        function autoFillMonths(wrap, levels) {
+            var hint = CHECK_IN_DOSE_HINT;
+            if (!hint || !hint.last_dose || !hint.continuation || !levels || !levels.length) return;
+
+            var continuation = hint.continuation.toLowerCase();
+            if (continuation.indexOf('change') !== -1 || continuation.indexOf('provider') !== -1) return;
+
+            // Extract numeric mg dose from patient answer (e.g. "Semaglutide 0.25 mg" → 0.25)
+            var doseMatch = hint.last_dose.match(/(\d+\.?\d*)\s*mg/i);
+            if (!doseMatch) return;
+            var dose = parseFloat(doseMatch[1]);
+
+            // Find the level whose label or formula contains this dose value
+            var currentIdx = -1;
+            for (var li = 0; li < levels.length; li++) {
+                var haystack = (levels[li].label || '') + ' ' + (levels[li].formula || '');
+                var nums = haystack.match(/(\d+\.?\d*)\s*mg/gi) || [];
+                for (var ni = 0; ni < nums.length; ni++) {
+                    if (Math.abs(parseFloat(nums[ni]) - dose) < 0.001) { currentIdx = li; break; }
+                }
+                if (currentIdx !== -1) break;
+            }
+            if (currentIdx === -1) return;
+
+            // Determine starting level index for M1
+            var startIdx;
+            if (continuation.indexOf('same') !== -1) {
+                startIdx = currentIdx;
+            } else if (continuation.indexOf('increase') !== -1) {
+                startIdx = currentIdx;
+            } else if (continuation.indexOf('decrease') !== -1) {
+                startIdx = Math.max(0, currentIdx - 1);
+            } else {
+                return;
+            }
+
+            var isSame = continuation.indexOf('same') !== -1;
+            var selects = wrap.querySelectorAll('.level-select');
+            selects.forEach(function (sel, m) {
+                var targetIdx = isSame ? startIdx : Math.min(startIdx + m, levels.length - 1);
+                sel.value = levels[targetIdx].label;
+                sel.dispatchEvent(new Event('change')); // triggers SIG auto-fill
+            });
         }
 
         // addRow(offeringId, bundleGroup, productKey)
