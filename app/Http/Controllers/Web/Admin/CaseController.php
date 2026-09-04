@@ -85,7 +85,7 @@ class CaseController extends Controller
          */
         $case = PatientCase::visibleTo($request->user())
             ->with([
-                'patient', 'partner', 'clinician.user',
+                'patient', 'partner', 'subStorefront', 'clinician.user',
                 'diseases',
                 'clinicalNotes.clinician.user',
                 'orders.pharmacy', 'messages.user', 'files', 'events',
