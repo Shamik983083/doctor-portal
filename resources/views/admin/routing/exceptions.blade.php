@@ -82,7 +82,7 @@
                                 <a class="case-link" href="{{ route('admin.cases.show', $exception->case->uuid) }}">
                                     {{ Str::limit($exception->case->uuid, 8, '') }}
                                 </a>
-                                <div class="partner-name">{{ $exception->case->partner?->name }}</div>
+                                <div class="partner-name">{{ $exception->case->partner?->name }}{{ $exception->case->subStorefront ? ' · ' . $exception->case->subStorefront->name : '' }}</div>
                             @else
                                 <span style="color:#9ca3af;font-size:.78rem">case removed</span>
                             @endif
@@ -136,6 +136,7 @@
                         <th>Case</th>
                         <th>State</th>
                         <th>Partner</th>
+                        <th>Sub-storefront</th>
                         <th>Waiting</th>
                     </tr>
                 </thead>
@@ -149,6 +150,7 @@
                         </td>
                         <td>{{ $case->patient_state ?? '—' }}</td>
                         <td>{{ $case->partner?->name }}</td>
+                        <td>{{ $case->subStorefront?->name ?? '—' }}</td>
                         <td>
                             <span class="{{ $case->created_at->diffInHours(now()) >= 48 ? 'stuck-warn' : ($case->created_at->diffInHours(now()) >= 24 ? 'waiting-orange' : '') }}">
                                 {{ $case->created_at->diffForHumans(null, true) }}
