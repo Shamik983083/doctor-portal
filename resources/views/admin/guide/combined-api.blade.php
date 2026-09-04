@@ -1278,11 +1278,12 @@ Content-Type: application/json
 <script>
 function setProgram(p) {
     // Toggle main content sections
+    // Must use explicit 'block'/'none' — '' would revert .prog-nad to its CSS display:none default
     document.querySelectorAll('.prog-glp').forEach(function(el) {
-        el.style.display = (p === 'glp') ? '' : 'none';
+        el.style.display = (p === 'glp') ? 'block' : 'none';
     });
     document.querySelectorAll('.prog-nad').forEach(function(el) {
-        el.style.display = (p === 'nad') ? '' : 'none';
+        el.style.display = (p === 'nad') ? 'block' : 'none';
     });
 
     // Update main switcher buttons
