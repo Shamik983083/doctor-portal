@@ -655,6 +655,27 @@
                     if (currentIdx !== -1) break;
                 }
             }
+
+            // Fallback: OFFERINGS may only contain the partner's current formulation
+            // (e.g. tablet only), so an injection dose like 0.25 mg won't appear there.
+            // Map the dose to a level index using the known GLP titration ladders.
+            if (currentIdx === -1) {
+                var KNOWN_DOSE_LEVELS = {
+                    semaglutide: [0.25, 0.5, 1, 1.7, 2.5],
+                    tirzepatide: [2.5, 5, 7.5, 10, 12.5, 15]
+                };
+                var lastDoseLower = (hint.last_dose || '').toLowerCase();
+                var drugFam = null;
+                if (lastDoseLower.indexOf('semaglutide') > -1) drugFam = 'semaglutide';
+                else if (lastDoseLower.indexOf('tirzepatide') > -1) drugFam = 'tirzepatide';
+                if (drugFam) {
+                    var knownDoses = KNOWN_DOSE_LEVELS[drugFam];
+                    for (var ki = 0; ki < knownDoses.length; ki++) {
+                        if (Math.abs(knownDoses[ki] - dose) < 0.001) { currentIdx = ki; break; }
+                    }
+                }
+            }
+
             // Cap the resolved index to the selected offering's level count
             if (currentIdx === -1) return;
             currentIdx = Math.min(currentIdx, levels.length - 1);
