@@ -1277,10 +1277,13 @@ Content-Type: application/json
 @section('scripts')
 <script>
 function setProgram(p) {
-    // Toggle main content sections
-    // Must use explicit 'block'/'none' — '' would revert .prog-nad to its CSS display:none default
+    // Toggle main content sections.
+    // GLP: '' removes the inline style and lets each element revert to its browser default
+    //   (block for divs, list-item for the TOC <li>) — no CSS hides GLP by default.
+    // NAD: must use 'block' explicitly to override the CSS .prog-nad { display:none } rule;
+    //   '' would just remove the inline override and leave the CSS hiding in place.
     document.querySelectorAll('.prog-glp').forEach(function(el) {
-        el.style.display = (p === 'glp') ? 'block' : 'none';
+        el.style.display = (p === 'glp') ? '' : 'none';
     });
     document.querySelectorAll('.prog-nad').forEach(function(el) {
         el.style.display = (p === 'nad') ? 'block' : 'none';
