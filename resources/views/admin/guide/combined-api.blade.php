@@ -720,7 +720,7 @@ Content-Type: application/json
     <div class="col-md-4">
         <div class="p-3 bg-light rounded border h-100">
             <div class="fw-semibold mb-1"><i class="bi bi-person-check me-1 text-primary"></i>Routing continuity</div>
-            <p class="small mb-0 text-muted">Routed to the same clinician who handled the patient's most recent completed visit for this partner and program. Normal routing applies as a fallback.</p>
+            <p class="small mb-0 text-muted">Routed to the same clinician who handled the patient's most recent completed visit. When the case belongs to a sub-storefront, only prior visits within that same sub-storefront are considered; otherwise the match is partner-wide. Normal routing applies as a fallback.</p>
         </div>
     </div>
     <div class="col-md-4">
