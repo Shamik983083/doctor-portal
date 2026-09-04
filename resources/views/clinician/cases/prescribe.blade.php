@@ -637,17 +637,27 @@
             if (!doseMatch) return;
             var dose = parseFloat(doseMatch[1]);
 
-            // Find the level whose label or formula contains this dose value
+            // Search across ALL offerings to find the level index for this dose.
+            // The clinician may have switched formulation (e.g. injection → tablet),
+            // so the patient's last mg value won't appear in the selected offering's
+            // levels. We treat the index (0 = LVL1, 1 = LVL2, …) as the universal
+            // "position in the titration ladder" and apply it to the chosen offering.
             var currentIdx = -1;
-            for (var li = 0; li < levels.length; li++) {
-                var haystack = (levels[li].label || '') + ' ' + (levels[li].formula || '');
-                var nums = haystack.match(/(\d+\.?\d*)\s*mg/gi) || [];
-                for (var ni = 0; ni < nums.length; ni++) {
-                    if (Math.abs(parseFloat(nums[ni]) - dose) < 0.001) { currentIdx = li; break; }
+            for (var oi = 0; oi < OFFERINGS.length && currentIdx === -1; oi++) {
+                var oLevels = OFFERINGS[oi].levels;
+                if (!oLevels || !oLevels.length) continue;
+                for (var li = 0; li < oLevels.length; li++) {
+                    var haystack = (oLevels[li].label || '') + ' ' + (oLevels[li].formula || '');
+                    var nums = haystack.match(/(\d+\.?\d*)\s*mg/gi) || [];
+                    for (var ni = 0; ni < nums.length; ni++) {
+                        if (Math.abs(parseFloat(nums[ni]) - dose) < 0.001) { currentIdx = li; break; }
+                    }
+                    if (currentIdx !== -1) break;
                 }
-                if (currentIdx !== -1) break;
             }
+            // Cap the resolved index to the selected offering's level count
             if (currentIdx === -1) return;
+            currentIdx = Math.min(currentIdx, levels.length - 1);
 
             // Determine starting level index for M1
             var startIdx;
@@ -667,6 +677,61 @@
                 var targetIdx = isSame ? startIdx : Math.min(startIdx + m, levels.length - 1);
                 sel.value = levels[targetIdx].label;
                 sel.dispatchEvent(new Event('change')); // triggers SIG auto-fill
+            });
+        }
+
+        // Auto-select the medication dropdown based on the patient's last dose formulation.
+        // Determines whether the last dose was injection or oral, then sets the med
+        // dropdown to the first matching offering of that type and drug family.
+        // Only fires when the dropdown has no value (fresh row, not pre-loaded).
+        function autoSelectMedication() {
+            var hint = CHECK_IN_DOSE_HINT;
+            if (!hint || !hint.last_dose || !hint.continuation) return;
+            var continuation = hint.continuation.toLowerCase();
+            if (continuation.indexOf('change') !== -1 || continuation.indexOf('provider') !== -1) return;
+
+            var doseMatch = hint.last_dose.match(/(\d+\.?\d*)\s*mg/i);
+            if (!doseMatch) return;
+            var dose = parseFloat(doseMatch[1]);
+
+            // Find the offering whose levels contain this dose value
+            var sourceOffering = null;
+            for (var oi = 0; oi < OFFERINGS.length && !sourceOffering; oi++) {
+                var oLevels = OFFERINGS[oi].levels;
+                if (!oLevels || !oLevels.length) continue;
+                for (var li = 0; li < oLevels.length; li++) {
+                    var hay = (oLevels[li].label || '') + ' ' + (oLevels[li].formula || '');
+                    var ns  = hay.match(/(\d+\.?\d*)\s*mg/gi) || [];
+                    for (var ni = 0; ni < ns.length; ni++) {
+                        if (Math.abs(parseFloat(ns[ni]) - dose) < 0.001) { sourceOffering = OFFERINGS[oi]; break; }
+                    }
+                    if (sourceOffering) break;
+                }
+            }
+            if (!sourceOffering) return;
+
+            var sn = (sourceOffering.name || '').toLowerCase();
+            var srcIsInjection = sn.indexOf('injection') > -1 || sn.indexOf('b12') > -1
+                              || sn.indexOf('subq') > -1   || sn.indexOf(' sq ') > -1;
+            var srcFam = family(sourceOffering.name);
+
+            // Find best-match offering: same drug family + same formulation type
+            var targetOffering = null;
+            for (var ti = 0; ti < OFFERINGS.length; ti++) {
+                if (family(OFFERINGS[ti].name) !== srcFam) continue;
+                var tn = (OFFERINGS[ti].name || '').toLowerCase();
+                var tIsInjection = tn.indexOf('injection') > -1 || tn.indexOf('b12') > -1
+                                || tn.indexOf('subq') > -1   || tn.indexOf(' sq ') > -1;
+                if (tIsInjection === srcIsInjection) { targetOffering = OFFERINGS[ti]; break; }
+            }
+            if (!targetOffering) return;
+
+            // Apply to any med dropdown that has no selection yet
+            list.querySelectorAll('[data-f="med"]').forEach(function (sel) {
+                if (!sel.value) {
+                    sel.value = String(targetOffering.id);
+                    sel.dispatchEvent(new Event('change'));
+                }
             });
         }
 
@@ -857,6 +922,9 @@
                 addRow(co.offering_id, null, null);
             });
         }());
+
+        // Auto-select medication + levels from check-in questionnaire answers
+        autoSelectMedication();
 
         refresh();
 
