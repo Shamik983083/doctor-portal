@@ -1166,17 +1166,17 @@ Content-Type: application/json
 <div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2"><i class="bi bi-diagram-3"></i></span>Sub-Storefronts API <span class="text-muted fw-normal small">(same for GLP-1 and NAD+)</span></div>
 <div class="card-body">
 <p class="text-muted small mb-3">
-    Sub-storefronts sit <strong>below a partner</strong> in the hierarchy. Each maps to its own <strong>Healthie sub-organisation</strong>, so cases, charts, and clinicians are fully segregated. Call <code>POST /api/partner/sub-storefronts</code> once when a new tenant registers.
+    Sub-storefronts sit <strong>below a partner</strong> in the hierarchy. Each maps to its own <strong>Healthie User Group</strong> within the partner's single Healthie org, so patient records are segregated by group. Call <code>POST /api/partner/sub-storefronts</code> once when a new tenant registers — a User Group is created automatically.
 </p>
-<div class="alert alert-warning small py-2 mb-3">
-    <i class="bi bi-key-fill me-1"></i>
-    <strong>One-time password:</strong> The <code>temporary_password</code> in the response is generated here and <strong>never stored</strong>. Relay it to the tenant immediately.
+<div class="alert alert-info small py-2 mb-3">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>User Group provisioning:</strong> On creation, a <strong>Healthie User Group</strong> is automatically created using the partner's API credentials. The group ID is returned in the response. No passwords or admin accounts are created.
 </div>
 <h6 class="fw-semibold mb-2">Endpoints</h6>
 <table class="table table-sm table-bordered mb-4" style="font-size:.84rem">
 <thead class="table-light"><tr><th>Method</th><th>URL</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/sub-storefronts</code></td><td>Create sub-storefront + Healthie sub-org + admin user</td></tr>
+<tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/sub-storefronts</code></td><td>Create sub-storefront and its Healthie User Group</td></tr>
 <tr><td><span class="badge-method method-get">GET</span></td><td><code>/api/partner/sub-storefronts</code></td><td>List active sub-storefronts for this partner</td></tr>
 </tbody>
 </table>
@@ -1200,15 +1200,13 @@ Content-Type: application/json
   "slug":   "amerilean",
   "status": "active",
   "healthie": {
-    "organization_id":    "123456",
-    "admin_email":        "john@amerilean.com",
-    "temporary_password": "Xk9mN2pQrA1!",   ← shown ONCE — never stored here
-    "error":              null
+    "group_id": "789012",
+    "error":    null
   }
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-sf-resp')">Copy</button>
 </div>
-<p class="small text-muted mt-2 mb-3">Store <code>sub_storefront_id</code> and send it as <code>sub_storefront_id</code> in every case payload for this tenant. <code>healthie.error</code> is non-null when Healthie provisioning fails — the sub-storefront is still created; an admin sets <code>healthie_organization_id</code> manually.</p>
+<p class="small text-muted mt-2 mb-3">Store <code>sub_storefront_id</code> and send it as <code>sub_storefront_id</code> in every case payload for this tenant. <code>healthie.error</code> is non-null when Healthie provisioning fails — the sub-storefront is still created; an admin sets the group ID manually. Cases are pushed to the partner's Healthie org with the patient assigned to that sub-storefront's User Group; the clinician is added to the patient's care team automatically.</p>
 <div class="position-relative mb-0">
 <pre class="bg-dark text-light rounded p-3 small mb-0" id="code-sf-case">// Include sub_storefront_id in every case submission for this tenant:
 {

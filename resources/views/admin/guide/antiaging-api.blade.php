@@ -824,16 +824,16 @@ Content-Type: application/json
 
 <p class="text-muted small mb-3">
     Sub-storefronts sit <strong>below a partner</strong> in the hierarchy (e.g. MedAxis → Amerilean, Invigorota).
-    Each sub-storefront maps to its own <strong>Healthie sub-organisation</strong>, so cases, charts, and clinicians
-    are fully segregated. Call <code>POST /api/partner/sub-storefronts</code> once when a new tenant registers
-    in your portal to create both the record here and the Healthie sub-org in a single step.
+    Each sub-storefront maps to its own <strong>Healthie User Group</strong> within the partner's single Healthie org,
+    so patient records are segregated by group. Call <code>POST /api/partner/sub-storefronts</code> once when a new
+    tenant registers in your portal — a User Group is created automatically.
 </p>
 
-<div class="alert alert-warning small py-2 mb-3">
-    <i class="bi bi-key-fill me-1"></i>
-    <strong>One-time password:</strong> The <code>temporary_password</code> in the response is generated here and
-    <strong>never stored</strong>. Relay it to the new tenant immediately (email them or display it once).
-    If lost, use Healthie's password-reset flow.
+<div class="alert alert-info small py-2 mb-3">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>User Group provisioning:</strong> On creation, a <strong>Healthie User Group</strong> is automatically
+    created using the partner's API credentials. The group ID is stored here and returned in the response.
+    No passwords or admin accounts are created.
 </div>
 
 <h6 class="fw-semibold mb-2">Endpoints</h6>
@@ -843,7 +843,7 @@ Content-Type: application/json
 <tr>
     <td><span class="badge-method method-post">POST</span></td>
     <td><code>/api/partner/sub-storefronts</code></td>
-    <td>Create a sub-storefront + Healthie sub-org + admin user (one-time password returned)</td>
+    <td>Create a sub-storefront and its Healthie User Group</td>
 </tr>
 <tr>
     <td><span class="badge-method method-get">GET</span></td>
@@ -870,10 +870,10 @@ Content-Type: application/json
 <table class="table table-sm table-bordered mb-4" style="font-size:.83rem">
 <thead class="table-light"><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td><code>name</code></td><td><span class="badge bg-danger">required</span></td><td>Display name for the sub-storefront and the Healthie sub-org</td></tr>
-<tr><td><code>first_name</code></td><td><span class="badge bg-danger">required</span></td><td>First name of the Healthie org admin created for this tenant</td></tr>
-<tr><td><code>last_name</code></td><td><span class="badge bg-danger">required</span></td><td>Last name</td></tr>
-<tr><td><code>email</code></td><td><span class="badge bg-danger">required</span></td><td>Email address — becomes the tenant's Healthie login</td></tr>
+<tr><td><code>name</code></td><td><span class="badge bg-danger">required</span></td><td>Display name for the sub-storefront and the Healthie User Group</td></tr>
+<tr><td><code>first_name</code></td><td><span class="badge bg-secondary">optional</span></td><td>Retained for forward-compatibility; no longer used for Healthie provisioning</td></tr>
+<tr><td><code>last_name</code></td><td><span class="badge bg-secondary">optional</span></td><td>Retained for forward-compatibility</td></tr>
+<tr><td><code>email</code></td><td><span class="badge bg-secondary">optional</span></td><td>Retained for forward-compatibility; no longer used for Healthie provisioning</td></tr>
 </tbody>
 </table>
 
@@ -885,18 +885,16 @@ Content-Type: application/json
   "slug":   "amerilean",
   "status": "active",
   "healthie": {
-    "organization_id":    "123456",
-    "admin_email":        "john@amerilean.com",
-    "temporary_password": "Xk9mN2pQrA1!",
-    "error":              null
+    "group_id": "789012",
+    "error":    null
   }
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-sf-resp')">Copy</button>
 </div>
 <ul class="small text-muted mb-4 mt-2 ps-3">
     <li><code>sub_storefront_id</code> — store this UUID; send it as <code>sub_storefront_id</code> in every future case payload for this tenant.</li>
-    <li><code>healthie.temporary_password</code> — shown <strong>once only</strong>, never stored here. Email it to the tenant or display it immediately.</li>
-    <li><code>healthie.error</code> — non-null when Healthie provisioning fails. The sub-storefront is still created; an admin must set <code>healthie_organization_id</code> manually in the portal.</li>
+    <li><code>healthie.group_id</code> — the Healthie User Group ID patients in this sub-storefront are assigned to.</li>
+    <li><code>healthie.error</code> — non-null when Healthie provisioning fails. The sub-storefront is still created; an admin must set the group ID manually in the portal.</li>
 </ul>
 
 <h6 class="fw-semibold mb-2">Sending Cases to a Sub-Storefront</h6>
@@ -913,8 +911,9 @@ Content-Type: application/json
 <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-sf-case')">Copy</button>
 </div>
 <p class="small text-muted mt-2 mb-0">
-    Cases with a valid <code>sub_storefront_id</code> are pushed to that sub-storefront's Healthie sub-org when approved.
-    All webhook events include <code>sub_storefront_id</code>. Cases without it behave exactly as before.
+    Cases with a valid <code>sub_storefront_id</code> are pushed to the partner's Healthie org with the patient
+    assigned to that sub-storefront's User Group. The prescribing clinician is added to the patient's care team
+    automatically. All webhook events include <code>sub_storefront_id</code>. Cases without it behave exactly as before.
 </p>
 
 </div>
