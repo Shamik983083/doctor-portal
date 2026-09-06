@@ -101,16 +101,25 @@ class SubStorefrontController extends Controller
         $partner = Partner::findOrFail($partnerId);
         abort_if($subStorefront->partner_id !== $partner->id, 403);
 
+        // Mappings are now partner-level (sub_storefront_id IS NULL) — all clinicians
+        // in a partner's Healthie org are shared across sub-storefronts.
         $clinicianMappings = ClinicianHealthieMapping::with('clinician.user')
-            ->where('sub_storefront_id', $subStorefront->id)
+            ->where('partner_id', $partner->id)
+            ->whereNull('sub_storefront_id')
             ->orderBy('status')
             ->get();
 
-        $allClinicians       = Clinician::with('user')->where('status', 'active')->orderBy('id')->get();
+        // Keyed by clinician_id for inline badge rendering in the view.
+        $clinicianSyncStatus = $clinicianMappings->keyBy('clinician_id')
+            ->map(fn ($m) => $m->status)
+            ->all();
+
+        $allClinicians        = Clinician::with('user')->where('status', 'active')->orderBy('id')->get();
         $assignedClinicianIds = $subStorefront->clinicians()->pluck('clinicians.id')->flip()->all();
 
         return view('admin.partners.sub-storefronts.edit', compact(
-            'partner', 'subStorefront', 'clinicianMappings', 'allClinicians', 'assignedClinicianIds'
+            'partner', 'subStorefront', 'clinicianMappings', 'clinicianSyncStatus',
+            'allClinicians', 'assignedClinicianIds'
         ));
     }
 

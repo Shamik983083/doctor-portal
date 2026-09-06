@@ -79,76 +79,56 @@
                 </div>
             </div>
 
-            {{-- Healthie credentials --}}
+            {{-- Healthie Integration --}}
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0"><i class="bi bi-heart-pulse me-2 text-danger"></i>Healthie Integration</h6>
-                    @if($subStorefront->healthie_organization_id)
-                        <span class="badge bg-success small"><i class="bi bi-check-circle-fill me-1"></i>Org provisioned</span>
+                    @if($subStorefront->healthie_default_group_id)
+                        <span class="badge bg-success small"><i class="bi bi-check-circle-fill me-1"></i>Group provisioned</span>
                     @else
-                        <span class="badge bg-warning text-dark small"><i class="bi bi-exclamation-circle me-1"></i>Not provisioned</span>
+                        <span class="badge bg-warning text-dark small"><i class="bi bi-exclamation-circle me-1"></i>No group set</span>
                     @endif
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Healthie API Key</label>
-                        <input type="password" name="healthie_api_key"
-                               class="form-control font-monospace @error('healthie_api_key') is-invalid @enderror"
-                               value="{{ old('healthie_api_key') }}"
-                               placeholder="Leave blank to keep existing value">
-                        @error('healthie_api_key') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        <div class="form-text">Stored encrypted. Leave blank to keep the current key.</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Healthie Endpoint</label>
-                        <input type="url" name="healthie_endpoint"
-                               class="form-control @error('healthie_endpoint') is-invalid @enderror"
-                               value="{{ old('healthie_endpoint', $subStorefront->healthie_endpoint) }}"
-                               placeholder="https://staging-api.gethealthie.com/graphql">
-                        @error('healthie_endpoint') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Authorization Shard</label>
-                        <input type="text" name="healthie_authorization_shard"
-                               class="form-control font-monospace @error('healthie_authorization_shard') is-invalid @enderror"
-                               value="{{ old('healthie_authorization_shard', $subStorefront->healthie_authorization_shard) }}">
-                        @error('healthie_authorization_shard') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Organization ID</label>
-                        <input type="text" name="healthie_organization_id"
-                               class="form-control font-monospace @error('healthie_organization_id') is-invalid @enderror"
-                               value="{{ old('healthie_organization_id', $subStorefront->healthie_organization_id) }}">
-                        @error('healthie_organization_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        <div class="form-text">Returned by Healthie after sub-org creation. Leave blank to auto-provision on save.</div>
-                    </div>
-
-                    <div class="row g-3 mb-3">
-                        <div class="col-sm-6">
-                            <label class="form-label fw-semibold">Default Provider ID</label>
-                            <input type="text" name="healthie_default_provider_id"
-                                   class="form-control font-monospace @error('healthie_default_provider_id') is-invalid @enderror"
-                                   value="{{ old('healthie_default_provider_id', $subStorefront->healthie_default_provider_id) }}">
-                            @error('healthie_default_provider_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label fw-semibold">Note Form ID</label>
-                            <input type="text" name="healthie_note_form_id"
-                                   class="form-control font-monospace @error('healthie_note_form_id') is-invalid @enderror"
-                                   value="{{ old('healthie_note_form_id', $subStorefront->healthie_note_form_id) }}">
-                            @error('healthie_note_form_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
+                    <div class="alert alert-secondary small mb-3 py-2">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Credentials (API key, endpoint) come from the <strong>parent partner's</strong> Healthie settings.
+                        Only the <strong>Group ID</strong> is specific to this sub-storefront — it controls which Healthie
+                        group patients are assigned to.
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Default Group ID</label>
-                        <input type="text" name="healthie_default_group_id"
-                               class="form-control font-monospace @error('healthie_default_group_id') is-invalid @enderror"
-                               value="{{ old('healthie_default_group_id', $subStorefront->healthie_default_group_id) }}">
-                        @error('healthie_default_group_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <div class="input-group">
+                            <input type="text" name="healthie_default_group_id"
+                                   class="form-control font-monospace @error('healthie_default_group_id') is-invalid @enderror"
+                                   value="{{ old('healthie_default_group_id', $subStorefront->healthie_default_group_id) }}"
+                                   placeholder="Leave blank to auto-create on save">
+                            @error('healthie_default_group_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="form-text">
+                            Patients in this sub-storefront are assigned to this Healthie group.
+                            Leave blank to auto-create a new group using the partner's API key.
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Default Provider ID <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" name="healthie_default_provider_id"
+                                   class="form-control font-monospace @error('healthie_default_provider_id') is-invalid @enderror"
+                                   value="{{ old('healthie_default_provider_id', $subStorefront->healthie_default_provider_id) }}">
+                            @error('healthie_default_provider_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-text">Override the partner's default provider for this sub-storefront.</div>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Note Form ID <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" name="healthie_note_form_id"
+                                   class="form-control font-monospace @error('healthie_note_form_id') is-invalid @enderror"
+                                   value="{{ old('healthie_note_form_id', $subStorefront->healthie_note_form_id) }}">
+                            @error('healthie_note_form_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-text">Override the partner's note form for this sub-storefront.</div>
+                        </div>
                     </div>
 
                     <div class="row g-3">
@@ -208,7 +188,6 @@
                                 <tr class="{{ $isGlobal ? 'table-primary bg-opacity-25' : '' }}">
                                     <td class="text-center">
                                         @if($isGlobal)
-                                            {{-- Global: always in pool, not stored in pivot --}}
                                             <input type="checkbox" class="form-check-input" checked disabled
                                                    title="Global — always eligible for all sub-storefronts">
                                         @else
@@ -230,10 +209,15 @@
                                                     <i class="bi bi-globe2"></i> global
                                                 </span>
                                             @endif
+                                            @if(isset($clinicianSyncStatus[$cl->id]))
+                                                @php $cs = $clinicianSyncStatus[$cl->id]; @endphp
+                                                <span class="badge ms-1 {{ $cs === 'synced' ? 'bg-success' : ($cs === 'failed' ? 'bg-danger' : 'bg-secondary') }}" style="font-size:.6rem">
+                                                    {{ $cs }}
+                                                </span>
+                                            @endif
                                         </label>
                                     </td>
                                     <td class="text-center">
-                                        {{-- Global: radio always enabled. Non-global: enabled only when assigned. --}}
                                         <input type="radio"
                                                class="form-check-input collab-radio"
                                                name="collaborating_clinician_id"
@@ -247,7 +231,6 @@
                             </tbody>
                         </table>
                     </div>
-                    {{-- Option to clear the collab default --}}
                     <div class="px-3 py-2 border-top small text-muted">
                         <input type="radio" name="collaborating_clinician_id" value="" id="collab_none"
                                class="form-check-input me-1"
@@ -270,7 +253,7 @@
     </div>
 
     <div class="col-lg-5">
-        {{-- Clinician mapping status --}}
+        {{-- Clinician Healthie sync status (partner-level mappings) --}}
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="bi bi-people me-2"></i>Clinician Provisioning</h6>
@@ -279,9 +262,11 @@
             @if($clinicianMappings->isEmpty())
                 <div class="card-body text-muted small text-center py-4">
                     <i class="bi bi-person-x fs-2 d-block mb-2 opacity-25"></i>
-                    No clinicians provisioned yet.
-                    @if(!$subStorefront->healthie_organization_id)
-                        <div class="mt-2">Provision the Healthie sub-org first.</div>
+                    No clinicians synced to the partner's Healthie org yet.
+                    @if(!$subStorefront->healthie_default_group_id)
+                        <div class="mt-2">Create the Healthie group first (save the sub-storefront).</div>
+                    @else
+                        <div class="mt-2">Clinicians are provisioned automatically in the background.</div>
                     @endif
                 </div>
             @else
@@ -319,11 +304,11 @@
             </div>
             <div class="card-body">
                 <p class="small text-muted mb-3">
-                    Deleting this sub-storefront removes it from the portal but <strong>does not delete the Healthie sub-org</strong>.
-                    Remove it from Healthie manually after deletion.
+                    Deleting this sub-storefront removes it from the portal but <strong>does not delete the Healthie User Group</strong>.
+                    Remove it from the Healthie admin portal manually after deletion.
                 </p>
                 <form method="POST" action="{{ route('admin.partners.sub-storefronts.destroy', [$partner->id, $subStorefront->id]) }}"
-                      onsubmit="return confirm('Delete \'{{ addslashes($subStorefront->name) }}\'? This cannot be undone. Remove the Healthie sub-org manually.')">
+                      onsubmit="return confirm('Delete \'{{ addslashes($subStorefront->name) }}\'? This cannot be undone. Remove the Healthie User Group manually.')">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="btn btn-outline-danger btn-sm w-100">
@@ -348,9 +333,6 @@ function copyValue(id) {
     });
 }
 
-// When a clinician's assign checkbox is toggled:
-// - Enable/disable their collab radio accordingly.
-// - If unchecked and the radio was selected, clear it and activate "None".
 function syncCollabRadio(clinicianId, isChecked) {
     const radio = document.getElementById('collab_' + clinicianId);
     if (!radio) return;

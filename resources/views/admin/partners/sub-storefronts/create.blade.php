@@ -39,77 +39,47 @@
                 </div>
             </div>
 
-            {{-- Healthie credentials --}}
+            {{-- Healthie Integration --}}
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0"><i class="bi bi-heart-pulse me-2 text-danger"></i>Healthie Integration</h6>
-                    <span class="badge bg-info text-dark small">Auto-provisioned on save</span>
+                    <span class="badge bg-info text-dark small">Group auto-created on save</span>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info small mb-3 py-2">
                         <i class="bi bi-info-circle me-1"></i>
-                        Leave <strong>Healthie API Key</strong> and <strong>Organization ID</strong> blank to auto-create the sub-org
-                        using the parent partner's API key. Fill them in to link an existing Healthie sub-org.
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Healthie API Key</label>
-                        <input type="password" name="healthie_api_key"
-                               class="form-control font-monospace @error('healthie_api_key') is-invalid @enderror"
-                               value="{{ old('healthie_api_key') }}"
-                               placeholder="Leave blank to auto-provision">
-                        @error('healthie_api_key') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Healthie Endpoint</label>
-                        <input type="url" name="healthie_endpoint"
-                               class="form-control @error('healthie_endpoint') is-invalid @enderror"
-                               value="{{ old('healthie_endpoint') }}"
-                               placeholder="https://staging-api.gethealthie.com/graphql">
-                        @error('healthie_endpoint') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Authorization Shard</label>
-                        <input type="text" name="healthie_authorization_shard"
-                               class="form-control font-monospace @error('healthie_authorization_shard') is-invalid @enderror"
-                               value="{{ old('healthie_authorization_shard') }}">
-                        @error('healthie_authorization_shard') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Organization ID</label>
-                        <input type="text" name="healthie_organization_id"
-                               class="form-control font-monospace @error('healthie_organization_id') is-invalid @enderror"
-                               value="{{ old('healthie_organization_id') }}"
-                               placeholder="Returned by Healthie after sub-org creation">
-                        @error('healthie_organization_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="row g-3 mb-3">
-                        <div class="col-sm-6">
-                            <label class="form-label fw-semibold">Default Provider ID</label>
-                            <input type="text" name="healthie_default_provider_id"
-                                   class="form-control font-monospace @error('healthie_default_provider_id') is-invalid @enderror"
-                                   value="{{ old('healthie_default_provider_id') }}">
-                            @error('healthie_default_provider_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label fw-semibold">Note Form ID</label>
-                            <input type="text" name="healthie_note_form_id"
-                                   class="form-control font-monospace @error('healthie_note_form_id') is-invalid @enderror"
-                                   value="{{ old('healthie_note_form_id') }}">
-                            @error('healthie_note_form_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
+                        On save, a <strong>Healthie User Group</strong> is automatically created using the parent partner's
+                        API credentials. The group ID is stored here for patient segregation.
+                        Leave <strong>Default Group ID</strong> blank to auto-create it; fill it in to link an existing group.
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Default Group ID</label>
                         <input type="text" name="healthie_default_group_id"
                                class="form-control font-monospace @error('healthie_default_group_id') is-invalid @enderror"
-                               value="{{ old('healthie_default_group_id') }}">
+                               value="{{ old('healthie_default_group_id') }}"
+                               placeholder="Auto-populated after save">
                         @error('healthie_default_group_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <div class="form-text">The Healthie group ID patients in this sub-storefront are assigned to.</div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Default Provider ID <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" name="healthie_default_provider_id"
+                                   class="form-control font-monospace @error('healthie_default_provider_id') is-invalid @enderror"
+                                   value="{{ old('healthie_default_provider_id') }}">
+                            @error('healthie_default_provider_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-text">Override the partner's default provider for this sub-storefront.</div>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Note Form ID <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" name="healthie_note_form_id"
+                                   class="form-control font-monospace @error('healthie_note_form_id') is-invalid @enderror"
+                                   value="{{ old('healthie_note_form_id') }}">
+                            @error('healthie_note_form_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-text">Override the partner's note form for this sub-storefront.</div>
+                        </div>
                     </div>
 
                     <div class="row g-3">
@@ -156,9 +126,9 @@
             <div class="card-body small text-muted">
                 <ol class="ps-3 mb-0">
                     <li class="mb-2">A UUID is automatically assigned to every sub-storefront. Tenants send it as <code>sub_storefront_id</code> in case payloads.</li>
-                    <li class="mb-2">On save, if no Healthie credentials are provided, the system attempts to auto-create a Healthie sub-org under the parent partner using the partner's API key.</li>
-                    <li class="mb-2">Once the sub-org is provisioned, all active global clinicians are automatically added to it.</li>
-                    <li>When a doctor approves a case tied to this sub-storefront, the EHR push uses <em>this sub-storefront's</em> Healthie credentials — records never cross sub-orgs.</li>
+                    <li class="mb-2">On save, the system creates a <strong>Healthie User Group</strong> using the parent partner's API credentials. All patients in this sub-storefront are assigned to that group.</li>
+                    <li class="mb-2">The prescribing clinician is automatically added to each patient's Healthie care team when a case is pushed, enabling provider-permission scoping.</li>
+                    <li>All API calls use the <em>partner's</em> Healthie credentials — sub-storefronts do not need their own API key.</li>
                 </ol>
             </div>
         </div>
