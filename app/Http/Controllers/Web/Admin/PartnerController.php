@@ -338,49 +338,16 @@ class PartnerController extends Controller
     }
 
     /**
-     * Create a Healthie sub-org for this partner if:
-     *   - they have an API key saved (credentials exist), AND
-     *   - they do NOT already have an organization_id (hasn't been created yet).
+     * Healthie partner-level org auto-creation is no longer supported.
      *
-     * On success: stores the returned org ID and dispatches provider provisioning.
-     * On failure: logs the error and flashes a warning — the partner record is
-     * still saved; admin can trigger a retry by saving EHR settings again.
+     * Healthie sub-organisations are an enterprise-only feature. Partner
+     * organisation IDs must be set manually in PartnerEhrSetting.organization_id
+     * after Healthie provisions the partner's account directly.
+     * Sub-storefront segregation now uses User Groups within the partner's org.
      */
     private function maybeCreateHealthieSubOrg(Partner $partner): void
     {
-        $settings = PartnerEhrSetting::where('partner_id', $partner->id)
-            ->where('provider', 'healthie')
-            ->first();
-
-        // No credentials yet, or org already exists — nothing to do.
-        if (! $settings || empty($settings->api_key) || ! empty($settings->organization_id)) {
-            return;
-        }
-
-        // Parent API key required for sub-org creation.
-        if (empty(config('ehr.healthie.parent_api_key'))) {
-            return;
-        }
-
-        try {
-            $service = app(HealthieProvisioningService::class);
-            $orgId   = $service->createSubOrganization($partner);
-
-            $settings->update(['organization_id' => $orgId]);
-
-            // Provision all active global clinicians into the new sub-org.
-            ProvisionAllCliniciansForPartnerJob::dispatch($partner->id);
-        } catch (\Throwable $e) {
-            Log::warning('HealthieProvisioning: sub-org creation failed', [
-                'partner_id' => $partner->id,
-                'error'      => $e->getMessage(),
-            ]);
-
-            session()->flash('healthie_warning',
-                'Partner saved, but Healthie sub-org creation failed: ' . $e->getMessage()
-                . ' — save the partner\'s EHR settings again to retry.'
-            );
-        }
+        // No-op. Organization IDs are set manually in the partner's EHR settings.
     }
 
     /**

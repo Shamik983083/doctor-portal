@@ -101,7 +101,9 @@ class EhrGatewayManager
             $subStorefront = $case->subStorefront ?? SubStorefront::find($case->sub_storefront_id);
 
             if ($subStorefront && $subStorefront->isPushable()) {
-                return HealthieEhrAdapter::forSubStorefront($subStorefront);
+                // Use the partner's credentials; sub-storefront only scopes the group.
+                $partnerSettings = $this->settingsFor($subStorefront->partner_id, 'healthie');
+                return HealthieEhrAdapter::forSubStorefront($subStorefront, $partnerSettings);
             }
             // Sub-storefront exists but not yet pushable — fall through to partner-level.
         }
@@ -134,7 +136,9 @@ class EhrGatewayManager
             $subStorefront = SubStorefront::find($subStorefrontId);
 
             if ($subStorefront && $subStorefront->isPushable()) {
-                return HealthieEhrAdapter::forSubStorefront($subStorefront);
+                // Use the partner's credentials; sub-storefront only scopes the group.
+                $partnerSettings = $this->settingsFor($subStorefront->partner_id, 'healthie');
+                return HealthieEhrAdapter::forSubStorefront($subStorefront, $partnerSettings);
             }
             // Sub-storefront not pushable — fall through to partner-level.
         }

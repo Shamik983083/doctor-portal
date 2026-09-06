@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Clinician;
+use App\Models\PartnerEhrSetting;
 use App\Models\SubStorefront;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,11 +13,17 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Fans out ProvisionClinicianInHealthieJob for every active global clinician
- * when a new sub-storefront is created or updated with a Healthie org ID.
+ * Fans out ProvisionClinicianInHealthieJob for every eligible clinician when a
+ * new sub-storefront is created with a Healthie user group.
  *
- * Each individual job handles its own idempotency — already-synced mappings
- * are skipped — so this job is safe to re-dispatch without duplicate accounts.
+ * In the User Groups model, "provisioning" means ensuring each clinician has an
+ * account in the PARTNER'S single Healthie org — not a per-sub-storefront account.
+ * Sub-storefront group membership is handled at push time (ensureInGroup / care team).
+ *
+ * The job dispatches regardless of whether the sub-storefront itself is "pushable"
+ * because clinician org membership is a precondition for push, not a consequence.
+ * Each individual ProvisionClinicianInHealthieJob is idempotent and will skip
+ * clinicians who are already synced.
  */
 class ProvisionAllCliniciansForSubStorefrontJob implements ShouldQueue
 {
@@ -37,9 +44,19 @@ class ProvisionAllCliniciansForSubStorefrontJob implements ShouldQueue
             return;
         }
 
-        if (! $subStorefront->isPushable()) {
-            Log::info('ProvisionAllCliniciansForSubStorefront: sub-storefront not pushable, skipping', [
+        // Gate on the PARTNER having Healthie credentials — individual jobs handle
+        // per-clinician idempotency and will skip already-synced mappings.
+        $hasPartnerSettings = PartnerEhrSetting::where('partner_id', $subStorefront->partner_id)
+            ->where('provider', 'healthie')
+            ->whereNotNull('organization_id')
+            ->whereNotNull('api_key')
+            ->whereNotNull('endpoint')
+            ->exists();
+
+        if (! $hasPartnerSettings) {
+            Log::info('ProvisionAllCliniciansForSubStorefront: parent partner has no Healthie org, skipping', [
                 'sub_storefront_id' => $this->subStorefrontId,
+                'partner_id'        => $subStorefront->partner_id,
             ]);
             return;
         }
@@ -60,6 +77,7 @@ class ProvisionAllCliniciansForSubStorefrontJob implements ShouldQueue
 
         Log::info('ProvisionAllCliniciansForSubStorefront: dispatched individual jobs', [
             'sub_storefront_id' => $this->subStorefrontId,
+            'partner_id'        => $subStorefront->partner_id,
             'clinician_count'   => $clinicians->count(),
         ]);
     }

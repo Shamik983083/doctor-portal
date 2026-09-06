@@ -79,12 +79,13 @@ class SubStorefrontController extends Controller
 
         $subStorefront->save();
 
-        // Auto-create Healthie sub-org if the partner has a configured API key and
-        // no organization_id was manually provided.
-        $warning = $this->maybeCreateHealthieSubOrg($subStorefront);
+        // Auto-create the Healthie user group if the partner has a configured API
+        // key and no group_id was manually provided.
+        $warning = $this->maybeCreateHealthieUserGroup($subStorefront);
 
-        // Provision all global clinicians into this new sub-org.
-        if ($subStorefront->healthie_organization_id) {
+        // Provision all eligible clinicians into the partner's Healthie org so
+        // they appear as care team members when patients are pushed.
+        if ($subStorefront->healthie_default_group_id) {
             ProvisionAllCliniciansForSubStorefrontJob::dispatch($subStorefront->id);
         }
 
@@ -170,10 +171,10 @@ class SubStorefrontController extends Controller
         // Sync only non-global clinicians into the pivot — globals are always eligible.
         $subStorefront->clinicians()->sync($nonGlobalIds);
 
-        $warning = $this->maybeCreateHealthieSubOrg($subStorefront);
+        $warning = $this->maybeCreateHealthieUserGroup($subStorefront);
 
-        // If org was just created (or already set), kick off clinician provisioning
-        if ($subStorefront->healthie_organization_id) {
+        // If a group is set, kick off clinician provisioning into the partner's org.
+        if ($subStorefront->healthie_default_group_id) {
             ProvisionAllCliniciansForSubStorefrontJob::dispatch($subStorefront->id);
         }
 
@@ -197,44 +198,44 @@ class SubStorefrontController extends Controller
         return redirect()
             ->route('admin.partners.sub-storefronts.index', $partner->id)
             ->with('success', "Sub-storefront \"{$subStorefront->name}\" has been removed.")
-            ->with('warning', 'The corresponding Healthie sub-organisation was NOT deleted automatically. Remove it from Healthie manually if needed.');
+            ->with('warning', 'The corresponding Healthie User Group was NOT deleted automatically. Remove it from the Healthie admin portal manually if needed.');
     }
 
     /**
-     * Attempt to auto-create the Healthie sub-org using the PARTNER's API key
-     * (the partner is the parent org in Healthie; sub-storefronts are sub-orgs under it).
-     * Idempotent: skips when healthie_organization_id is already set.
+     * Attempt to auto-create a Healthie User Group for this sub-storefront.
+     *
+     * Uses the partner's single Healthie org credentials (PartnerEhrSetting).
+     * Idempotent: skips when healthie_default_group_id is already set.
      * Non-fatal: catches all exceptions and returns a flash-safe warning string.
      */
-    private function maybeCreateHealthieSubOrg(SubStorefront $subStorefront): ?string
+    private function maybeCreateHealthieUserGroup(SubStorefront $subStorefront): ?string
     {
-        if (! empty($subStorefront->healthie_organization_id)) {
+        if (! empty($subStorefront->healthie_default_group_id)) {
             return null;
         }
 
-        // Use the partner's PartnerEhrSetting API key as the acting credential.
         $partnerSettings = $subStorefront->partner->healthieSettings;
 
         if (! $partnerSettings || empty($partnerSettings->api_key) || empty($partnerSettings->endpoint)) {
-            return 'Healthie sub-org was NOT auto-created: the parent partner has no Healthie API key configured. '
-                . 'Enter the organization_id manually, or configure the partner\'s Healthie credentials first.';
+            return 'Healthie user group was NOT auto-created: the parent partner has no Healthie API key configured. '
+                . 'Enter the group_id manually, or configure the partner\'s Healthie credentials first.';
         }
 
         try {
             $service = app(HealthieProvisioningService::class);
-            $orgId   = $service->createSubOrgForStorefront($subStorefront, $partnerSettings);
+            $groupId = $service->createUserGroup($subStorefront, $partnerSettings);
 
-            $subStorefront->update(['healthie_organization_id' => $orgId]);
+            $subStorefront->update(['healthie_default_group_id' => $groupId]);
 
             return null;
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('SubStorefront: Healthie sub-org creation failed', [
+            \Illuminate\Support\Facades\Log::warning('SubStorefront: Healthie user group creation failed', [
                 'sub_storefront_id' => $subStorefront->id,
                 'error'             => $e->getMessage(),
             ]);
 
-            return 'Healthie sub-org auto-creation failed: ' . $e->getMessage()
-                . ' Enter the organization_id manually once resolved.';
+            return 'Healthie user group auto-creation failed: ' . $e->getMessage()
+                . ' Enter the group_id manually once resolved.';
         }
     }
 }

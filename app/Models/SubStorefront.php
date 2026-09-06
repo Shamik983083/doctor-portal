@@ -77,16 +77,17 @@ class SubStorefront extends Model
 
     /**
      * True when this sub-storefront can actively push records to Healthie.
-     * All four fields must be present; is_enabled and sandbox_validated must both
-     * be true — enabling push is a deliberate act after sandbox validation.
+     *
+     * In the User Groups model, the partner's single Healthie org handles all
+     * API calls. The sub-storefront only needs a group ID (its segregation
+     * boundary) plus the two deliberate-enable flags. The partner's api_key and
+     * endpoint are checked at resolve time in EhrGatewayManager.
      */
     public function isPushable(): bool
     {
         return $this->healthie_is_enabled
             && $this->healthie_sandbox_validated
-            && ! empty($this->healthie_api_key)
-            && ! empty($this->healthie_endpoint)
-            && ! empty($this->healthie_organization_id);
+            && ! empty($this->healthie_default_group_id);
     }
 
     /**
@@ -97,9 +98,8 @@ class SubStorefront extends Model
     {
         $missing = [];
 
-        foreach (['healthie_api_key', 'healthie_endpoint', 'healthie_organization_id', 'healthie_default_provider_id'] as $field) {
+        foreach (['healthie_default_group_id', 'healthie_default_provider_id'] as $field) {
             if (empty($this->$field)) {
-                // Return friendly key names (strip the healthie_ prefix for display)
                 $missing[] = str_replace('healthie_', '', $field);
             }
         }
