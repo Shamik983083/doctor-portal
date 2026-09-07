@@ -362,60 +362,66 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             return;
         }
 
-        $mutation = <<<'GQL'
-        mutation BulkUpdateClients($input: bulkUpdateClientsInput!) {
-            bulkUpdateClients(input: $input) {
+        // Use inline input (no typed variable) to match Healthie support's confirmed example exactly.
+        // The return type does not expose a 'messages' field — only 'users'.
+        $idsJson           = json_encode([$clientId]);
+        $groupLine         = $groupId            ? "user_group_id: \"{$groupId}\""                   : '';
+        $providerLine      = $clinicianHealthieId ? "other_provider_ids: \"{$clinicianHealthieId}\""  : '';
+
+        $mutation = <<<GQL
+        mutation BulkUpdateClients {
+            bulkUpdateClients(
+                input: {
+                    ids: {$idsJson}
+                    {$groupLine}
+                    {$providerLine}
+                }
+            ) {
                 users {
                     id
-                }
-                messages {
-                    field
-                    message
+                    email
                 }
             }
         }
         GQL;
 
-        $input = ['ids' => [$clientId]];
-
-        if ($groupId) {
-            $input['user_group_id'] = $groupId;
-        }
-
-        if ($clinicianHealthieId) {
-            $input['other_provider_ids'] = (string) $clinicianHealthieId;
-        }
-
         try {
-            $response = $this->graphql($mutation, ['input' => $input]);
+            $response = $this->graphql($mutation, []);
             $json     = $response->json();
 
             if (! empty($json['errors'])) {
                 $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
                 Log::warning('Healthie bulkUpdateClients failed', [
-                    'partner_id'          => $this->settings->partner_id,
-                    'client_id'           => $clientId,
-                    'group_id'            => $groupId,
+                    'partner_id'            => $this->settings->partner_id,
+                    'client_id'             => $clientId,
+                    'group_id'              => $groupId,
                     'clinician_healthie_id' => $clinicianHealthieId,
-                    'errors'              => $msg,
+                    'errors'                => $msg,
                 ]);
                 return;
             }
 
-            $fieldErrors = $json['data']['bulkUpdateClients']['messages'] ?? [];
-            if (! empty($fieldErrors)) {
-                Log::warning('Healthie bulkUpdateClients had field messages', [
-                    'partner_id' => $this->settings->partner_id,
-                    'client_id'  => $clientId,
-                    'messages'   => $fieldErrors,
+            $updatedUsers = $json['data']['bulkUpdateClients']['users'] ?? [];
+
+            if (empty($updatedUsers)) {
+                // API returned success but no users — the client ID was not found or the
+                // operation was a no-op. Log at WARNING so it surfaces for investigation.
+                Log::warning('Healthie bulkUpdateClients returned 0 users (no-op) — client may not exist in Healthie or user_group_id is not accepted', [
+                    'partner_id'            => $this->settings->partner_id,
+                    'client_id'             => $clientId,
+                    'group_id'              => $groupId,
+                    'clinician_healthie_id' => $clinicianHealthieId,
+                    'raw_response'          => $json,
                 ]);
+                return;
             }
 
             Log::info('Healthie bulkUpdateClients succeeded', [
-                'partner_id'          => $this->settings->partner_id,
-                'client_id'           => $clientId,
-                'group_id'            => $groupId,
+                'partner_id'            => $this->settings->partner_id,
+                'client_id'             => $clientId,
+                'group_id'              => $groupId,
                 'clinician_healthie_id' => $clinicianHealthieId,
+                'updated_user_ids'      => array_column($updatedUsers, 'id'),
             ]);
         } catch (\Throwable $e) {
             Log::warning('Healthie bulkUpdateClients threw', [
