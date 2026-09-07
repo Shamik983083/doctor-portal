@@ -338,9 +338,12 @@ class HealthieProvisioningService
         string $endpoint,
         ?string $shard = null,
     ): ?string {
+        // No type filter — Healthie's valid type strings differ from the "Provider"
+        // role string and passing an unknown type returns an empty result set, making
+        // the lookup silently fail. Email matching is done client-side below.
         $query = <<<'GQL'
         query FindProvider($keywords: String) {
-            users(keywords: $keywords, offset: 0, should_paginate: false, type: "Provider") {
+            users(keywords: $keywords, offset: 0, should_paginate: false) {
                 id
                 email
             }
