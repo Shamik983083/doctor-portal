@@ -93,17 +93,7 @@
                     @if($subStorefront->healthie_default_group_id)
                         <span class="badge bg-success small"><i class="bi bi-check-circle-fill me-1"></i>Group provisioned</span>
                     @else
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-warning text-dark small"><i class="bi bi-exclamation-circle me-1"></i>No group set</span>
-                            <form method="POST"
-                                  action="{{ route('admin.partners.sub-storefronts.provision-group', [$partner->id, $subStorefront->id]) }}"
-                                  onsubmit="return confirm('Create a Healthie User Group for \'{{ addslashes($subStorefront->name) }}\'? This will call the Healthie API now.')">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:.75rem">
-                                    <i class="bi bi-plus-circle me-1"></i>Create Healthie Group
-                                </button>
-                            </form>
-                        </div>
+                        <span class="badge bg-warning text-dark small"><i class="bi bi-exclamation-circle me-1"></i>No group set</span>
                     @endif
                 </div>
                 <div class="card-body">
@@ -313,6 +303,29 @@
                 </ul>
             @endif
         </div>
+
+        {{-- Healthie Group provisioning --}}
+        @if(!$subStorefront->healthie_default_group_id)
+        <div class="card mb-3 border-warning">
+            <div class="card-header bg-warning bg-opacity-10 border-warning">
+                <h6 class="mb-0 text-warning-emphasis"><i class="bi bi-diagram-3 me-2"></i>Healthie Group</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    No Healthie User Group is linked to this sub-storefront.
+                    Patients cannot be pushed to Healthie until a group is created.
+                </p>
+                <form method="POST"
+                      action="{{ route('admin.partners.sub-storefronts.provision-group', [$partner->id, $subStorefront->id]) }}"
+                      onsubmit="return confirm('Create a Healthie User Group for \'{{ addslashes($subStorefront->name) }}\'?\n\nThis will call the Healthie API and save the Group ID here.')">
+                    @csrf
+                    <button type="submit" class="btn btn-warning btn-sm w-100">
+                        <i class="bi bi-plus-circle me-1"></i>Create Healthie Group
+                    </button>
+                </form>
+            </div>
+        </div>
+        @endif
 
         {{-- Danger zone --}}
         <div class="card border-danger">
