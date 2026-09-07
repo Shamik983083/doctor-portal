@@ -331,59 +331,15 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
     /**
      * Ensure the patient belongs to this sub-storefront's Healthie group.
      *
-     * addGroupMembers is not available in all Healthie org plans. As a fallback
-     * we call updateUser with user_group_id — the same field accepted on createClient.
-     * New patients already have user_group_id set at creation; this call covers
-     * existing patients who predate the group.
-     *
-     * Best-effort: never throws.
+     * New patients are assigned at createClient time via user_group_id (see
+     * findOrCreateClient). Post-creation group assignment is not supported by
+     * this Healthie org: addGroupMembers doesn't exist, and user_group_id is
+     * not a field on updateUserInput.
      */
     private function ensureInGroup(string $clientId, string $groupId): void
     {
-        $mutation = <<<'GQL'
-        mutation AssignPatientGroup($input: updateUserInput!) {
-            updateUser(input: $input) {
-                user {
-                    id
-                }
-                messages {
-                    field
-                    message
-                }
-            }
-        }
-        GQL;
-
-        try {
-            $response = $this->graphql($mutation, [
-                'input' => [
-                    'id'            => $clientId,
-                    'user_group_id' => $groupId,
-                ],
-            ]);
-
-            if (! empty($response->json('errors'))) {
-                Log::warning('Healthie group assignment returned errors', [
-                    'partner_id' => $this->settings->partner_id,
-                    'group_id'   => $groupId,
-                    'client_id'  => $clientId,
-                    'errors'     => $response->json('errors'),
-                ]);
-            } else {
-                Log::info('Healthie group assignment succeeded', [
-                    'partner_id' => $this->settings->partner_id,
-                    'group_id'   => $groupId,
-                    'client_id'  => $clientId,
-                ]);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Healthie group assignment threw', [
-                'partner_id' => $this->settings->partner_id,
-                'group_id'   => $groupId,
-                'client_id'  => $clientId,
-                'error'      => $e->getMessage(),
-            ]);
-        }
+        // No-op: new patients receive user_group_id on createClient.
+        // If Healthie adds a post-creation group membership mutation, implement it here.
     }
 
     /**
