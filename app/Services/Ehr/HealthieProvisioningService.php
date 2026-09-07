@@ -353,9 +353,18 @@ class HealthieProvisioningService
         }
 
         // ── Step 3: is_provider flag via updateOrganizationMembership ─────────────
-        // updateOrganizationMembershipInput uses the membership record ID, but
-        // passing the user ID here is a best-effort attempt that may work depending
-        // on the org's Healthie version. Failures are logged and non-blocking.
+        // Requires the membership record ID (not user ID). Look it up first.
+        $membershipId = $this->lookupMembershipIdForUser($healthieUserId, $settings);
+
+        if (! $membershipId) {
+            Log::warning('HealthieProvisioning: setIsProvider skipped — could not resolve membership ID', [
+                'clinician_id'     => $clinician->id,
+                'partner_id'       => $settings->partner_id,
+                'healthie_user_id' => $healthieUserId,
+            ]);
+            return;
+        }
+
         $membershipMutation = <<<'GQL'
         mutation SetIsProvider($input: updateOrganizationMembershipInput!) {
             updateOrganizationMembership(input: $input) {
@@ -368,7 +377,7 @@ class HealthieProvisioningService
         try {
             $membershipResponse = $this->graphql(
                 $membershipMutation,
-                ['input' => ['id' => $healthieUserId, 'is_provider' => true]],
+                ['input' => ['id' => $membershipId, 'is_provider' => true]],
                 $settings->api_key,
                 $settings->endpoint,
                 $settings->authorization_shard
@@ -378,20 +387,21 @@ class HealthieProvisioningService
 
             if (! empty($membershipJson['errors'])) {
                 $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $membershipJson['errors']));
-                Log::warning('HealthieProvisioning: setIsProvider (updateOrganizationMembership) failed', [
+                Log::warning('HealthieProvisioning: setIsProvider failed', [
                     'clinician_id'     => $clinician->id,
                     'partner_id'       => $settings->partner_id,
                     'healthie_user_id' => $healthieUserId,
+                    'membership_id'    => $membershipId,
                     'errors'           => $msg,
                 ]);
             } else {
                 $membershipFieldErrors = $membershipJson['data']['updateOrganizationMembership']['messages'] ?? [];
                 if (! empty($membershipFieldErrors)) {
                     Log::warning('HealthieProvisioning: setIsProvider had field messages', [
-                        'clinician_id'     => $clinician->id,
-                        'partner_id'       => $settings->partner_id,
-                        'healthie_user_id' => $healthieUserId,
-                        'messages'         => $membershipFieldErrors,
+                        'clinician_id'  => $clinician->id,
+                        'partner_id'    => $settings->partner_id,
+                        'membership_id' => $membershipId,
+                        'messages'      => $membershipFieldErrors,
                     ]);
                 }
 
@@ -400,6 +410,7 @@ class HealthieProvisioningService
                     'clinician_id'     => $clinician->id,
                     'partner_id'       => $settings->partner_id,
                     'healthie_user_id' => $healthieUserId,
+                    'membership_id'    => $membershipId,
                     'is_provider'      => $isProvider,
                 ]);
             }
@@ -476,6 +487,54 @@ class HealthieProvisioningService
         }
 
         return null;
+    }
+
+    /**
+     * Look up the OrganizationMembership record ID for a given Healthie user.
+     *
+     * The top-level organizationMemberships query accepts user_ids and returns
+     * each membership's own `id` — which is what updateOrganizationMembership needs.
+     * Returns null when the membership cannot be found or the query fails.
+     */
+    private function lookupMembershipIdForUser(string $userId, PartnerEhrSetting $settings): ?string
+    {
+        $query = <<<'GQL'
+        query GetMembershipByUser($user_ids: [ID]) {
+            organizationMemberships(user_ids: $user_ids) {
+                id
+            }
+        }
+        GQL;
+
+        try {
+            $response = $this->graphql(
+                $query,
+                ['user_ids' => [$userId]],
+                $settings->api_key,
+                $settings->endpoint,
+                $settings->authorization_shard
+            );
+
+            $json = $response->json();
+
+            if (! empty($json['errors'])) {
+                Log::warning('HealthieProvisioning: membership ID lookup returned errors', [
+                    'user_id' => $userId,
+                    'errors'  => $json['errors'],
+                ]);
+                return null;
+            }
+
+            $memberships = $json['data']['organizationMemberships'] ?? [];
+            $id = $memberships[0]['id'] ?? null;
+            return $id ? (string) $id : null;
+        } catch (\Throwable $e) {
+            Log::warning('HealthieProvisioning: membership ID lookup threw', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            return null;
+        }
     }
 
     private function splitName(string $fullName): array
