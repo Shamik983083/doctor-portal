@@ -290,12 +290,23 @@ class HealthieProvisioningService
             $memberInput['qualifications'] = $clinician->credentials;
         }
 
-        $licensedStates = $clinician->licensed_states ?? [];
-        if (! empty($licensedStates)) {
-            $memberInput['state_licenses'] = array_map(
-                fn ($s) => ['state' => strtoupper((string) ($s['state'] ?? $s))],
-                $licensedStates
-            );
+        // Healthie appends state_licenses on each call — we must destroy all
+        // existing records by ID then re-add the current set to avoid duplicates.
+        $existingLicenseIds = $this->fetchExistingStateLicenseIds($healthieUserId, $settings);
+        $licensedStates     = $clinician->licensed_states ?? [];
+
+        if (! empty($existingLicenseIds) || ! empty($licensedStates)) {
+            $stateLicensesInput = [];
+
+            foreach ($existingLicenseIds as $licenseId) {
+                $stateLicensesInput[] = ['id' => $licenseId, '_destroy' => true];
+            }
+
+            foreach ($licensedStates as $s) {
+                $stateLicensesInput[] = ['state' => strtoupper((string) ($s['state'] ?? $s))];
+            }
+
+            $memberInput['state_licenses'] = $stateLicensesInput;
         }
 
         $memberMutation = <<<'GQL'
@@ -549,6 +560,56 @@ class HealthieProvisioningService
                 'error'   => $e->getMessage(),
             ]);
             return null;
+        }
+    }
+
+    /**
+     * Fetch the IDs of all existing state_license records for a Healthie org member.
+     *
+     * Healthie's updateOrganizationMember appends new state_license rows rather than
+     * replacing them. Fetching the existing IDs lets us mark them _destroy=true in the
+     * same mutation call, avoiding duplicates on every sync.
+     */
+    private function fetchExistingStateLicenseIds(string $userId, PartnerEhrSetting $settings): array
+    {
+        $query = <<<'GQL'
+        query GetMemberLicenses($id: ID!) {
+            organizationMember(id: $id) {
+                state_licenses {
+                    id
+                    state
+                }
+            }
+        }
+        GQL;
+
+        try {
+            $response = $this->graphql(
+                $query,
+                ['id' => $userId],
+                $settings->api_key,
+                $settings->endpoint,
+                $settings->authorization_shard
+            );
+
+            $json = $response->json();
+
+            if (! empty($json['errors'])) {
+                Log::warning('HealthieProvisioning: failed to fetch existing state licenses', [
+                    'user_id' => $userId,
+                    'errors'  => $json['errors'],
+                ]);
+                return [];
+            }
+
+            $licenses = $json['data']['organizationMember']['state_licenses'] ?? [];
+            return array_column($licenses, 'id');
+        } catch (\Throwable $e) {
+            Log::warning('HealthieProvisioning: fetchExistingStateLicenseIds threw', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            return [];
         }
     }
 
