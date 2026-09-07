@@ -362,8 +362,20 @@ class HealthieProvisioningService
 
         try {
             $response = $this->graphql($query, [], $apiKey, $endpoint, $shard);
+            $json     = $response->json();
 
-            foreach ($response->json('data.organizationMemberships') ?? [] as $membership) {
+            Log::info('HealthieProvisioning: organizationMemberships raw response', [
+                'email'          => $email,
+                'http_status'    => $response->status(),
+                'errors'         => $json['errors'] ?? null,
+                'member_count'   => count($json['data']['organizationMemberships'] ?? []),
+                'member_emails'  => array_map(
+                    fn ($m) => $m['user']['email'] ?? null,
+                    $json['data']['organizationMemberships'] ?? []
+                ),
+            ]);
+
+            foreach ($json['data']['organizationMemberships'] ?? [] as $membership) {
                 $user = $membership['user'] ?? null;
                 if ($user && isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
                     return (string) $user['id'];
