@@ -375,17 +375,17 @@ class HealthieProvisioningService
         GQL;
 
         // All four flags are set in a single updateOrganizationMembership call:
-        //   is_provider              — "Should appear as a provider?" toggle
-        //   dietitian_auto_conversation — "Has Chat conversation automatically created with client"
-        //   can_schedule_with_clients   — "Clients can schedule sessions with this org member"
-        //                                 (requires is_provider=true; we set both together)
-        //   notify_of_client_activity   — "Is notified of any client activity"
+        //   is_provider                      — "Should appear as a provider?" toggle
+        //   auto_create_convo_for_care_team  — "Has Chat conversation automatically created with client"
+        //   allow_self_scheduling_in_care_team — "Clients can schedule sessions with this org member"
+        //                                        (requires is_provider=true; we set both together)
+        //   notify_any_client_activity       — "Is notified of any client activity"
         $membershipInput = [
-            'id'                          => $membershipId,
-            'is_provider'                 => true,
-            'dietitian_auto_conversation' => true,
-            'can_schedule_with_clients'   => true,
-            'notify_of_client_activity'   => true,
+            'id'                               => $membershipId,
+            'is_provider'                      => true,
+            'auto_create_convo_for_care_team'  => true,
+            'allow_self_scheduling_in_care_team' => true,
+            'notify_any_client_activity'       => true,
         ];
 
         try {
