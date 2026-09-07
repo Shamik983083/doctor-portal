@@ -254,7 +254,7 @@ class HealthieProvisioningService
             'phone_number' => $clinician->phone ?: null,
             'npi_number'   => $clinician->npi ?: null,
             'credentials'  => $clinician->credentials ?: null,
-            'specialty'    => $clinician->specialty ?: null,
+            'specialties'  => $clinician->specialty ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 
         // id must always be present even if somehow blank-filtered (it won't be).
@@ -269,9 +269,6 @@ class HealthieProvisioningService
             updateUser(input: $input) {
                 user {
                     id
-                    npi_number
-                    credentials
-                    specialty
                 }
                 messages {
                     field
