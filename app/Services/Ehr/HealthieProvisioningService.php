@@ -572,12 +572,19 @@ class HealthieProvisioningService
      */
     private function fetchExistingStateLicenseIds(string $userId, PartnerEhrSetting $settings): array
     {
+        // organizationMember (singular) does not exist in this org's schema.
+        // organizationMemberships(user_ids) is confirmed working — use it and
+        // pull state_licenses through the nested user object.
         $query = <<<'GQL'
-        query GetMemberLicenses($id: ID!) {
-            organizationMember(id: $id) {
-                state_licenses {
+        query GetMemberLicenses($user_ids: [ID]) {
+            organizationMemberships(user_ids: $user_ids) {
+                id
+                user {
                     id
-                    state
+                    state_licenses {
+                        id
+                        state
+                    }
                 }
             }
         }
@@ -586,7 +593,7 @@ class HealthieProvisioningService
         try {
             $response = $this->graphql(
                 $query,
-                ['id' => $userId],
+                ['user_ids' => [$userId]],
                 $settings->api_key,
                 $settings->endpoint,
                 $settings->authorization_shard
@@ -602,7 +609,8 @@ class HealthieProvisioningService
                 return [];
             }
 
-            $licenses = $json['data']['organizationMember']['state_licenses'] ?? [];
+            $memberships = $json['data']['organizationMemberships'] ?? [];
+            $licenses    = $memberships[0]['user']['state_licenses'] ?? [];
             return array_column($licenses, 'id');
         } catch (\Throwable $e) {
             Log::warning('HealthieProvisioning: fetchExistingStateLicenseIds threw', [
