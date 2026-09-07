@@ -211,18 +211,9 @@ class HealthieProvisioningService
     /**
      * Push current provider profile details to an already-provisioned Healthie account.
      *
-     * Called after initial provisioning AND as the update path when a clinician's
-     * NPI, credentials, specialty, phone, or licensed states change in this system.
-     *
-     * Fields synced (all best-effort — a missing value is omitted, not errored):
-     *   npi_number      ← clinician.npi
-     *   credentials     ← clinician.credentials  (e.g. "MD", "DO", "NP")
-     *   specialty       ← clinician.specialty
-     *   phone_number    ← clinician.phone
-     *   first_name /
-     *   last_name       ← clinician.user.name
-     *   dietitian_setting.licensed_in_states
-     *                   ← clinician.licensed_states[].state  (comma-separated)
+     * Fields synced: first_name, last_name, phone_number.
+     * Provider-specific fields (npi_number, credentials, specialty, dietitian_setting)
+     * are not accepted by updateUserInput in this Healthie org.
      *
      * Throws on GraphQL-level errors so the caller (provisioning job) can mark the
      * mapping as failed and surface the error through the normal retry path.
@@ -232,37 +223,17 @@ class HealthieProvisioningService
         $user                      = $clinician->user;
         [$firstName, $lastName]    = $this->splitName($user->name);
 
-        $licensedInStates = null;
-        if (! empty($clinician->licensed_states)) {
-            $codes = collect($clinician->licensed_states)
-                ->pluck('state')
-                ->filter()
-                ->map(fn ($s) => strtoupper(trim($s)))
-                ->unique()
-                ->values()
-                ->all();
-
-            if (! empty($codes)) {
-                $licensedInStates = implode(', ', $codes);
-            }
-        }
-
+        // Only basic identity fields are accepted by updateUserInput in this Healthie org.
+        // Provider-specific fields (npi_number, credentials, specialty, dietitian_setting)
+        // are not defined on updateUserInput and cause schema validation errors.
         $input = array_filter([
             'id'           => $healthieUserId,
             'first_name'   => $firstName ?: null,
             'last_name'    => $lastName ?: null,
             'phone_number' => $clinician->phone ?: null,
-            'npi_number'   => $clinician->npi ?: null,
-            'credentials'  => $clinician->credentials ?: null,
-            'specialties'  => $clinician->specialty ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 
-        // id must always be present even if somehow blank-filtered (it won't be).
         $input['id'] = $healthieUserId;
-
-        if ($licensedInStates !== null) {
-            $input['dietitian_setting'] = ['licensed_in_states' => $licensedInStates];
-        }
 
         $mutation = <<<'GQL'
         mutation UpdateProvider($input: updateUserInput!) {
