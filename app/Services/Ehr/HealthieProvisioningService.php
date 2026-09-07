@@ -332,58 +332,62 @@ class HealthieProvisioningService
             $settings->api_key,
             $settings->endpoint,
             $settings->authorization_shard,
+            $settings->organization_id,
         );
     }
 
     /**
      * Shared provider lookup by raw credentials.
      *
-     * Uses organizationMemberships — the direct read-side of createOrganizationMembership.
-     * The users() query is client-scoped in Healthie; it does not return org members
-     * regardless of the type filter. organizationMemberships returns all members of the
-     * partner's single Healthie org and is filtered by email client-side.
+     * organizationMemberships (top-level) is a POINT-LOOKUP — it requires `id` or
+     * `user_ids` and cannot be used to list all members. Instead we fetch the org by
+     * its known ID and walk its organization_memberships relationship, filtering by
+     * email client-side.
      */
     private function findProviderByEmailWithCreds(
         string $email,
         string $apiKey,
         string $endpoint,
         ?string $shard = null,
+        ?string $organizationId = null,
     ): ?string {
-        // organizationMemberships does not accept offset/should_paginate args.
         $query = <<<'GQL'
-        query ListOrgMembers {
-            organizationMemberships {
-                user {
-                    id
-                    email
+        query GetOrgMembers($id: ID!) {
+            organization(id: $id) {
+                organization_memberships {
+                    user {
+                        id
+                        email
+                    }
                 }
             }
         }
         GQL;
 
         try {
-            $response = $this->graphql($query, [], $apiKey, $endpoint, $shard);
+            $response = $this->graphql($query, ['id' => $organizationId], $apiKey, $endpoint, $shard);
             $json     = $response->json();
 
-            Log::info('HealthieProvisioning: organizationMemberships raw response', [
+            Log::info('HealthieProvisioning: org member lookup via organization query', [
                 'email'          => $email,
+                'org_id'         => $organizationId,
                 'http_status'    => $response->status(),
                 'errors'         => $json['errors'] ?? null,
-                'member_count'   => count($json['data']['organizationMemberships'] ?? []),
+                'member_count'   => count($json['data']['organization']['organization_memberships'] ?? []),
                 'member_emails'  => array_map(
                     fn ($m) => $m['user']['email'] ?? null,
-                    $json['data']['organizationMemberships'] ?? []
+                    $json['data']['organization']['organization_memberships'] ?? []
                 ),
             ]);
 
-            foreach ($json['data']['organizationMemberships'] ?? [] as $membership) {
+            foreach ($json['data']['organization']['organization_memberships'] ?? [] as $membership) {
                 $user = $membership['user'] ?? null;
                 if ($user && isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
                     return (string) $user['id'];
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning('HealthieProvisioning: org membership list fetch failed', [
+            Log::warning('HealthieProvisioning: org member lookup failed', [
                 'email' => $email,
                 'error' => $e->getMessage(),
             ]);
