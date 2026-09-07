@@ -349,9 +349,10 @@ class HealthieProvisioningService
         string $endpoint,
         ?string $shard = null,
     ): ?string {
+        // organizationMemberships does not accept offset/should_paginate args.
         $query = <<<'GQL'
         query ListOrgMembers {
-            organizationMemberships(offset: 0, should_paginate: false) {
+            organizationMemberships {
                 user {
                     id
                     email
