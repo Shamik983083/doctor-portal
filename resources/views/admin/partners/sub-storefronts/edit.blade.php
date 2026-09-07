@@ -315,11 +315,11 @@
                     No Healthie User Group is linked to this sub-storefront.
                     Patients cannot be pushed to Healthie until a group is created.
                 </p>
-                <form method="POST"
-                      action="{{ route('admin.partners.sub-storefronts.provision-group', [$partner->id, $subStorefront->id]) }}"
-                      onsubmit="return confirm('Create a Healthie User Group for \'{{ addslashes($subStorefront->name) }}\'?\n\nThis will call the Healthie API and save the Group ID here.')">
+                <form id="provisionGroupForm" method="POST"
+                      action="{{ route('admin.partners.sub-storefronts.provision-group', [$partner->id, $subStorefront->id]) }}">
                     @csrf
-                    <button type="submit" class="btn btn-warning btn-sm w-100">
+                    <button type="button" class="btn btn-warning btn-sm w-100"
+                            onclick="openConfirmModal('provision')">
                         <i class="bi bi-plus-circle me-1"></i>Create Healthie Group
                     </button>
                 </form>
@@ -337,11 +337,12 @@
                     Deleting this sub-storefront removes it from the portal but <strong>does not delete the Healthie User Group</strong>.
                     Remove it from the Healthie admin portal manually after deletion.
                 </p>
-                <form method="POST" action="{{ route('admin.partners.sub-storefronts.destroy', [$partner->id, $subStorefront->id]) }}"
-                      onsubmit="return confirm('Delete \'{{ addslashes($subStorefront->name) }}\'? This cannot be undone. Remove the Healthie User Group manually.')">
+                <form id="deleteSubStorefrontForm" method="POST"
+                      action="{{ route('admin.partners.sub-storefronts.destroy', [$partner->id, $subStorefront->id]) }}">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                    <button type="button" class="btn btn-outline-danger btn-sm w-100"
+                            onclick="openConfirmModal('delete')">
                         <i class="bi bi-trash me-1"></i>Delete Sub-Storefront
                     </button>
                 </form>
@@ -351,8 +352,99 @@
 </div>
 @endsection
 
+{{-- ── Shared confirmation modal (provision + delete) ──────────────── --}}
+<div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+
+            {{-- Colour strip + icon --}}
+            <div id="confirmModalStrip" class="d-flex align-items-center justify-content-center py-4"
+                 style="background:linear-gradient(135deg,#fff8ec 0%,#fff3cd 100%);">
+                <div id="confirmModalIcon"
+                     style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;
+                            justify-content:center;font-size:1.55rem;
+                            background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+                    <i class="bi bi-diagram-3-fill text-warning"></i>
+                </div>
+            </div>
+
+            <div class="modal-body text-center px-4 pt-3 pb-2">
+                <h5 class="fw-bold mb-1" id="confirmModalLabel" style="letter-spacing:-.01em;font-size:1.05rem;"></h5>
+                <p class="text-muted mb-0" id="confirmModalBody" style="font-size:.875rem;line-height:1.6;"></p>
+            </div>
+
+            <div class="modal-footer border-0 px-4 pb-4 pt-2 d-flex gap-2 justify-content-center">
+                <button type="button" class="btn btn-light fw-semibold px-4"
+                        style="border-radius:10px;border:1px solid #dee2e6;"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmModalSubmit"
+                        class="btn fw-semibold px-4"
+                        style="border-radius:10px;min-width:140px;">
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 @section('scripts')
 <script>
+const MODAL_CONFIG = {
+    provision: {
+        strip:  'linear-gradient(135deg,#fff8ec 0%,#fff3cd 100%)',
+        icon:   'bi-diagram-3-fill text-warning',
+        iconBg: '#fff',
+        title:  'Create Healthie User Group?',
+        body:   'This will call the Healthie API and create a User Group named <strong>{{ addslashes($subStorefront->name) }}</strong>. The Group ID will be saved here automatically.',
+        btn:    'Create Group',
+        btnCls: 'btn-warning',
+        formId: 'provisionGroupForm',
+    },
+    delete: {
+        strip:  'linear-gradient(135deg,#fff5f5 0%,#ffe0e0 100%)',
+        icon:   'bi-trash3-fill text-danger',
+        iconBg: '#fff',
+        title:  'Delete "{{ addslashes($subStorefront->name) }}"?',
+        body:   'This will permanently remove the sub-storefront and all its data from the portal. <strong>The Healthie User Group will not be deleted</strong> — remove it from the Healthie admin portal manually.',
+        btn:    'Yes, Delete',
+        btnCls: 'btn-danger',
+        formId: 'deleteSubStorefrontForm',
+    },
+};
+
+let pendingFormId = null;
+
+function openConfirmModal(action) {
+    const cfg = MODAL_CONFIG[action];
+    if (!cfg) return;
+
+    document.getElementById('confirmModalStrip').style.background = cfg.strip;
+
+    const iconEl = document.getElementById('confirmModalIcon');
+    iconEl.style.background = cfg.iconBg;
+    iconEl.innerHTML = `<i class="bi ${cfg.icon}" style="font-size:1.55rem;"></i>`;
+
+    document.getElementById('confirmModalLabel').textContent = cfg.title;
+    document.getElementById('confirmModalBody').innerHTML = cfg.body;
+
+    const btn = document.getElementById('confirmModalSubmit');
+    btn.textContent = cfg.btn;
+    btn.className = `btn fw-semibold px-4 ${cfg.btnCls}`;
+    btn.style.borderRadius = '10px';
+    btn.style.minWidth = '140px';
+
+    pendingFormId = cfg.formId;
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmActionModal')).show();
+}
+
+document.getElementById('confirmModalSubmit').addEventListener('click', function () {
+    if (pendingFormId) {
+        bootstrap.Modal.getInstance(document.getElementById('confirmActionModal')).hide();
+        document.getElementById(pendingFormId).submit();
+    }
+});
+
 function copyValue(id) {
     const el = document.getElementById(id);
     navigator.clipboard.writeText(el.value).then(() => {
