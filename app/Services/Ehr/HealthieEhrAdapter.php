@@ -423,8 +423,73 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
                 'clinician_healthie_id' => $clinicianHealthieId,
                 'updated_user_ids'      => array_column($updatedUsers, 'id'),
             ]);
+
+            // Verify the group was actually applied by reading the client back.
+            $this->verifyClientGroup($clientId, $groupId);
         } catch (\Throwable $e) {
             Log::warning('Healthie bulkUpdateClients threw', [
+                'partner_id' => $this->settings->partner_id,
+                'client_id'  => $clientId,
+                'error'      => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Read the client back from Healthie and log their actual user_group_id and
+     * other_providers, so we can confirm whether bulkUpdateClients actually applied
+     * the group/care-team assignment. Diagnostic only — never throws.
+     */
+    private function verifyClientGroup(string $clientId, ?string $expectedGroupId): void
+    {
+        try {
+            $query = <<<GQL
+            query VerifyClient {
+                user(id: "{$clientId}") {
+                    id
+                    email
+                    user_group {
+                        id
+                        name
+                    }
+                    other_providers {
+                        id
+                        email
+                    }
+                }
+            }
+            GQL;
+
+            $response = $this->graphql($query, []);
+            $json     = $response->json();
+            $user     = $json['data']['user'] ?? null;
+
+            if (! $user) {
+                Log::warning('Healthie verifyClientGroup: client not found', [
+                    'partner_id' => $this->settings->partner_id,
+                    'client_id'  => $clientId,
+                    'errors'     => $json['errors'] ?? [],
+                ]);
+                return;
+            }
+
+            $actualGroupId   = $user['user_group']['id']   ?? null;
+            $actualGroupName = $user['user_group']['name'] ?? null;
+            $providerIds     = array_column($user['other_providers'] ?? [], 'id');
+            $groupMatches    = $actualGroupId === $expectedGroupId;
+
+            $level = $groupMatches ? 'info' : 'warning';
+            Log::$level('Healthie verifyClientGroup', [
+                'partner_id'        => $this->settings->partner_id,
+                'client_id'         => $clientId,
+                'expected_group_id' => $expectedGroupId,
+                'actual_group_id'   => $actualGroupId,
+                'actual_group_name' => $actualGroupName,
+                'group_matches'     => $groupMatches,
+                'other_provider_ids' => $providerIds,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Healthie verifyClientGroup threw', [
                 'partner_id' => $this->settings->partner_id,
                 'client_id'  => $clientId,
                 'error'      => $e->getMessage(),
