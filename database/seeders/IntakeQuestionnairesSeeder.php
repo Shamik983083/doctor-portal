@@ -10,8 +10,8 @@ class IntakeQuestionnairesSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->seedMWLWeightLoss();
-        $this->seedAntiAging();
+        // $this->seedMWLWeightLoss();  // temporarily disabled
+        // $this->seedAntiAging();      // temporarily disabled
     }
 
     // ────────────────────────────────────────────────────────────────────────────

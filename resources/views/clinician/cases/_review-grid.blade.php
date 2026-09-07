@@ -77,6 +77,7 @@
                     <th>Med 3 Req</th>
                     <th>Med 4 Req</th>
                     <th>Company</th>
+                    <th>Sub-SF</th>
                     <th>Allergies</th>
                     <th>STD ZOF</th>
                     <th>Video Visit</th>
@@ -134,6 +135,15 @@
                         <td>{{ $clin['med4'] }}</td>
                         <td>{{ $case->partner?->name ?? '-' }}</td>
                         <td>
+                            @if($case->subStorefront)
+                                <span class="pill neutral" title="{{ $case->subStorefront->name }}">
+                                    {{ \Illuminate\Support\Str::limit($case->subStorefront->name, 12) }}
+                                </span>
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>
                             @if($clin['allergy'] === 'Y')
                                 <span class="allergy-detail-wrap" data-stop="1">
                                     <button type="button" class="allergy-flag">Y &#9432;</button>
@@ -151,7 +161,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="21"><div class="stub"><strong>Nothing in this queue</strong>No case currently matches this filter.</div></td></tr>
+                    <tr><td colspan="22"><div class="stub"><strong>Nothing in this queue</strong>No case currently matches this filter.</div></td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -282,10 +292,11 @@
         }
 
         return [
-            'id'       => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
-            'name'     => $case->patient?->full_name ?? 'Unknown',
-            'email'    => $case->patient?->email ?? null,
-            'company'  => $case->partner?->name ?? '-',
+            'id'            => $case->external_id ?? \Illuminate\Support\Str::limit($case->uuid, 8, ''),
+            'name'          => $case->patient?->full_name ?? 'Unknown',
+            'email'         => $case->patient?->email ?? null,
+            'company'       => $case->partner?->name ?? '-',
+            'subStorefront' => $case->subStorefront?->name ?? null,
             'term'     => $clin['term'],
             'dose'     => $clin['dose'],
             'triage'   => $case->triage ?? 'unclassified',
@@ -469,7 +480,7 @@
                 + '<div class="eyebrow">Quick review · ' + esc(d.id) + '</div>'
                 + '<h2>' + esc(d.name) + (d.email ? ' <span style="font-size:14px;font-weight:500;color:var(--soft-muted,#6b7a99)">(' + esc(d.email) + ')</span>' : '') + (d.isRefill ? ' <span class="pill" style="font-size:10px;vertical-align:middle">Refill</span>' : '') + '</h2>'
                 + demoChipsHtml
-                + '<p>' + esc(d.company) + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state ? ' · ' + esc(d.state) : '') + '</p></div>'
+                + '<p>' + esc(d.company) + (d.subStorefront ? ' · ' + esc(d.subStorefront) : '') + ' · Request ' + esc(d.term) + ' · ' + esc(d.dose) + (d.state ? ' · ' + esc(d.state) : '') + '</p></div>'
                 + '<div class="quick-pills"><span class="pill ' + esc(d.triage) + '">' + esc(triageLabel) + '</span>'
                 + '<span class="pill ' + esc(d.tone) + '">' + esc(d.label) + '</span></div></div>'
                 + '<div class="quick-review-grid">'

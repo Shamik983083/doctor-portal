@@ -71,6 +71,7 @@ Content-Type: application/json
   "hold_status":    false,
   "is_refill":      false,
   "metadata":       { "source": "patient-portal" },
+  "sub_storefront_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
 
   "offerings": [
     { "product_key": "semaglutide", "month_frequency": 12, "quantity": 1 }
@@ -136,6 +137,7 @@ Content-Type: application/json
 | `hold_status` | — | boolean | `true` = case sits on hold until you release it via `POST /{uuid}/hold`. Default `false`. |
 | `is_refill` | — | boolean | `true` = refill / check-in. See [Refill Cases](#refill--check-in-cases). Default `false`. |
 | `metadata` | — | object | Free-form JSON stored verbatim on the case. Not used clinically. |
+| `sub_storefront_id` | — | UUID string | UUID of the sub-storefront this case belongs to. Obtain from your admin portal. Must belong to your partner account and have `status: active`. When present, the case is segregated under that sub-storefront's Healthie sub-org and all webhook events include this ID. Omit for cases that are not sub-storefront-specific. |
 
 ---
 
@@ -342,6 +344,61 @@ The patient is matched by `email` or `patient.external_id`. The prior case and p
 
 ---
 
+## Sub-Storefront Endpoints
+
+Sub-storefronts map to Healthie sub-organisations. When a new tenant is created in your tenant portal, call `POST /api/partner/sub-storefronts` to register it in the doctor portal and auto-provision its Healthie sub-org in one step.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/partner/sub-storefronts` | List active sub-storefronts for this partner |
+| POST | `/api/partner/sub-storefronts` | Create a sub-storefront + Healthie sub-org |
+
+### Create a Sub-Storefront
+
+```
+POST /api/partner/sub-storefronts
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "name":       "Amerilean",
+  "first_name": "John",
+  "last_name":  "Doe",
+  "email":      "john@amerilean.com"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `name` | ✓ | Display name for the sub-storefront / Healthie sub-org |
+| `first_name` | ✓ | First name of the Healthie org admin user created for this tenant |
+| `last_name` | ✓ | Last name |
+| `email` | ✓ | Email of the Healthie org admin — becomes their Healthie login |
+
+**Response 201:**
+```json
+{
+  "sub_storefront_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+  "name": "Amerilean",
+  "slug": "amerilean",
+  "status": "active",
+  "healthie": {
+    "organization_id":    "123456",
+    "admin_email":        "john@amerilean.com",
+    "temporary_password": "Xk9mN2pQrA1!",
+    "error":              null
+  }
+}
+```
+
+- `sub_storefront_id` — UUID to send as `sub_storefront_id` in future case payloads.
+- `healthie.temporary_password` — shown **once only**, never stored. Relay it to the new user immediately (email them). If lost, use Healthie's password-reset flow.
+- `healthie.error` — non-null when Healthie provisioning failed (e.g. partner has no API key). The sub-storefront is still created; an admin must set `healthie_organization_id` manually.
+
+All active global clinicians are automatically provisioned into the new Healthie sub-org in the background after creation.
+
+---
+
 ## Webhooks
 
 ### Managing webhook endpoints
@@ -379,7 +436,7 @@ The portal sends a `POST` to your URL with `Content-Type: application/json` for 
 | `order_status_changed` | Order status updated |
 | `tracking_number_changed` | Shipping tracking number added |
 
-All payloads include at minimum: `case_id` (UUID), `patient_id` (UUID), `status`, and `timestamp` (Unix).
+All payloads include at minimum: `case_id` (UUID), `patient_id` (UUID), `status`, `timestamp` (Unix), and `sub_storefront_id` (UUID string, or `null` when the case is not tied to a sub-storefront).
 
 The `prescription_written` payload additionally includes:
 ```json

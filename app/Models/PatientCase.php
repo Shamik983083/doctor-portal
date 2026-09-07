@@ -14,7 +14,7 @@ class PatientCase extends Model
     protected $table = 'cases';
 
     protected $fillable = [
-        'uuid', 'partner_id', 'patient_id', 'clinician_id', 'external_id',
+        'uuid', 'partner_id', 'sub_storefront_id', 'patient_id', 'clinician_id', 'external_id',
         'status', 'hold_status', 'is_chargeable', 'charge_amount',
         'support_note', 'support_at', 'cancellation_reason', 'patient_state', 'visit_type',
         'is_refill',
@@ -277,6 +277,7 @@ class PatientCase extends Model
     }
 
     public function partner() { return $this->belongsTo(Partner::class); }
+    public function subStorefront() { return $this->belongsTo(SubStorefront::class); }
     public function patient() { return $this->belongsTo(Patient::class); }
     public function clinician() { return $this->belongsTo(Clinician::class); }
     public function caseOfferings() { return $this->hasMany(CaseOffering::class, 'case_id'); }
@@ -294,8 +295,10 @@ class PatientCase extends Model
     public function casePrescription()       { return $this->hasOne(CasePrescription::class, 'case_id')->where('review_status', '!=', 'draft')->latestOfMany('prescribed_at'); }
 
     /**
-     * The most recent completed case for the same patient + partner that produced
-     * a prescription. Returns null if no such case exists.
+     * The most recent completed case that produced a prescription, scoped to the
+     * same patient and — when the current case belongs to a sub-storefront — to
+     * that same sub-storefront. Falls back to partner-level scope when no
+     * sub-storefront is set, preserving the original behaviour.
      *
      * Shared by ContinuityResolver (routing) and the prior-visit panel shown to
      * clinicians on refill cases. Eager-loads everything the panel needs so callers
@@ -314,7 +317,11 @@ class PatientCase extends Model
                 'clinicalNotes' => fn ($q) => $q->orderByDesc('created_at')->limit(1),
             ])
             ->where('patient_id', $case->patient_id)
-            ->where('partner_id', $case->partner_id)
+            ->when(
+                $case->sub_storefront_id,
+                fn ($q) => $q->where('sub_storefront_id', $case->sub_storefront_id),
+                fn ($q) => $q->where('partner_id', $case->partner_id),
+            )
             ->where('id', '!=', $case->id)
             ->where('status', self::STATUS_COMPLETED)
             ->whereNotNull('clinician_id')

@@ -393,6 +393,23 @@
     </div>
 
     {{-- ── Collaborating Clinician ───────────────────────────────── --}}
+    {{-- Hidden when partner has sub-storefronts: each sub-storefront manages its own default. --}}
+    @if($partner->subStorefronts()->exists())
+    <div class="ep-card">
+        <div class="ep-card-header">
+            <div class="ep-icon ep-icon-green"><i class="bi bi-person-badge"></i></div>
+            <h6>Collaborating Clinician Default</h6>
+        </div>
+        <div class="ep-card-body">
+            <div class="alert alert-info py-2 mb-0 small">
+                <i class="bi bi-info-circle me-1"></i>
+                This partner has sub-storefronts. Each sub-storefront manages its own collaborating clinician default
+                and clinician assignment pool. Set those on the
+                <a href="{{ route('admin.partners.sub-storefronts.index', $partner->id) }}">Sub-Storefronts</a> page.
+            </div>
+        </div>
+    </div>
+    @else
     <div class="ep-card">
         <div class="ep-card-header">
             <div class="ep-icon ep-icon-green"><i class="bi bi-person-badge"></i></div>
@@ -421,6 +438,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     {{-- ── Healthie EHR Settings ─────────────────────────────────── --}}
     <div class="ep-card">

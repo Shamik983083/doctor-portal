@@ -2,7 +2,9 @@
 
 namespace App\Services\Ehr;
 
+use App\Models\ClinicianHealthieMapping;
 use App\Models\PartnerEhrSetting;
+use App\Models\SubStorefront;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -36,25 +38,78 @@ use RuntimeException;
  *   - If a lookup returns a record belonging to another company, that is a bug,
  *     not a merge candidate. Fail; do not write.
  *
- * Setup and the remaining decisions: docs/integrations/HEALTHIE-SETUP.md
- * API reference: https://docs.gethealthie.com/guides/intro/
+ * ============================================================================
+ * ARCHITECTURE NOTE — USER GROUPS (Healthie support guidance, post-launch):
+ * ============================================================================
+ * Healthie sub-organisations are enterprise-only. Patient segregation is now
+ * achieved through User Groups and Care Teams within a single partner org:
+ *
+ *   1. User Group  — one group per sub-storefront (healthie_default_group_id).
+ *      Patients are assigned to the group on CREATION via user_group_id on
+ *      createClient, and added to the group on any subsequent FIND via
+ *      addGroupMembers (both calls are best-effort idempotent).
+ *   2. Care Team   — the prescribing clinician is added to the patient's care
+ *      team via createCareTeamMembership after every find-or-create, so that
+ *      provider-permission scoping works immediately.
+ *
+ *   All operations run with the PARTNER's single credential (PartnerEhrSetting).
+ *   Sub-storefronts no longer carry their own api_key / endpoint / org_id —
+ *   only the group ID and optional note form / provider overrides.
  * ============================================================================
  *
- * WHAT IS WIRED:
- *
- * Per-company credential resolution, the transport, Healthie's documented auth
- * headers (Authorization: Basic <key>, AuthorizationSource: API, and
- * AuthorizationShard when the account is sharded), error normalisation, GraphQL
- * error handling (Healthie returns HTTP 200 with an `errors` array), tenant
- * segregation check, and the full two-step flow:
- *   1. findOrCreateClient — looks up the Healthie client by namespaced patient
- *      key; creates the client if not found.
- *   2. buildMutation — posts a createFormAnswerGroup (when note_form_id is
- *      configured) or createNote (the simpler fallback).
+ * Setup and the remaining decisions: docs/integrations/HEALTHIE-SETUP.md
+ * API reference: https://docs.gethealthie.com/guides/intro/
  */
 class HealthieEhrAdapter implements EhrGatewayAdapter
 {
+    /**
+     * When non-null, this adapter is operating in sub-storefront mode.
+     * The sub-storefront's group ID has already been baked into $settings->default_group_id.
+     * Clinician mapping lookups still use partner_id with sub_storefront_id IS NULL
+     * because all clinicians live in the partner's single Healthie org.
+     */
+    public ?int $subStorefrontId = null;
+
     public function __construct(private PartnerEhrSetting $settings) {}
+
+    /**
+     * Build an adapter that uses the PARTNER's Healthie credentials but targets
+     * the sub-storefront's user group.
+     *
+     * The partner's PartnerEhrSetting supplies api_key, endpoint, shard, and
+     * organization_id. The sub-storefront overrides default_group_id (and
+     * optionally note_form_id and default_provider_id).
+     *
+     * This keeps assertPayloadBelongsToThisCompany() intact: the settings object
+     * retains the parent partner_id, which must match the payload.
+     */
+    public static function forSubStorefront(SubStorefront $subStorefront, PartnerEhrSetting $partnerSettings): self
+    {
+        // Build a synthetic settings object using the partner's credentials
+        // but with the sub-storefront's group/note/provider overrides.
+        $settings                      = new PartnerEhrSetting();
+        $settings->partner_id          = $partnerSettings->partner_id;
+        $settings->provider            = $partnerSettings->provider;
+        $settings->api_key             = $partnerSettings->api_key;
+        $settings->endpoint            = $partnerSettings->endpoint;
+        $settings->authorization_shard = $partnerSettings->authorization_shard;
+        $settings->organization_id     = $partnerSettings->organization_id;
+        $settings->is_enabled          = $partnerSettings->is_enabled;
+        $settings->sandbox_validated   = $partnerSettings->sandbox_validated;
+
+        // Sub-storefront-scoped overrides (fall through to partner defaults when empty)
+        $settings->default_group_id    = $subStorefront->healthie_default_group_id
+            ?: $partnerSettings->default_group_id;
+        $settings->note_form_id        = $subStorefront->healthie_note_form_id
+            ?: $partnerSettings->note_form_id;
+        $settings->default_provider_id = $subStorefront->healthie_default_provider_id
+            ?: $partnerSettings->default_provider_id;
+
+        $instance                  = new self($settings);
+        $instance->subStorefrontId = $subStorefront->id;
+
+        return $instance;
+    }
 
     public function key(): string { return 'healthie'; }
 
@@ -71,15 +126,17 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         }
 
         // Step 1: resolve or create the Healthie client for this patient.
-        // Throws RuntimeException on client-creation failure (retryable — the
-        // outbox will try again up to max_attempts).
         $healthieClientId = $this->findOrCreateClient($payload);
 
-        // Step 2: push vitals (weight, height, BMI) as metric entries.
+        // Step 2: assign patient to their sub-storefront group + add prescribing clinician
+        // to care team via bulkUpdateClients — the single supported mutation for both.
+        $this->bulkUpdateClientGroupAndCareTeam($payload, $healthieClientId);
+
+        // Step 4: push vitals (weight, height, BMI) as metric entries.
         // Best-effort: a vital failing to post must not block or fail the record.
         $this->pushVitals($payload, $healthieClientId);
 
-        // Step 3: post the clinical note.
+        // Step 5: post the clinical note.
         [$mutation, $variables] = $this->buildMutation($payload, $healthieClientId);
 
         try {
@@ -164,8 +221,8 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
      * record_identifier matches our namespaced key. Email is only the initial
      * filter; the namespaced key is the authoritative match.
      *
-     * On create: stores the namespaced key in record_identifier so future
-     * lookups never rely on email alone.
+     * On create: the user_group_id assigns the patient to their sub-storefront's
+     * group immediately. For found patients, ensureInGroup() is called after.
      */
     private function findOrCreateClient(array $payload): string
     {
@@ -207,6 +264,22 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         }
         GQL;
 
+        // Clinician mapping: always look up at partner level (sub_storefront_id IS NULL)
+        // because in the User Groups model all clinicians live in the partner's single org.
+        $clinicianId = $payload['encounter']['clinician_id'] ?? null;
+        $partnerId   = $payload['company']['partner_id'] ?? null;
+        $resolvedProviderId = null;
+
+        if ($clinicianId && $partnerId) {
+            $resolvedProviderId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
+                ->where('partner_id', $partnerId)
+                ->whereNull('sub_storefront_id')
+                ->where('status', 'synced')
+                ->value('healthie_user_id');
+        }
+
+        $resolvedProviderId = $resolvedProviderId ?: ($this->settings->default_provider_id ?: null);
+
         // Build input and strip nulls/empty-strings. dont_send_welcome is kept
         // explicitly — it is a boolean and must not be stripped by the filter.
         $input = array_filter([
@@ -217,7 +290,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             'dob'               => $payload['patient']['date_of_birth'] ?? null,
             'gender'            => $payload['patient']['gender'] ?? null,
             'record_identifier' => $namespacedKey,
-            'dietitian_id'      => $this->settings->default_provider_id ?: null,
+            'dietitian_id'      => $resolvedProviderId,
             'user_group_id'     => $this->settings->default_group_id ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 
@@ -234,28 +307,132 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             throw new RuntimeException("Healthie client creation failed: {$messages}");
         }
 
-        $clientId = $createJson['data']['createClient']['user']['id'] ?? null;
+        $clientId    = $createJson['data']['createClient']['user']['id'] ?? null;
+        $fieldErrors = $createJson['data']['createClient']['messages'] ?? [];
 
         if (! $clientId) {
-            $fieldErrors = $createJson['data']['createClient']['messages'] ?? [];
-            $detail      = implode('; ', array_map(
+            $detail = implode('; ', array_map(
                 fn ($m) => ($m['field'] ?? '?') . ': ' . ($m['message'] ?? '?'),
                 $fieldErrors
             ));
             throw new RuntimeException("Healthie returned no client ID after createClient. {$detail}");
         }
 
+        if (! empty($fieldErrors)) {
+            Log::warning('Healthie createClient succeeded but had field messages', [
+                'partner_id' => $this->settings->partner_id,
+                'client_id'  => $clientId,
+                'messages'   => $fieldErrors,
+            ]);
+        }
+
         return (string) $clientId;
     }
 
     /**
-     * Builds the note creation mutation for the resolved Healthie client ID.
+     * Assign the patient to their sub-storefront's user group AND add the prescribing
+     * clinician to the care team in a single call via bulkUpdateClients.
      *
-     * Uses createFormAnswerGroup (a proper charting record tied to a form
-     * template) when note_form_id is configured. Falls back to createNote
-     * (a plain text note on the patient's timeline) when it is not. Either
-     * path produces a record the extractReference helper can parse.
+     * This is the Healthie-confirmed approach: addGroupMembers, createCareTeamMembership,
+     * and updateUser with user_group_id/dietitian_id are all unsupported in this org.
+     * bulkUpdateClients handles both in one mutation.
+     *
+     * Best-effort: failures are logged but never thrown — group / care-team issues
+     * must not block the clinical note push that follows.
      */
+    private function bulkUpdateClientGroupAndCareTeam(array $payload, string $clientId): void
+    {
+        $groupId = $this->settings->default_group_id ?: null;
+
+        // Resolve the prescribing clinician's Healthie ID for care-team assignment.
+        $clinicianId        = $payload['encounter']['clinician_id'] ?? null;
+        $partnerId          = $payload['company']['partner_id'] ?? null;
+        $clinicianHealthieId = null;
+
+        if ($clinicianId && $partnerId) {
+            $clinicianHealthieId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
+                ->where('partner_id', $partnerId)
+                ->whereNull('sub_storefront_id')
+                ->where('status', 'synced')
+                ->value('healthie_user_id');
+        }
+
+        if (! $groupId && ! $clinicianHealthieId) {
+            // Nothing to assign — skip the API call entirely.
+            return;
+        }
+
+        // Use inline input (no typed variable) to match Healthie support's confirmed example exactly.
+        // The return type does not expose a 'messages' field — only 'users'.
+        $idsJson           = json_encode([$clientId]);
+        $groupLine         = $groupId            ? "user_group_id: \"{$groupId}\""                   : '';
+        $providerLine      = $clinicianHealthieId ? "other_provider_ids: \"{$clinicianHealthieId}\""  : '';
+
+        $mutation = <<<GQL
+        mutation BulkUpdateClients {
+            bulkUpdateClients(
+                input: {
+                    ids: {$idsJson}
+                    {$groupLine}
+                    {$providerLine}
+                }
+            ) {
+                users {
+                    id
+                    email
+                }
+            }
+        }
+        GQL;
+
+        try {
+            $response = $this->graphql($mutation, []);
+            $json     = $response->json();
+
+            if (! empty($json['errors'])) {
+                $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
+                Log::warning('Healthie bulkUpdateClients failed', [
+                    'partner_id'            => $this->settings->partner_id,
+                    'client_id'             => $clientId,
+                    'group_id'              => $groupId,
+                    'clinician_healthie_id' => $clinicianHealthieId,
+                    'errors'                => $msg,
+                ]);
+                return;
+            }
+
+            $updatedUsers = $json['data']['bulkUpdateClients']['users'] ?? [];
+
+            if (empty($updatedUsers)) {
+                // API returned success but no users — the client ID was not found or the
+                // operation was a no-op. Log at WARNING so it surfaces for investigation.
+                Log::warning('Healthie bulkUpdateClients returned 0 users (no-op) — client may not exist in Healthie or user_group_id is not accepted', [
+                    'partner_id'            => $this->settings->partner_id,
+                    'client_id'             => $clientId,
+                    'group_id'              => $groupId,
+                    'clinician_healthie_id' => $clinicianHealthieId,
+                    'raw_response'          => $json,
+                ]);
+                return;
+            }
+
+            Log::info('Healthie bulkUpdateClients succeeded', [
+                'partner_id'            => $this->settings->partner_id,
+                'client_id'             => $clientId,
+                'group_id'              => $groupId,
+                'clinician_healthie_id' => $clinicianHealthieId,
+                'updated_user_ids'      => array_column($updatedUsers, 'id'),
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::warning('Healthie bulkUpdateClients threw', [
+                'partner_id' => $this->settings->partner_id,
+                'client_id'  => $clientId,
+                'error'      => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Pushes weight, height, and BMI to Healthie as MetricEntry records.
      *
@@ -317,6 +494,14 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         }
     }
 
+    /**
+     * Builds the note creation mutation for the resolved Healthie client ID.
+     *
+     * Uses createFormAnswerGroup (a proper charting record tied to a form
+     * template) when note_form_id is configured. Falls back to createNote
+     * (a plain text note on the patient's timeline) when it is not. Either
+     * path produces a record the extractReference helper can parse.
+     */
     private function buildMutation(array $payload, string $healthieClientId): array
     {
         $noteText = $this->buildNoteText($payload);
@@ -401,7 +586,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
     {
         $lines = [];
 
-        $lines[] = 'MEDAXIS CLINICAL NOTE';
+        $lines[] = 'AXISMD CLINICAL NOTE';
         $lines[] = 'Case: ' . ($payload['source']['case_id'] ?? 'unknown');
         $lines[] = 'Approved: ' . ($payload['encounter']['approved_at'] ?? 'unknown');
 

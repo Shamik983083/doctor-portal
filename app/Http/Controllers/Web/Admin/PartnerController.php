@@ -3,14 +3,18 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProvisionAllCliniciansForPartnerJob;
 use App\Models\Clinician;
+use App\Models\ClinicianHealthieMapping;
 use App\Models\Partner;
 use App\Models\PartnerEhrSetting;
 use App\Models\User;
+use App\Services\Ehr\HealthieProvisioningService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Passport\ClientRepository;
@@ -70,6 +74,9 @@ class PartnerController extends Controller
         $partner = Partner::create($partnerData);
 
         $this->saveHealthieSettings($partner, $request);
+
+        // Auto-create Healthie sub-org if API key was provided at creation time.
+        $this->maybeCreateHealthieSubOrg($partner);
 
         // Create Passport client for this partner
         $clientRepo = app(ClientRepository::class);
@@ -214,6 +221,10 @@ class PartnerController extends Controller
             'sandbox_validated' => $request->boolean('healthie_sandbox_validated'),
         ]);
 
+        // Fallback: if sub-org creation was missed at create time (e.g. API key
+        // was not filled in then), create it now that credentials are present.
+        $this->maybeCreateHealthieSubOrg($partner);
+
         return redirect()->route('admin.partners.index')
             ->with('success', 'Partner updated.')
             ->with('warning', $this->healthieConfigWarning($partner));
@@ -305,6 +316,11 @@ class PartnerController extends Controller
     public function destroy(int $id)
     {
         $partner = Partner::findOrFail($id);
+
+        // Soft-delete does not fire DB-level FK cascades, so clean up orphan
+        // mapping rows explicitly before the partner record disappears.
+        ClinicianHealthieMapping::where('partner_id', $partner->id)->delete();
+
         $partner->delete();
 
         return redirect()->route('admin.partners.index')
@@ -319,6 +335,19 @@ class PartnerController extends Controller
         $webhook->delete();
 
         return redirect()->route('admin.partners.show', $partner->id)->with('success', 'Webhook deleted.');
+    }
+
+    /**
+     * Healthie partner-level org auto-creation is no longer supported.
+     *
+     * Healthie sub-organisations are an enterprise-only feature. Partner
+     * organisation IDs must be set manually in PartnerEhrSetting.organization_id
+     * after Healthie provisions the partner's account directly.
+     * Sub-storefront segregation now uses User Groups within the partner's org.
+     */
+    private function maybeCreateHealthieSubOrg(Partner $partner): void
+    {
+        // No-op. Organization IDs are set manually in the partner's EHR settings.
     }
 
     /**

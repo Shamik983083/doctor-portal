@@ -164,6 +164,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <li><a class="toc-link text-decoration-none" href="#db">What Gets Created in DB</a></li>
     <li><a class="toc-link text-decoration-none" href="#clinical">Push Clinical Intake</a></li>
     <li><a class="toc-link text-decoration-none" href="#endpoints">Additional Endpoints</a></li>
+    <li><a class="toc-link text-decoration-none" href="#sub-storefronts">Sub-Storefronts API</a></li>
     <li><a class="toc-link text-decoration-none" href="#checklist">Integration Checklist</a></li>
 </ol>
 </div>
@@ -348,6 +349,7 @@ Content-Type: application/json
   "is_chargeable":  true,
   "hold_status":    false,
   "is_refill":      false,         // true = refill/check-in visit — see "Refill / Check-in Cases" section below
+  "sub_storefront_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924", // optional — UUID from POST /api/partner/sub-storefronts
   "metadata":       { "source": "patient-portal" },  // optional free-form object, stored verbatim on the case
 
   "offerings": [
@@ -886,6 +888,110 @@ Content-Type: application/json
 <tr><td><span class="badge-method method-post">POST</span></td><td><code>/api/partner/cases/{uuid}/close-thread</code></td><td>Close a parallel support thread (case NOT in <code>support</code> status). Locks compose forms on both portals and fires <code>support_thread_closed</code> webhook. Body: <code>{ "partner_note": "..." }</code> (optional).</td></tr>
 </tbody>
 </table>
+
+</div>
+</div>
+
+{{-- ── SUB-STOREFRONTS ────────────────────────────────────────── --}}
+<div id="sub-storefronts" class="card mb-4 section-anchor">
+<div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2"><i class="bi bi-diagram-3"></i></span>Sub-Storefronts API</div>
+<div class="card-body">
+
+<p class="text-muted small mb-3">
+    Sub-storefronts sit <strong>below a partner</strong> in the hierarchy (e.g. AXISmd → Amerilean, Invigorota).
+    Each sub-storefront maps to its own <strong>Healthie User Group</strong>, giving patients a segregated chart view
+    while sharing the partner's single Healthie organisation. Call <code>POST /api/partner/sub-storefronts</code> once
+    when a new tenant registers — the User Group is created automatically using the partner's API key.
+</p>
+
+<div class="alert alert-info small py-2 mb-3">
+    <i class="bi bi-people-fill me-1"></i>
+    <strong>User Group provisioning:</strong> A Healthie User Group is automatically created using the partner's API key.
+    Patients submitted with this <code>sub_storefront_id</code> are assigned to that group on first EHR push,
+    and the prescribing clinician is added to their care team for permission-scoped access.
+</div>
+
+<h6 class="fw-semibold mb-2">Endpoints</h6>
+<table class="table table-sm table-bordered mb-4" style="font-size:.84rem">
+<thead class="table-light"><tr><th>Method</th><th>URL</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr>
+    <td><span class="badge-method method-post">POST</span></td>
+    <td><code>/api/partner/sub-storefronts</code></td>
+    <td>Create a sub-storefront + Healthie User Group</td>
+</tr>
+<tr>
+    <td><span class="badge-method method-get">GET</span></td>
+    <td><code>/api/partner/sub-storefronts</code></td>
+    <td>List active sub-storefronts for this partner</td>
+</tr>
+</tbody>
+</table>
+
+<h6 class="fw-semibold mb-2">Create a Sub-Storefront — Request</h6>
+<div class="position-relative mb-1">
+<pre class="bg-dark text-light rounded p-3 small mb-0" id="code-sf-req">POST /api/partner/sub-storefronts
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "name":       "Amerilean",
+  "first_name": "John",
+  "last_name":  "Doe",
+  "email":      "john@amerilean.com"
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-sf-req')">Copy</button>
+</div>
+<table class="table table-sm table-bordered mb-4" style="font-size:.83rem">
+<thead class="table-light"><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td><span class="badge bg-danger">required</span></td><td>Display name for the sub-storefront. Also used as the Healthie User Group name.</td></tr>
+<tr><td><code>first_name</code></td><td><span class="badge bg-secondary">optional</span></td><td>Retained for forward-compatibility. No Healthie admin user is created.</td></tr>
+<tr><td><code>last_name</code></td><td><span class="badge bg-secondary">optional</span></td><td>Retained for forward-compatibility.</td></tr>
+<tr><td><code>email</code></td><td><span class="badge bg-secondary">optional</span></td><td>Retained for forward-compatibility.</td></tr>
+</tbody>
+</table>
+
+<h6 class="fw-semibold mb-2">Response — 201 Created</h6>
+<div class="position-relative mb-1">
+<pre class="bg-dark text-light rounded p-3 small mb-0" id="code-sf-resp">{
+  "sub_storefront_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+  "name":   "Amerilean",
+  "slug":   "amerilean",
+  "status": "active",
+  "healthie": {
+    "group_id": "12345",
+    "error":    null
+  }
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-sf-resp')">Copy</button>
+</div>
+<ul class="small text-muted mb-4 mt-2 ps-3">
+    <li><code>sub_storefront_id</code> — store this UUID; send it as <code>sub_storefront_id</code> in every future case payload for this tenant.</li>
+    <li><code>healthie.group_id</code> — the Healthie User Group ID patients in this sub-storefront are assigned to. Store it if your portal needs to reference the group directly.</li>
+    <li><code>healthie.error</code> — non-null when Healthie provisioning fails (e.g. partner's Healthie API key not configured). The sub-storefront is still created; an admin must set the group ID manually in the portal.</li>
+</ul>
+
+<h6 class="fw-semibold mb-2">Sending Cases to a Sub-Storefront</h6>
+<p class="small text-muted mb-2">After creating the sub-storefront, include its UUID in every case submission for that tenant:</p>
+<div class="position-relative mb-1">
+<pre class="bg-dark text-light rounded p-3 small mb-0" id="code-sf-case">POST /api/partner/cases
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "sub_storefront_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+  "patient": { ... },
+  "offerings": [ ... ]
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-sf-case')">Copy</button>
+</div>
+<p class="small text-muted mt-2 mb-0">
+    Cases with a valid <code>sub_storefront_id</code> are pushed to the partner's Healthie org with the patient
+    assigned to that sub-storefront's User Group. The prescribing clinician is added to the patient's care team
+    automatically. All webhook events for that case include <code>sub_storefront_id</code>.
+    Cases without it behave exactly as before.
+</p>
 
 </div>
 </div>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'MEDAXIS')</title>
+    <title>@yield('title', 'AXISmd')</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     {{-- Bootstrap loaded first so preview-css overrides it on clinical screens --}}
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -89,8 +89,8 @@
 
     <aside class="side">
         <div class="side-head">
-            <div class="brand-mark">M</div>
-            <div class="brand-text">MEDAXIS</div>
+            <div class="brand-mark">A</div>
+            <div class="brand-text">AXISmd</div>
         </div>
 
         <div class="side-scroll" id="nav">

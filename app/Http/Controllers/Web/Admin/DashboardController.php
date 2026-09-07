@@ -7,6 +7,7 @@ use App\Models\Clinician;
 use App\Models\Offering;
 use App\Models\Partner;
 use App\Models\Patient;
+use App\Models\SubStorefront;
 use App\Models\PatientCase;
 use App\Models\Setting;
 use App\Models\Webhook;
@@ -103,25 +104,48 @@ class DashboardController extends Controller
         $recentCases = PatientCase::visibleTo($user)->with(['patient', 'partner', 'clinician.user'])
             ->latest()->take(10)->get();
 
-        // ── Storefront workload (partner × triage) ───────────────────────
-        $partners = Partner::orderBy('name')->get();
-        $openByPartner = PatientCase::visibleTo($user)->whereIn('status', self::OPEN_STATUSES)
-            ->selectRaw('partner_id, triage, COUNT(*) as c')
-            ->groupBy('partner_id', 'triage')
-            ->get()
-            ->groupBy('partner_id');
+        // ── Storefront workload (sub-storefront × triage) ────────────────
+        // Show one row per sub-storefront. Cases without a sub-storefront
+        // roll up under their partner's name (marked as "— no sub-storefront").
+        $subStorefronts = SubStorefront::with('partner')->orderBy('name')->get();
 
-        $storefronts = $partners->map(function ($p) use ($openByPartner) {
-            $rows = $openByPartner->get($p->id) ?? collect();
+        $openBySub = PatientCase::visibleTo($user)->whereIn('status', self::OPEN_STATUSES)
+            ->selectRaw('sub_storefront_id, partner_id, triage, COUNT(*) as c')
+            ->groupBy('sub_storefront_id', 'partner_id', 'triage')
+            ->get()
+            ->groupBy(fn ($r) => $r->sub_storefront_id ?? 'partner:' . $r->partner_id);
+
+        // Rows for each sub-storefront
+        $storefronts = $subStorefronts->map(function ($ss) use ($openBySub) {
+            $rows = $openBySub->get($ss->id) ?? collect();
             return [
-                'name'   => $p->name,
-                'status' => $p->status,
-                'green'  => (int) ($rows->firstWhere('triage', 'green')?->c ?? 0),
-                'yellow' => (int) ($rows->firstWhere('triage', 'yellow')?->c ?? 0),
-                'red'    => (int) ($rows->firstWhere('triage', 'red')?->c ?? 0),
-                'open'   => (int) $rows->sum('c'),
+                'name'    => $ss->name,
+                'partner' => $ss->partner?->name ?? '—',
+                'status'  => $ss->status,
+                'green'   => (int) ($rows->firstWhere('triage', 'green')?->c ?? 0),
+                'yellow'  => (int) ($rows->firstWhere('triage', 'yellow')?->c ?? 0),
+                'red'     => (int) ($rows->firstWhere('triage', 'red')?->c ?? 0),
+                'open'    => (int) $rows->sum('c'),
             ];
         });
+
+        // Append partner-level rollup rows for cases with no sub-storefront
+        $partners = Partner::orderBy('name')->get();
+        foreach ($partners as $p) {
+            $key  = 'partner:' . $p->id;
+            $rows = $openBySub->get($key) ?? collect();
+            if ($rows->isNotEmpty()) {
+                $storefronts->push([
+                    'name'    => '(Direct)',
+                    'partner' => $p->name,
+                    'status'  => $p->status,
+                    'green'   => (int) ($rows->firstWhere('triage', 'green')?->c ?? 0),
+                    'yellow'  => (int) ($rows->firstWhere('triage', 'yellow')?->c ?? 0),
+                    'red'     => (int) ($rows->firstWhere('triage', 'red')?->c ?? 0),
+                    'open'    => (int) $rows->sum('c'),
+                ]);
+            }
+        }
 
         // ── Weighted provider load ───────────────────────────────────────
         $providerLoads = Clinician::visibleTo($user)->with('user')->get()->map(function ($c) use ($user) {

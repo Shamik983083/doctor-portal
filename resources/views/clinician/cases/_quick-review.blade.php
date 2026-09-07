@@ -16,7 +16,7 @@
             @php $idStatus = strtolower($d['id_verified'] ?? ''); @endphp
             <span class="demo-chip {{ $idStatus === 'verified' ? 'chip-verified' : 'chip-unverified' }}">{{ $idStatus === 'verified' ? 'ID Verified' : 'ID Unverified' }}</span>
         </div>
-        <p>{{ $d['company'] }} · Request {{ $d['term'] }} · {{ $d['dose'] }}{{ !empty($d['state']) ? ' · ' . $d['state'] : '' }}</p>
+        <p>{{ $d['company'] }}{{ !empty($d['subStorefront']) ? ' · ' . $d['subStorefront'] : '' }} · Request {{ $d['term'] }} · {{ $d['dose'] }}{{ !empty($d['state']) ? ' · ' . $d['state'] : '' }}</p>
     </div>
     <div class="quick-pills">
         <span class="pill {{ $d['triage'] }}">{{ ucfirst($d['triage']) }}</span>

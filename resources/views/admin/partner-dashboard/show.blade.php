@@ -1,14 +1,14 @@
 @extends('layouts.admin')
 
-@section('title', $partner->name . ' — Partner Dashboard')
-@section('page-title', $partner->name)
+@section('title', ($direct ? 'Direct — ' : '') . $partner->name . ' — Dashboard')
+@section('page-title', ($direct ? 'Direct · ' : '') . $partner->name)
 
 @section('content')
 
 {{-- Back + scope note --}}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <a href="{{ route('admin.partner-dashboard.index') }}" class="text-muted small text-decoration-none">
-        <i class="bi bi-arrow-left me-1"></i>All partners
+        <i class="bi bi-arrow-left me-1"></i>All sub-storefronts
     </a>
     @unless($user->isSuperAdmin())
     <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small">
@@ -208,7 +208,7 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Recent Cases</h6>
-        <a href="{{ route('admin.cases.index', ['partner_id' => $partner->id]) }}"
+        <a href="{{ route('admin.cases.index', array_filter(['partner_id' => $partner->id])) }}"
            class="btn btn-sm btn-outline-secondary py-0 px-2 small">
             View all <i class="bi bi-arrow-right ms-1"></i>
         </a>

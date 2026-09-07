@@ -3,6 +3,8 @@
 namespace App\Services\Ehr;
 
 use App\Models\PartnerEhrSetting;
+use App\Models\PatientCase;
+use App\Models\SubStorefront;
 use RuntimeException;
 
 /**
@@ -69,6 +71,104 @@ class EhrGatewayManager
         }
 
         return $settings;
+    }
+
+    /**
+     * Resolve the correct adapter for a specific case.
+     *
+     * When the case is tied to a sub-storefront, the adapter is built using that
+     * sub-storefront's own Healthie credentials. When there is no sub-storefront,
+     * the partner-level PartnerEhrSetting is used — the existing path.
+     *
+     * This is the preferred entry point for case-push callers; resolve($partnerId)
+     * remains for non-case contexts (provisioning, lookups, etc.).
+     */
+    public function resolveForCase(PatientCase $case): EhrGatewayAdapter
+    {
+        $key = config('ehr.adapter', 'mock');
+
+        if (in_array($key, self::SAFE_ADAPTERS, true)) {
+            return new MockEhrAdapter();
+        }
+
+        if (! config('ehr.enabled') || ! config('ehr.sandbox_validated')) {
+            throw new RuntimeException(
+                "EHR adapter [{$key}] requires ehr.enabled AND ehr.sandbox_validated."
+            );
+        }
+
+        if ($key === 'healthie' && $case->sub_storefront_id) {
+            $subStorefront = $case->subStorefront ?? SubStorefront::find($case->sub_storefront_id);
+
+            // Use the sub-storefront scoped adapter whenever the sub-storefront has a
+            // group ID — the partner's credentials are used, so sub-storefront-level
+            // is_enabled/sandbox_validated flags are not the right gate here.
+            if ($subStorefront && ! empty($subStorefront->healthie_default_group_id)) {
+                $partnerSettings = $this->settingsFor($subStorefront->partner_id, 'healthie');
+                return HealthieEhrAdapter::forSubStorefront($subStorefront, $partnerSettings);
+            }
+            // No group provisioned yet — fall through to partner-level adapter.
+        }
+
+        return $this->resolve($case->partner_id);
+    }
+
+    /**
+     * Resolve the adapter from a stored EHR payload (used at push time when only the
+     * serialised payload is available, not the live PatientCase model).
+     */
+    public function resolveForPayload(array $payload): EhrGatewayAdapter
+    {
+        $key = config('ehr.adapter', 'mock');
+
+        if (in_array($key, self::SAFE_ADAPTERS, true)) {
+            return new MockEhrAdapter();
+        }
+
+        if (! config('ehr.enabled') || ! config('ehr.sandbox_validated')) {
+            throw new RuntimeException(
+                "EHR adapter [{$key}] requires ehr.enabled AND ehr.sandbox_validated."
+            );
+        }
+
+        $partnerId       = $payload['company']['partner_id']       ?? null;
+        $subStorefrontId = $payload['company']['sub_storefront_id'] ?? null;
+
+        if ($key === 'healthie' && $subStorefrontId) {
+            $subStorefront = SubStorefront::find($subStorefrontId);
+
+            if ($subStorefront && ! empty($subStorefront->healthie_default_group_id)) {
+                $partnerSettings = $this->settingsFor($subStorefront->partner_id, 'healthie');
+                return HealthieEhrAdapter::forSubStorefront($subStorefront, $partnerSettings);
+            }
+        }
+
+        return $this->resolve($partnerId);
+    }
+
+    /**
+     * True when a record should actually be pushed for this case.
+     * Checks the sub-storefront when present, otherwise the partner-level settings.
+     */
+    public function pushEnabledForCase(PatientCase $case): bool
+    {
+        if (! config('ehr.enabled') || ! config('ehr.sandbox_validated')) {
+            return false;
+        }
+
+        if (in_array(config('ehr.adapter', 'mock'), self::SAFE_ADAPTERS, true)) {
+            return false;
+        }
+
+        if ($case->sub_storefront_id) {
+            $subStorefront = $case->subStorefront ?? SubStorefront::find($case->sub_storefront_id);
+            if ($subStorefront && $subStorefront->isPushable()) {
+                return true;
+            }
+            // Sub-storefront not pushable — fall back to partner-level check
+        }
+
+        return $this->pushEnabled($case->partner_id);
     }
 
     /**

@@ -61,7 +61,7 @@ class CaseController extends Controller
         // review's "View source answers" can show the full intake (Devin msg
         // 2271) without a query per case.
         $cases = PatientCase::with([
-                'patient', 'partner', 'caseOfferings.offering',
+                'patient', 'partner', 'subStorefront', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
             ])
             ->withCount(['messages as unread_messages_count' => fn ($q) => $q->where('direction', 'inbound')->where('is_read', false),
@@ -182,7 +182,7 @@ class CaseController extends Controller
         // Same eager loads as the queue, so My Cases can render the identical
         // review grid + quick review (Devin msg 2283).
         $base = PatientCase::with([
-                'patient', 'partner', 'caseOfferings.offering',
+                'patient', 'partner', 'subStorefront', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
                 'casePrescription.medications',
             ])
@@ -265,7 +265,7 @@ class CaseController extends Controller
             ->values();
 
         $cases = PatientCase::with([
-                'patient', 'partner', 'caseOfferings.offering',
+                'patient', 'partner', 'subStorefront', 'caseOfferings.offering',
                 'caseQuestions', 'questionnaireResponses.answers',
                 'casePrescription.medications',
             ])
@@ -441,7 +441,7 @@ class CaseController extends Controller
     public function show(string $uuid)
     {
         $case = PatientCase::with([
-            'patient', 'partner', 'clinician.user',
+            'patient', 'partner', 'subStorefront', 'clinician.user',
             'caseOfferings.offering',
             'diseases', 'clinicalNotes.clinician.user',
             'orders.pharmacy', 'messages', 'files', 'tags',
@@ -491,7 +491,7 @@ class CaseController extends Controller
     public function prescribeForm(string $uuid)
     {
         $case = PatientCase::with([
-            'patient', 'partner', 'clinician.user',
+            'patient', 'partner', 'subStorefront', 'clinician.user',
             'caseOfferings.offering.category',
         ])->where('uuid', $uuid)->firstOrFail();
 
@@ -538,8 +538,7 @@ class CaseController extends Controller
         // Only runs for refill cases; null-safe to never crash if no prior exists.
         $priorCase = $case->isRefillRequest() ? PatientCase::priorCompletedCase($case) : null;
 
-        // 4.3: Check-in answers for the current refill case — the questionnaire
-        // the patient completed for this visit, distinct from the prior-case intake.
+        // 4.3: Check-in answers for the panel display — only for detected refill cases.
         $checkInResponses = collect();
         if ($case->isRefillRequest()) {
             $case->loadMissing([
@@ -551,6 +550,30 @@ class CaseController extends Controller
                     && $r->questionnaire?->purpose === 'check_in')
                 ->sortByDesc('completed_at')
                 ->values();
+        }
+
+        // Extract dose hint so the prescribe form can auto-select medication + month levels.
+        // Searches ALL completed questionnaire responses (any purpose) so it works for both
+        // new cases (intake form may include prior-dose questions) and refill cases.
+        // loadMissing is idempotent — free when already loaded for refill cases above.
+        $checkInDoseHint = ['last_dose' => null, 'continuation' => null];
+        $case->loadMissing([
+            'questionnaireResponses.questionnaire',
+            'questionnaireResponses.answers',
+        ]);
+        foreach ($case->questionnaireResponses->filter(fn ($r) => $r->completed_at !== null) as $qResp) {
+            foreach ($qResp->answers as $ans) {
+                $qt = strtolower($ans->question_text ?? '');
+                if (!$checkInDoseHint['last_dose'] && str_contains($qt, 'last dose')) {
+                    $checkInDoseHint['last_dose'] = $ans->answer;
+                }
+                if (!$checkInDoseHint['continuation'] && str_contains($qt, 'how would you like to continue')) {
+                    $checkInDoseHint['continuation'] = $ans->answer;
+                }
+                if ($checkInDoseHint['last_dose'] && $checkInDoseHint['continuation']) {
+                    break 2;
+                }
+            }
         }
 
         // Pass the requested month_frequency so the prescribe form can pre-select the
@@ -583,7 +606,7 @@ class CaseController extends Controller
 
         return view('clinician.cases.prescribe', compact(
             'case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions',
-            'priorCase', 'checkInResponses', 'requestedMonthFrequency', 'caseOfferingsData'
+            'priorCase', 'checkInResponses', 'checkInDoseHint', 'requestedMonthFrequency', 'caseOfferingsData'
         ));
     }
 

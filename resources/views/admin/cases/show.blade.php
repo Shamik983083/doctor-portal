@@ -46,6 +46,12 @@
                         <span class="text-muted">Partner</span>
                         <span class="fw-medium text-end" style="max-width:60%">{{ $case->partner->name ?? '—' }}</span>
                     </div>
+                    @if($case->subStorefront)
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Sub-storefront</span>
+                        <span class="fw-medium text-end" style="max-width:60%">{{ $case->subStorefront->name }}</span>
+                    </div>
+                    @endif
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Clinician</span>
                         <span class="fw-medium text-end" style="max-width:60%">{{ $case->clinician?->full_name ?? '—' }}</span>

@@ -11,6 +11,7 @@ use App\Models\PatientFile;
 use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireQuestion;
 use App\Models\QuestionnaireResponse;
+use App\Models\SubStorefront;
 use App\Services\CaseStateMachine;
 use App\Services\CheckInQuestionnaireResolver;
 use Illuminate\Http\Request;
@@ -75,6 +76,7 @@ class CaseController extends Controller
             'is_refill'                                       => 'nullable|boolean',
             'hold_status'                                     => 'boolean',
             'is_chargeable'                                   => 'boolean',
+            'sub_storefront_id'                               => 'nullable|string|uuid',
             'patient_state'                                   => 'nullable|string|size:2',
             'metadata'                                        => 'nullable|array',
             /*
@@ -304,23 +306,41 @@ class CaseController extends Controller
             $patient->update($patientData);
         }
 
-        // E19: copy the partner's collaborating clinician default onto the patient
-        // if the patient does not already have one. Never overwrites an existing
-        // assignment — the partner default is a first-time convenience, not a rule.
-        if ($partner->collaborating_clinician_id && !$patient->collaborating_clinician_id) {
-            $patient->update(['collaborating_clinician_id' => $partner->collaborating_clinician_id]);
-        }
-
         if (($data['external_id'] ?? null) && empty($data['is_refill']) && $partner->cases()->where('external_id', $data['external_id'])->exists()) {
             return response()->json(['message' => 'Case with this external_id already exists.'], 409);
         }
 
-        $case = DB::transaction(function () use ($data, $partner, $patient, $request, $resolvedOfferings) {
+        $subStorefront = null;
+        if (!empty($data['sub_storefront_id'])) {
+            $subStorefront = SubStorefront::where('uuid', $data['sub_storefront_id'])
+                ->where('partner_id', $partner->id)
+                ->where('status', 'active')
+                ->first();
+
+            if (!$subStorefront) {
+                return response()->json([
+                    'message' => 'sub_storefront_id does not belong to this partner or is not active.',
+                    'errors'  => ['sub_storefront_id' => ['Invalid sub-storefront.']],
+                ], 422);
+            }
+        }
+
+        // E19: copy the collaborating clinician default onto the patient if they do
+        // not already have one. Sub-storefront default takes priority over partner
+        // default. Never overwrites an existing assignment.
+        $defaultCollab = $subStorefront?->collaborating_clinician_id
+            ?? $partner->collaborating_clinician_id;
+        if ($defaultCollab && !$patient->collaborating_clinician_id) {
+            $patient->update(['collaborating_clinician_id' => $defaultCollab]);
+        }
+
+        $case = DB::transaction(function () use ($data, $partner, $patient, $request, $resolvedOfferings, $subStorefront) {
             $case = $partner->cases()->create([
-                'patient_id'    => $patient->id,
-                'external_id'   => $data['external_id'] ?? null,
-                'visit_type'    => $data['visit_type'] ?? null,
-                'is_refill'     => $data['is_refill'] ?? false,
+                'patient_id'      => $patient->id,
+                'external_id'     => $data['external_id'] ?? null,
+                'visit_type'      => $data['visit_type'] ?? null,
+                'is_refill'       => $data['is_refill'] ?? false,
+                'sub_storefront_id' => $subStorefront?->id,
                 'clinical_intake' => $data['clinical_intake'] ?? null,
                 'hold_status'   => $data['hold_status'] ?? false,
                 'is_chargeable' => $data['is_chargeable'] ?? true,

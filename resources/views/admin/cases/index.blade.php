@@ -73,6 +73,7 @@
                             <th>Triage</th>
                             <th>Patient</th>
                             <th>Partner</th>
+                            <th>Sub-Storefront</th>
                             <th>Clinician</th>
                             <th>Offerings</th>
                             <th>Status</th>
@@ -96,6 +97,15 @@
                                 <small class="text-muted">{{ $case->patient_state ?? $case->patient?->state ?? '—' }}</small>
                             </td>
                             <td><small>{{ $case->partner?->name ?? '—' }}</small></td>
+                            <td>
+                                @if($case->subStorefront)
+                                    <span class="badge rounded-pill" style="background:#4361ee12;color:#4361ee;font-size:.7rem;font-weight:600;">
+                                        {{ $case->subStorefront->name }}
+                                    </span>
+                                @else
+                                    <span class="text-muted small">—</span>
+                                @endif
+                            </td>
                             <td>
                                 @if($case->clinician)
                                     <small>{{ $case->clinician->full_name }}</small>
@@ -127,7 +137,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="9" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases found.</td></tr>
+                        <tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No cases found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

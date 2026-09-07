@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Partner\PatientController;
 use App\Http\Controllers\Api\Partner\QuestionnaireController;
 use App\Http\Controllers\Api\Partner\FileController;
 use App\Http\Controllers\Api\Partner\MessageController;
+use App\Http\Controllers\Api\Partner\SubStorefrontController;
 use App\Http\Controllers\Api\Partner\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -67,6 +68,12 @@ Route::prefix('partner')->middleware('partner.auth')->group(function () {
         Route::get('/{id}', [OrderController::class, 'show']);
         Route::put('/{id}', [OrderController::class, 'update']);
         Route::post('/{id}/cancel', [OrderController::class, 'cancel']);
+    });
+
+    // Sub-Storefronts — tenant portals call these to register new tenants
+    Route::prefix('sub-storefronts')->group(function () {
+        Route::get('/', [SubStorefrontController::class, 'index']);
+        Route::post('/', [SubStorefrontController::class, 'store']);
     });
 
     // Webhooks

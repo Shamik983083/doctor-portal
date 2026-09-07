@@ -35,7 +35,7 @@ class RoutingOperationsController extends Controller
     public function exceptions()
     {
         $exceptions = RoutingException::open()
-            ->with(['case.patient', 'case.partner'])
+            ->with(['case.patient', 'case.partner', 'case.subStorefront'])
             ->orderByDesc('first_seen_at')
             ->get();
 
@@ -47,7 +47,7 @@ class RoutingOperationsController extends Controller
          */
         $pooled = PatientCase::whereNull('clinician_id')
             ->where('status', PatientCase::STATUS_WAITING)
-            ->with(['patient', 'partner'])
+            ->with(['patient', 'partner', 'subStorefront'])
             ->orderBy('created_at')
             ->limit(100)
             ->get();

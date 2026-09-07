@@ -8,7 +8,7 @@
         'admin.questionnaires.*', 'admin.questions.*', 'admin.partner-dashboard.*',
         'admin.escalations.*', 'admin.messages.*'
     );
-    $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*', 'admin.ehr-records.*', 'guide.healthie-ehr');
+    $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*', 'admin.ehr-records.*', 'guide.healthie-ehr', 'admin.guide.partner-api');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*', 'admin.ai.*');
     $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*', 'admin.users.*');
 @endphp
@@ -113,10 +113,7 @@
     </div>
 
     {{-- ── API & Developer ─────────────────────────────────── --}}
-    {{-- Super admin only: "All API integrations etc should be a super admin
-         function" (Devin msg 2117). The routes enforce it; this keeps a Doctor
-         Admin from being shown links they cannot open. --}}
-    @role('super_admin')
+    @hasanyrole('super_admin|admin')
     <button class="sidebar-section-toggle {{ $apiActive ? '' : 'collapsed' }}"
             type="button"
             data-bs-toggle="collapse"
@@ -131,18 +128,16 @@
            href="{{ route('admin.guide.messaging') }}">
             <i class="bi bi-chat-dots"></i> Messaging API
         </a>
-        <a class="nav-link {{ request()->routeIs('admin.guide.glp-api') ? 'active' : '' }}"
-           href="{{ route('admin.guide.glp-api') }}">
-            <i class="bi bi-journal-medical"></i> GLP API
+        {{-- Combined GLP + NAD partner API guide --}}
+        <a class="nav-link {{ request()->routeIs('admin.guide.partner-api') ? 'active' : '' }}"
+           href="{{ route('admin.guide.partner-api') }}">
+            <i class="bi bi-journal-medical"></i> Partner API
         </a>
-        <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}"
+        {{-- Anti-Aging API hidden --}}
+        {{-- <a class="nav-link {{ request()->routeIs('admin.guide.antiaging-api') ? 'active' : '' }}"
            href="{{ route('admin.guide.antiaging-api') }}">
             <i class="bi bi-stars"></i> Anti-Aging API
-        </a>
-        <a class="nav-link {{ request()->routeIs('admin.guide.nad-api') ? 'active' : '' }}"
-           href="{{ route('admin.guide.nad-api') }}">
-            <i class="bi bi-capsule"></i> NAD API
-        </a>
+        </a> --}}
         <a class="nav-link {{ request()->routeIs('admin.guide.healthie-ehr') ? 'active' : '' }}"
            href="{{ route('admin.guide.healthie-ehr') }}">
             <i class="bi bi-hospital"></i> Healthie EHR Guide
@@ -169,12 +164,10 @@
         </a>
 
     </div>
-    @endrole
+    @endhasanyrole
 
     {{-- ── Configuration ───────────────────────────────────── --}}
-    {{-- Also super admin only: settings and the triage rule set change clinical
-         behaviour for every doctor, not just one admin's group. --}}
-    @role('super_admin')
+    @hasanyrole('super_admin|admin')
     <button class="sidebar-section-toggle {{ $cfgActive ? '' : 'collapsed' }}"
             type="button"
             data-bs-toggle="collapse"
@@ -214,7 +207,7 @@
         </a>
 
     </div>
-    @endrole
+    @endhasanyrole
 
     {{-- ── Routing operations ──────────────────────────────────
          NOT super-admin gated, unlike the configuration block above. Devin msg

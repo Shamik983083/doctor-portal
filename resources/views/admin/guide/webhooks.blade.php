@@ -165,10 +165,11 @@ Content-Type: application/json
 
 <h6 class="fw-semibold mb-2">Body Structure — all events share these top-level fields</h6>
 <pre id="code-body-structure">{
-  "event":     "case_created",          // always present — mirrors the X-Event-Type header; injected before HMAC signing
-  "case_id":   "uuid-of-the-case",      // present on case/prescription/note/message events
-  "patient_id":"uuid-of-the-patient",   // present on most events
-  "timestamp": 1751539200,              // Unix timestamp (seconds)
+  "event":              "case_created",          // always present — mirrors the X-Event-Type header; injected before HMAC signing
+  "case_id":            "uuid-of-the-case",      // present on case/prescription/note/message events
+  "patient_id":         "uuid-of-the-patient",   // present on most events
+  "sub_storefront_id":  "e3b0c442-98fc-1c14-9afb-f4c8996fb924", // UUID of the sub-storefront, or null for partner-level cases
+  "timestamp":          1751539200,              // Unix timestamp (seconds)
   // … event-specific fields (see event reference below)
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-body-structure')">Copy</button>
@@ -287,6 +288,11 @@ def webhook():
 <div class="card-header fw-semibold"><span class="step-badge bg-primary text-white me-2">5</span>All Events</div>
 <div class="card-body pb-0">
 <p class="mb-3 small text-muted">Use the <code>X-Event-Type</code> header to route each delivery to the correct handler. All timestamps are Unix seconds (UTC).</p>
+<div class="alert alert-info border-0 mb-3 small py-2">
+    <i class="bi bi-diagram-3 me-1"></i>
+    <strong>Sub-storefronts:</strong> All case-related events include a <code>sub_storefront_id</code> field (UUID string, or <code>null</code> for partner-level cases).
+    Use it to route the event to the correct tenant in your system.
+</div>
 
 <div class="alert alert-primary border-0 mb-3 small">
     <strong><i class="bi bi-arrow-left-right me-1"></i>Push vs Pull — understand the two directions:</strong>

@@ -183,7 +183,22 @@ final class RoutingPolicyResolver
 
         // Eager loaded because acceptsCategory() reads the relation per doctor,
         // and a lazy load here is one query per clinician per case created.
-        $clinicians = Clinician::with('acceptedCategories')->get();
+        //
+        // When the case comes from a specific sub-storefront, only clinicians that
+        // are either globally available (is_global = true) OR explicitly assigned to
+        // that sub-storefront are eligible. Cases with no sub-storefront consider
+        // all active clinicians as before.
+        $clinicians = Clinician::with('acceptedCategories')
+            ->when($case->sub_storefront_id, function ($q) use ($case) {
+                $q->where(function ($inner) use ($case) {
+                    $inner->where('is_global', true)
+                          ->orWhereHas('subStorefronts', fn ($sq) =>
+                              $sq->where('sub_storefronts.id', $case->sub_storefront_id)
+                          );
+                });
+            })
+            ->where('status', 'active')
+            ->get();
 
         if ($clinicians->isEmpty()) {
             return [];

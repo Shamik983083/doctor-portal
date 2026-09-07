@@ -47,7 +47,7 @@ class EhrRecordService
 
         // Company-scoped: a storefront that is not fully configured previews
         // rather than erroring on every approval.
-        $enabled = $this->gateway->pushEnabled($case->partner_id);
+        $enabled = $this->gateway->pushEnabledForCase($case);
 
         $record = DB::transaction(function () use ($case, $note, $payload, $enabled) {
             $record = EhrRecord::create([
@@ -99,8 +99,7 @@ class EhrRecordService
         try {
             // Resolved for THIS record's company, so the credential used is
             // always the one belonging to the storefront that owns the case.
-            $partnerId = $record->payload['company']['partner_id'] ?? $record->partner_id;
-            $result = $this->gateway->resolve($partnerId)->createRecord($record->payload);
+            $result = $this->gateway->resolveForPayload($record->payload)->createRecord($record->payload);
         } catch (\Throwable $e) {
             $record->update([
                 'status'     => EhrRecord::STATUS_FAILED,
@@ -190,10 +189,15 @@ class EhrRecordService
              * scoped by it.
              */
             'company' => [
-                'partner_id'   => $case->partner_id,
-                'partner_uuid' => $case->partner?->uuid,
-                'name'         => $case->partner?->name,
-                'slug'         => $case->partner?->slug,
+                'partner_id'       => $case->partner_id,
+                'partner_uuid'     => $case->partner?->uuid,
+                'name'             => $case->partner?->name,
+                'slug'             => $case->partner?->slug,
+                // Sub-storefront context: used at push time to route credentials
+                // to the correct Healthie sub-org. Null for partner-level cases.
+                'sub_storefront_id'   => $case->sub_storefront_id,
+                'sub_storefront_uuid' => $case->subStorefront?->uuid,
+                'sub_storefront_name' => $case->subStorefront?->name,
             ],
 
             'patient' => [
@@ -224,11 +228,14 @@ class EhrRecordService
             ], fn ($v) => $v !== null),
 
             'encounter' => [
-                'visit_type'  => $case->visit_type,
-                'status'      => $case->status,
-                'approved_at' => optional($case->approved_at)->toIso8601String(),
-                'triage'      => $case->triage,
-                'clinician'   => [
+                'visit_type'   => $case->visit_type,
+                'status'       => $case->status,
+                'approved_at'  => optional($case->approved_at)->toIso8601String(),
+                'triage'       => $case->triage,
+                // clinician_id is carried so the adapter can look up the dynamic
+                // Healthie user ID for this clinician in this partner's sub-org.
+                'clinician_id' => $case->clinician_id,
+                'clinician'    => [
                     'name' => $case->clinician?->full_name,
                     'npi'  => $case->clinician?->npi,
                 ],

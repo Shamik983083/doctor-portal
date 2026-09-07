@@ -190,12 +190,13 @@ class CaseStateMachine
         // Fire a dedicated webhook so partner systems can distinguish this
         // reassignment-from-support from an initial case_assigned_to_clinician event.
         $this->webhookDispatcher->dispatch($case->partner_id, 'case_returned_to_clinician', [
-            'event'      => 'case_returned_to_clinician',
-            'case_id'    => $case->uuid,
-            'patient_id' => $case->patient?->uuid,
-            'status'     => $case->status,
-            'visit_type' => $case->visit_type,
-            'timestamp'  => now()->timestamp,
+            'event'             => 'case_returned_to_clinician',
+            'case_id'           => $case->uuid,
+            'patient_id'        => $case->patient?->uuid,
+            'status'            => $case->status,
+            'visit_type'        => $case->visit_type,
+            'sub_storefront_id' => $case->subStorefront?->uuid,
+            'timestamp'         => now()->timestamp,
         ]);
 
         return $case;
@@ -271,11 +272,12 @@ class CaseStateMachine
         }
 
         $this->webhookDispatcher->dispatch($case->partner_id, 'escalation_started', [
-            'event'      => 'escalation_started',
-            'case_id'    => $case->uuid,
-            'patient_id' => $case->patient?->uuid,
-            'case_status' => $case->status,
-            'timestamp'  => now()->timestamp,
+            'event'             => 'escalation_started',
+            'case_id'           => $case->uuid,
+            'patient_id'        => $case->patient?->uuid,
+            'case_status'       => $case->status,
+            'sub_storefront_id' => $case->subStorefront?->uuid,
+            'timestamp'         => now()->timestamp,
         ]);
     }
 
@@ -301,11 +303,12 @@ class CaseStateMachine
         $case->refresh();
 
         $this->webhookDispatcher->dispatch($case->partner_id, 'support_thread_closed', [
-            'event'      => 'support_thread_closed',
-            'case_id'    => $case->uuid,
-            'patient_id' => $case->patient?->uuid,
-            'case_status' => $case->status,
-            'timestamp'  => now()->timestamp,
+            'event'             => 'support_thread_closed',
+            'case_id'           => $case->uuid,
+            'patient_id'        => $case->patient?->uuid,
+            'case_status'       => $case->status,
+            'sub_storefront_id' => $case->subStorefront?->uuid,
+            'timestamp'         => now()->timestamp,
         ]);
     }
 
@@ -325,11 +328,12 @@ class CaseStateMachine
         $eventType = $eventMap[$status] ?? "case_{$status}";
 
         $payload = [
-            'case_id'    => $case->uuid,
-            'patient_id' => $case->patient->uuid ?? null,
-            'status'     => $status,
-            'visit_type' => $case->visit_type,
-            'timestamp'  => now()->timestamp,
+            'case_id'           => $case->uuid,
+            'patient_id'        => $case->patient->uuid ?? null,
+            'status'            => $status,
+            'visit_type'        => $case->visit_type,
+            'sub_storefront_id' => $case->subStorefront?->uuid,
+            'timestamp'         => now()->timestamp,
         ];
 
         if ($status === PatientCase::STATUS_SUPPORT) {

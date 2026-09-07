@@ -10,6 +10,7 @@ use App\Http\Controllers\Web\Admin\CaseController as AdminCaseController;
 use App\Http\Controllers\Web\Admin\PatientController as AdminPatientController;
 use App\Http\Controllers\Web\Admin\PartnerController as AdminPartnerController;
 use App\Http\Controllers\Web\Admin\PartnerProductPlanController as AdminPartnerProductPlanController;
+use App\Http\Controllers\Web\Admin\SubStorefrontController as AdminSubStorefrontController;
 use App\Http\Controllers\Web\Admin\ClinicianController as AdminClinicianController;
 use App\Http\Controllers\Web\Admin\OfferingController as AdminOfferingController;
 use App\Http\Controllers\Web\Admin\OfferingCategoryController as AdminOfferingCategoryController;
@@ -185,6 +186,15 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::delete('/{id}/webhooks/{webhookId}', [AdminPartnerController::class, 'destroyWebhook'])->name('webhooks.destroy');
         Route::delete('/{id}', [AdminPartnerController::class, 'destroy'])->name('destroy');
         Route::get('/{id}/healthie-lookup', [AdminPartnerController::class, 'healthieLookup'])->name('healthie-lookup');
+        // Sub-storefronts: tenant-level Healthie sub-orgs nested under a partner
+        Route::get('/{partnerId}/sub-storefronts', [AdminSubStorefrontController::class, 'index'])->name('sub-storefronts.index');
+        Route::get('/{partnerId}/sub-storefronts/create', [AdminSubStorefrontController::class, 'create'])->name('sub-storefronts.create');
+        Route::post('/{partnerId}/sub-storefronts', [AdminSubStorefrontController::class, 'store'])->name('sub-storefronts.store');
+        Route::get('/{partnerId}/sub-storefronts/{subStorefront}/edit', [AdminSubStorefrontController::class, 'edit'])->name('sub-storefronts.edit');
+        Route::put('/{partnerId}/sub-storefronts/{subStorefront}', [AdminSubStorefrontController::class, 'update'])->name('sub-storefronts.update');
+        Route::delete('/{partnerId}/sub-storefronts/{subStorefront}', [AdminSubStorefrontController::class, 'destroy'])->name('sub-storefronts.destroy');
+        Route::post('/{partnerId}/sub-storefronts/{subStorefront}/provision-group', [AdminSubStorefrontController::class, 'provisionGroup'])->name('sub-storefronts.provision-group');
+        Route::post('/{partnerId}/sub-storefronts/{subStorefront}/sync-clinicians', [AdminSubStorefrontController::class, 'syncClinicians'])->name('sub-storefronts.sync-clinicians');
         // Product plans (one-to-many product_key ↔ offering mapping)
         Route::get('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'index'])->name('product-plans.index');
         Route::post('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'store'])->name('product-plans.store');
@@ -206,6 +216,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/priority', [AdminClinicianController::class, 'priorityIndex'])->name('priority');
         Route::patch('/reorder', [AdminClinicianController::class, 'reorder'])->name('reorder');
         Route::patch('/{id}/case-load', [AdminClinicianController::class, 'updateCaseLoad'])->name('case-load');
+        Route::post('/{id}/resync-healthie', [AdminClinicianController::class, 'resyncHealthie'])->name('resync-healthie');
         Route::get('/{id}', [AdminClinicianController::class, 'show'])->name('show');
         Route::get('/{id}/edit', [AdminClinicianController::class, 'edit'])->name('edit');
         Route::put('/{id}', [AdminClinicianController::class, 'update'])->name('update');
@@ -288,7 +299,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
      * Grouped rather than annotated route by route so a new integration added
      * here inherits the restriction instead of relying on someone remembering it.
      */
-    Route::middleware('role:super_admin')->group(function () {
+    Route::middleware('role:admin|super_admin')->group(function () {
 
     // Developer Guide
     Route::get('/guide/messaging', fn() => view('admin.guide.messaging'))->name('guide.messaging');
@@ -306,13 +317,21 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 
         return view('admin.guide.webhooks', compact('partner', 'webhookUrl'));
     })->name('guide.webhooks');
+    // Combined GLP + NAD partner API guide
+    Route::get('/guide/partner-api', function () {
+        $with = ['questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order')];
+        $glpQuestionnaire = \App\Models\Questionnaire::with($with)->where('name', 'GLP Questionnaire')->first();
+        $nadQuestionnaire = \App\Models\Questionnaire::with($with)->where('name', 'NAD Questionnaire')->first();
+        return view('admin.guide.combined-api', compact('glpQuestionnaire', 'nadQuestionnaire'));
+    })->name('guide.partner-api');
+
+    // Legacy routes — kept so old bookmarks and integrations still work
     Route::get('/guide/glp-api', function () {
         $questionnaire = \App\Models\Questionnaire::with([
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('step_number')->orderBy('sort_order'),
         ])->where('name', 'GLP Questionnaire')->first();
         return view('admin.guide.weightloss-api', compact('questionnaire'));
     })->name('guide.glp-api');
-    // Legacy redirect so old bookmarks still work
     Route::redirect('/guide/weightloss-api', '/admin/guide/glp-api', 301);
 
     Route::get('/guide/antiaging-api', function () {
@@ -331,8 +350,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 
     Route::get('/guide/healthie-ehr', fn() => view('admin.guide.healthie-ehr'))->name('guide.healthie-ehr');
 
-    // EHR Records — integration surface, super admin only (Devin msg 2117)
-    Route::prefix('ehr-records')->name('ehr-records.')->middleware('role:super_admin')->group(function () {
+    // EHR Records
+    Route::prefix('ehr-records')->name('ehr-records.')->group(function () {
         Route::get('/',               [AdminEhrRecordController::class, 'index'])->name('index');
         Route::get('/{uuid}',         [AdminEhrRecordController::class, 'show'])->name('show');
         Route::post('/{uuid}/retry',  [AdminEhrRecordController::class, 'retry'])->name('retry');
@@ -342,11 +361,11 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
     Route::get('/settings',  [AdminSettingsController::class, 'index'])->name('settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
 
-    // Audit Log — read-only record of all admin-initiated model changes
-    Route::get('/audit-log', [AdminAuditLogController::class, 'index'])->name('audit-log.index');
+    // Audit Log — read-only record of all admin-initiated model changes (super admin only)
+    Route::get('/audit-log', [AdminAuditLogController::class, 'index'])->middleware('role:super_admin')->name('audit-log.index');
 
-    // All-users roster — one place to see every user across all roles
-    Route::get('/users', [\App\Http\Controllers\Web\Admin\UserRosterController::class, 'index'])->name('users.index');
+    // All-users roster — one place to see every user across all roles (super admin only)
+    Route::get('/users', [\App\Http\Controllers\Web\Admin\UserRosterController::class, 'index'])->middleware('role:super_admin')->name('users.index');
 
     // Triage Rule Set — per-questionnaire disqualifier rules
     Route::prefix('triage-rules')->name('triage-rules.')->group(function () {
@@ -435,8 +454,9 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 
     // Per-partner dashboard — operational view scoped to visibleTo(); open to both admin tiers
     Route::prefix('partner-dashboard')->name('partner-dashboard.')->group(function () {
-        Route::get('/',    [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'index'])->name('index');
-        Route::get('/{id}',[\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'show'])->name('show');
+        Route::get('/',           [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'index'])->name('index');
+        Route::get('/sub/{id}',   [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'showSubStorefront'])->name('show-sub');
+        Route::get('/{id}',       [\App\Http\Controllers\Web\Admin\PartnerDashboardController::class, 'show'])->name('show');
     });
 
     // Offering Categories

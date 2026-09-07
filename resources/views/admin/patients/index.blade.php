@@ -54,7 +54,13 @@
                         <td><small>{{ $patient->email }}</small></td>
                         <td><small>{{ $patient->phone ?? '—' }}</small></td>
                         <td>{{ $patient->state ?? '—' }}</td>
-                        <td><small>{{ $patient->partner->name ?? '—' }}</small></td>
+                        <td>
+                            <small>{{ $patient->partner->name ?? '—' }}</small>
+                            @php $latestSubSf = $patient->cases->first()?->subStorefront; @endphp
+                            @if($latestSubSf)
+                                <br><small class="text-muted" style="font-size:.72rem;">{{ $latestSubSf->name }}</small>
+                            @endif
+                        </td>
                         <td>
                             <span class="badge {{ $patient->cases_count > 0 ? 'bg-primary' : 'bg-light text-dark border' }}">
                                 {{ $patient->cases_count }}
