@@ -116,10 +116,10 @@ class HealthieProvisioningService
         $user = $clinician->user;
 
         // Idempotent: if this provider already exists in this org return their ID.
+        // is_provider and professional fields are set by updateProviderDetails which
+        // always runs after provisionClinician in the job.
         $existing = $this->findProviderMembership($user->email, $settings);
         if ($existing) {
-            // Always ensure is_provider=true even for pre-existing members.
-            $this->setIsProvider($existing['user_id'], $settings);
             return $existing['user_id'];
         }
 
@@ -179,7 +179,6 @@ class HealthieProvisioningService
                 if (str_contains(strtolower($fe['message'] ?? ''), 'already')) {
                     $found = $this->findProviderMembership($user->email, $settings);
                     if ($found) {
-                        $this->setIsProvider($found['user_id'], $settings);
                         return $found['user_id'];
                     }
 
@@ -206,83 +205,69 @@ class HealthieProvisioningService
             'org_id'       => $settings->organization_id,
         ]);
 
-        if ($userId) {
-            $this->setIsProvider($userId, $settings);
-        }
-
         return (string) $userId;
     }
 
     /**
      * Push current provider profile details to an already-provisioned Healthie account.
      *
-     * Fields synced: first_name, last_name, phone_number.
-     * Provider-specific fields (npi_number, credentials, specialty, dietitian_setting)
-     * are not accepted by updateUserInput in this Healthie org.
+     * Two calls are made:
+     *   1. updateUser       — basic identity (first_name, last_name, phone_number)
+     *   2. updateOrganizationMember — professional fields (npi, qualifications/credentials,
+     *                                 state_licenses) and is_provider flag
      *
      * Throws on GraphQL-level errors so the caller (provisioning job) can mark the
      * mapping as failed and surface the error through the normal retry path.
      */
     public function updateProviderDetails(Clinician $clinician, PartnerEhrSetting $settings, string $healthieUserId): void
     {
-        $user                      = $clinician->user;
-        [$firstName, $lastName]    = $this->splitName($user->name);
+        $user                   = $clinician->user;
+        [$firstName, $lastName] = $this->splitName($user->name);
 
-        // Only basic identity fields are accepted by updateUserInput in this Healthie org.
-        // Provider-specific fields (npi_number, credentials, specialty, dietitian_setting)
-        // are not defined on updateUserInput and cause schema validation errors.
-        $input = array_filter([
+        // ── Step 1: basic identity via updateUser ──────────────────────────────
+        $userInput = array_filter([
             'id'           => $healthieUserId,
             'first_name'   => $firstName ?: null,
             'last_name'    => $lastName ?: null,
             'phone_number' => $clinician->phone ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 
-        $input['id'] = $healthieUserId;
+        $userInput['id'] = $healthieUserId;
 
-        $mutation = <<<'GQL'
+        $userMutation = <<<'GQL'
         mutation UpdateProvider($input: updateUserInput!) {
             updateUser(input: $input) {
-                user {
-                    id
-                }
-                messages {
-                    field
-                    message
-                }
+                user { id }
+                messages { field message }
             }
         }
         GQL;
 
-        $response = $this->graphql(
-            $mutation,
-            ['input' => $input],
+        $userResponse = $this->graphql(
+            $userMutation,
+            ['input' => $userInput],
             $settings->api_key,
             $settings->endpoint,
             $settings->authorization_shard
         );
 
-        $json = $response->json();
+        $userJson = $userResponse->json();
 
-        if (! empty($json['errors'])) {
-            $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
+        if (! empty($userJson['errors'])) {
+            $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $userJson['errors']));
             throw new RuntimeException(
                 "Healthie provider update failed for clinician [{$clinician->id}] "
                 . "partner [{$settings->partner_id}]: {$msg}"
             );
         }
 
-        $fieldErrors = $json['data']['updateUser']['messages'] ?? [];
-        if (! empty($fieldErrors)) {
-            $detail = implode('; ', array_map(
-                fn ($m) => ($m['field'] ?? '?') . ': ' . ($m['message'] ?? '?'),
-                $fieldErrors
-            ));
-            Log::warning('HealthieProvisioning: provider update had field errors', [
+        $userFieldErrors = $userJson['data']['updateUser']['messages'] ?? [];
+        if (! empty($userFieldErrors)) {
+            Log::warning('HealthieProvisioning: provider updateUser had field errors', [
                 'clinician_id'     => $clinician->id,
                 'partner_id'       => $settings->partner_id,
                 'healthie_user_id' => $healthieUserId,
-                'errors'           => $detail,
+                'errors'           => $userFieldErrors,
             ]);
         }
 
@@ -290,8 +275,82 @@ class HealthieProvisioningService
             'clinician_id'     => $clinician->id,
             'partner_id'       => $settings->partner_id,
             'healthie_user_id' => $healthieUserId,
-            'fields_sent'      => array_keys($input),
+            'fields_sent'      => array_keys($userInput),
         ]);
+
+        // ── Step 2: professional fields + is_provider via updateOrganizationMember ──
+        $memberInput = ['id' => $healthieUserId, 'is_provider' => true];
+
+        if (! empty($clinician->npi)) {
+            $memberInput['npi'] = $clinician->npi;
+        }
+
+        if (! empty($clinician->credentials)) {
+            $memberInput['qualifications'] = $clinician->credentials;
+        }
+
+        $licensedStates = $clinician->licensed_states ?? [];
+        if (! empty($licensedStates)) {
+            $memberInput['state_licenses'] = array_map(
+                fn ($s) => ['state' => strtoupper((string) ($s['state'] ?? $s))],
+                $licensedStates
+            );
+        }
+
+        $memberMutation = <<<'GQL'
+        mutation UpdateOrgMember($input: updateOrganizationMemberInput!) {
+            updateOrganizationMember(input: $input) {
+                user { id }
+                messages { field message }
+            }
+        }
+        GQL;
+
+        try {
+            $memberResponse = $this->graphql(
+                $memberMutation,
+                ['input' => $memberInput],
+                $settings->api_key,
+                $settings->endpoint,
+                $settings->authorization_shard
+            );
+
+            $memberJson = $memberResponse->json();
+
+            if (! empty($memberJson['errors'])) {
+                $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $memberJson['errors']));
+                Log::warning('HealthieProvisioning: updateOrganizationMember failed', [
+                    'clinician_id'     => $clinician->id,
+                    'partner_id'       => $settings->partner_id,
+                    'healthie_user_id' => $healthieUserId,
+                    'errors'           => $msg,
+                ]);
+                return;
+            }
+
+            $memberFieldErrors = $memberJson['data']['updateOrganizationMember']['messages'] ?? [];
+            if (! empty($memberFieldErrors)) {
+                Log::warning('HealthieProvisioning: updateOrganizationMember had field messages', [
+                    'clinician_id'     => $clinician->id,
+                    'partner_id'       => $settings->partner_id,
+                    'healthie_user_id' => $healthieUserId,
+                    'messages'         => $memberFieldErrors,
+                ]);
+            }
+
+            Log::info('HealthieProvisioning: org member professional fields updated', [
+                'clinician_id'     => $clinician->id,
+                'partner_id'       => $settings->partner_id,
+                'healthie_user_id' => $healthieUserId,
+                'fields_sent'      => array_keys($memberInput),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('HealthieProvisioning: updateOrganizationMember threw', [
+                'clinician_id' => $clinician->id,
+                'partner_id'   => $settings->partner_id,
+                'error'        => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -358,75 +417,6 @@ class HealthieProvisioningService
         }
 
         return null;
-    }
-
-    /**
-     * Mark the org member as a provider using updateOrganizationMember.
-     *
-     * updateOrganizationMember identifies the member by user ID (id field) and
-     * accepts the same permission flags as updateOrganizationMembership, including
-     * is_provider. This avoids the need to look up a separate membership record ID.
-     *
-     * Best-effort — a failure is logged but does not block the provisioning result.
-     */
-    private function setIsProvider(string $userId, PartnerEhrSetting $settings): void
-    {
-        $mutation = <<<'GQL'
-        mutation SetIsProvider($input: updateOrganizationMemberInput!) {
-            updateOrganizationMember(input: $input) {
-                user {
-                    id
-                }
-                messages {
-                    field
-                    message
-                }
-            }
-        }
-        GQL;
-
-        try {
-            $response = $this->graphql(
-                $mutation,
-                ['input' => ['id' => $userId, 'is_provider' => true]],
-                $settings->api_key,
-                $settings->endpoint,
-                $settings->authorization_shard
-            );
-
-            $json = $response->json();
-
-            if (! empty($json['errors'])) {
-                $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
-                Log::warning('HealthieProvisioning: setIsProvider failed', [
-                    'partner_id' => $settings->partner_id,
-                    'user_id'    => $userId,
-                    'errors'     => $msg,
-                ]);
-                return;
-            }
-
-            $fieldErrors = $json['data']['updateOrganizationMember']['messages'] ?? [];
-
-            if (! empty($fieldErrors)) {
-                Log::warning('HealthieProvisioning: setIsProvider had field messages', [
-                    'partner_id' => $settings->partner_id,
-                    'user_id'    => $userId,
-                    'messages'   => $fieldErrors,
-                ]);
-            }
-
-            Log::info('HealthieProvisioning: setIsProvider succeeded', [
-                'partner_id' => $settings->partner_id,
-                'user_id'    => $userId,
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('HealthieProvisioning: setIsProvider threw', [
-                'partner_id' => $settings->partner_id,
-                'user_id'    => $userId,
-                'error'      => $e->getMessage(),
-            ]);
-        }
     }
 
     private function splitName(string $fullName): array
