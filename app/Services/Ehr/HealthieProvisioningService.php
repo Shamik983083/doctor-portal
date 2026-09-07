@@ -116,10 +116,7 @@ class HealthieProvisioningService
         $user = $clinician->user;
 
         // Idempotent: if this provider already exists in this org return their ID.
-        // Healthie's `keywords` param is name-indexed for providers, not email-indexed,
-        // so try both to cover manually-created accounts and accounts added via the API.
-        $existingId = $this->findProviderByEmail($user->email, $settings)
-            ?: $this->findProviderByEmailWithCreds($user->email, $settings->api_key, $settings->endpoint, $settings->authorization_shard, $user->name);
+        $existingId = $this->findProviderByEmail($user->email, $settings);
         if ($existingId) {
             return $existingId;
         }
@@ -180,17 +177,14 @@ class HealthieProvisioningService
             // then a search scoped to inactive users (the account may have been deactivated).
             foreach ($fieldErrors as $fe) {
                 if (str_contains(strtolower($fe['message'] ?? ''), 'already')) {
-                    $found = $this->findProviderByEmail($user->email, $settings)
-                        ?: $this->findProviderByEmailWithCreds($user->email, $settings->api_key, $settings->endpoint, $settings->authorization_shard, $user->name)
-                        ?: $this->findInactiveProviderByEmail($user->email, $settings->api_key, $settings->endpoint, $settings->authorization_shard);
+                    $found = $this->findProviderByEmail($user->email, $settings);
                     if ($found) {
                         return $found;
                     }
 
                     throw new RuntimeException(
-                        "Clinician [{$user->email}] is already in the Healthie org but could not be located by "
-                        . "active lookup. The account is likely deactivated in Healthie. "
-                        . "Re-activate the member at Organization → Members, then re-sync."
+                        "Clinician [{$user->email}] is already in the Healthie org but could not be located. "
+                        . "If the account is deactivated in Healthie, re-activate it at Organization → Members, then re-sync."
                     );
                 }
             }
@@ -344,20 +338,22 @@ class HealthieProvisioningService
     /**
      * Shared provider lookup by raw credentials.
      *
-     * $keywords defaults to $email, but callers may pass the provider's full name
-     * as a fallback since Healthie's `keywords` param appears to be name-indexed
-     * for provider accounts. Email matching is always done client-side.
+     * Fetches ALL active provider accounts for the org (no keyword filter) and
+     * matches by email client-side. Keyword-based search is unreliable for
+     * provider accounts: Healthie's users() query is client-scoped by default,
+     * and the keywords parameter indexes by name (not email) for org members.
+     * For a typical partner org with a handful of clinicians, fetching all
+     * providers is fast and avoids every keyword-indexing ambiguity.
      */
     private function findProviderByEmailWithCreds(
         string $email,
         string $apiKey,
         string $endpoint,
         ?string $shard = null,
-        ?string $keywords = null,
     ): ?string {
         $query = <<<'GQL'
-        query FindProvider($keywords: String) {
-            users(keywords: $keywords, offset: 0, should_paginate: false) {
+        query FindProviders {
+            users(offset: 0, should_paginate: false, type: "Provider") {
                 id
                 email
             }
@@ -365,7 +361,7 @@ class HealthieProvisioningService
         GQL;
 
         try {
-            $response = $this->graphql($query, ['keywords' => $keywords ?? $email], $apiKey, $endpoint, $shard);
+            $response = $this->graphql($query, [], $apiKey, $endpoint, $shard);
 
             foreach ($response->json('data.users') ?? [] as $user) {
                 if (isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
@@ -373,45 +369,10 @@ class HealthieProvisioningService
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning('HealthieProvisioning: provider lookup failed, will attempt create', [
-                'email'    => $email,
-                'keywords' => $keywords ?? $email,
-                'error'    => $e->getMessage(),
+            Log::warning('HealthieProvisioning: provider list fetch failed', [
+                'email' => $email,
+                'error' => $e->getMessage(),
             ]);
-        }
-
-        return null;
-    }
-
-    /**
-     * Last-resort lookup for a provider whose account has been deactivated in Healthie.
-     * Deactivated users are excluded from the default users() query result set.
-     */
-    private function findInactiveProviderByEmail(string $email, string $apiKey, string $endpoint, ?string $shard = null): ?string
-    {
-        $query = <<<'GQL'
-        query FindInactiveProvider($keywords: String) {
-            users(keywords: $keywords, offset: 0, should_paginate: false, active_status: "inactive") {
-                id
-                email
-            }
-        }
-        GQL;
-
-        try {
-            $response = $this->graphql($query, ['keywords' => $email], $apiKey, $endpoint, $shard);
-
-            foreach ($response->json('data.users') ?? [] as $user) {
-                if (isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
-                    Log::warning('HealthieProvisioning: provider found but is INACTIVE in Healthie', [
-                        'email'            => $email,
-                        'healthie_user_id' => $user['id'],
-                    ]);
-                    return (string) $user['id'];
-                }
-            }
-        } catch (\Throwable) {
-            // active_status filter may not be supported — swallow and let caller throw.
         }
 
         return null;
