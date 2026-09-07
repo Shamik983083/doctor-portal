@@ -374,10 +374,24 @@ class HealthieProvisioningService
         }
         GQL;
 
+        // All four flags are set in a single updateOrganizationMembership call:
+        //   is_provider              — "Should appear as a provider?" toggle
+        //   dietitian_auto_conversation — "Has Chat conversation automatically created with client"
+        //   can_schedule_with_clients   — "Clients can schedule sessions with this org member"
+        //                                 (requires is_provider=true; we set both together)
+        //   notify_of_client_activity   — "Is notified of any client activity"
+        $membershipInput = [
+            'id'                          => $membershipId,
+            'is_provider'                 => true,
+            'dietitian_auto_conversation' => true,
+            'can_schedule_with_clients'   => true,
+            'notify_of_client_activity'   => true,
+        ];
+
         try {
             $membershipResponse = $this->graphql(
                 $membershipMutation,
-                ['input' => ['id' => $membershipId, 'is_provider' => true]],
+                ['input' => $membershipInput],
                 $settings->api_key,
                 $settings->endpoint,
                 $settings->authorization_shard
@@ -387,7 +401,7 @@ class HealthieProvisioningService
 
             if (! empty($membershipJson['errors'])) {
                 $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $membershipJson['errors']));
-                Log::warning('HealthieProvisioning: setIsProvider failed', [
+                Log::warning('HealthieProvisioning: setMembershipFlags failed', [
                     'clinician_id'     => $clinician->id,
                     'partner_id'       => $settings->partner_id,
                     'healthie_user_id' => $healthieUserId,
@@ -397,7 +411,7 @@ class HealthieProvisioningService
             } else {
                 $membershipFieldErrors = $membershipJson['data']['updateOrganizationMembership']['messages'] ?? [];
                 if (! empty($membershipFieldErrors)) {
-                    Log::warning('HealthieProvisioning: setIsProvider had field messages', [
+                    Log::warning('HealthieProvisioning: setMembershipFlags had field messages', [
                         'clinician_id'  => $clinician->id,
                         'partner_id'    => $settings->partner_id,
                         'membership_id' => $membershipId,
@@ -406,16 +420,17 @@ class HealthieProvisioningService
                 }
 
                 $isProvider = $membershipJson['data']['updateOrganizationMembership']['organizationMembership']['is_provider'] ?? null;
-                Log::info('HealthieProvisioning: setIsProvider succeeded', [
+                Log::info('HealthieProvisioning: setMembershipFlags succeeded', [
                     'clinician_id'     => $clinician->id,
                     'partner_id'       => $settings->partner_id,
                     'healthie_user_id' => $healthieUserId,
                     'membership_id'    => $membershipId,
+                    'flags_sent'       => array_keys($membershipInput),
                     'is_provider'      => $isProvider,
                 ]);
             }
         } catch (\Throwable $e) {
-            Log::warning('HealthieProvisioning: setIsProvider threw', [
+            Log::warning('HealthieProvisioning: setMembershipFlags threw', [
                 'clinician_id' => $clinician->id,
                 'partner_id'   => $settings->partner_id,
                 'error'        => $e->getMessage(),
