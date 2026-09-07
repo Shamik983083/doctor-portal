@@ -128,16 +128,9 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         // Step 1: resolve or create the Healthie client for this patient.
         $healthieClientId = $this->findOrCreateClient($payload);
 
-        // Step 2: ensure the patient belongs to this sub-storefront's group (idempotent).
-        // For NEW patients this is already handled by user_group_id on createClient;
-        // this call covers EXISTING patients who were created before the group was set.
-        if (! empty($this->settings->default_group_id)) {
-            $this->ensureInGroup($healthieClientId, $this->settings->default_group_id);
-        }
-
-        // Step 3: add the prescribing clinician to the patient's care team (idempotent).
-        // This allows provider-permission scoping to restrict clinicians to their own patients.
-        $this->ensureCareTeamMember($payload, $healthieClientId);
+        // Step 2: assign patient to their sub-storefront group + add prescribing clinician
+        // to care team via bulkUpdateClients — the single supported mutation for both.
+        $this->bulkUpdateClientGroupAndCareTeam($payload, $healthieClientId);
 
         // Step 4: push vitals (weight, height, BMI) as metric entries.
         // Best-effort: a vital failing to post must not block or fail the record.
@@ -337,32 +330,100 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
     }
 
     /**
-     * Ensure the patient belongs to this sub-storefront's Healthie group.
+     * Assign the patient to their sub-storefront's user group AND add the prescribing
+     * clinician to the care team in a single call via bulkUpdateClients.
      *
-     * New patients are assigned at createClient time via user_group_id (see
-     * findOrCreateClient). Post-creation group assignment is not supported by
-     * this Healthie org: addGroupMembers doesn't exist, and user_group_id is
-     * not a field on updateUserInput.
+     * This is the Healthie-confirmed approach: addGroupMembers, createCareTeamMembership,
+     * and updateUser with user_group_id/dietitian_id are all unsupported in this org.
+     * bulkUpdateClients handles both in one mutation.
+     *
+     * Best-effort: failures are logged but never thrown — group / care-team issues
+     * must not block the clinical note push that follows.
      */
-    private function ensureInGroup(string $clientId, string $groupId): void
+    private function bulkUpdateClientGroupAndCareTeam(array $payload, string $clientId): void
     {
-        // No-op: new patients receive user_group_id on createClient.
-        // If Healthie adds a post-creation group membership mutation, implement it here.
-    }
+        $groupId = $this->settings->default_group_id ?: null;
 
-    /**
-     * Assign the prescribing clinician to the patient's care team.
-     *
-     * dietitian_id is set on createClient at patient creation time, which covers
-     * new patients. Post-creation assignment via updateUser is not supported in
-     * this Healthie org's schema (dietitian_id and createCareTeamMembership are
-     * both absent from the available mutation inputs).
-     */
-    private function ensureCareTeamMember(array $payload, string $clientId): void
-    {
-        // No-op: dietitian_id is written at createClient time for new patients.
-        // If Healthie adds a supported mutation for post-creation assignment,
-        // implement it here.
+        // Resolve the prescribing clinician's Healthie ID for care-team assignment.
+        $clinicianId        = $payload['encounter']['clinician_id'] ?? null;
+        $partnerId          = $payload['company']['partner_id'] ?? null;
+        $clinicianHealthieId = null;
+
+        if ($clinicianId && $partnerId) {
+            $clinicianHealthieId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
+                ->where('partner_id', $partnerId)
+                ->whereNull('sub_storefront_id')
+                ->where('status', 'synced')
+                ->value('healthie_user_id');
+        }
+
+        if (! $groupId && ! $clinicianHealthieId) {
+            // Nothing to assign — skip the API call entirely.
+            return;
+        }
+
+        $mutation = <<<'GQL'
+        mutation BulkUpdateClients($input: bulkUpdateClientsInput!) {
+            bulkUpdateClients(input: $input) {
+                users {
+                    id
+                }
+                messages {
+                    field
+                    message
+                }
+            }
+        }
+        GQL;
+
+        $input = ['ids' => [$clientId]];
+
+        if ($groupId) {
+            $input['user_group_id'] = $groupId;
+        }
+
+        if ($clinicianHealthieId) {
+            $input['other_provider_ids'] = (string) $clinicianHealthieId;
+        }
+
+        try {
+            $response = $this->graphql($mutation, ['input' => $input]);
+            $json     = $response->json();
+
+            if (! empty($json['errors'])) {
+                $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
+                Log::warning('Healthie bulkUpdateClients failed', [
+                    'partner_id'          => $this->settings->partner_id,
+                    'client_id'           => $clientId,
+                    'group_id'            => $groupId,
+                    'clinician_healthie_id' => $clinicianHealthieId,
+                    'errors'              => $msg,
+                ]);
+                return;
+            }
+
+            $fieldErrors = $json['data']['bulkUpdateClients']['messages'] ?? [];
+            if (! empty($fieldErrors)) {
+                Log::warning('Healthie bulkUpdateClients had field messages', [
+                    'partner_id' => $this->settings->partner_id,
+                    'client_id'  => $clientId,
+                    'messages'   => $fieldErrors,
+                ]);
+            }
+
+            Log::info('Healthie bulkUpdateClients succeeded', [
+                'partner_id'          => $this->settings->partner_id,
+                'client_id'           => $clientId,
+                'group_id'            => $groupId,
+                'clinician_healthie_id' => $clinicianHealthieId,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Healthie bulkUpdateClients threw', [
+                'partner_id' => $this->settings->partner_id,
+                'client_id'  => $clientId,
+                'error'      => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
