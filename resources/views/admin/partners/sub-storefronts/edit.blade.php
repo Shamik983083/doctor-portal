@@ -22,6 +22,13 @@
     </div>
 @endif
 
+@if(session('info'))
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <i class="bi bi-info-circle-fill me-2"></i>{{ session('info') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+
 <div class="row g-4">
     <div class="col-lg-7">
         <form method="POST" action="{{ route('admin.partners.sub-storefronts.update', [$partner->id, $subStorefront->id]) }}">
@@ -86,7 +93,17 @@
                     @if($subStorefront->healthie_default_group_id)
                         <span class="badge bg-success small"><i class="bi bi-check-circle-fill me-1"></i>Group provisioned</span>
                     @else
-                        <span class="badge bg-warning text-dark small"><i class="bi bi-exclamation-circle me-1"></i>No group set</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-warning text-dark small"><i class="bi bi-exclamation-circle me-1"></i>No group set</span>
+                            <form method="POST"
+                                  action="{{ route('admin.partners.sub-storefronts.provision-group', [$partner->id, $subStorefront->id]) }}"
+                                  onsubmit="return confirm('Create a Healthie User Group for \'{{ addslashes($subStorefront->name) }}\'? This will call the Healthie API now.')">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:.75rem">
+                                    <i class="bi bi-plus-circle me-1"></i>Create Healthie Group
+                                </button>
+                            </form>
+                        </div>
                     @endif
                 </div>
                 <div class="card-body">

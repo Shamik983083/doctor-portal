@@ -193,6 +193,57 @@ class SubStorefrontController extends Controller
             ->with('healthie_warning', $warning);
     }
 
+    /**
+     * POST /admin/partners/{partnerId}/sub-storefronts/{subStorefront}/provision-group
+     *
+     * Re-attempts Healthie User Group creation for a sub-storefront that was
+     * created before the partner had valid credentials, or whose auto-creation
+     * failed at creation time.
+     *
+     * Safe to call on a sub-storefront that already has a group ID — it will
+     * return immediately without calling Healthie again.
+     */
+    public function provisionGroup(int $partnerId, SubStorefront $subStorefront)
+    {
+        $partner = Partner::findOrFail($partnerId);
+        abort_if($subStorefront->partner_id !== $partner->id, 403);
+
+        if (! empty($subStorefront->healthie_default_group_id)) {
+            return redirect()
+                ->route('admin.partners.sub-storefronts.edit', [$partner->id, $subStorefront->id])
+                ->with('info', "A Healthie group is already provisioned (ID: {$subStorefront->healthie_default_group_id}). No action taken.");
+        }
+
+        $partnerSettings = $partner->healthieSettings;
+
+        if (! $partnerSettings || empty($partnerSettings->api_key) || empty($partnerSettings->endpoint)) {
+            return redirect()
+                ->route('admin.partners.sub-storefronts.edit', [$partner->id, $subStorefront->id])
+                ->with('error', 'Cannot provision group: the partner has no Healthie API key or endpoint configured. Set those on the partner edit page first.');
+        }
+
+        try {
+            $service = app(HealthieProvisioningService::class);
+            $groupId = $service->createUserGroup($subStorefront, $partnerSettings);
+            $subStorefront->update(['healthie_default_group_id' => $groupId]);
+
+            ProvisionAllCliniciansForSubStorefrontJob::dispatch($subStorefront->id);
+
+            return redirect()
+                ->route('admin.partners.sub-storefronts.edit', [$partner->id, $subStorefront->id])
+                ->with('success', "Healthie User Group created successfully (ID: {$groupId}). Clinician provisioning is running in the background.");
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Admin: Healthie user group re-provision failed', [
+                'sub_storefront_id' => $subStorefront->id,
+                'error'             => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('admin.partners.sub-storefronts.edit', [$partner->id, $subStorefront->id])
+                ->with('error', 'Healthie group creation failed: ' . $e->getMessage());
+        }
+    }
+
     public function destroy(int $partnerId, SubStorefront $subStorefront)
     {
         $partner = Partner::findOrFail($partnerId);

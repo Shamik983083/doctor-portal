@@ -193,6 +193,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
         Route::get('/{partnerId}/sub-storefronts/{subStorefront}/edit', [AdminSubStorefrontController::class, 'edit'])->name('sub-storefronts.edit');
         Route::put('/{partnerId}/sub-storefronts/{subStorefront}', [AdminSubStorefrontController::class, 'update'])->name('sub-storefronts.update');
         Route::delete('/{partnerId}/sub-storefronts/{subStorefront}', [AdminSubStorefrontController::class, 'destroy'])->name('sub-storefronts.destroy');
+        Route::post('/{partnerId}/sub-storefronts/{subStorefront}/provision-group', [AdminSubStorefrontController::class, 'provisionGroup'])->name('sub-storefronts.provision-group');
         // Product plans (one-to-many product_key ↔ offering mapping)
         Route::get('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'index'])->name('product-plans.index');
         Route::post('/{id}/product-plans', [AdminPartnerProductPlanController::class, 'store'])->name('product-plans.store');
