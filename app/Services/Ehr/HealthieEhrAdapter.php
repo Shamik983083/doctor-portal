@@ -314,15 +314,23 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             throw new RuntimeException("Healthie client creation failed: {$messages}");
         }
 
-        $clientId = $createJson['data']['createClient']['user']['id'] ?? null;
+        $clientId    = $createJson['data']['createClient']['user']['id'] ?? null;
+        $fieldErrors = $createJson['data']['createClient']['messages'] ?? [];
 
         if (! $clientId) {
-            $fieldErrors = $createJson['data']['createClient']['messages'] ?? [];
-            $detail      = implode('; ', array_map(
+            $detail = implode('; ', array_map(
                 fn ($m) => ($m['field'] ?? '?') . ': ' . ($m['message'] ?? '?'),
                 $fieldErrors
             ));
             throw new RuntimeException("Healthie returned no client ID after createClient. {$detail}");
+        }
+
+        if (! empty($fieldErrors)) {
+            Log::warning('Healthie createClient succeeded but had field messages', [
+                'partner_id' => $this->settings->partner_id,
+                'client_id'  => $clientId,
+                'messages'   => $fieldErrors,
+            ]);
         }
 
         return (string) $clientId;
