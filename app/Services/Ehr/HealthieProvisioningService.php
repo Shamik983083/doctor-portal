@@ -116,7 +116,10 @@ class HealthieProvisioningService
         $user = $clinician->user;
 
         // Idempotent: if this provider already exists in this org return their ID.
-        $existingId = $this->findProviderByEmail($user->email, $settings);
+        // Healthie's `keywords` param is name-indexed for providers, not email-indexed,
+        // so try both to cover manually-created accounts and accounts added via the API.
+        $existingId = $this->findProviderByEmail($user->email, $settings)
+            ?: $this->findProviderByEmailWithCreds($user->email, $settings->api_key, $settings->endpoint, $settings->authorization_shard, $user->name);
         if ($existingId) {
             return $existingId;
         }
@@ -173,9 +176,12 @@ class HealthieProvisioningService
 
         if (! $userId) {
             // "Already a member" arrives as a field error — look them up instead of failing.
+            // Try both email-as-keywords and name-as-keywords since Healthie's provider
+            // search indexes differently depending on account type.
             foreach ($fieldErrors as $fe) {
                 if (str_contains(strtolower($fe['message'] ?? ''), 'already')) {
-                    $found = $this->findProviderByEmail($user->email, $settings);
+                    $found = $this->findProviderByEmail($user->email, $settings)
+                        ?: $this->findProviderByEmailWithCreds($user->email, $settings->api_key, $settings->endpoint, $settings->authorization_shard, $user->name);
                     if ($found) {
                         return $found;
                     }
@@ -330,17 +336,18 @@ class HealthieProvisioningService
 
     /**
      * Shared provider lookup by raw credentials.
-     * type: "Provider" is required — without it Healthie returns only patients.
+     *
+     * $keywords defaults to $email, but callers may pass the provider's full name
+     * as a fallback since Healthie's `keywords` param appears to be name-indexed
+     * for provider accounts. Email matching is always done client-side.
      */
     private function findProviderByEmailWithCreds(
         string $email,
         string $apiKey,
         string $endpoint,
         ?string $shard = null,
+        ?string $keywords = null,
     ): ?string {
-        // No type filter — Healthie's valid type strings differ from the "Provider"
-        // role string and passing an unknown type returns an empty result set, making
-        // the lookup silently fail. Email matching is done client-side below.
         $query = <<<'GQL'
         query FindProvider($keywords: String) {
             users(keywords: $keywords, offset: 0, should_paginate: false) {
@@ -351,7 +358,7 @@ class HealthieProvisioningService
         GQL;
 
         try {
-            $response = $this->graphql($query, ['keywords' => $email], $apiKey, $endpoint, $shard);
+            $response = $this->graphql($query, ['keywords' => $keywords ?? $email], $apiKey, $endpoint, $shard);
 
             foreach ($response->json('data.users') ?? [] as $user) {
                 if (isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
@@ -360,8 +367,9 @@ class HealthieProvisioningService
             }
         } catch (\Throwable $e) {
             Log::warning('HealthieProvisioning: provider lookup failed, will attempt create', [
-                'email' => $email,
-                'error' => $e->getMessage(),
+                'email'    => $email,
+                'keywords' => $keywords ?? $email,
+                'error'    => $e->getMessage(),
             ]);
         }
 
