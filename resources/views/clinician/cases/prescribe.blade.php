@@ -616,16 +616,21 @@
             }
         }
 
-        // Auto-select month dosage levels based on check-in answers:
-        //   "What was your last dose?"          → last_dose (e.g. "Semaglutide 0.25 mg")
-        //   "How would you like to continue?"   → continuation answer text
+        // Auto-select month dosage levels based on check-in answers.
         //
-        // Continuation rules:
-        //   Same dose          → all months = current level
-        //   Increase dosage    → M1 = current level, ascending each month
-        //   Decrease dosage    → M1 = one level down, ascending each month
-        //   Change medication  → M1 = current level, ascending (shows prior drug's dose as context)
-        //   Provider           → no auto-fill
+        // Reads two questionnaire hints passed from PHP:
+        //   CHECK_IN_DOSE_HINT.last_dose    → e.g. "Tirzepatide 7.5 mg"
+        //   CHECK_IN_DOSE_HINT.continuation → e.g. "Increase my dosage"
+        //
+        // Continuation → slot assignment (M_n = month n; startIdx = resolved starting level):
+        //   Same dose          → all months = currentIdx           (stay flat)
+        //   Increase dosage    → M1=currentIdx, M2=+1, M3=+2 …    (ascending, M1 stays at current)
+        //   Decrease dosage    → startIdx=max(0,currentIdx−1);     (step back first, then ascending)
+        //                        M1=startIdx, M2=+1, M3=+2 …
+        //   Change medications → identical to Increase             (prior dose is the new baseline)
+        //   Provider decides   → no fill (return early)
+        //
+        // All indices are capped at levels.length−1.
         function autoFillMonths(wrap, levels) {
             var hint = CHECK_IN_DOSE_HINT;
             if (!hint || !hint.last_dose || !hint.continuation || !levels || !levels.length) return;
@@ -633,16 +638,16 @@
             var continuation = hint.continuation.toLowerCase();
             if (continuation.indexOf('provider') !== -1) return;
 
-            // Extract numeric mg dose from patient answer (e.g. "Semaglutide 0.25 mg" → 0.25)
+            // Extract numeric mg dose from patient answer (e.g. "Tirzepatide 7.5 mg" → 7.5)
             var doseMatch = hint.last_dose.match(/(\d+\.?\d*)\s*mg/i);
             if (!doseMatch) return;
             var dose = parseFloat(doseMatch[1]);
 
-            // Search across ALL offerings to find the level index for this dose.
-            // The clinician may have switched formulation (e.g. injection → tablet),
-            // so the patient's last mg value won't appear in the selected offering's
-            // levels. We treat the index (0 = LVL1, 1 = LVL2, …) as the universal
-            // "position in the titration ladder" and apply it to the chosen offering.
+            // PATH A — cross-offering mg search.
+            // Search every offering (not just the currently selected one) for a level whose
+            // label+formula contains the patient's dose. Return the level INDEX (0-based),
+            // not the mg value itself, so the same ordinal position can be applied even
+            // when the selected offering's mg values differ (e.g. injection → tablet switch).
             var currentIdx = -1;
             for (var oi = 0; oi < OFFERINGS.length && currentIdx === -1; oi++) {
                 var oLevels = OFFERINGS[oi].levels;
@@ -657,13 +662,14 @@
                 }
             }
 
-            // Fallback: OFFERINGS may only contain the partner's current formulation
-            // (e.g. tablet only), so an injection dose like 0.25 mg won't appear there.
-            // Map the dose to a level index using the known GLP titration ladders.
+            // PATH B — hardcoded GLP titration ladder fallback.
+            // Used when OFFERINGS is filtered to a single formulation and the patient's
+            // prior dose doesn't appear in any loaded offering's levels (e.g. partner
+            // loads only tablets but patient was on injection).
             if (currentIdx === -1) {
                 var KNOWN_DOSE_LEVELS = {
-                    semaglutide: [0.25, 0.5, 1, 1.7, 2.5],
-                    tirzepatide: [2.5, 5, 7.5, 10, 12.5, 15]
+                    semaglutide: [0.25, 0.5, 1, 1.7, 2.5],           // injection weekly ladder
+                    tirzepatide: [2.5, 5, 7.5, 10, 12.5, 15]         // injection weekly ladder
                 };
                 var lastDoseLower = (hint.last_dose || '').toLowerCase();
                 var drugFam = null;
@@ -677,20 +683,21 @@
                 }
             }
 
-            // Cap the resolved index to the selected offering's level count
-            if (currentIdx === -1) return;
+            if (currentIdx === -1) return; // dose not found anywhere — leave dropdowns alone
+
+            // Cap to the selected offering's level count (may have fewer levels than the source)
             currentIdx = Math.min(currentIdx, levels.length - 1);
 
-            // Determine starting level index for M1
+            // Resolve starting index for M1 from the continuation answer
             var startIdx;
             if (continuation.indexOf('same') !== -1) {
-                startIdx = currentIdx;
+                startIdx = currentIdx;                          // flat — all months at current
             } else if (continuation.indexOf('increase') !== -1) {
-                startIdx = currentIdx;
+                startIdx = currentIdx;                          // M1 stays at current, M2+ step up
             } else if (continuation.indexOf('decrease') !== -1) {
-                startIdx = Math.max(0, currentIdx - 1);
+                startIdx = Math.max(0, currentIdx - 1);        // M1 one level down, then ascending
             } else if (continuation.indexOf('change') !== -1) {
-                startIdx = currentIdx; // Prior dose shown as starting context; clinician adjusts
+                startIdx = currentIdx;                          // treat same as increase
             } else {
                 return;
             }
@@ -699,27 +706,43 @@
             var selects = wrap.querySelectorAll('.level-select');
             selects.forEach(function (sel, m) {
                 var targetIdx = isSame ? startIdx : Math.min(startIdx + m, levels.length - 1);
-                sel.value = levels[targetIdx].label;
+                // Use selectedIndex (+1 because option[0] is the blank placeholder) rather than
+                // sel.value = label, so special characters in level labels never cause a mismatch.
+                sel.selectedIndex = targetIdx + 1;
                 sel.dispatchEvent(new Event('change')); // triggers SIG auto-fill
             });
         }
 
-        // Auto-select the medication dropdown based on the patient's last dose formulation.
-        // Works for both new and refill cases: injection → injection, oral → oral.
-        // Overrides a pre-loaded offering if a better formulation match is available;
-        // if no matching offering exists in OFFERINGS (e.g. only one formulation loaded),
-        // the selection is left as-is and autoFillMonths handles levels by ordinal position.
+        // Auto-select the medication dropdown from the patient's last dose formulation.
+        //
+        // Goal: set the dropdown to an offering that matches the patient's prior drug
+        // family AND formulation type (injection → injection, oral → oral). Fires after
+        // rows are pre-loaded from CASE_OFFERINGS_DATA; overrides the pre-selection when
+        // a better formulation match exists in OFFERINGS.
+        //
+        // Guards: returns early when hint is missing, continuation is "provider", or no
+        // mg value is extractable. "Change medications" does NOT exit early — the prior
+        // drug family and formulation are still auto-selected as the starting point.
+        //
+        // PATH A — find source offering in OFFERINGS by mg value.
+        // PATH B — fallback: infer family ("semaglutide"/"tirzepatide") and formulation
+        //          ("tablet"/"oral" → oral; anything else → injection) from answer text.
+        //          Used when OFFERINGS is filtered and the patient's prior formulation
+        //          isn't loaded (e.g. partner shows only tablets, patient was on injection).
+        //
+        // Injection keywords (name check): injection, b12, subq, sq.
+        // Oral: anything that doesn't match injection keywords.
         function autoSelectMedication() {
             var hint = CHECK_IN_DOSE_HINT;
             if (!hint || !hint.last_dose || !hint.continuation) return;
             var continuation = hint.continuation.toLowerCase();
-            if (continuation.indexOf('provider') !== -1) return;
+            if (continuation.indexOf('provider') !== -1) return; // clinician decides manually
 
             var doseMatch = hint.last_dose.match(/(\d+\.?\d*)\s*mg/i);
             if (!doseMatch) return;
             var dose = parseFloat(doseMatch[1]);
 
-            // Try to find the source offering in OFFERINGS by mg value
+            // PATH A — search OFFERINGS for a level whose label+formula contains the dose
             var sourceOffering = null;
             for (var oi = 0; oi < OFFERINGS.length && !sourceOffering; oi++) {
                 var oLevels = OFFERINGS[oi].levels;
@@ -736,22 +759,21 @@
 
             var srcFam, srcIsInjection;
             if (sourceOffering) {
+                // PATH A succeeded — derive family + formulation type from the source offering name
                 srcFam = family(sourceOffering.name);
-                var sn  = (sourceOffering.name || '').toLowerCase();
+                var sn = (sourceOffering.name || '').toLowerCase();
                 srcIsInjection = sn.indexOf('injection') > -1 || sn.indexOf('b12') > -1
                               || sn.indexOf('subq') > -1 || sn.indexOf(' sq ') > -1;
             } else {
-                // Source offering not in OFFERINGS (cross-formulation: e.g. patient was on
-                // injection but only tablet is loaded). Infer family + type from answer text.
+                // PATH B — source not in OFFERINGS; infer from patient's answer text
                 var lastLower = (hint.last_dose || '').toLowerCase();
-                if (lastLower.indexOf('semaglutide') > -1)       srcFam = 'semaglutide';
-                else if (lastLower.indexOf('tirzepatide') > -1)  srcFam = 'tirzepatide';
-                else return;
-                // "tablet" / "oral" keyword → oral; otherwise assume injection
+                if (lastLower.indexOf('semaglutide') > -1)      srcFam = 'semaglutide';
+                else if (lastLower.indexOf('tirzepatide') > -1) srcFam = 'tirzepatide';
+                else return; // unknown drug family — no auto-select
                 srcIsInjection = lastLower.indexOf('tablet') === -1 && lastLower.indexOf('oral') === -1;
             }
 
-            // Find the best offering in OFFERINGS: same drug family + same formulation type
+            // Find the first offering in OFFERINGS with the same drug family AND formulation type
             var targetOffering = null;
             for (var ti = 0; ti < OFFERINGS.length; ti++) {
                 if (family(OFFERINGS[ti].name) !== srcFam) continue;
@@ -760,13 +782,15 @@
                                 || tn.indexOf('subq') > -1 || tn.indexOf(' sq ') > -1;
                 if (tIsInjection === srcIsInjection) { targetOffering = OFFERINGS[ti]; break; }
             }
-            if (!targetOffering) return; // no matching formulation available — leave as-is
+            if (!targetOffering) return; // matching formulation not in OFFERINGS — leave as-is
 
-            // Apply to all med dropdowns — override if current selection differs
+            // Apply to all med dropdowns (overrides pre-selection if ID differs).
+            // For bundle rows whose dropdown is filtered to a different family, setting a
+            // non-existent value is a silent no-op, so those rows are unaffected.
             list.querySelectorAll('[data-f="med"]').forEach(function (sel) {
                 if (String(sel.value) !== String(targetOffering.id)) {
                     sel.value = String(targetOffering.id);
-                    sel.dispatchEvent(new Event('change'));
+                    sel.dispatchEvent(new Event('change')); // → syncMed → renderMonths → autoFillMonths
                 }
             });
         }
