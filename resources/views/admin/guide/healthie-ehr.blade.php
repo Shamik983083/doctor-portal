@@ -501,11 +501,12 @@
                 <div class="g-step-body">
                     <h3>Clinician provisioning — happens automatically when clinicians are saved</h3>
                     <p>You do not need to manually create provider accounts in Healthie. When any clinician is saved
-                    in MEDAXIS, the system automatically:</p>
+                    in MEDAXIS, the system automatically runs three syncs in sequence:</p>
                     <div class="g-step-note">
-                        1. Checks whether the clinician already has an account in this partner's Healthie org.<br>
-                        2. If not — creates one via <em>createOrganizationMembership</em>.<br>
-                        3. Always pushes current NPI number, credentials (MD, DO, NP…), specialty, and licensed states to keep Healthie up to date.<br><br>
+                        <strong>1. Create or find the account</strong> — checks whether the clinician already exists in this partner's Healthie org. If not, creates one via <em>createOrganizationMembership</em>.<br><br>
+                        <strong>2. Sync basic identity</strong> — pushes first name, last name, and phone number via <em>updateUser</em>.<br><br>
+                        <strong>3. Sync professional details</strong> — pushes NPI number, credentials (MD, DO, NP…), and licensed states via <em>updateOrganizationMember</em>, then sets the <em>Is Dr. a provider?</em> flag to Yes via <em>updateOrganizationMembership</em> so the clinician appears in Healthie's scheduling and care-team selectors.<br><br>
+                        All three steps run on every sync — including re-syncs — so Healthie always reflects the current values from MEDAXIS.<br><br>
                         <strong>Where to see status:</strong> Each clinician's profile shows their Healthie sync status (Synced / Pending / Failed) per partner under the <em>Healthie Provisioning</em> section. If it shows Failed, the error message is shown there — fix the clinician's profile and the next save will retry.
                     </div>
                 </div>
@@ -717,7 +718,7 @@
             ],
             [
                 'Do I need to create provider accounts in Healthie manually?',
-                'No. MEDAXIS handles this automatically. When any clinician\'s profile is saved in the admin, the system provisions them into every partner\'s Healthie org they should belong to. If they already exist, it skips creation and just updates their details (NPI, credentials, specialty, licensed states). You can see the sync status on the clinician\'s profile page.',
+                'No. MEDAXIS handles this automatically. When any clinician\'s profile is saved in the admin, the system provisions them into every partner\'s Healthie org they should belong to. Each sync runs three steps: create/find the account, sync name and phone, then sync NPI, credentials, licensed states, and the "Is Dr. a provider?" flag. All three steps run on every sync, so Healthie always reflects current MEDAXIS data. You can see the sync status on the clinician\'s profile page.',
             ],
             [
                 'What happens if the API key is wrong or expired?',
@@ -816,12 +817,22 @@
                     <tr>
                         <td style="font-size:.83rem;color:var(--g-text2);">Clinician saved (new)</td>
                         <td><code class="g-code">createOrganizationMembership</code></td>
-                        <td style="font-size:.83rem;color:var(--g-muted);">Provider account created in partner org; membership ID stored</td>
+                        <td style="font-size:.83rem;color:var(--g-muted);">Provider account created in partner org</td>
                     </tr>
                     <tr>
-                        <td style="font-size:.83rem;color:var(--g-text2);">Clinician saved (new or update)</td>
+                        <td style="font-size:.83rem;color:var(--g-text2);">Clinician saved (new or update) — step 1</td>
                         <td><code class="g-code">updateUser</code></td>
-                        <td style="font-size:.83rem;color:var(--g-muted);">NPI, credentials, specialty, phone, licensed states pushed to existing account</td>
+                        <td style="font-size:.83rem;color:var(--g-muted);">First name, last name, phone number synced</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:.83rem;color:var(--g-text2);">Clinician saved (new or update) — step 2</td>
+                        <td><code class="g-code">updateOrganizationMember</code></td>
+                        <td style="font-size:.83rem;color:var(--g-muted);">NPI, qualifications (credentials), and licensed states synced. Uses clinician's Healthie user ID as identifier.</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:.83rem;color:var(--g-text2);">Clinician saved (new or update) — step 3</td>
+                        <td><code class="g-code">updateOrganizationMembership</code></td>
+                        <td style="font-size:.83rem;color:var(--g-muted);">Sets <code class="g-code">is_provider: true</code> so the clinician appears in scheduling and care-team selectors. Membership record ID fetched first via <code class="g-code">organizationMemberships(user_ids: [...])</code>.</td>
                     </tr>
                     <tr>
                         <td style="font-size:.83rem;color:var(--g-text2);">Patient not found by email</td>
@@ -830,13 +841,8 @@
                     </tr>
                     <tr>
                         <td style="font-size:.83rem;color:var(--g-text2);">Every patient push</td>
-                        <td><code class="g-code">addGroupMembers</code></td>
-                        <td style="font-size:.83rem;color:var(--g-muted);">Patient added to sub-storefront's User Group (best-effort — failures logged, record not failed)</td>
-                    </tr>
-                    <tr>
-                        <td style="font-size:.83rem;color:var(--g-text2);">Every patient push</td>
-                        <td><code class="g-code">createCareTeamMembership</code></td>
-                        <td style="font-size:.83rem;color:var(--g-muted);">Clinician linked to patient with <code class="g-code">role: "Provider"</code> (best-effort)</td>
+                        <td><code class="g-code">bulkUpdateClients</code></td>
+                        <td style="font-size:.83rem;color:var(--g-muted);">Single call that assigns patient to sub-storefront User Group (<code class="g-code">user_group_id</code>) and links the prescribing clinician as a care team provider (<code class="g-code">other_provider_ids</code>). Best-effort — failures logged, push not failed.</td>
                     </tr>
                     <tr>
                         <td style="font-size:.83rem;color:var(--g-text2);"><code class="g-code">note_form_id</code> is set</td>
@@ -864,8 +870,8 @@
             <table class="g-field-table">
                 <thead><tr><th>File</th><th>Role</th></tr></thead>
                 <tbody>
-                    <tr><td><code class="g-code">app/Services/Ehr/HealthieEhrAdapter.php</code></td><td style="font-size:.83rem;color:var(--g-muted);">Record push adapter — findOrCreateClient, ensureInGroup, ensureCareTeamMember, buildMutation, pushVitals. Uses partner credentials + sub-storefront group override via <code class="g-code">forSubStorefront()</code> factory.</td></tr>
-                    <tr><td><code class="g-code">app/Services/Ehr/HealthieProvisioningService.php</code></td><td style="font-size:.83rem;color:var(--g-muted);">Org provisioning — createUserGroup (on sub-storefront create), provisionClinician (createOrganizationMembership), updateProviderDetails (updateUser mutation for NPI/credentials/specialty/licensed states).</td></tr>
+                    <tr><td><code class="g-code">app/Services/Ehr/HealthieEhrAdapter.php</code></td><td style="font-size:.83rem;color:var(--g-muted);">Record push adapter — findOrCreateClient, bulkUpdateClientGroupAndCareTeam (single call sets user group + care team provider), buildMutation, pushVitals. Uses partner credentials + sub-storefront group override via <code class="g-code">forSubStorefront()</code> factory.</td></tr>
+                    <tr><td><code class="g-code">app/Services/Ehr/HealthieProvisioningService.php</code></td><td style="font-size:.83rem;color:var(--g-muted);">Org provisioning — createUserGroup (on sub-storefront create), provisionClinician (createOrganizationMembership), updateProviderDetails (3 steps: updateUser for name/phone; updateOrganizationMember for NPI/credentials/states; updateOrganizationMembership for is_provider via membership ID from organizationMemberships lookup).</td></tr>
                     <tr><td><code class="g-code">app/Jobs/ProvisionClinicianInHealthieJob.php</code></td><td style="font-size:.83rem;color:var(--g-muted);">Dispatched on clinician save. Iterates all partner EHR settings, creates or updates the clinician account. Idempotent — already-synced rows skip create but always push updated details.</td></tr>
                     <tr><td><code class="g-code">app/Services/EhrRecordService.php</code></td><td style="font-size:.83rem;color:var(--g-muted);">Outbox orchestrator — buildPayload, scopedPatientKey, recordApproval, push.</td></tr>
                     <tr><td><code class="g-code">app/Services/Ehr/EhrGatewayManager.php</code></td><td style="font-size:.83rem;color:var(--g-muted);">Resolves adapter for a partner — enforces dual env-flag gate and isPushable().</td></tr>
@@ -885,7 +891,7 @@
             <ul style="font-size:.84rem;color:var(--g-muted);padding-left:1.25rem;line-height:2;margin:0;">
                 <li>Each partner pushes with its own Healthie API key — no global key, no fallback.</li>
                 <li>Patient matching uses namespaced key <code class="g-code">partner_uuid:patient_id</code> — never email, phone, or DOB alone.</li>
-                <li>Sub-storefront separation is enforced by Healthie User Groups — each sub-storefront has its own <code class="g-code">healthie_default_group_id</code> and every patient push calls <code class="g-code">addGroupMembers</code> to place the patient in the correct group.</li>
+                <li>Sub-storefront separation is enforced by Healthie User Groups — each sub-storefront has its own <code class="g-code">healthie_default_group_id</code> and every patient push calls <code class="g-code">bulkUpdateClients</code> to place the patient in the correct group and link the prescribing clinician as care team provider in one call.</li>
                 <li>Clinician mappings are partner-level (<code class="g-code">sub_storefront_id = NULL</code>) — one Healthie account per clinician per partner, reused across all sub-storefronts.</li>
                 <li>The <code class="g-code">EhrGatewayManager</code> resolves a different adapter instance per partner — a shared credential is architecturally impossible.</li>
             </ul>
