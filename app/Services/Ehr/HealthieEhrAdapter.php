@@ -329,97 +329,19 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
     }
 
     /**
-     * Ensure the patient is a member of this sub-storefront's Healthie group.
+     * Ensure the patient belongs to this sub-storefront's Healthie group.
      *
-     * Best-effort: Healthie may return an error if the user is already in the
-     * group or the group does not exist — both cases are logged and swallowed so
-     * they never block the prescription note from being pushed.
-     *
-     * Uses the addGroupMembers mutation per Healthie's group management docs.
-     */
-    private function ensureInGroup(string $clientId, string $groupId): void
-    {
-        // Healthie's addGroupMembersPayload exposes `user_group` (not `group`) — same
-        // naming convention as createGroupPayload. Requesting the wrong field name
-        // causes the server to reject the mutation at schema validation, silently
-        // leaving the patient un-grouped.
-        $mutation = <<<'GQL'
-        mutation AddGroupMembers($input: addGroupMembersInput!) {
-            addGroupMembers(input: $input) {
-                user_group {
-                    id
-                }
-                messages {
-                    field
-                    message
-                }
-            }
-        }
-        GQL;
-
-        try {
-            $response = $this->graphql($mutation, [
-                'input' => [
-                    'id'         => $groupId,
-                    'member_ids' => [$clientId],
-                ],
-            ]);
-
-            if (! empty($response->json('errors'))) {
-                Log::warning('Healthie addGroupMembers returned errors', [
-                    'partner_id' => $this->settings->partner_id,
-                    'group_id'   => $groupId,
-                    'client_id'  => $clientId,
-                    'errors'     => $response->json('errors'),
-                ]);
-            } else {
-                Log::info('Healthie addGroupMembers succeeded', [
-                    'partner_id' => $this->settings->partner_id,
-                    'group_id'   => $groupId,
-                    'client_id'  => $clientId,
-                ]);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Healthie addGroupMembers threw', [
-                'partner_id' => $this->settings->partner_id,
-                'group_id'   => $groupId,
-                'client_id'  => $clientId,
-                'error'      => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Assign the prescribing clinician as the patient's dietitian in Healthie.
-     *
-     * Healthie's createCareTeamMembership mutation is not available in all org
-     * plans. Using updateUser with dietitian_id achieves the same provider
-     * scoping: each patient is linked to their prescribing clinician.
+     * addGroupMembers is not available in all Healthie org plans. As a fallback
+     * we call updateUser with user_group_id — the same field accepted on createClient.
+     * New patients already have user_group_id set at creation; this call covers
+     * existing patients who predate the group.
      *
      * Best-effort: never throws.
      */
-    private function ensureCareTeamMember(array $payload, string $clientId): void
+    private function ensureInGroup(string $clientId, string $groupId): void
     {
-        $clinicianId = $payload['encounter']['clinician_id'] ?? null;
-        $partnerId   = $payload['company']['partner_id'] ?? null;
-
-        if (! $clinicianId || ! $partnerId) {
-            return;
-        }
-
-        $clinicianHealthieId = ClinicianHealthieMapping::where('clinician_id', $clinicianId)
-            ->where('partner_id', $partnerId)
-            ->whereNull('sub_storefront_id')
-            ->where('status', 'synced')
-            ->value('healthie_user_id')
-            ?: $this->settings->default_provider_id;
-
-        if (! $clinicianHealthieId) {
-            return;
-        }
-
         $mutation = <<<'GQL'
-        mutation AssignPatientDietitian($input: updateUserInput!) {
+        mutation AssignPatientGroup($input: updateUserInput!) {
             updateUser(input: $input) {
                 user {
                     id
@@ -435,32 +357,48 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         try {
             $response = $this->graphql($mutation, [
                 'input' => [
-                    'id'           => $clientId,
-                    'dietitian_id' => $clinicianHealthieId,
+                    'id'            => $clientId,
+                    'user_group_id' => $groupId,
                 ],
             ]);
 
             if (! empty($response->json('errors'))) {
-                Log::warning('Healthie dietitian assignment returned errors', [
-                    'partner_id'            => $this->settings->partner_id,
-                    'client_id'             => $clientId,
-                    'clinician_healthie_id' => $clinicianHealthieId,
-                    'errors'                => $response->json('errors'),
+                Log::warning('Healthie group assignment returned errors', [
+                    'partner_id' => $this->settings->partner_id,
+                    'group_id'   => $groupId,
+                    'client_id'  => $clientId,
+                    'errors'     => $response->json('errors'),
                 ]);
             } else {
-                Log::info('Healthie dietitian assigned', [
-                    'partner_id'            => $this->settings->partner_id,
-                    'client_id'             => $clientId,
-                    'clinician_healthie_id' => $clinicianHealthieId,
+                Log::info('Healthie group assignment succeeded', [
+                    'partner_id' => $this->settings->partner_id,
+                    'group_id'   => $groupId,
+                    'client_id'  => $clientId,
                 ]);
             }
         } catch (\Throwable $e) {
-            Log::warning('Healthie dietitian assignment threw', [
+            Log::warning('Healthie group assignment threw', [
                 'partner_id' => $this->settings->partner_id,
+                'group_id'   => $groupId,
                 'client_id'  => $clientId,
                 'error'      => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Assign the prescribing clinician to the patient's care team.
+     *
+     * dietitian_id is set on createClient at patient creation time, which covers
+     * new patients. Post-creation assignment via updateUser is not supported in
+     * this Healthie org's schema (dietitian_id and createCareTeamMembership are
+     * both absent from the available mutation inputs).
+     */
+    private function ensureCareTeamMember(array $payload, string $clientId): void
+    {
+        // No-op: dietitian_id is written at createClient time for new patients.
+        // If Healthie adds a supported mutation for post-creation assignment,
+        // implement it here.
     }
 
     /**
