@@ -116,9 +116,11 @@ class HealthieProvisioningService
         $user = $clinician->user;
 
         // Idempotent: if this provider already exists in this org return their ID.
-        $existingId = $this->findProviderByEmail($user->email, $settings);
-        if ($existingId) {
-            return $existingId;
+        $existing = $this->findProviderMembership($user->email, $settings);
+        if ($existing) {
+            // Always ensure is_provider=true even for pre-existing members.
+            $this->setIsProvider($existing['membership_id'], $settings);
+            return $existing['user_id'];
         }
 
         $mutation = <<<'GQL'
@@ -167,19 +169,19 @@ class HealthieProvisioningService
             );
         }
 
-        $membership  = $json['data']['createOrganizationMembership']['organizationMembership'] ?? null;
-        $userId      = $membership['user']['id'] ?? null;
-        $fieldErrors = $json['data']['createOrganizationMembership']['messages'] ?? [];
+        $membership   = $json['data']['createOrganizationMembership']['organizationMembership'] ?? null;
+        $userId       = $membership['user']['id'] ?? null;
+        $membershipId = $membership['id'] ?? null;
+        $fieldErrors  = $json['data']['createOrganizationMembership']['messages'] ?? [];
 
         if (! $userId) {
             // "Already a member" arrives as a field error — look them up instead of failing.
-            // Try email-as-keywords, then name-as-keywords (Healthie indexes providers by name),
-            // then a search scoped to inactive users (the account may have been deactivated).
             foreach ($fieldErrors as $fe) {
                 if (str_contains(strtolower($fe['message'] ?? ''), 'already')) {
-                    $found = $this->findProviderByEmail($user->email, $settings);
+                    $found = $this->findProviderMembership($user->email, $settings);
                     if ($found) {
-                        return $found;
+                        $this->setIsProvider($found['membership_id'], $settings);
+                        return $found['user_id'];
                     }
 
                     throw new RuntimeException(
@@ -199,11 +201,16 @@ class HealthieProvisioningService
         }
 
         Log::info('HealthieProvisioning: clinician provisioned into org', [
-            'clinician_id' => $clinician->id,
-            'partner_id'   => $settings->partner_id,
-            'healthie_id'  => $userId,
-            'org_id'       => $settings->organization_id,
+            'clinician_id'  => $clinician->id,
+            'partner_id'    => $settings->partner_id,
+            'healthie_id'   => $userId,
+            'membership_id' => $membershipId,
+            'org_id'        => $settings->organization_id,
         ]);
+
+        if ($membershipId) {
+            $this->setIsProvider($membershipId, $settings);
+        }
 
         return (string) $userId;
     }
@@ -295,34 +302,28 @@ class HealthieProvisioningService
      */
     private function findProviderByEmail(string $email, PartnerEhrSetting $settings): ?string
     {
-        return $this->findProviderByEmailWithCreds(
-            $email,
-            $settings->api_key,
-            $settings->endpoint,
-            $settings->authorization_shard,
-            $settings->organization_id,
-        );
+        return $this->findProviderMembership($email, $settings)['user_id'] ?? null;
     }
 
     /**
-     * Shared provider lookup by raw credentials.
+     * Look up a provider by email and return both their Healthie user ID and
+     * organisation membership ID. The membership ID is required for
+     * updateOrganizationMembership (e.g. setting is_provider).
+     *
+     * Returns null when the email is not found in this org.
      *
      * organizationMemberships (top-level) is a POINT-LOOKUP — it requires `id` or
      * `user_ids` and cannot be used to list all members. Instead we fetch the org by
      * its known ID and walk its organization_memberships relationship, filtering by
      * email client-side.
      */
-    private function findProviderByEmailWithCreds(
-        string $email,
-        string $apiKey,
-        string $endpoint,
-        ?string $shard = null,
-        ?string $organizationId = null,
-    ): ?string {
+    private function findProviderMembership(string $email, PartnerEhrSetting $settings): ?array
+    {
         $query = <<<'GQL'
         query GetOrgMembers($id: ID!) {
             organization(id: $id) {
                 organization_memberships {
+                    id
                     user {
                         id
                         email
@@ -333,13 +334,22 @@ class HealthieProvisioningService
         GQL;
 
         try {
-            $response = $this->graphql($query, ['id' => $organizationId], $apiKey, $endpoint, $shard);
-            $json     = $response->json();
+            $response = $this->graphql(
+                $query,
+                ['id' => $settings->organization_id],
+                $settings->api_key,
+                $settings->endpoint,
+                $settings->authorization_shard
+            );
+            $json = $response->json();
 
             foreach ($json['data']['organization']['organization_memberships'] ?? [] as $membership) {
                 $user = $membership['user'] ?? null;
                 if ($user && isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
-                    return (string) $user['id'];
+                    return [
+                        'user_id'       => (string) $user['id'],
+                        'membership_id' => (string) $membership['id'],
+                    ];
                 }
             }
         } catch (\Throwable $e) {
@@ -350,6 +360,76 @@ class HealthieProvisioningService
         }
 
         return null;
+    }
+
+    /**
+     * Mark the organisation membership as a provider so the clinician appears in
+     * Healthie's provider selection lists (scheduling, client pairing, etc.).
+     *
+     * Uses updateOrganizationMembership with is_provider=true. Best-effort — a
+     * failure here is logged but does not block the provisioning result.
+     */
+    private function setIsProvider(string $membershipId, PartnerEhrSetting $settings): void
+    {
+        $mutation = <<<'GQL'
+        mutation SetIsProvider($input: updateOrganizationMembershipInput!) {
+            updateOrganizationMembership(input: $input) {
+                organizationMembership {
+                    id
+                    is_provider
+                }
+                messages {
+                    field
+                    message
+                }
+            }
+        }
+        GQL;
+
+        try {
+            $response = $this->graphql(
+                $mutation,
+                ['input' => ['id' => $membershipId, 'is_provider' => true]],
+                $settings->api_key,
+                $settings->endpoint,
+                $settings->authorization_shard
+            );
+
+            $json = $response->json();
+
+            if (! empty($json['errors'])) {
+                $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
+                Log::warning('HealthieProvisioning: setIsProvider failed', [
+                    'partner_id'    => $settings->partner_id,
+                    'membership_id' => $membershipId,
+                    'errors'        => $msg,
+                ]);
+                return;
+            }
+
+            $isProvider  = $json['data']['updateOrganizationMembership']['organizationMembership']['is_provider'] ?? null;
+            $fieldErrors = $json['data']['updateOrganizationMembership']['messages'] ?? [];
+
+            if (! empty($fieldErrors)) {
+                Log::warning('HealthieProvisioning: setIsProvider had field messages', [
+                    'partner_id'    => $settings->partner_id,
+                    'membership_id' => $membershipId,
+                    'messages'      => $fieldErrors,
+                ]);
+            }
+
+            Log::info('HealthieProvisioning: setIsProvider succeeded', [
+                'partner_id'    => $settings->partner_id,
+                'membership_id' => $membershipId,
+                'is_provider'   => $isProvider,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('HealthieProvisioning: setIsProvider threw', [
+                'partner_id'    => $settings->partner_id,
+                'membership_id' => $membershipId,
+                'error'         => $e->getMessage(),
+            ]);
+        }
     }
 
     private function splitName(string $fullName): array
