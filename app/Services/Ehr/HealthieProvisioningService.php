@@ -119,7 +119,7 @@ class HealthieProvisioningService
         $existing = $this->findProviderMembership($user->email, $settings);
         if ($existing) {
             // Always ensure is_provider=true even for pre-existing members.
-            $this->setIsProvider($existing['membership_id'], $settings);
+            $this->setIsProvider($existing['user_id'], $settings);
             return $existing['user_id'];
         }
 
@@ -169,10 +169,9 @@ class HealthieProvisioningService
             );
         }
 
-        $membership   = $json['data']['createOrganizationMembership']['organizationMembership'] ?? null;
-        $userId       = $membership['user']['id'] ?? null;
-        $membershipId = $membership['id'] ?? null;
-        $fieldErrors  = $json['data']['createOrganizationMembership']['messages'] ?? [];
+        $membership  = $json['data']['createOrganizationMembership']['organizationMembership'] ?? null;
+        $userId      = $membership['user']['id'] ?? null;
+        $fieldErrors = $json['data']['createOrganizationMembership']['messages'] ?? [];
 
         if (! $userId) {
             // "Already a member" arrives as a field error — look them up instead of failing.
@@ -180,7 +179,7 @@ class HealthieProvisioningService
                 if (str_contains(strtolower($fe['message'] ?? ''), 'already')) {
                     $found = $this->findProviderMembership($user->email, $settings);
                     if ($found) {
-                        $this->setIsProvider($found['membership_id'], $settings);
+                        $this->setIsProvider($found['user_id'], $settings);
                         return $found['user_id'];
                     }
 
@@ -201,15 +200,14 @@ class HealthieProvisioningService
         }
 
         Log::info('HealthieProvisioning: clinician provisioned into org', [
-            'clinician_id'  => $clinician->id,
-            'partner_id'    => $settings->partner_id,
-            'healthie_id'   => $userId,
-            'membership_id' => $membershipId,
-            'org_id'        => $settings->organization_id,
+            'clinician_id' => $clinician->id,
+            'partner_id'   => $settings->partner_id,
+            'healthie_id'  => $userId,
+            'org_id'       => $settings->organization_id,
         ]);
 
-        if ($membershipId) {
-            $this->setIsProvider($membershipId, $settings);
+        if ($userId) {
+            $this->setIsProvider($userId, $settings);
         }
 
         return (string) $userId;
@@ -306,11 +304,7 @@ class HealthieProvisioningService
     }
 
     /**
-     * Look up a provider by email and return both their Healthie user ID and
-     * organisation membership ID. The membership ID is required for
-     * updateOrganizationMembership (e.g. setting is_provider).
-     *
-     * Returns null when the email is not found in this org.
+     * Look up a provider by email and return their Healthie user ID.
      *
      * organizationMemberships (top-level) is a POINT-LOOKUP — it requires `id` or
      * `user_ids` and cannot be used to list all members. Instead we fetch the org by
@@ -323,7 +317,6 @@ class HealthieProvisioningService
         query GetOrgMembers($id: ID!) {
             organization(id: $id) {
                 organization_memberships {
-                    id
                     user {
                         id
                         email
@@ -343,13 +336,18 @@ class HealthieProvisioningService
             );
             $json = $response->json();
 
+            if (! empty($json['errors'])) {
+                Log::warning('HealthieProvisioning: org member lookup returned errors', [
+                    'email'  => $email,
+                    'errors' => $json['errors'],
+                ]);
+                return null;
+            }
+
             foreach ($json['data']['organization']['organization_memberships'] ?? [] as $membership) {
                 $user = $membership['user'] ?? null;
                 if ($user && isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
-                    return [
-                        'user_id'       => (string) $user['id'],
-                        'membership_id' => (string) $membership['id'],
-                    ];
+                    return ['user_id' => (string) $user['id']];
                 }
             }
         } catch (\Throwable $e) {
@@ -363,20 +361,21 @@ class HealthieProvisioningService
     }
 
     /**
-     * Mark the organisation membership as a provider so the clinician appears in
-     * Healthie's provider selection lists (scheduling, client pairing, etc.).
+     * Mark the org member as a provider using updateOrganizationMember.
      *
-     * Uses updateOrganizationMembership with is_provider=true. Best-effort — a
-     * failure here is logged but does not block the provisioning result.
+     * updateOrganizationMember identifies the member by user ID (id field) and
+     * accepts the same permission flags as updateOrganizationMembership, including
+     * is_provider. This avoids the need to look up a separate membership record ID.
+     *
+     * Best-effort — a failure is logged but does not block the provisioning result.
      */
-    private function setIsProvider(string $membershipId, PartnerEhrSetting $settings): void
+    private function setIsProvider(string $userId, PartnerEhrSetting $settings): void
     {
         $mutation = <<<'GQL'
-        mutation SetIsProvider($input: updateOrganizationMembershipInput!) {
-            updateOrganizationMembership(input: $input) {
-                organizationMembership {
+        mutation SetIsProvider($input: updateOrganizationMemberInput!) {
+            updateOrganizationMember(input: $input) {
+                user {
                     id
-                    is_provider
                 }
                 messages {
                     field
@@ -389,7 +388,7 @@ class HealthieProvisioningService
         try {
             $response = $this->graphql(
                 $mutation,
-                ['input' => ['id' => $membershipId, 'is_provider' => true]],
+                ['input' => ['id' => $userId, 'is_provider' => true]],
                 $settings->api_key,
                 $settings->endpoint,
                 $settings->authorization_shard
@@ -400,34 +399,32 @@ class HealthieProvisioningService
             if (! empty($json['errors'])) {
                 $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
                 Log::warning('HealthieProvisioning: setIsProvider failed', [
-                    'partner_id'    => $settings->partner_id,
-                    'membership_id' => $membershipId,
-                    'errors'        => $msg,
+                    'partner_id' => $settings->partner_id,
+                    'user_id'    => $userId,
+                    'errors'     => $msg,
                 ]);
                 return;
             }
 
-            $isProvider  = $json['data']['updateOrganizationMembership']['organizationMembership']['is_provider'] ?? null;
-            $fieldErrors = $json['data']['updateOrganizationMembership']['messages'] ?? [];
+            $fieldErrors = $json['data']['updateOrganizationMember']['messages'] ?? [];
 
             if (! empty($fieldErrors)) {
                 Log::warning('HealthieProvisioning: setIsProvider had field messages', [
-                    'partner_id'    => $settings->partner_id,
-                    'membership_id' => $membershipId,
-                    'messages'      => $fieldErrors,
+                    'partner_id' => $settings->partner_id,
+                    'user_id'    => $userId,
+                    'messages'   => $fieldErrors,
                 ]);
             }
 
             Log::info('HealthieProvisioning: setIsProvider succeeded', [
-                'partner_id'    => $settings->partner_id,
-                'membership_id' => $membershipId,
-                'is_provider'   => $isProvider,
+                'partner_id' => $settings->partner_id,
+                'user_id'    => $userId,
             ]);
         } catch (\Throwable $e) {
             Log::warning('HealthieProvisioning: setIsProvider threw', [
-                'partner_id'    => $settings->partner_id,
-                'membership_id' => $membershipId,
-                'error'         => $e->getMessage(),
+                'partner_id' => $settings->partner_id,
+                'user_id'    => $userId,
+                'error'      => $e->getMessage(),
             ]);
         }
     }
