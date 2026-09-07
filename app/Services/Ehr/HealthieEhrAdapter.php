@@ -390,13 +390,13 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
     }
 
     /**
-     * Add the prescribing clinician to the patient's Healthie care team.
+     * Assign the prescribing clinician as the patient's dietitian in Healthie.
      *
-     * This enables Healthie's provider-permission scoping so each clinician
-     * can only see patients on their care team.
+     * Healthie's createCareTeamMembership mutation is not available in all org
+     * plans. Using updateUser with dietitian_id achieves the same provider
+     * scoping: each patient is linked to their prescribing clinician.
      *
-     * Best-effort: never throws. Healthie may return a field error if the
-     * membership already exists — this is safe to ignore.
+     * Best-effort: never throws.
      */
     private function ensureCareTeamMember(array $payload, string $clientId): void
     {
@@ -419,9 +419,9 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         }
 
         $mutation = <<<'GQL'
-        mutation AddCareTeamMember($input: createCareTeamMembershipInput!) {
-            createCareTeamMembership(input: $input) {
-                care_team_membership {
+        mutation AssignPatientDietitian($input: updateUserInput!) {
+            updateUser(input: $input) {
+                user {
                     id
                 }
                 messages {
@@ -435,22 +435,27 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
         try {
             $response = $this->graphql($mutation, [
                 'input' => [
-                    'user_id'              => $clientId,
-                    'care_team_member_id'  => $clinicianHealthieId,
-                    'role'                 => 'Provider',
+                    'id'           => $clientId,
+                    'dietitian_id' => $clinicianHealthieId,
                 ],
             ]);
 
             if (! empty($response->json('errors'))) {
-                Log::info('Healthie createCareTeamMembership returned errors (may already be a member)', [
-                    'partner_id'           => $this->settings->partner_id,
-                    'client_id'            => $clientId,
+                Log::warning('Healthie dietitian assignment returned errors', [
+                    'partner_id'            => $this->settings->partner_id,
+                    'client_id'             => $clientId,
                     'clinician_healthie_id' => $clinicianHealthieId,
-                    'errors'               => $response->json('errors'),
+                    'errors'                => $response->json('errors'),
+                ]);
+            } else {
+                Log::info('Healthie dietitian assigned', [
+                    'partner_id'            => $this->settings->partner_id,
+                    'client_id'             => $clientId,
+                    'clinician_healthie_id' => $clinicianHealthieId,
                 ]);
             }
         } catch (\Throwable $e) {
-            Log::warning('Healthie createCareTeamMembership threw', [
+            Log::warning('Healthie dietitian assignment threw', [
                 'partner_id' => $this->settings->partner_id,
                 'client_id'  => $clientId,
                 'error'      => $e->getMessage(),
