@@ -339,10 +339,14 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
      */
     private function ensureInGroup(string $clientId, string $groupId): void
     {
+        // Healthie's addGroupMembersPayload exposes `user_group` (not `group`) — same
+        // naming convention as createGroupPayload. Requesting the wrong field name
+        // causes the server to reject the mutation at schema validation, silently
+        // leaving the patient un-grouped.
         $mutation = <<<'GQL'
         mutation AddGroupMembers($input: addGroupMembersInput!) {
             addGroupMembers(input: $input) {
-                group {
+                user_group {
                     id
                 }
                 messages {
@@ -362,11 +366,17 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
             ]);
 
             if (! empty($response->json('errors'))) {
-                Log::info('Healthie addGroupMembers returned errors (patient may already be in group)', [
+                Log::warning('Healthie addGroupMembers returned errors', [
                     'partner_id' => $this->settings->partner_id,
                     'group_id'   => $groupId,
                     'client_id'  => $clientId,
                     'errors'     => $response->json('errors'),
+                ]);
+            } else {
+                Log::info('Healthie addGroupMembers succeeded', [
+                    'partner_id' => $this->settings->partner_id,
+                    'group_id'   => $groupId,
+                    'client_id'  => $clientId,
                 ]);
             }
         } catch (\Throwable $e) {

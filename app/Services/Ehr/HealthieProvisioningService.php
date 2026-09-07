@@ -140,6 +140,8 @@ class HealthieProvisioningService
 
         [$firstName, $lastName] = $this->splitName($user->name);
 
+        // phone_number is not a field on createOrganizationMembershipInput —
+        // it belongs on updateUser (called in updateProviderDetails after provisioning).
         $response = $this->graphql(
             $mutation,
             ['input' => array_filter([
@@ -147,7 +149,6 @@ class HealthieProvisioningService
                 'first_name'        => $firstName,
                 'last_name'         => $lastName ?: null,
                 'password'          => Str::random(12) . 'A1!',
-                'phone_number'      => $clinician->phone ?: '0000000000',
                 'organization_id'   => $settings->organization_id,
                 'send_invite_email' => false,
             ], fn ($v) => $v !== null && $v !== '')],
