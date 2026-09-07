@@ -624,13 +624,23 @@
         //   Same dose          → all months = current level
         //   Increase dosage    → M1 = current level, ascending each month
         //   Decrease dosage    → M1 = one level down, ascending each month
-        //   Change / Provider  → no auto-fill
+        //   Change medication  → M1 = level 1, ascending (fresh start on new drug)
+        //   Provider           → no auto-fill
         function autoFillMonths(wrap, levels) {
             var hint = CHECK_IN_DOSE_HINT;
             if (!hint || !hint.last_dose || !hint.continuation || !levels || !levels.length) return;
 
             var continuation = hint.continuation.toLowerCase();
-            if (continuation.indexOf('change') !== -1 || continuation.indexOf('provider') !== -1) return;
+            if (continuation.indexOf('provider') !== -1) return;
+
+            // Medication change: start at the lowest dose of the new medication.
+            if (continuation.indexOf('change') !== -1) {
+                wrap.querySelectorAll('.level-select').forEach(function (sel, m) {
+                    sel.value = levels[Math.min(m, levels.length - 1)].label;
+                    sel.dispatchEvent(new Event('change'));
+                });
+                return;
+            }
 
             // Extract numeric mg dose from patient answer (e.g. "Semaglutide 0.25 mg" → 0.25)
             var doseMatch = hint.last_dose.match(/(\d+\.?\d*)\s*mg/i);
