@@ -336,18 +336,6 @@ class HealthieProvisioningService
             $response = $this->graphql($query, ['id' => $organizationId], $apiKey, $endpoint, $shard);
             $json     = $response->json();
 
-            Log::info('HealthieProvisioning: org member lookup via organization query', [
-                'email'          => $email,
-                'org_id'         => $organizationId,
-                'http_status'    => $response->status(),
-                'errors'         => $json['errors'] ?? null,
-                'member_count'   => count($json['data']['organization']['organization_memberships'] ?? []),
-                'member_emails'  => array_map(
-                    fn ($m) => $m['user']['email'] ?? null,
-                    $json['data']['organization']['organization_memberships'] ?? []
-                ),
-            ]);
-
             foreach ($json['data']['organization']['organization_memberships'] ?? [] as $membership) {
                 $user = $membership['user'] ?? null;
                 if ($user && isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
