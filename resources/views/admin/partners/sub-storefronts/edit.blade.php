@@ -261,10 +261,22 @@
 
     <div class="col-lg-5">
         {{-- Clinician Healthie sync status (partner-level mappings) --}}
+        <form id="syncCliniciansForm" method="POST"
+              action="{{ route('admin.partners.sub-storefronts.sync-clinicians', [$partner->id, $subStorefront->id]) }}">
+            @csrf
+        </form>
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="bi bi-people me-2"></i>Clinician Provisioning</h6>
-                <span class="badge bg-secondary">{{ $clinicianMappings->count() }}</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary">{{ $clinicianMappings->count() }}</span>
+                    @if($subStorefront->healthie_default_group_id)
+                    <button type="submit" form="syncCliniciansForm" class="btn btn-sm btn-outline-primary py-0"
+                            title="Re-run clinician provisioning (skips already-synced)">
+                        <i class="bi bi-arrow-repeat me-1"></i>Re-sync
+                    </button>
+                    @endif
+                </div>
             </div>
             @if($clinicianMappings->isEmpty())
                 <div class="card-body text-muted small text-center py-4">

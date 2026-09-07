@@ -244,6 +244,31 @@ class SubStorefrontController extends Controller
         }
     }
 
+    /**
+     * POST /admin/partners/{partnerId}/sub-storefronts/{subStorefront}/sync-clinicians
+     *
+     * Re-dispatches clinician provisioning for a sub-storefront, retrying any
+     * failed mappings. Safe to call at any time — already-synced clinicians are
+     * skipped by the individual provisioning job.
+     */
+    public function syncClinicians(int $partnerId, SubStorefront $subStorefront)
+    {
+        $partner = Partner::findOrFail($partnerId);
+        abort_if($subStorefront->partner_id !== $partner->id, 403);
+
+        if (empty($subStorefront->healthie_default_group_id)) {
+            return redirect()
+                ->route('admin.partners.sub-storefronts.edit', [$partner->id, $subStorefront->id])
+                ->with('error', 'Create the Healthie group first before syncing clinicians.');
+        }
+
+        ProvisionAllCliniciansForSubStorefrontJob::dispatch($subStorefront->id);
+
+        return redirect()
+            ->route('admin.partners.sub-storefronts.edit', [$partner->id, $subStorefront->id])
+            ->with('info', 'Clinician re-sync started in the background. Refresh in a moment to see updated statuses.');
+    }
+
     public function destroy(int $partnerId, SubStorefront $subStorefront)
     {
         $partner = Partner::findOrFail($partnerId);
