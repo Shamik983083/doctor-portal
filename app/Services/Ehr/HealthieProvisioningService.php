@@ -51,7 +51,7 @@ class HealthieProvisioningService
         $mutation = <<<'GQL'
         mutation CreateGroup($input: createGroupInput!) {
             createGroup(input: $input) {
-                group {
+                user_group {
                     id
                     name
                 }
@@ -76,7 +76,7 @@ class HealthieProvisioningService
             throw new RuntimeException("Healthie user group creation failed for sub-storefront [{$subStorefront->name}]: {$msg}");
         }
 
-        $groupId = $json['data']['createGroup']['group']['id'] ?? null;
+        $groupId = $json['data']['createGroup']['user_group']['id'] ?? null;
 
         if (! $groupId) {
             $fieldErrors = $json['data']['createGroup']['messages'] ?? [];
