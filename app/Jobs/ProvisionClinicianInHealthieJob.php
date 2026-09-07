@@ -61,28 +61,40 @@ class ProvisionClinicianInHealthieJob implements ShouldQueue
             'sub_storefront_id' => null,
         ]);
 
-        if ($mapping->exists
+        $alreadySynced = $mapping->exists
             && $mapping->status === ClinicianHealthieMapping::STATUS_SYNCED
-            && ! empty($mapping->healthie_user_id)) {
-            return;
-        }
+            && ! empty($mapping->healthie_user_id);
 
         try {
-            $healthieUserId = $service->provisionClinician($this->clinician, $settings);
+            if ($alreadySynced) {
+                // Account already exists — skip creation, just push updated details.
+                $healthieUserId = $mapping->healthie_user_id;
+            } else {
+                $healthieUserId = $service->provisionClinician($this->clinician, $settings);
 
-            $mapping->fill([
-                'healthie_user_id' => $healthieUserId,
-                'healthie_org_id'  => $settings->organization_id,
-                'status'           => ClinicianHealthieMapping::STATUS_SYNCED,
-                'last_error'       => null,
-                'synced_at'        => now(),
-            ])->save();
+                $mapping->fill([
+                    'healthie_user_id' => $healthieUserId,
+                    'healthie_org_id'  => $settings->organization_id,
+                    'status'           => ClinicianHealthieMapping::STATUS_SYNCED,
+                    'last_error'       => null,
+                    'synced_at'        => now(),
+                ])->save();
 
-            Log::info('HealthieProvisioning: clinician synced (partner-level)', [
-                'clinician_id'     => $this->clinician->id,
-                'partner_id'       => $settings->partner_id,
-                'healthie_user_id' => $healthieUserId,
-            ]);
+                Log::info('HealthieProvisioning: clinician provisioned (partner-level)', [
+                    'clinician_id'     => $this->clinician->id,
+                    'partner_id'       => $settings->partner_id,
+                    'healthie_user_id' => $healthieUserId,
+                ]);
+            }
+
+            // Always push current NPI, credentials, specialty, licensed states
+            // regardless of whether the account was newly created or already existed.
+            // This is the update path for profile changes.
+            $service->updateProviderDetails($this->clinician, $settings, $healthieUserId);
+
+            // Stamp synced_at on updates too so admin can see the last sync time.
+            $mapping->fill(['synced_at' => now(), 'last_error' => null])->save();
+
         } catch (\Throwable $e) {
             $mapping->fill([
                 'status'     => ClinicianHealthieMapping::STATUS_FAILED,

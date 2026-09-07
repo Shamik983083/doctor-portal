@@ -427,6 +427,7 @@ class HealthieEhrAdapter implements EhrGatewayAdapter
                 'input' => [
                     'user_id'              => $clientId,
                     'care_team_member_id'  => $clinicianHealthieId,
+                    'role'                 => 'Provider',
                 ],
             ]);
 

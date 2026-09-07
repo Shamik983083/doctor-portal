@@ -201,6 +201,119 @@ class HealthieProvisioningService
     }
 
     /**
+     * Push current provider profile details to an already-provisioned Healthie account.
+     *
+     * Called after initial provisioning AND as the update path when a clinician's
+     * NPI, credentials, specialty, phone, or licensed states change in this system.
+     *
+     * Fields synced (all best-effort — a missing value is omitted, not errored):
+     *   npi_number      ← clinician.npi
+     *   credentials     ← clinician.credentials  (e.g. "MD", "DO", "NP")
+     *   specialty       ← clinician.specialty
+     *   phone_number    ← clinician.phone
+     *   first_name /
+     *   last_name       ← clinician.user.name
+     *   dietitian_setting.licensed_in_states
+     *                   ← clinician.licensed_states[].state  (comma-separated)
+     *
+     * Throws on GraphQL-level errors so the caller (provisioning job) can mark the
+     * mapping as failed and surface the error through the normal retry path.
+     */
+    public function updateProviderDetails(Clinician $clinician, PartnerEhrSetting $settings, string $healthieUserId): void
+    {
+        $user                      = $clinician->user;
+        [$firstName, $lastName]    = $this->splitName($user->name);
+
+        $licensedInStates = null;
+        if (! empty($clinician->licensed_states)) {
+            $codes = collect($clinician->licensed_states)
+                ->pluck('state')
+                ->filter()
+                ->map(fn ($s) => strtoupper(trim($s)))
+                ->unique()
+                ->values()
+                ->all();
+
+            if (! empty($codes)) {
+                $licensedInStates = implode(', ', $codes);
+            }
+        }
+
+        $input = array_filter([
+            'id'           => $healthieUserId,
+            'first_name'   => $firstName ?: null,
+            'last_name'    => $lastName ?: null,
+            'phone_number' => $clinician->phone ?: null,
+            'npi_number'   => $clinician->npi ?: null,
+            'credentials'  => $clinician->credentials ?: null,
+            'specialty'    => $clinician->specialty ?: null,
+        ], fn ($v) => $v !== null && $v !== '');
+
+        // id must always be present even if somehow blank-filtered (it won't be).
+        $input['id'] = $healthieUserId;
+
+        if ($licensedInStates !== null) {
+            $input['dietitian_setting'] = ['licensed_in_states' => $licensedInStates];
+        }
+
+        $mutation = <<<'GQL'
+        mutation UpdateProvider($input: updateUserInput!) {
+            updateUser(input: $input) {
+                user {
+                    id
+                    npi_number
+                    credentials
+                    specialty
+                }
+                messages {
+                    field
+                    message
+                }
+            }
+        }
+        GQL;
+
+        $response = $this->graphql(
+            $mutation,
+            ['input' => $input],
+            $settings->api_key,
+            $settings->endpoint,
+            $settings->authorization_shard
+        );
+
+        $json = $response->json();
+
+        if (! empty($json['errors'])) {
+            $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $json['errors']));
+            throw new RuntimeException(
+                "Healthie provider update failed for clinician [{$clinician->id}] "
+                . "partner [{$settings->partner_id}]: {$msg}"
+            );
+        }
+
+        $fieldErrors = $json['data']['updateUser']['messages'] ?? [];
+        if (! empty($fieldErrors)) {
+            $detail = implode('; ', array_map(
+                fn ($m) => ($m['field'] ?? '?') . ': ' . ($m['message'] ?? '?'),
+                $fieldErrors
+            ));
+            Log::warning('HealthieProvisioning: provider update had field errors', [
+                'clinician_id'     => $clinician->id,
+                'partner_id'       => $settings->partner_id,
+                'healthie_user_id' => $healthieUserId,
+                'errors'           => $detail,
+            ]);
+        }
+
+        Log::info('HealthieProvisioning: provider details updated', [
+            'clinician_id'     => $clinician->id,
+            'partner_id'       => $settings->partner_id,
+            'healthie_user_id' => $healthieUserId,
+            'fields_sent'      => array_keys($input),
+        ]);
+    }
+
+    /**
      * Look up a provider by email within a partner's Healthie org.
      * Returns their Healthie user ID or null if not found.
      */
