@@ -338,12 +338,10 @@ class HealthieProvisioningService
     /**
      * Shared provider lookup by raw credentials.
      *
-     * Fetches ALL active provider accounts for the org (no keyword filter) and
-     * matches by email client-side. Keyword-based search is unreliable for
-     * provider accounts: Healthie's users() query is client-scoped by default,
-     * and the keywords parameter indexes by name (not email) for org members.
-     * For a typical partner org with a handful of clinicians, fetching all
-     * providers is fast and avoids every keyword-indexing ambiguity.
+     * Uses organizationMemberships — the direct read-side of createOrganizationMembership.
+     * The users() query is client-scoped in Healthie; it does not return org members
+     * regardless of the type filter. organizationMemberships returns all members of the
+     * partner's single Healthie org and is filtered by email client-side.
      */
     private function findProviderByEmailWithCreds(
         string $email,
@@ -352,10 +350,12 @@ class HealthieProvisioningService
         ?string $shard = null,
     ): ?string {
         $query = <<<'GQL'
-        query FindProviders {
-            users(offset: 0, should_paginate: false, type: "Provider") {
-                id
-                email
+        query ListOrgMembers {
+            organizationMemberships(offset: 0, should_paginate: false) {
+                user {
+                    id
+                    email
+                }
             }
         }
         GQL;
@@ -363,13 +363,14 @@ class HealthieProvisioningService
         try {
             $response = $this->graphql($query, [], $apiKey, $endpoint, $shard);
 
-            foreach ($response->json('data.users') ?? [] as $user) {
-                if (isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
+            foreach ($response->json('data.organizationMemberships') ?? [] as $membership) {
+                $user = $membership['user'] ?? null;
+                if ($user && isset($user['email']) && strtolower($user['email']) === strtolower($email)) {
                     return (string) $user['id'];
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning('HealthieProvisioning: provider list fetch failed', [
+            Log::warning('HealthieProvisioning: org membership list fetch failed', [
                 'email' => $email,
                 'error' => $e->getMessage(),
             ]);
