@@ -278,8 +278,9 @@ class HealthieProvisioningService
             'fields_sent'      => array_keys($userInput),
         ]);
 
-        // ── Step 2: professional fields + is_provider via updateOrganizationMember ──
-        $memberInput = ['id' => $healthieUserId, 'is_provider' => true];
+        // ── Step 2: professional fields via updateOrganizationMember ──────────────
+        // is_provider is NOT on updateOrganizationMemberInput — handled in step 3.
+        $memberInput = ['id' => $healthieUserId];
 
         if (! empty($clinician->npi)) {
             $memberInput['npi'] = $clinician->npi;
@@ -325,27 +326,85 @@ class HealthieProvisioningService
                     'healthie_user_id' => $healthieUserId,
                     'errors'           => $msg,
                 ]);
-                return;
-            }
+            } else {
+                $memberFieldErrors = $memberJson['data']['updateOrganizationMember']['messages'] ?? [];
+                if (! empty($memberFieldErrors)) {
+                    Log::warning('HealthieProvisioning: updateOrganizationMember had field messages', [
+                        'clinician_id'     => $clinician->id,
+                        'partner_id'       => $settings->partner_id,
+                        'healthie_user_id' => $healthieUserId,
+                        'messages'         => $memberFieldErrors,
+                    ]);
+                }
 
-            $memberFieldErrors = $memberJson['data']['updateOrganizationMember']['messages'] ?? [];
-            if (! empty($memberFieldErrors)) {
-                Log::warning('HealthieProvisioning: updateOrganizationMember had field messages', [
+                Log::info('HealthieProvisioning: org member professional fields updated', [
                     'clinician_id'     => $clinician->id,
                     'partner_id'       => $settings->partner_id,
                     'healthie_user_id' => $healthieUserId,
-                    'messages'         => $memberFieldErrors,
+                    'fields_sent'      => array_keys($memberInput),
                 ]);
             }
-
-            Log::info('HealthieProvisioning: org member professional fields updated', [
-                'clinician_id'     => $clinician->id,
-                'partner_id'       => $settings->partner_id,
-                'healthie_user_id' => $healthieUserId,
-                'fields_sent'      => array_keys($memberInput),
-            ]);
         } catch (\Throwable $e) {
             Log::warning('HealthieProvisioning: updateOrganizationMember threw', [
+                'clinician_id' => $clinician->id,
+                'partner_id'   => $settings->partner_id,
+                'error'        => $e->getMessage(),
+            ]);
+        }
+
+        // ── Step 3: is_provider flag via updateOrganizationMembership ─────────────
+        // updateOrganizationMembershipInput uses the membership record ID, but
+        // passing the user ID here is a best-effort attempt that may work depending
+        // on the org's Healthie version. Failures are logged and non-blocking.
+        $membershipMutation = <<<'GQL'
+        mutation SetIsProvider($input: updateOrganizationMembershipInput!) {
+            updateOrganizationMembership(input: $input) {
+                organizationMembership { is_provider }
+                messages { field message }
+            }
+        }
+        GQL;
+
+        try {
+            $membershipResponse = $this->graphql(
+                $membershipMutation,
+                ['input' => ['id' => $healthieUserId, 'is_provider' => true]],
+                $settings->api_key,
+                $settings->endpoint,
+                $settings->authorization_shard
+            );
+
+            $membershipJson = $membershipResponse->json();
+
+            if (! empty($membershipJson['errors'])) {
+                $msg = implode('; ', array_map(fn ($e) => $e['message'] ?? 'unknown', $membershipJson['errors']));
+                Log::warning('HealthieProvisioning: setIsProvider (updateOrganizationMembership) failed', [
+                    'clinician_id'     => $clinician->id,
+                    'partner_id'       => $settings->partner_id,
+                    'healthie_user_id' => $healthieUserId,
+                    'errors'           => $msg,
+                ]);
+            } else {
+                $membershipFieldErrors = $membershipJson['data']['updateOrganizationMembership']['messages'] ?? [];
+                if (! empty($membershipFieldErrors)) {
+                    Log::warning('HealthieProvisioning: setIsProvider had field messages', [
+                        'clinician_id'     => $clinician->id,
+                        'partner_id'       => $settings->partner_id,
+                        'healthie_user_id' => $healthieUserId,
+                        'messages'         => $membershipFieldErrors,
+                    ]);
+                }
+
+                $isProvider = $membershipJson['data']['updateOrganizationMembership']['organizationMembership']['is_provider'] ?? null;
+                Log::info('HealthieProvisioning: setIsProvider succeeded', [
+                    'clinician_id'     => $clinician->id,
+                    'partner_id'       => $settings->partner_id,
+                    'healthie_user_id' => $healthieUserId,
+                    'is_provider'      => $isProvider,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('HealthieProvisioning: setIsProvider threw', [
                 'clinician_id' => $clinician->id,
                 'partner_id'   => $settings->partner_id,
                 'error'        => $e->getMessage(),
