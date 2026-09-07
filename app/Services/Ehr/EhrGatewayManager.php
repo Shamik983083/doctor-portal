@@ -100,12 +100,14 @@ class EhrGatewayManager
         if ($key === 'healthie' && $case->sub_storefront_id) {
             $subStorefront = $case->subStorefront ?? SubStorefront::find($case->sub_storefront_id);
 
-            if ($subStorefront && $subStorefront->isPushable()) {
-                // Use the partner's credentials; sub-storefront only scopes the group.
+            // Use the sub-storefront scoped adapter whenever the sub-storefront has a
+            // group ID — the partner's credentials are used, so sub-storefront-level
+            // is_enabled/sandbox_validated flags are not the right gate here.
+            if ($subStorefront && ! empty($subStorefront->healthie_default_group_id)) {
                 $partnerSettings = $this->settingsFor($subStorefront->partner_id, 'healthie');
                 return HealthieEhrAdapter::forSubStorefront($subStorefront, $partnerSettings);
             }
-            // Sub-storefront exists but not yet pushable — fall through to partner-level.
+            // No group provisioned yet — fall through to partner-level adapter.
         }
 
         return $this->resolve($case->partner_id);
@@ -135,12 +137,10 @@ class EhrGatewayManager
         if ($key === 'healthie' && $subStorefrontId) {
             $subStorefront = SubStorefront::find($subStorefrontId);
 
-            if ($subStorefront && $subStorefront->isPushable()) {
-                // Use the partner's credentials; sub-storefront only scopes the group.
+            if ($subStorefront && ! empty($subStorefront->healthie_default_group_id)) {
                 $partnerSettings = $this->settingsFor($subStorefront->partner_id, 'healthie');
                 return HealthieEhrAdapter::forSubStorefront($subStorefront, $partnerSettings);
             }
-            // Sub-storefront not pushable — fall through to partner-level.
         }
 
         return $this->resolve($partnerId);
