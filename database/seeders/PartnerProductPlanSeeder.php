@@ -6,6 +6,7 @@ use App\Models\Offering;
 use App\Models\Partner;
 use App\Models\PartnerProductPlan;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Seeds the standard product-key → offering mappings for every active partner.
@@ -66,8 +67,15 @@ class PartnerProductPlanSeeder extends Seeder
 
         $created = 0;
         $skipped = 0;
+        $now     = now()->toDateTimeString();
 
         foreach ($partners as $partner) {
+            // Collect every offering ID this partner needs so we can bulk-upsert
+            // offering_partner after the plan rows. GlpOfferingsSeeder creates
+            // offerings per partner but never writes the pivot; OfferingController
+            // does it for admin-created offerings but not seeded ones.
+            $partnerOfferingIds = [];
+
             foreach (self::PLANS as $productKey => $offeringNames) {
                 foreach (self::FREQUENCIES as $freq) {
                     foreach ($offeringNames as $offeringName) {
@@ -84,8 +92,20 @@ class PartnerProductPlanSeeder extends Seeder
                         ]);
 
                         $new->wasRecentlyCreated ? $created++ : $skipped++;
+                        $partnerOfferingIds[] = $offeringId;
                     }
                 }
+            }
+
+            // Ensure offering_partner pivot rows exist with is_active = true.
+            // Upsert is idempotent — existing rows are left intact (only
+            // is_active and updated_at are touched if the row already exists).
+            foreach (array_unique($partnerOfferingIds) as $offeringId) {
+                DB::table('offering_partner')->upsert(
+                    [['offering_id' => $offeringId, 'partner_id' => $partner->id, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]],
+                    ['offering_id', 'partner_id'],
+                    ['is_active', 'updated_at'],
+                );
             }
         }
 
