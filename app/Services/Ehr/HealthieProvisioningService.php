@@ -212,7 +212,7 @@ class HealthieProvisioningService
      * Push current provider profile details to an already-provisioned Healthie account.
      *
      * Two calls are made:
-     *   1. updateUser       — basic identity (first_name, last_name, phone_number)
+     *   1. updateUser       — basic identity (first_name, last_name, email, phone_number)
      *   2. updateOrganizationMember — professional fields (npi, qualifications/credentials,
      *                                 state_licenses) and is_provider flag
      *
@@ -230,6 +230,7 @@ class HealthieProvisioningService
             'first_name'   => $firstName ?: null,
             'last_name'    => $lastName ?: null,
             'phone_number' => $clinician->phone ?: null,
+            'email'        => $user->email ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 
         $userInput['id'] = $healthieUserId;
