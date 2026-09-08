@@ -53,7 +53,7 @@
                         <label class="form-label fw-semibold">Month Frequency <span class="text-danger">*</span></label>
                         <select name="month_frequency" class="form-select @error('month_frequency') is-invalid @enderror" required>
                             <option value="">— Select duration —</option>
-                            @foreach([1, 3, 6, 12] as $freq)
+                            @foreach([1, 3, 4, 6, 12] as $freq)
                                 <option value="{{ $freq }}" {{ old('month_frequency') == $freq ? 'selected' : '' }}>
                                     {{ $freq }} month{{ $freq > 1 ? 's' : '' }}
                                 </option>

@@ -40,7 +40,7 @@ class PartnerProductPlanSeeder extends Seeder
         ],
     ];
 
-    private const FREQUENCIES = [1, 3, 6, 12];
+    private const FREQUENCIES = [1, 3, 4, 6, 12];
 
     public function run(): void
     {

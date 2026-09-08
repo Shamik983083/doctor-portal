@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class PartnerProductPlanController extends Controller
 {
-    private const ALLOWED_FREQUENCIES = [1, 3, 6, 12];
+    private const ALLOWED_FREQUENCIES = [1, 3, 4, 6, 12];
 
     public function index(int $partnerId)
     {
