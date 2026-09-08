@@ -415,10 +415,11 @@
         }
         function monthsIn(term) { var t = TERMS.filter(function (x) { return x.v === term; })[0]; return t ? t.n : 1; }
         // Number of dosing-level dropdowns to render per term:
-        // 1M → 1, 3M → 4, everything else → 3.
+        // 1M → 1, 3M → 3, 4M → 4, 6M/12M → 3.
         function dosingCount(term) {
             if (term === '1M') return 1;
-            if (term === '3M') return 4;
+            if (term === '3M') return 3;
+            if (term === '4M') return 4;
             return 3;
         }
 
