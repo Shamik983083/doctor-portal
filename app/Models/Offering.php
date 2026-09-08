@@ -19,7 +19,7 @@ class Offering extends Model
         'dispense_unit', 'dispense_units', 'days_until_dispense', 'directions', 'sig',
         'available_states', 'video_required_states', 'images', 'faqs', 'is_active', 'is_controlled_substance', 'metadata',
         'approval_status', 'approved_by', 'approved_at', 'rejection_note',
-        'levels',
+        'levels', 'formulation_type',
     ];
 
     protected $casts = [

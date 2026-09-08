@@ -27,6 +27,7 @@
     $offeringData = $offerings->map(fn($o) => [
         'id' => $o->id, 'name' => $o->name,
         'category_id' => $o->category_id,
+        'formulation_type' => $o->formulation_type,
         'refills' => $o->refills, 'quantity' => $o->quantity,
         'days_supply' => $o->days_supply, 'dispense_unit' => $o->dispense_unit,
         'compound_formula' => $o->compound_formula,
@@ -290,6 +291,7 @@
     var CASE_OFFERINGS_DATA = @json($caseOfferingsData);
     var ICD10_SUGGESTIONS = @json($icd10Suggestions ?? []);
     var CHECK_IN_DOSE_HINT = @json($checkInDoseHint);
+    var FORMULATION_HINT = @json($formulationHint ?? null);
 </script>
 <script>
     // C9: ICD-10 chip editor
@@ -734,7 +736,31 @@
         // Oral: anything that doesn't match injection keywords.
         function autoSelectMedication() {
             var hint = CHECK_IN_DOSE_HINT;
-            if (!hint || !hint.last_dose || !hint.continuation) return;
+            var hasHint = hint && hint.last_dose && hint.continuation;
+
+            // PATH C — new case with formulation hint from the partner API.
+            // Runs only when there is no check-in questionnaire hint (new cases).
+            // Picks the first offering whose formulation_type matches the hint.
+            if (!hasHint && FORMULATION_HINT) {
+                var wantInjection = (FORMULATION_HINT === 'injectable');
+                var fTarget = null;
+                for (var fi = 0; fi < OFFERINGS.length; fi++) {
+                    var ft = OFFERINGS[fi].formulation_type;
+                    if (!ft) continue;
+                    if ((ft === 'injectable') === wantInjection) { fTarget = OFFERINGS[fi]; break; }
+                }
+                if (fTarget) {
+                    list.querySelectorAll('[data-f="med"]').forEach(function (sel) {
+                        if (String(sel.value) !== String(fTarget.id)) {
+                            sel.value = String(fTarget.id);
+                            sel.dispatchEvent(new Event('change'));
+                        }
+                    });
+                }
+                return;
+            }
+
+            if (!hasHint) return;
             var continuation = hint.continuation.toLowerCase();
             if (continuation.indexOf('provider') !== -1) return; // clinician decides manually
 

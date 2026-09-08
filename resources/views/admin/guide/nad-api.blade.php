@@ -280,12 +280,14 @@ Content-Type: application/json
     { "offering_id": "YOUR_NAD_OFFERING_UUID", "quantity": 1 }
 
     // Option B (new): product_key + month_frequency — portal resolves internally
-    // { "product_key": "nad", "month_frequency": 1, "quantity": 1 }
+    // { "product_key": "nad", "month_frequency": 1, "quantity": 1, "formulation": "injectable" }
+    // formulation: "injectable" | "oral" (optional) — NAD is always injectable; you may
+    // omit this field or explicitly pass "injectable". "oral" is not valid for NAD.
 
     // Option C — bundle: NAD alongside another program (e.g. GLP-1 or Anti-Aging).
     // bundle_group is a free-form string — any offerings sharing the same value
     // are treated as one bundle on the prescribe screen.
-    // { "product_key": "nad",          "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" },
+    // { "product_key": "nad",          "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" },
     // { "product_key": "anti-aging",   "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" }
   ],
 
@@ -441,7 +443,9 @@ Content-Type: application/json
 
 <h6 class="fw-semibold mb-2">Option B — Product Plans (new)</h6>
 <pre class="mb-3">"offerings": [
-  { "product_key": "nad", "month_frequency": 1, "quantity": 1 }
+  { "product_key": "nad", "month_frequency": 1, "quantity": 1, "formulation": "injectable" }
+  // formulation: "injectable" | "oral" (optional). NAD is always injectable;
+  // sending "injectable" or omitting the field are both correct.
 ]
 // No offering_id needed. The portal looks up the plan you configured
 // in Admin → Partners → Product Plans and resolves to the offering(s).</pre>

@@ -526,7 +526,7 @@ class CaseController extends Controller
             ->get(['offerings.id', 'offerings.name', 'offerings.internal_name', 'offerings.compound_formula',
                 'offerings.refills', 'offerings.quantity', 'offerings.days_supply', 'offerings.dispense_unit',
                 'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels', 'offerings.sig',
-                'offerings.category_id']);
+                'offerings.category_id', 'offerings.formulation_type']);
 
         $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
 
@@ -604,9 +604,14 @@ class CaseController extends Controller
             'product_key'  => $co->product_key,
         ])->values();
 
+        // Formulation hint from the partner API payload — drives offering auto-select
+        // on new cases where no check-in questionnaire hint is available yet.
+        $formulationHint = $case->caseOfferings->first()?->formulation;
+
         return view('clinician.cases.prescribe', compact(
             'case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions',
-            'priorCase', 'checkInResponses', 'checkInDoseHint', 'requestedMonthFrequency', 'caseOfferingsData'
+            'priorCase', 'checkInResponses', 'checkInDoseHint', 'requestedMonthFrequency',
+            'caseOfferingsData', 'formulationHint'
         ));
     }
 

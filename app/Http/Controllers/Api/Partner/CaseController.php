@@ -110,6 +110,7 @@ class CaseController extends Controller
             'offerings.*.month_frequency'                     => 'nullable|integer|min:1|max:24',
             'offerings.*.quantity'                            => 'integer|min:1',
             'offerings.*.bundle_group'                        => 'nullable|string|max:100',
+            'offerings.*.formulation'                         => 'nullable|in:injectable,oral',
             // Simplified flat answers (new path — questionnaire derived from offering)
             'answers'                                         => 'nullable|array',
             'answers.*.slug'                                  => 'required_with:answers|string|max:120',
@@ -362,6 +363,7 @@ class CaseController extends Controller
                             'month_frequency' => isset($offeringData['month_frequency']) ? (int) $offeringData['month_frequency'] : null,
                             'product_key'     => $offeringData['product_key'] ?? null,
                             'bundle_group'    => $offeringData['bundle_group'] ?? null,
+                            'formulation'     => $offeringData['formulation'] ?? null,
                         ]);
                         $attachedOfferingsIds[] = $offering->id;
                     }
