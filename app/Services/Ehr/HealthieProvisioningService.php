@@ -230,6 +230,7 @@ class HealthieProvisioningService
             'first_name'   => $firstName ?: null,
             'last_name'    => $lastName ?: null,
             'phone_number' => $clinician->phone ?: null,
+            'email' => $user->email ?: null,
         ], fn ($v) => $v !== null && $v !== '');
 
         $userInput['id'] = $healthieUserId;
