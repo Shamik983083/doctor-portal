@@ -42,6 +42,15 @@ class PartnerProductPlanSeeder extends Seeder
         'nad_glutathione' => [
             'NAD+/Glutathione',
         ],
+        'bpc157' => [
+            'BPC-157',
+        ],
+        'bpc157_tb500' => [
+            'BPC-157/TB-500',
+        ],
+        'tesamorelin' => [
+            'Tesamorelin',
+        ],
     ];
 
     private const FREQUENCIES = [1, 3, 4, 6, 12];
