@@ -532,6 +532,7 @@ Content-Type: application/json
 <h6 class="fw-semibold mb-2">Option B — Product Plans (new)</h6>
 <pre class="mb-3">"offerings": [
   { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  // Valid product_key values: "semaglutide", "tirzepatide", "semaglutide_tirzepatide", "glp1-weightloss"
   // formulation: "injectable" | "oral" (optional) — when provided, the clinician's
   // medication dropdown auto-selects the matching formulation (e.g. "oral" picks
   // the SNAC tablet over the B12/B6 injection). Omit to leave selection to the clinician.

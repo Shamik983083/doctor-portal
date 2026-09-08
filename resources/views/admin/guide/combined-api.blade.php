@@ -275,7 +275,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
 <tbody>
 <tr>
     <td><code>offerings[].product_key</code></td>
-    <td class="diff-glp glp-val"><code>"semaglutide"</code> or <code>"glp1-weightloss"</code></td>
+    <td class="diff-glp glp-val"><code>"semaglutide"</code>, <code>"tirzepatide"</code>, <code>"semaglutide_tirzepatide"</code>, or <code>"glp1-weightloss"</code></td>
     <td class="diff-nad nad-val"><code>"nad"</code></td>
 </tr>
 <tr>
@@ -557,7 +557,7 @@ Content-Type: application/json
   "metadata":       { "source": "patient-portal" },
 
   // ── offerings ────────────────────────────────────────────────────────────────
-  // GLP-1 product_key: "semaglutide" or "glp1-weightloss"
+  // GLP-1 product_key: "semaglutide", "tirzepatide", "semaglutide_tirzepatide", or "glp1-weightloss"
   // typical month_frequency: 3
   "offerings": [
     { "offering_id": "YOUR_MWL_OFFERING_UUID", "quantity": 1 }          // Option A: direct UUID (legacy)
@@ -773,7 +773,9 @@ Content-Type: application/json
   { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
   // formulation: "injectable" | "oral" (optional) — auto-selects the clinician's medication dropdown.
   // For semaglutide: "oral" picks the SNAC tablet; "injectable" picks B12 or B6. Omit to leave choice to the clinician.
-  // or: { "product_key": "glp1-weightloss", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  // or: { "product_key": "tirzepatide",            "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  // or: { "product_key": "semaglutide_tirzepatide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  // or: { "product_key": "glp1-weightloss",         "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
 ]</pre>
 <h6 class="fw-semibold mb-2">Option C — Bundle (GLP-1 + NAD+)</h6>
 <pre class="mb-3">"offerings": [
