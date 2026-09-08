@@ -147,6 +147,12 @@
                                             @if($plan->offering?->internal_name)
                                                 <span class="text-muted">({{ $plan->offering->internal_name }})</span>
                                             @endif
+                                            @if($plan->offering?->formulation_type)
+                                                @php $ft = $plan->offering->formulation_type; @endphp
+                                                <span class="badge ms-1 {{ $ft === 'oral' ? 'bg-success' : 'bg-primary' }} bg-opacity-10 {{ $ft === 'oral' ? 'text-success border-success' : 'text-primary border-primary' }} border border-opacity-25" style="font-size:.68rem;vertical-align:middle">
+                                                    {{ ucfirst($ft) }}
+                                                </span>
+                                            @endif
                                         </td>
                                         <td class="align-middle small text-muted">{{ $plan->label ?: '—' }}</td>
                                         <td class="text-end align-middle pe-3">
