@@ -32,6 +32,9 @@ class PartnerProductPlanSeeder extends Seeder
             'Tirzepatide/Cyanocobalamin (B12)',
             'Tirzepatide/Pyridoxine (B6)',
         ],
+        'semaglutide_tirzepatide' => [
+            'Semaglutide/Tirzepatide',
+        ],
         'nad' => [
             'NAD+ (Nicotinamide Adenine Dinucleotide)',
         ],
