@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             OfferingCategoriesSeeder::class,
             GlpOfferingsSeeder::class,
             NadOfferingsSeeder::class,
+            PeptideOfferingsSeeder::class,
             AttachQuestionnairesToOfferingsSeeder::class,
             PartnerProductPlanSeeder::class,
             SettingsSeeder::class,
