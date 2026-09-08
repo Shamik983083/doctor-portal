@@ -53,7 +53,7 @@
                         <label class="form-label fw-semibold">Month Frequency <span class="text-danger">*</span></label>
                         <select name="month_frequency" class="form-select @error('month_frequency') is-invalid @enderror" required>
                             <option value="">— Select duration —</option>
-                            @foreach([1, 3, 6, 12] as $freq)
+                            @foreach([1, 3, 4, 6, 12] as $freq)
                                 <option value="{{ $freq }}" {{ old('month_frequency') == $freq ? 'selected' : '' }}>
                                     {{ $freq }} month{{ $freq > 1 ? 's' : '' }}
                                 </option>
@@ -146,6 +146,12 @@
                                             {{ $plan->offering?->name ?? '—' }}
                                             @if($plan->offering?->internal_name)
                                                 <span class="text-muted">({{ $plan->offering->internal_name }})</span>
+                                            @endif
+                                            @if($plan->offering?->formulation_type)
+                                                @php $ft = $plan->offering->formulation_type; @endphp
+                                                <span class="badge ms-1 {{ $ft === 'oral' ? 'bg-success' : 'bg-primary' }} bg-opacity-10 {{ $ft === 'oral' ? 'text-success border-success' : 'text-primary border-primary' }} border border-opacity-25" style="font-size:.68rem;vertical-align:middle">
+                                                    {{ ucfirst($ft) }}
+                                                </span>
                                             @endif
                                         </td>
                                         <td class="align-middle small text-muted">{{ $plan->label ?: '—' }}</td>

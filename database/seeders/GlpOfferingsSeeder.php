@@ -28,6 +28,7 @@ class GlpOfferingsSeeder extends Seeder
                 'name'             => 'Semaglutide/Cyanocobalamin (B12)',
                 'internal_name'    => 'Sema/B12',
                 'compound_formula' => 'Semaglutide / Cyanocobalamin (B12) compounded injection',
+                'formulation_type' => 'injectable',
                 'levels' => [
                     ['label' => 'LVL1 - 1MG (0.25mg/wk)',   'formula' => '0.25mg/0.5mg/0.5mL (2mL)'],
                     ['label' => 'LVL2 - 2MG (0.5mg/wk)',    'formula' => '0.5mg/0.5mg/0.5mL (2mL)'],
@@ -42,6 +43,7 @@ class GlpOfferingsSeeder extends Seeder
                 'name'             => 'Semaglutide/Pyridoxine (B6)',
                 'internal_name'    => 'Sema/B6',
                 'compound_formula' => 'Semaglutide / Pyridoxine (B6) compounded injection',
+                'formulation_type' => 'injectable',
                 'levels' => [
                     ['label' => 'LVL1 - 1MG (0.25mg/wk)',   'formula' => '0.25mg/0.5mg/0.5mL (2mL)'],
                     ['label' => 'LVL2 - 2MG (0.5mg/wk)',    'formula' => '0.5mg/0.5mg/0.5mL (2mL)'],
@@ -56,6 +58,7 @@ class GlpOfferingsSeeder extends Seeder
                 'name'             => 'Tirzepatide/Cyanocobalamin (B12)',
                 'internal_name'    => 'Tirz/B12',
                 'compound_formula' => 'Tirzepatide / Cyanocobalamin (B12) compounded injection',
+                'formulation_type' => 'injectable',
                 'levels' => [
                     ['label' => 'LVL1 - 10MG (2.5mg/wk)',   'formula' => '2.5mg/1mg/0.5mL (2mL)'],
                     ['label' => 'LVL2 - 20MG (5mg/wk)',     'formula' => '5mg/1mg/0.5mL (2mL)'],
@@ -71,6 +74,7 @@ class GlpOfferingsSeeder extends Seeder
                 'name'             => 'Tirzepatide/Pyridoxine (B6)',
                 'internal_name'    => 'Tirz/B6',
                 'compound_formula' => 'Tirzepatide / Pyridoxine (B6) compounded injection',
+                'formulation_type' => 'injectable',
                 'levels' => [
                     ['label' => 'LVL1 - 10MG (2.5mg/wk)',   'formula' => '2.5mg/1mg/0.5mL (2mL)'],
                     ['label' => 'LVL2 - 20MG (5mg/wk)',     'formula' => '5mg/1mg/0.5mL (2mL)'],
@@ -86,6 +90,7 @@ class GlpOfferingsSeeder extends Seeder
                 'name'             => 'Semaglutide/Tirzepatide',
                 'internal_name'    => 'Sema/Tirz',
                 'compound_formula' => 'Semaglutide / Tirzepatide compounded injection',
+                'formulation_type' => 'injectable',
                 'levels' => [
                     ['label' => 'LVL1 - 0.8MG/8MG',   'formula' => '0.2mg/2mg/0.5mL (2mL)'],
                     ['label' => 'LVL2 - 1.6MG/16MG',  'formula' => '0.4mg/4mg/0.5mL (2mL)'],
@@ -101,6 +106,7 @@ class GlpOfferingsSeeder extends Seeder
                 'name'             => 'Semaglutide Tablet (SNAC)',
                 'internal_name'    => 'Sema SNAC',
                 'compound_formula' => 'Semaglutide / SNAC oral capsule',
+                'formulation_type' => 'oral',
                 'dispense_unit'    => 'capsule',
                 'quantity'         => 30,
                 'days_supply'      => 30,
@@ -130,27 +136,35 @@ class GlpOfferingsSeeder extends Seeder
 
         foreach ($partnerIds as $partnerId) {
             foreach ($products as $product) {
-                $name = $product['name'];
+                $name           = $product['name'];
+                $formulationType = $product['formulation_type'];
 
-                // Skip if this offering already exists for this partner.
-                $exists = Offering::withTrashed()
+                // Backfill formulation_type on existing offerings (including soft-deleted).
+                $existing = Offering::withTrashed()
                     ->where('partner_id', $partnerId)
                     ->where('name', $name)
-                    ->exists();
+                    ->first();
 
-                if ($exists) {
-                    $this->command->line("  skipped  [{$name}] already exists for partner #{$partnerId}");
+                if ($existing) {
+                    if ($existing->formulation_type !== $formulationType) {
+                        $existing->formulation_type = $formulationType;
+                        $existing->saveQuietly();
+                        $this->command->line("  updated  [{$name}] formulation_type={$formulationType} for partner #{$partnerId}");
+                    } else {
+                        $this->command->line("  skipped  [{$name}] already up-to-date for partner #{$partnerId}");
+                    }
                     continue;
                 }
 
                 $attrs = array_merge($injectableDefaults, [
-                    'uuid'          => Str::uuid(),
-                    'partner_id'    => $partnerId,
-                    'category_id'   => $glp->id,
-                    'name'          => $name,
-                    'internal_name' => $product['internal_name'],
+                    'uuid'             => Str::uuid(),
+                    'partner_id'       => $partnerId,
+                    'category_id'      => $glp->id,
+                    'name'             => $name,
+                    'internal_name'    => $product['internal_name'],
                     'compound_formula' => $product['compound_formula'],
-                    'levels'        => $product['levels'],
+                    'formulation_type' => $formulationType,
+                    'levels'           => $product['levels'],
                 ]);
 
                 // Product-level overrides (e.g. SNAC tablet has different unit/qty).
@@ -164,6 +178,21 @@ class GlpOfferingsSeeder extends Seeder
 
                 $this->command->info("  created  [{$name}] for partner #{$partnerId}");
             }
+        }
+
+        // Catch-all: backfill any offering records not covered by the per-partner loop above.
+        // This handles offerings with partner_id = NULL (global/shared) or any record
+        // whose partner_id wasn't in the current Partner list at seeder run time.
+        $bulkUpdated = 0;
+        foreach ($products as $product) {
+            $rows = Offering::withTrashed()
+                ->where('name', $product['name'])
+                ->whereNull('formulation_type')
+                ->update(['formulation_type' => $product['formulation_type']]);
+            $bulkUpdated += $rows;
+        }
+        if ($bulkUpdated > 0) {
+            $this->command->line("  bulk-backfilled formulation_type on {$bulkUpdated} additional offering record(s).");
         }
 
         $this->command->info('GLP offerings seeded.');

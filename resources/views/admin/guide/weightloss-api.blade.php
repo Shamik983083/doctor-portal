@@ -360,7 +360,7 @@ Content-Type: application/json
     // The portal resolves to the first matching plan offering.
     // The clinician's dropdown is pre-filled but they can switch to any
     // offering in the same drug family.
-    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1 }
+    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
 
     // Option C — bundle: two or more product_key entries sharing bundle_group.
     // bundle_group is a free-form string you choose — any two offerings in the
@@ -369,8 +369,8 @@ Content-Type: application/json
     // filtered to that component's drug family only (e.g. semaglutide slot
     // shows only semaglutide offerings; NAD slot shows only NAD offerings).
     // Removing any row on the prescribe screen removes the entire bundle.
-    // { "product_key": "semaglutide",  "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" },
-    // { "product_key": "nad",          "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" }
+    // { "product_key": "semaglutide",  "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" },
+    // { "product_key": "nad",          "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" }
   ],
 
   // ── clinical_intake — populates the clinician's left-panel review fields ───────
@@ -531,7 +531,10 @@ Content-Type: application/json
 
 <h6 class="fw-semibold mb-2">Option B — Product Plans (new)</h6>
 <pre class="mb-3">"offerings": [
-  { "product_key": "glp1-weightloss", "month_frequency": 3, "quantity": 1 }
+  { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  // formulation: "injectable" | "oral" (optional) — when provided, the clinician's
+  // medication dropdown auto-selects the matching formulation (e.g. "oral" picks
+  // the SNAC tablet over the B12/B6 injection). Omit to leave selection to the clinician.
 ]
 // No offering_id needed. The portal looks up the plan you configured
 // in Admin → Partners → Product Plans and resolves to the offering.</pre>

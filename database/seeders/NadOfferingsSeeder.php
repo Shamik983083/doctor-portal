@@ -28,6 +28,7 @@ class NadOfferingsSeeder extends Seeder
                 'name'             => 'NAD+ (Nicotinamide Adenine Dinucleotide)',
                 'internal_name'    => 'NAD+',
                 'compound_formula' => 'Nicotinamide Adenine Dinucleotide compounded injection',
+                'formulation_type' => 'injectable',
                 'levels' => [
                     ['label' => 'LVL1 - 500MG',  'formula' => '100mg/mL (5mL)'],
                     ['label' => 'LVL2 - 1000MG', 'formula' => '100mg/mL (10mL)'],
@@ -39,6 +40,7 @@ class NadOfferingsSeeder extends Seeder
                 'name'             => 'NAD+/Glutathione',
                 'internal_name'    => 'NAD+/Glut',
                 'compound_formula' => 'Nicotinamide Adenine Dinucleotide / Glutathione compounded injection',
+                'formulation_type' => 'injectable',
                 'levels' => [
                     ['label' => 'LVL1 - 500MG/500MG',   'formula' => '100mg/100mg/mL (5mL)'],
                     ['label' => 'LVL2 - 1000MG/1000MG', 'formula' => '100mg/100mg/mL (10mL)'],
@@ -63,16 +65,23 @@ class NadOfferingsSeeder extends Seeder
 
         foreach ($partnerIds as $partnerId) {
             foreach ($products as $product) {
-                $name = $product['name'];
+                $name            = $product['name'];
+                $formulationType = $product['formulation_type'];
 
-                // Skip if this offering already exists for this partner.
-                $exists = Offering::withTrashed()
+                // Backfill formulation_type on existing offerings (including soft-deleted).
+                $existing = Offering::withTrashed()
                     ->where('partner_id', $partnerId)
                     ->where('name', $name)
-                    ->exists();
+                    ->first();
 
-                if ($exists) {
-                    $this->command->line("  skipped  [{$name}] already exists for partner #{$partnerId}");
+                if ($existing) {
+                    if ($existing->formulation_type !== $formulationType) {
+                        $existing->formulation_type = $formulationType;
+                        $existing->saveQuietly();
+                        $this->command->line("  updated  [{$name}] formulation_type={$formulationType} for partner #{$partnerId}");
+                    } else {
+                        $this->command->line("  skipped  [{$name}] already up-to-date for partner #{$partnerId}");
+                    }
                     continue;
                 }
 
@@ -83,11 +92,27 @@ class NadOfferingsSeeder extends Seeder
                     'name'             => $name,
                     'internal_name'    => $product['internal_name'],
                     'compound_formula' => $product['compound_formula'],
+                    'formulation_type' => $formulationType,
                     'levels'           => $product['levels'],
                 ]));
 
                 $this->command->info("  created  [{$name}] for partner #{$partnerId}");
             }
+        }
+
+        // Catch-all: backfill any offering records not covered by the per-partner loop above.
+        // This handles offerings with partner_id = NULL (global/shared) or any record
+        // whose partner_id wasn't in the current Partner list at seeder run time.
+        $bulkUpdated = 0;
+        foreach ($products as $product) {
+            $rows = Offering::withTrashed()
+                ->where('name', $product['name'])
+                ->whereNull('formulation_type')
+                ->update(['formulation_type' => $product['formulation_type']]);
+            $bulkUpdated += $rows;
+        }
+        if ($bulkUpdated > 0) {
+            $this->command->line("  bulk-backfilled formulation_type on {$bulkUpdated} additional offering record(s).");
         }
 
         $this->command->info('NAD offerings seeded.');

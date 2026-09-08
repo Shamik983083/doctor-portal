@@ -561,10 +561,11 @@ Content-Type: application/json
   // typical month_frequency: 3
   "offerings": [
     { "offering_id": "YOUR_MWL_OFFERING_UUID", "quantity": 1 }          // Option A: direct UUID (legacy)
-    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1 }  // Option B: product key
+    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }  // Option B: product key
+    // "formulation": "injectable" | "oral" — optional; auto-selects the clinician's medication dropdown
     // Bundle with NAD+:
-    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" },
-    // { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" }
+    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" },
+    // { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" }
   ],
 
   // ── clinical_intake (GLP-1 fields) ───────────────────────────────────────────
@@ -641,10 +642,11 @@ Content-Type: application/json
   // typical month_frequency: 1
   "offerings": [
     { "offering_id": "YOUR_NAD_OFFERING_UUID", "quantity": 1 }          // Option A: direct UUID (legacy)
-    // { "product_key": "nad", "month_frequency": 1, "quantity": 1 }         // Option B: product key
+    // { "product_key": "nad", "month_frequency": 1, "quantity": 1, "formulation": "injectable" }  // Option B: product key
+    // NAD is always injectable — send "injectable" or omit formulation entirely
     // Bundle with GLP-1:
-    // { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" },
-    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" }
+    // { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" },
+    // { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" }
   ],
 
   // ── clinical_intake (NAD+ fields) ────────────────────────────────────────────
@@ -768,13 +770,15 @@ Content-Type: application/json
 ]</pre>
 <h6 class="fw-semibold mb-2">Option B — Product Plans</h6>
 <pre class="mb-3">"offerings": [
-  { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1 }
-  // or: { "product_key": "glp1-weightloss", "month_frequency": 3, "quantity": 1 }
+  { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  // formulation: "injectable" | "oral" (optional) — auto-selects the clinician's medication dropdown.
+  // For semaglutide: "oral" picks the SNAC tablet; "injectable" picks B12 or B6. Omit to leave choice to the clinician.
+  // or: { "product_key": "glp1-weightloss", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
 ]</pre>
 <h6 class="fw-semibold mb-2">Option C — Bundle (GLP-1 + NAD+)</h6>
 <pre class="mb-3">"offerings": [
-  { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" },
-  { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" }
+  { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" },
+  { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" }
 ]
 // bundle_group is any string you choose — offerings sharing the same value are treated
 // as one bundle on the prescribe screen. Each gets its own locked dropdown.</pre>
@@ -832,14 +836,15 @@ Content-Type: application/json
 ]</pre>
 <h6 class="fw-semibold mb-2">Option B — Product Plans</h6>
 <pre class="mb-3">"offerings": [
-  { "product_key": "nad", "month_frequency": 1, "quantity": 1 }
+  { "product_key": "nad", "month_frequency": 1, "quantity": 1, "formulation": "injectable" }
+  // formulation: "injectable" | "oral" (optional). NAD is always injectable — send "injectable" or omit.
 ]
 // "product_key": "nad" can fan out to both NAD+ and NAD+/Glutathione
 // simultaneously if both are configured as plan rows.</pre>
 <h6 class="fw-semibold mb-2">Option C — Bundle (NAD+ + GLP-1)</h6>
 <pre class="mb-3">"offerings": [
-  { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1" },
-  { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1" }
+  { "product_key": "nad",         "month_frequency": 1, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" },
+  { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "bundle_group": "combo-1", "formulation": "injectable" }
 ]</pre>
 
 <h6 class="fw-semibold mb-2"><code>prescription_written</code> Webhook — NAD+ Payload</h6>
