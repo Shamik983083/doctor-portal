@@ -100,6 +100,21 @@ class NadOfferingsSeeder extends Seeder
             }
         }
 
+        // Catch-all: backfill any offering records not covered by the per-partner loop above.
+        // This handles offerings with partner_id = NULL (global/shared) or any record
+        // whose partner_id wasn't in the current Partner list at seeder run time.
+        $bulkUpdated = 0;
+        foreach ($products as $product) {
+            $rows = Offering::withTrashed()
+                ->where('name', $product['name'])
+                ->whereNull('formulation_type')
+                ->update(['formulation_type' => $product['formulation_type']]);
+            $bulkUpdated += $rows;
+        }
+        if ($bulkUpdated > 0) {
+            $this->command->line("  bulk-backfilled formulation_type on {$bulkUpdated} additional offering record(s).");
+        }
+
         $this->command->info('NAD offerings seeded.');
     }
 }
