@@ -37,7 +37,7 @@ class PeptideOfferingsSeeder extends Seeder
                 'compound_formula' => 'BPC-157 compounded injection',
                 'formulation_type' => 'injectable',
                 'levels' => [
-                    ['label' => 'LVL1 - 15MG', 'formula' => '3mg/mL (5mL)'],
+                    ['label' => 'LVL1 - 15MG', 'formula' => '3mg/mL (5mL)', 'sig' => 'Inject 25 units subcutaneously 5 days per week'],
                 ],
             ],
 
@@ -48,7 +48,7 @@ class PeptideOfferingsSeeder extends Seeder
                 'compound_formula' => 'BPC-157 / TB-500 compounded injection',
                 'formulation_type' => 'injectable',
                 'levels' => [
-                    ['label' => 'LVL1 - 15MG/15MG', 'formula' => '3mg/3mg/mL (5mL)'],
+                    ['label' => 'LVL1 - 15MG/15MG', 'formula' => '3mg/3mg/mL (5mL)', 'sig' => 'Inject 25 units subcutaneously 5 days per week'],
                 ],
             ],
 
@@ -59,7 +59,7 @@ class PeptideOfferingsSeeder extends Seeder
                 'compound_formula' => 'Tesamorelin compounded injection',
                 'formulation_type' => 'injectable',
                 'levels' => [
-                    ['label' => 'LVL1 - 10MG', 'formula' => '2mg/mL (5mL)'],
+                    ['label' => 'LVL1 - 10MG', 'formula' => '2mg/mL (5mL)', 'sig' => 'Inject 25 units subcutaneously 5 days per week'],
                 ],
             ],
         ];

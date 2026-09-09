@@ -30,8 +30,8 @@ class NadOfferingsSeeder extends Seeder
                 'compound_formula' => 'Nicotinamide Adenine Dinucleotide compounded injection',
                 'formulation_type' => 'injectable',
                 'levels' => [
-                    ['label' => 'LVL1 - 500MG',  'formula' => '100mg/mL (5mL)'],
-                    ['label' => 'LVL2 - 1000MG', 'formula' => '100mg/mL (10mL)'],
+                    ['label' => 'LVL1 - 500MG',  'formula' => '100mg/mL (5mL)',  'sig' => 'Inject 25 units subcutaneously 5 days per week'],
+                    ['label' => 'LVL2 - 1000MG', 'formula' => '100mg/mL (10mL)', 'sig' => 'Inject 25 units subcutaneously 5 days per week'],
                 ],
             ],
 
@@ -42,8 +42,8 @@ class NadOfferingsSeeder extends Seeder
                 'compound_formula' => 'Nicotinamide Adenine Dinucleotide / Glutathione compounded injection',
                 'formulation_type' => 'injectable',
                 'levels' => [
-                    ['label' => 'LVL1 - 500MG/500MG',   'formula' => '100mg/100mg/mL (5mL)'],
-                    ['label' => 'LVL2 - 1000MG/1000MG', 'formula' => '100mg/100mg/mL (10mL)'],
+                    ['label' => 'LVL1 - 500MG/500MG',   'formula' => '100mg/100mg/mL (5mL)',  'sig' => 'Inject 25 units subcutaneously 5 days per week'],
+                    ['label' => 'LVL2 - 1000MG/1000MG', 'formula' => '100mg/100mg/mL (10mL)', 'sig' => 'Inject 25 units subcutaneously 5 days per week'],
                 ],
             ],
         ];
