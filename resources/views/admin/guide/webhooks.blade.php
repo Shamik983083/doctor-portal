@@ -51,9 +51,9 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
 
 {{-- ── TOC ────────────────────────────────────────────────── --}}
 <div class="col-lg-3 d-none d-lg-block">
-<div class="card sticky-top" style="top:1rem">
-<div class="card-header py-2"><strong class="small">Contents</strong></div>
-<div class="card-body py-2 px-3">
+<div class="card sticky-top" style="top:1rem;max-height:calc(100vh - 2rem);display:flex;flex-direction:column">
+<div class="card-header py-2" style="flex-shrink:0"><strong class="small">Contents</strong></div>
+<div class="card-body py-2 px-3" style="overflow-y:auto;flex:1 1 0">
 <ol class="mb-0 ps-3" style="line-height:2.1">
     <li><a class="toc-link text-decoration-none" href="#overview">Overview</a></li>
     <li><a class="toc-link text-decoration-none" href="#register">Register a Webhook</a></li>
@@ -88,7 +88,7 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
     <li><a class="toc-link text-decoration-none" href="#checklist">Checklist</a></li>
 </ol>
 </div>
-<div class="card-footer py-2 px-3">
+<div class="card-footer py-2 px-3" style="flex-shrink:0">
 <button class="btn btn-sm btn-outline-secondary w-100" onclick="window.print()">
     <i class="bi bi-printer me-1"></i>Print
 </button>
