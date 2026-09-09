@@ -583,8 +583,10 @@
                 if (levels) {
                     var opts = '<option value="" data-sig="" data-formula="">Select level</option>'
                         + levels.map(function (lvl) {
+                            // formula stored in data-formula and submitted to pharmacy,
+                            // but NOT shown to the prescriber in the dropdown display.
                             return '<option value="' + esc(lvl.label) + '" data-sig="' + esc(lvl.sig || '') + '" data-formula="' + esc(lvl.formula || '') + '">'
-                                + esc(lvl.label) + ' · ' + esc(lvl.formula) + '</option>';
+                                + esc(lvl.label) + '</option>';
                         }).join('');
                     control = '<select name="medications[' + i + '][months][]" required class="level-select">' + opts + '</select>';
                 } else if (fam) {
