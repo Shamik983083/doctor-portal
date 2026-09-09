@@ -143,7 +143,7 @@ class PatientCase extends Model
      */
     public function queueClinical(): array
     {
-        $ci = $this->clinical_intake ?? [];
+        $ci   = $this->clinical_intake ?? [];
         $dash = '-';
 
         $offerings = $this->caseOfferings->pluck('offering.name')->filter()->values();
@@ -152,8 +152,17 @@ class PatientCase extends Model
             ? $ci[$k]
             : $fallback;
 
+        // Tier 1: partner explicitly provided clinical_intake.product → use it as-is.
+        // Tier 2: derive from questionnaire "last dose" answer — same logic as the
+        //         approve screen's autoSelectMedication() JS function — so both views agree.
+        // Tier 3: fall back to first case_offering offering name (original behaviour).
+        $product1Fallback = $offerings->get(0) ?? $dash;
+        if (!isset($ci['product']) || $ci['product'] === '' || $ci['product'] === null) {
+            $product1Fallback = $this->resolveProductFromQuestionnaire() ?? $product1Fallback;
+        }
+
         return [
-            'product'       => $val('product', $offerings->get(0) ?? $dash),
+            'product'       => $val('product', $product1Fallback),
             'dose'          => $val('dose', $dash),
             'term'          => $val('term', $dash),
             'plan'          => $val('plan', $dash),
@@ -166,6 +175,73 @@ class PatientCase extends Model
             'allergyDetail' => $val('allergyDetail'),
             'video'         => $val('video', $this->offeringRequiresVideoLabel($dash)),
         ];
+    }
+
+    /**
+     * Mirror the JS autoSelectMedication() PATH A/B logic in PHP.
+     *
+     * Scans already-loaded questionnaire answers for "last dose", extracts the
+     * drug family (semaglutide / tirzepatide / nad), then finds the first
+     * accessible offering for the partner that belongs to that family.
+     * Returns null when no match can be derived (new cases, provider-decides, etc.).
+     */
+    private function resolveProductFromQuestionnaire(): ?string
+    {
+        // Only works when relations are already loaded — avoids N+1 on every queue row.
+        if (! $this->relationLoaded('questionnaireResponses')) {
+            return null;
+        }
+
+        $lastDose = null;
+        foreach ($this->questionnaireResponses as $qResp) {
+            if (! $qResp->relationLoaded('answers')) {
+                continue;
+            }
+            foreach ($qResp->answers as $ans) {
+                $qt = strtolower($ans->question_text ?? '');
+                if (str_contains($qt, 'last dose')) {
+                    $lastDose = $ans->answer;
+                    break 2;
+                }
+            }
+        }
+
+        if (! $lastDose) {
+            return null;
+        }
+
+        $lower = strtolower($lastDose);
+        if (str_contains($lower, 'semaglutide'))      $family = 'semaglutide';
+        elseif (str_contains($lower, 'tirzepatide'))  $family = 'tirzepatide';
+        elseif (str_contains($lower, 'nad'))          $family = 'nad';
+        else                                           return null;
+
+        $isOral = str_contains($lower, 'tablet') || str_contains($lower, 'oral') || str_contains($lower, 'snac');
+
+        // Search case_offerings first (no extra query).
+        foreach ($this->caseOfferings as $co) {
+            $name = strtolower($co->offering->name ?? '');
+            if (str_contains($name, $family)) {
+                return $co->offering->name;
+            }
+        }
+
+        // Fall back to partner's accessible offerings (eager-loaded by queue controller).
+        if ($this->relationLoaded('partner') && $this->partner?->relationLoaded('accessibleOfferings')) {
+            $wantOral = $isOral;
+            $match = $this->partner->accessibleOfferings->first(function ($offering) use ($family, $wantOral) {
+                $name = strtolower($offering->name ?? '');
+                if (! str_contains($name, $family)) return false;
+                $oral = str_contains($name, 'tablet') || str_contains($name, 'snac')
+                     || ($offering->formulation_type ?? '') === 'oral';
+                return $oral === $wantOral;
+            });
+            if ($match) {
+                return $match->name;
+            }
+        }
+
+        return null;
     }
 
     /** Video-visit label fallback from the case offerings when intake is silent. */
