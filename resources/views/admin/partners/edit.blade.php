@@ -701,6 +701,19 @@
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+
+    /* ── Save Changes loader ───────────────────────────── */
+    (function () {
+        var form = document.querySelector('form');
+        var btn  = form && form.querySelector('button[type="submit"]');
+        if (!form || !btn) return;
+        form.addEventListener('submit', function () {
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="ep-spin" style="border-color:rgba(255,255,255,.35);border-top-color:#fff"></span> Saving…';
+            btn.style.opacity = '.85';
+        });
+    })();
 })();
 </script>
 @endsection
