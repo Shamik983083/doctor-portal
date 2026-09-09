@@ -369,5 +369,23 @@
 })();
 </script>
 @yield('scripts')
+
+<script>
+(function () {
+    var SPINNER = '<svg style="display:inline-block;vertical-align:middle;margin-right:5px;animation:glbl-spin .65s linear infinite" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-opacity=".25" stroke-width="2"/><path d="M7 1.5a5.5 5.5 0 0 1 5.5 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    var STYLE = document.createElement('style');
+    STYLE.textContent = '@keyframes glbl-spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(STYLE);
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (form.dataset.noSubmitLoader !== undefined) return;
+        var btn = form.querySelector('button[type="submit"]:not([data-no-loader])');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.innerHTML = SPINNER + 'Saving…';
+        btn.style.opacity = '.88';
+    }, true);
+})();
+</script>
 </body>
 </html>
