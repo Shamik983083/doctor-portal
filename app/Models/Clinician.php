@@ -205,6 +205,37 @@ class Clinician extends Model
             return false;
         }
 
-        return collect($states)->pluck('state')->contains(strtoupper($state));
+        $today = now()->toDateString();
+
+        return collect($states)
+            ->filter(fn ($s) => empty($s['expiry_date']) || $s['expiry_date'] >= $today)
+            ->pluck('state')
+            ->contains(strtoupper($state));
+    }
+
+    /**
+     * Is there a license for this state that has passed its expiry_date?
+     *
+     * Distinct from isLicensedInState() returning false (state never licensed).
+     * Used by EligibilityEvaluator to surface LICENSE_EXPIRED_IN_STATE rather
+     * than RESIDENCE_STATE_LICENSE_MISSING, so admins know the fix is a renewal
+     * rather than recruiting in that state.
+     */
+    public function isLicenseExpiredInState(string $state): bool
+    {
+        $states = $this->licensed_states ?? [];
+
+        if (empty($states)) {
+            return false;
+        }
+
+        $state = strtoupper($state);
+        $today = now()->toDateString();
+
+        return collect($states)->contains(
+            fn ($s) => strtoupper($s['state']) === $state
+                && ! empty($s['expiry_date'])
+                && $s['expiry_date'] < $today
+        );
     }
 }

@@ -48,6 +48,7 @@ final class EligibilityEvaluator
     public const PROVIDER_NOT_ACTIVE               = 'PROVIDER_NOT_ACTIVE';
     public const PROVIDER_UNAVAILABLE              = 'PROVIDER_UNAVAILABLE';
     public const RESIDENCE_STATE_LICENSE_MISSING   = 'RESIDENCE_STATE_LICENSE_MISSING';
+    public const LICENSE_EXPIRED_IN_STATE          = 'LICENSE_EXPIRED_IN_STATE';
     public const LICENSURE_NOT_RECORDED            = 'LICENSURE_NOT_RECORDED';
     public const DAILY_VOLUME_CAP_REACHED          = 'DAILY_VOLUME_CAP_REACHED';
     public const OPEN_CASES_CAP_REACHED            = 'OPEN_CASES_CAP_REACHED';
@@ -77,6 +78,7 @@ final class EligibilityEvaluator
         self::PROVIDER_NOT_ACTIVE             => 'Doctor is not active',
         self::PROVIDER_UNAVAILABLE            => 'Doctor is marked unavailable',
         self::RESIDENCE_STATE_LICENSE_MISSING => 'No licence in the patient\'s state',
+        self::LICENSE_EXPIRED_IN_STATE        => 'Licence in this state has expired — renewal required',
         self::LICENSURE_NOT_RECORDED          => 'No licensed states recorded for this doctor',
         self::CATEGORY_NOT_ACCEPTED           => 'Doctor does not accept this product category',
         self::VISIT_TYPE_NOT_ACCEPTED         => 'Doctor does not take this type of visit',
@@ -136,6 +138,10 @@ final class EligibilityEvaluator
                 if ($requireRecordedLicensure) {
                     $reasons[] = self::LICENSURE_NOT_RECORDED;
                 }
+            } elseif ($clinician->isLicenseExpiredInState($state)) {
+                // Expired is checked before missing so the admin sees "renewal
+                // required" rather than "no licence", which would imply recruiting.
+                $reasons[] = self::LICENSE_EXPIRED_IN_STATE;
             } elseif (! $clinician->isLicensedInState($state)) {
                 $reasons[] = self::RESIDENCE_STATE_LICENSE_MISSING;
             }
