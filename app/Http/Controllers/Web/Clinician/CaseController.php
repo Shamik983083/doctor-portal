@@ -644,6 +644,8 @@ class CaseController extends Controller
             'medications.*.months.*'            => 'nullable|string|max:60',
             'medications.*.sigs'                => 'nullable|array',
             'medications.*.sigs.*'              => 'nullable|string|max:500',
+            'medications.*.formulas'            => 'nullable|array',
+            'medications.*.formulas.*'          => 'nullable|string|max:120',
         ]);
 
         $case = PatientCase::where('uuid', $uuid)->firstOrFail();
@@ -732,6 +734,10 @@ class CaseController extends Controller
                 $sigs = array_values(array_map(fn ($s) => trim((string) $s), $rawSigs));
                 $sigsHaveContent = collect($sigs)->contains(fn ($s) => $s !== '');
 
+                $rawFormulas = $med['formulas'] ?? [];
+                $formulas = array_values(array_map(fn ($f) => trim((string) $f), $rawFormulas));
+                $formulasHaveContent = collect($formulas)->contains(fn ($f) => $f !== '');
+
                 $dosing = null;
                 if (filled($med['frequency'] ?? null) || filled($med['term'] ?? null) || $months !== []) {
                     $dosing = [
@@ -740,6 +746,7 @@ class CaseController extends Controller
                         'term'       => $med['term'] ?? null,
                         'months'     => $months,
                         'sigs'       => $sigsHaveContent ? $sigs : null,
+                        'formulas'   => $formulasHaveContent ? $formulas : null,
                     ];
                 }
 

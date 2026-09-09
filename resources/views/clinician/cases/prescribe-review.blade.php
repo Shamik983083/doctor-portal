@@ -55,6 +55,9 @@
                                 <div style="display:flex;align-items:baseline;gap:8px;font-size:12px">
                                     <span style="font-weight:700;color:var(--accent-ink);min-width:26px;font-size:11px">M{{ $mi + 1 }}</span>
                                     <span style="color:var(--ink)">{{ $dose }}</span>
+                                    @if(!empty($med->dosing['formulas'][$mi]))
+                                        <span style="color:var(--muted);font-size:11px">· {{ $med->dosing['formulas'][$mi] }}</span>
+                                    @endif
                                     @if(!empty($med->dosing['sigs'][$mi]))
                                         <span style="color:var(--muted)">— {{ $med->dosing['sigs'][$mi] }}</span>
                                     @endif

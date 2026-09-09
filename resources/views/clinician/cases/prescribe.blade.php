@@ -581,9 +581,9 @@
             for (var m = 0; m < slots; m++) {
                 var control;
                 if (levels) {
-                    var opts = '<option value="" data-sig="">Select level</option>'
+                    var opts = '<option value="" data-sig="" data-formula="">Select level</option>'
                         + levels.map(function (lvl) {
-                            return '<option value="' + esc(lvl.label) + '" data-sig="' + esc(lvl.sig || '') + '">'
+                            return '<option value="' + esc(lvl.label) + '" data-sig="' + esc(lvl.sig || '') + '" data-formula="' + esc(lvl.formula || '') + '">'
                                 + esc(lvl.label) + ' · ' + esc(lvl.formula) + '</option>';
                         }).join('');
                     control = '<select name="medications[' + i + '][months][]" required class="level-select">' + opts + '</select>';
@@ -600,18 +600,24 @@
                     + ' required'
                     + ' style="margin-top:5px;width:100%;font-size:11px;padding:4px 7px;'
                     + 'border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);">';
-                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + '</div>';
+                var formulaHidden = '<input type="hidden"'
+                    + ' name="medications[' + i + '][formulas][]"'
+                    + ' value="" class="level-formula-input">';
+                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + formulaHidden + '</div>';
             }
             wrap.innerHTML = '<div class="months">' + head + '<div class="months-grid">' + cells + '</div></div>';
 
-            // Wire level→SIG auto-fill after DOM is set
+            // Wire level→SIG and level→formula auto-fill after DOM is set
             if (levels) {
                 wrap.querySelectorAll('.level-select').forEach(function (sel) {
                     sel.addEventListener('change', function () {
                         var opt = this.options[this.selectedIndex];
-                        var sig = opt ? (opt.getAttribute('data-sig') || '') : '';
-                        var sigInp = this.parentElement.querySelector('input[name$="[sigs][]"]');
-                        if (sigInp) sigInp.value = sig;
+                        var sig     = opt ? (opt.getAttribute('data-sig')     || '') : '';
+                        var formula = opt ? (opt.getAttribute('data-formula') || '') : '';
+                        var sigInp     = this.parentElement.querySelector('input[name$="[sigs][]"]');
+                        var formulaInp = this.parentElement.querySelector('input.level-formula-input');
+                        if (sigInp)     sigInp.value     = sig;
+                        if (formulaInp) formulaInp.value = formula;
                     });
                 });
                 // Auto-select levels from check-in dose hint
