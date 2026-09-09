@@ -564,10 +564,10 @@ def webhook():
 <div id="ev-prescription-written" class="card mb-3 section-anchor border-success">
 <div class="card-header py-2 d-flex align-items-center gap-2 bg-success bg-opacity-10">
     <span class="event-badge" style="background:#d1fae5;border-color:#6ee7b7;color:#065f46">prescription_written</span>
-    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, full medication details with <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, and per-month SIG instructions inside <code>dosing.sigs[]</code></span>
+    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, full medication details with <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, per-month SIG instructions inside <code>dosing.sigs[]</code>, and compound variant details inside <code>dosing.formulas[]</code></span>
 </div>
 <div class="card-body">
-<p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is a structured array of ICD-10-CM codes and each medication includes both a flat <code>sig</code> (offering default, resolved per partner) and per-month <code>dosing.sigs[]</code> overrides set by the clinician at prescription time.</p>
+<p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is a structured array of ICD-10-CM codes and each medication includes both a flat <code>sig</code> (offering default, resolved per partner) and per-month <code>dosing.sigs[]</code> overrides set by the clinician at prescription time. <strong>As of Phase 3</strong> — <code>dosing.formulas[]</code> contains the compound variant detail string for each dose level (e.g. the exact concentration/volume specification for compounding or dispensing), parallel to <code>months[]</code> and <code>sigs[]</code>.</p>
 <pre id="code-ev-rx">{
   "case_id":         "9d2f1c3e-...",
   "external_id":     "order-wl-20240701-001",   // your reference ID
@@ -619,6 +619,17 @@ def webhook():
           "Inject 0.5 mg subcutaneously once weekly",
           "Inject 1.0 mg subcutaneously once weekly",
           "Inject 1.5 mg subcutaneously once weekly"
+        ],
+
+        // formulas[]: compound variant detail for each dose level — passed directly to pharmacy.
+        // Parallel to months[] and sigs[] — formulas[0] is the variant for months[0], etc.
+        // NOT shown to the prescriber. Use these for dispensing labels and pharmacy prep.
+        // null on prescriptions written before Phase 3 (this field was not collected).
+        "formulas": [
+          "0.25mg/0.5mg/0.5mL (2mL)",
+          "0.5mg/0.5mg/0.5mL (2mL)",
+          "1mg/1mg/0.5mL (2mL)",
+          "1.7mg/1mg/0.5mL (2mL)"
         ]
       }
     }
@@ -656,6 +667,21 @@ function sigForLevel(array $med, int $levelIndex): string {
     $perLevel = $med['dosing']['sigs'][$levelIndex] ?? '';
     if ($perLevel !== '') return $perLevel;
     return $med['sig'] ?? '';   // offering default fallback
+}</pre>
+</div>
+
+<div class="alert alert-info mt-0 mb-2 small">
+    <i class="bi bi-capsule me-1"></i>
+    <strong>Using <code>dosing.formulas[]</code> for pharmacy compound specifications:</strong>
+    <code>dosing.formulas</code> is an array parallel to <code>dosing.months</code> and <code>dosing.sigs</code>. Each entry is the exact compound variant detail for that dose level (e.g. <code>"0.25mg/0.5mg/0.5mL (2mL)"</code>), intended for pharmacy dispensing labels and compounding instructions.
+    <ul class="mb-1 mt-2">
+        <li>This field was <strong>not shown to the prescriber</strong> — it is a pharmacy-facing specification only.</li>
+        <li><code>dosing.formulas</code> is <code>null</code> on prescriptions written before Phase 3 (field was not collected). Always null-check before using.</li>
+        <li>The array is parallel to <code>months[]</code> — <code>formulas[0]</code> is the variant for M1, <code>formulas[1]</code> for M2, and so on.</li>
+    </ul>
+    <pre style="background:#f8fafc;color:#1f2937;border:1px solid #e2e8f0;border-radius:6px;padding:.5rem .75rem;font-size:.8rem;margin-top:.4rem;overflow-x:auto">// PHP — resolve compound formula for a given dose level
+function formulaForLevel(array $med, int $levelIndex): ?string {
+    return $med['dosing']['formulas'][$levelIndex] ?? null;
 }</pre>
 </div>
 
@@ -999,7 +1025,7 @@ function sigForLevel(array $med, int $levelIndex): string {
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Endpoint must be <strong>HTTPS</strong> and publicly reachable; respond with <code>200</code> within 10 seconds</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Verify <code>X-Webhook-Signature</code> on <strong>every</strong> incoming request using a constant-time comparison</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Route by <code>X-Event-Type</code> header — do not rely solely on payload fields to identify the event</li>
-    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> includes <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, a flat <code>sig</code> (offering default), and per-level <code>dosing.sigs[]</code> overrides; use <code>sigForLevel(med, index)</code> pattern — prefer <code>dosing.sigs[i]</code> when non-empty, fall back to <code>sig</code></li>
+    <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>prescription_written</code></strong> — each item in <code>meds_prescribed[]</code> includes <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, a flat <code>sig</code> (offering default), per-level <code>dosing.sigs[]</code> overrides (prefer <code>dosing.sigs[i]</code> when non-empty, fall back to <code>sig</code>), and <strong><code>dosing.formulas[]</code></strong> (compound variant detail per dose level, for pharmacy/dispensing — <code>null</code> on legacy prescriptions)</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>case_support</code></strong> — <code>support_note</code> is in the payload; notify your team and use the escalation chat (portal or <code>POST /messages</code>) to reply</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Handle <strong><code>escalation_started</code></strong> — clinician forwarded a patient message without changing case status; notify your support team and call <code>GET /messages?channel=escalation</code> to fetch the initial message</li>
     <li class="mb-2"><i class="bi bi-check-square text-success me-2"></i>Subscribe to <strong><code>escalation_message_sent</code></strong> — poll <code>GET /messages?channel=escalation</code> on receipt to fetch the clinician's reply body</li>
