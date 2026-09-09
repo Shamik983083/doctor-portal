@@ -769,9 +769,21 @@
             if (!doseMatch) return;
             var dose = parseFloat(doseMatch[1]);
 
-            // PATH A — search OFFERINGS for a level whose label+formula contains the dose
+            // Extract drug family and formulation from the patient's answer text first.
+            // This prevents a false mg-value match on a different drug (e.g. Sema LVL5 also
+            // contains "2.5mg" and would be found before Tirzepatide LVL1 if not filtered).
+            var lastDoseLower = (hint.last_dose || '').toLowerCase();
+            var doseFamilyHint = family(hint.last_dose); // reuse the name→family mapper
+            var doseIsOral = lastDoseLower.indexOf('tablet') > -1
+                          || lastDoseLower.indexOf('oral') > -1
+                          || lastDoseLower.indexOf('snac') > -1;
+
+            // PATH A — search OFFERINGS for a level whose label+formula contains the dose.
+            // When the patient's answer names a drug (e.g. "Tirzepatide 2.5 mg"), restrict
+            // the scan to that drug family so a same-mg level in another drug is not matched.
             var sourceOffering = null;
             for (var oi = 0; oi < OFFERINGS.length && !sourceOffering; oi++) {
+                if (doseFamilyHint && family(OFFERINGS[oi].name) !== doseFamilyHint) continue;
                 var oLevels = OFFERINGS[oi].levels;
                 if (!oLevels || !oLevels.length) continue;
                 for (var li = 0; li < oLevels.length; li++) {
@@ -783,6 +795,21 @@
                     if (sourceOffering) break;
                 }
             }
+            // If family-restricted scan found nothing, fall back to scanning all offerings.
+            if (!sourceOffering && doseFamilyHint) {
+                for (var oi = 0; oi < OFFERINGS.length && !sourceOffering; oi++) {
+                    var oLevels = OFFERINGS[oi].levels;
+                    if (!oLevels || !oLevels.length) continue;
+                    for (var li = 0; li < oLevels.length; li++) {
+                        var hay = (oLevels[li].label || '') + ' ' + (oLevels[li].formula || '');
+                        var ns  = hay.match(/(\d+\.?\d*)\s*mg/gi) || [];
+                        for (var ni = 0; ni < ns.length; ni++) {
+                            if (Math.abs(parseFloat(ns[ni]) - dose) < 0.001) { sourceOffering = OFFERINGS[oi]; break; }
+                        }
+                        if (sourceOffering) break;
+                    }
+                }
+            }
 
             var srcFam, srcIsInjection;
             if (sourceOffering) {
@@ -791,13 +818,16 @@
                 var sn = (sourceOffering.name || '').toLowerCase();
                 srcIsInjection = sn.indexOf('injection') > -1 || sn.indexOf('b12') > -1
                               || sn.indexOf('subq') > -1 || sn.indexOf(' sq ') > -1;
+            } else if (doseFamilyHint) {
+                // PATH B (text-derived) — drug family already extracted above from answer text
+                srcFam        = doseFamilyHint;
+                srcIsInjection = !doseIsOral;
             } else {
-                // PATH B — source not in OFFERINGS; infer from patient's answer text
-                var lastLower = (hint.last_dose || '').toLowerCase();
-                if (lastLower.indexOf('semaglutide') > -1)      srcFam = 'semaglutide';
-                else if (lastLower.indexOf('tirzepatide') > -1) srcFam = 'tirzepatide';
+                // PATH B fallback — no family in text and no offering match
+                if (lastDoseLower.indexOf('semaglutide') > -1)      srcFam = 'semaglutide';
+                else if (lastDoseLower.indexOf('tirzepatide') > -1) srcFam = 'tirzepatide';
                 else return; // unknown drug family — no auto-select
-                srcIsInjection = lastLower.indexOf('tablet') === -1 && lastLower.indexOf('oral') === -1;
+                srcIsInjection = !doseIsOral;
             }
 
             // Find the first offering in OFFERINGS with the same drug family AND formulation type
