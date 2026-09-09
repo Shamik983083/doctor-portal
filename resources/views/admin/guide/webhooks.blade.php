@@ -31,6 +31,47 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
 .section-anchor { scroll-margin-top:80px }
 .toc-link { font-size:.85rem }
 .event-badge { font-family:monospace; font-size:.78rem; background:#f3f4f6; border:1px solid #d1d5db; border-radius:4px; padding:1px 6px; color:#1f2937 }
+
+/* ── Sidebar nav links ─────────────────────────── */
+.wh-nav-link {
+    display:block;
+    font-size:.8rem;
+    font-weight:500;
+    color:#374151;
+    text-decoration:none;
+    padding:5px 14px 5px 16px;
+    border-left:2px solid transparent;
+    transition:background .12s, color .12s, border-color .12s;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+.wh-nav-link.wh-event {
+    font-family:monospace;
+    font-size:.75rem;
+    font-weight:400;
+    color:#6b7280;
+    padding-left:20px;
+}
+.wh-nav-link.wh-event-rx {
+    color:#065f46;
+    font-weight:600;
+}
+.wh-nav-link:hover {
+    background:#f9fafb;
+    color:#111827;
+    border-left-color:#d1d5db;
+}
+.wh-nav-link.wh-active {
+    background:#eff6ff;
+    color:#1d4ed8;
+    border-left-color:#1d4ed8;
+    font-weight:600;
+}
+.wh-nav-link.wh-event.wh-active {
+    color:#1d4ed8;
+    font-weight:600;
+}
 .step-badge { width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; flex-shrink:0 }
 .endpoint-row { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:.45rem .75rem; font-size:.8rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.75rem }
 .endpoint-row .method-pill { font-size:.68rem; font-weight:700; padding:1px 7px; border-radius:3px; flex-shrink:0 }
@@ -51,48 +92,67 @@ pre { background:#1e1e2e; color:#cdd6f4; border-radius:8px; padding:1.1rem 1.3re
 
 {{-- ── TOC ────────────────────────────────────────────────── --}}
 <div class="col-lg-3 d-none d-lg-block">
-<div class="card sticky-top" style="top:1rem">
-<div class="card-header py-2"><strong class="small">Contents</strong></div>
-<div class="card-body py-2 px-3">
-<ol class="mb-0 ps-3" style="line-height:2.1">
-    <li><a class="toc-link text-decoration-none" href="#overview">Overview</a></li>
-    <li><a class="toc-link text-decoration-none" href="#register">Register a Webhook</a></li>
-    <li><a class="toc-link text-decoration-none" href="#delivery">Delivery Format</a></li>
-    <li><a class="toc-link text-decoration-none" href="#security">Signature Verification</a></li>
-    <li><a class="toc-link text-decoration-none" href="#retry">Retry Behaviour</a></li>
-    <li><a class="toc-link text-decoration-none" href="#events">All Events</a>
-        <ol class="ps-3 mb-0" style="line-height:2">
-            <li><a class="toc-link text-decoration-none" href="#ev-case-created">case_created</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-waiting">case_waiting</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-assigned">case_assigned_to_clinician</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-support">case_support</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-escalation-started">escalation_started</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-escalation-message">escalation_message_sent</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-returned">case_returned_to_clinician</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-support-thread-closed">support_thread_closed</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-approved">case_approved</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-prescription-written">prescription_written</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-processing">case_processing</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-completed">case_completed</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-case-cancelled">case_cancelled</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-note-added">clinical_note_added</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-message-created">message_created</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-patient-message">patient_message_received</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-order-status">order_status_changed</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-tracking">tracking_number_changed</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-patient-modified">patient_modified</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-patient-created">patient_created</a></li>
-            <li><a class="toc-link text-decoration-none" href="#ev-patient-deleted">patient_deleted</a></li>
-        </ol>
-    </li>
-    <li><a class="toc-link text-decoration-none" href="#checklist">Checklist</a></li>
-</ol>
-</div>
-<div class="card-footer py-2 px-3">
-<button class="btn btn-sm btn-outline-secondary w-100" onclick="window.print()">
-    <i class="bi bi-printer me-1"></i>Print
-</button>
-</div>
+<div id="wh-toc" style="position:sticky;top:1rem;max-height:calc(100vh - 2rem);display:flex;flex-direction:column;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden">
+
+  {{-- header --}}
+  <div style="padding:12px 16px 10px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <span style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b7280">Contents</span>
+    <button onclick="window.print()" title="Print" style="background:none;border:none;padding:2px 6px;border-radius:5px;cursor:pointer;color:#6b7280;line-height:1" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+      <i class="bi bi-printer" style="font-size:.85rem"></i>
+    </button>
+  </div>
+
+  {{-- scrollable links --}}
+  <div style="overflow-y:auto;flex:1;padding:8px 0 12px">
+
+    <div style="padding:4px 14px 2px">
+      <span style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af">Setup</span>
+    </div>
+    <a class="wh-nav-link" href="#overview">Overview</a>
+    <a class="wh-nav-link" href="#register">Register a Webhook</a>
+    <a class="wh-nav-link" href="#delivery">Delivery Format</a>
+    <a class="wh-nav-link" href="#security">Signature Verification</a>
+    <a class="wh-nav-link" href="#retry">Retry Behaviour</a>
+
+    <div style="padding:10px 14px 2px;margin-top:2px;border-top:1px solid #f3f4f6">
+      <span style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af">Case Events</span>
+    </div>
+    <a class="wh-nav-link wh-event" href="#ev-case-created">case_created</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-waiting">case_waiting</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-assigned">case_assigned_to_clinician</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-support">case_support</a>
+    <a class="wh-nav-link wh-event" href="#ev-escalation-started">escalation_started</a>
+    <a class="wh-nav-link wh-event" href="#ev-escalation-message">escalation_message_sent</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-returned">case_returned_to_clinician</a>
+    <a class="wh-nav-link wh-event" href="#ev-support-thread-closed">support_thread_closed</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-approved">case_approved</a>
+    <a class="wh-nav-link wh-event wh-event-rx" href="#ev-prescription-written">prescription_written</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-processing">case_processing</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-completed">case_completed</a>
+    <a class="wh-nav-link wh-event" href="#ev-case-cancelled">case_cancelled</a>
+
+    <div style="padding:10px 14px 2px;margin-top:2px;border-top:1px solid #f3f4f6">
+      <span style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af">Clinical &amp; Messaging</span>
+    </div>
+    <a class="wh-nav-link wh-event" href="#ev-note-added">clinical_note_added</a>
+    <a class="wh-nav-link wh-event" href="#ev-message-created">message_created</a>
+    <a class="wh-nav-link wh-event" href="#ev-patient-message">patient_message_received</a>
+
+    <div style="padding:10px 14px 2px;margin-top:2px;border-top:1px solid #f3f4f6">
+      <span style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af">Orders &amp; Patients</span>
+    </div>
+    <a class="wh-nav-link wh-event" href="#ev-order-status">order_status_changed</a>
+    <a class="wh-nav-link wh-event" href="#ev-tracking">tracking_number_changed</a>
+    <a class="wh-nav-link wh-event" href="#ev-patient-modified">patient_modified</a>
+    <a class="wh-nav-link wh-event" href="#ev-patient-created">patient_created</a>
+    <a class="wh-nav-link wh-event" href="#ev-patient-deleted">patient_deleted</a>
+
+    <div style="padding:10px 14px 2px;margin-top:2px;border-top:1px solid #f3f4f6">
+      <span style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af">Reference</span>
+    </div>
+    <a class="wh-nav-link" href="#checklist">Integration Checklist</a>
+
+  </div>
 </div>
 </div>
 
@@ -1059,5 +1119,40 @@ function copyCode(id) {
         });
     });
 }
+
+// ── Scroll spy ──────────────────────────────────────────────
+(function () {
+    var navLinks = document.querySelectorAll('#wh-toc .wh-nav-link');
+    var sections = [];
+    navLinks.forEach(function (a) {
+        var id = a.getAttribute('href').replace('#', '');
+        var el = document.getElementById(id);
+        if (el) sections.push({ el: el, link: a });
+    });
+    if (!sections.length) return;
+
+    function onScroll() {
+        var scrollY = window.scrollY + 100;
+        var active = sections[0];
+        for (var i = 0; i < sections.length; i++) {
+            if (sections[i].el.getBoundingClientRect().top + window.scrollY <= scrollY) {
+                active = sections[i];
+            }
+        }
+        navLinks.forEach(function (a) { a.classList.remove('wh-active'); });
+        active.link.classList.add('wh-active');
+
+        // keep active link visible in the scrollable TOC
+        var toc = document.querySelector('#wh-toc > div:nth-child(2)');
+        if (toc) {
+            var linkTop = active.link.offsetTop;
+            var linkBot = linkTop + active.link.offsetHeight;
+            if (linkTop < toc.scrollTop) toc.scrollTop = linkTop - 8;
+            else if (linkBot > toc.scrollTop + toc.clientHeight) toc.scrollTop = linkBot - toc.clientHeight + 8;
+        }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+})();
 </script>
 @endsection
