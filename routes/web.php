@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\Auth\LoginController;
 use App\Http\Controllers\Web\Auth\ForgotPasswordController;
+use App\Http\Controllers\Web\Auth\MfaController;
 use App\Http\Controllers\Web\Auth\ResetPasswordController;
 use App\Http\Controllers\Web\Clinician\DashboardController as ClinicianDashboard;
 use App\Http\Controllers\Web\Clinician\CaseController as ClinicianCaseController;
@@ -48,6 +49,17 @@ Route::post('/reset-password', [ResetPasswordController::class, 'reset'])->name(
 
 Route::get('/', fn() => redirect('/login'));
 
+// MFA step-2 — session-gated, no auth middleware (user not yet logged in at this point)
+Route::get('/mfa/verify',  [MfaController::class, 'showVerify'])->name('mfa.verify');
+Route::post('/mfa/verify', [MfaController::class, 'verify'])->name('mfa.verify.submit');
+Route::post('/mfa/resend', [MfaController::class, 'resend'])->name('mfa.resend');
+
+// Forced password reset — requires full auth + mfa, but user is not yet on their dashboard
+Route::middleware(['auth', 'mfa'])->group(function () {
+    Route::get('/password/force-reset',  [MfaController::class, 'showForceReset'])->name('password.force-reset');
+    Route::post('/password/force-reset', [MfaController::class, 'forceReset'])->name('password.force-reset.submit');
+});
+
 // Public questionnaire form renderer · no auth required
 Route::prefix('forms')->name('forms.')->group(function () {
     Route::get('/{uuid}',  [QuestionnaireFormController::class, 'show'])->name('show');
@@ -56,7 +68,7 @@ Route::prefix('forms')->name('forms.')->group(function () {
 
 // /ma-portal was a read-only showcase retired in favour of the real portals.
 // 301s keep stale bookmarks working until the next release.
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'mfa'])->group(function () {
     Route::permanentRedirect('/ma-portal', '/admin/dashboard');
     Route::permanentRedirect('/ma-portal/practitioner', '/clinician/dashboard');
     Route::permanentRedirect('/ma-portal/admin', '/admin/dashboard');
@@ -69,7 +81,7 @@ Route::middleware(['auth'])->group(function () {
  * the controllers' `Auth::user()->clinician` cannot be null. The role gate still
  * says who may knock; this says who has a queue to show.
  */
-Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinician.portal'])->name('clinician.')->group(function () {
+Route::prefix('clinician')->middleware(['auth', 'mfa', 'force.reset', 'role:clinician|admin', 'clinician.portal'])->name('clinician.')->group(function () {
     Route::get('/dashboard', [ClinicianDashboard::class, 'index'])->name('dashboard');
 
     /*
@@ -132,7 +144,7 @@ Route::prefix('clinician')->middleware(['auth', 'role:clinician|admin', 'clinici
 });
 
 // Admin Console
-Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('admin.')->group(function () {
+Route::prefix('admin')->middleware(['auth', 'mfa', 'force.reset', 'role:admin|super_admin'])->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
 
     // Notifications
@@ -470,7 +482,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin|super_admin'])->name('ad
 });
 
 // Partner Portal
-Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])->name('partner.')->group(function () {
+Route::prefix('partner')->middleware(['auth', 'mfa', 'force.reset', 'role:partner', 'partner.portal'])->name('partner.')->group(function () {
     Route::get('/dashboard', [PartnerDashboard::class, 'index'])->name('dashboard');
 
     // Offerings
@@ -514,7 +526,7 @@ Route::prefix('partner')->middleware(['auth', 'role:partner', 'partner.portal'])
 });
 
 // Support Staff Portal
-Route::prefix('support')->middleware(['auth', 'role:support_staff'])->name('support.')->group(function () {
+Route::prefix('support')->middleware(['auth', 'mfa', 'force.reset', 'role:support_staff'])->name('support.')->group(function () {
     Route::get('/dashboard', [SupportDashboard::class, 'index'])->name('dashboard');
 
     Route::prefix('cases')->name('cases.')->group(function () {

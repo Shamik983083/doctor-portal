@@ -247,10 +247,11 @@ class PartnerController extends Controller
         ]);
 
         $user = User::create([
-            'name'       => $data['name'],
-            'email'      => $data['email'],
-            'password'   => Hash::make($data['password']),
-            'partner_id' => $partner->id,
+            'name'                 => $data['name'],
+            'email'                => $data['email'],
+            'password'             => Hash::make($data['password']),
+            'partner_id'           => $partner->id,
+            'force_password_reset' => true,
         ]);
 
         $user->assignRole('partner');

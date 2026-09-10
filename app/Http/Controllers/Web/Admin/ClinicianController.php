@@ -50,9 +50,10 @@ class ClinicianController extends Controller
         ]);
 
         $user = User::create([
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'password' => Hash::make($data['password']),
+            'name'                 => $data['name'],
+            'email'                => $data['email'],
+            'password'             => Hash::make($data['password']),
+            'force_password_reset' => true,
         ]);
         $user->assignRole('clinician');
 

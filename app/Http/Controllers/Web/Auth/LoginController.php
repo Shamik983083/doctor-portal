@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Web\Auth\MfaController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -39,8 +40,14 @@ class LoginController extends Controller
              * select should not read as deactivated because the value is absent.
              */
             if (Auth::user()->is_active ?? true) {
-                $request->session()->regenerate();
-                return redirect()->intended($this->redirectAfterLogin());
+                $user = Auth::user();
+                Auth::logout();
+
+                $request->session()->put('mfa_pending_user_id', $user->id);
+
+                MfaController::sendMfaCode($user);
+
+                return redirect()->route('mfa.verify');
             }
 
             Auth::logout();
@@ -55,6 +62,11 @@ class LoginController extends Controller
 
     public function logout(Request $request)
     {
+        $user = Auth::user();
+        if ($user) {
+            $user->forceFill(['remember_token' => null])->save();
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
