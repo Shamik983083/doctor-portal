@@ -17,8 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'partner.auth'      => \App\Http\Middleware\PartnerAuthenticate::class,
             'partner.portal'    => \App\Http\Middleware\PartnerPortalAccess::class,
             'clinician.portal'  => \App\Http\Middleware\ClinicianPortalAccess::class,
-            'role'            => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission'      => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role'              => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'        => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'mfa'               => \App\Http\Middleware\MfaMiddleware::class,
+            'force.reset'       => \App\Http\Middleware\ForcePasswordResetMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

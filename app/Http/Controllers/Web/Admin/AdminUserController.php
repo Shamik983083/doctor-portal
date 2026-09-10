@@ -46,9 +46,10 @@ class AdminUserController extends Controller
         ]);
 
         $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
+            'name'                 => $request->name,
+            'email'                => $request->email,
+            'password'             => Hash::make($request->password),
+            'force_password_reset' => true,
         ]);
 
         $user->assignRole($request->role);

@@ -23,6 +23,9 @@ class User extends Authenticatable
         // silently dropped by the mass-assignment guard, and the deactivate
         // button reports success while changing nothing.
         'is_active',
+        'force_password_reset',
+        'mfa_code',
+        'mfa_expires_at',
     ];
 
     protected $hidden = [
