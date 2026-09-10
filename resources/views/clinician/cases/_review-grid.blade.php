@@ -30,7 +30,158 @@
     $expandState = fn(?string $abbr) => ($abbr && $abbr !== '-')
         ? ($usStates[strtoupper(trim($abbr))] ?? $abbr)
         : null;
+
+    // Active filter params for this view
+    $filterActive = [];
+    if (request()->filled('search')) $filterActive['search'] = request('search');
+    if (request()->filled('triage')) $filterActive['triage'] = request('triage');
+    $isQueueRoute = request()->routeIs('clinician.cases.queue');
+    if ($isQueueRoute && request()->filled('state')) $filterActive['state'] = request('state');
+    $filterCount   = count($filterActive);
+    $filterBaseUrl = url()->current();
+    $tabParam      = request()->filled('tab') ? ['tab' => request('tab')] : [];
+    $clearAllUrl   = $filterBaseUrl . ($tabParam ? '?' . http_build_query($tabParam) : '');
+    $removeFilter  = function (string $key) use ($filterBaseUrl, $filterActive, $tabParam) {
+        $p = array_merge($tabParam, array_diff_key($filterActive, [$key => null]));
+        return $filterBaseUrl . ($p ? '?' . http_build_query($p) : '');
+    };
 @endphp
+<style>
+/* ── Filter drawer ───────────────────────────────────────── */
+.fp-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(9,25,41,.42);
+    z-index: 1499;
+    opacity: 0; pointer-events: none;
+    transition: opacity .22s ease;
+}
+.fp-backdrop.open { opacity: 1; pointer-events: auto; }
+.fp-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 320px; max-width: 90vw;
+    background: #fff;
+    border-left: 1px solid var(--line, #dde3ef);
+    box-shadow: -10px 0 44px rgba(9,25,41,.13);
+    z-index: 1500;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+}
+.fp-drawer.open { transform: translateX(0); }
+.fp-drawer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 16px;
+    border-bottom: 1px solid var(--line, #dde3ef);
+    flex-shrink: 0;
+}
+.fp-drawer-title {
+    font-size: 14px; font-weight: 700; color: var(--ink);
+    display: flex; align-items: center; gap: 7px;
+}
+.fp-drawer-title i { font-size: 15px; color: var(--accent); }
+.fp-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700; border-radius: 99px;
+}
+.fp-close {
+    display: grid; place-items: center;
+    width: 28px; height: 28px;
+    border: 1px solid var(--line-strong, #c8d0e3); border-radius: 6px;
+    background: #fff; color: var(--muted); font-size: 18px; line-height: 1;
+    cursor: pointer; transition: background .12s, color .12s; padding: 0;
+}
+.fp-close:hover { background: #f4f7fc; color: var(--ink); }
+.fp-form {
+    flex: 1; overflow-y: auto; padding: 20px 20px 12px;
+    display: flex; flex-direction: column; gap: 22px;
+}
+.fp-section-label {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 9px;
+}
+.fp-input {
+    width: 100%; padding: 9px 11px;
+    border: 1px solid var(--line-strong, #c8d0e3); border-radius: 8px;
+    font-size: 14px; color: var(--ink); background: #fff;
+    outline: none; transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+}
+.fp-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(67,97,238,.12);
+}
+.fp-input::placeholder { color: var(--soft-muted, #9aabbd); }
+.fp-triage-group { display: flex; gap: 7px; flex-wrap: wrap; }
+.fp-triage-opt { cursor: pointer; }
+.fp-triage-opt input[type="radio"] { display: none; }
+.fp-triage-opt .pill,
+.fp-triage-opt .fp-triage-all {
+    display: inline-flex; align-items: center;
+    opacity: .48; transition: opacity .15s, box-shadow .15s, background .15s;
+    cursor: pointer; user-select: none;
+}
+.fp-triage-all {
+    padding: 3px 12px; border-radius: 99px;
+    font-size: 12px; font-weight: 680;
+    background: var(--blue-bg, #eef2f7); color: var(--ink);
+}
+.fp-triage-opt:has(input:checked) .pill,
+.fp-triage-opt:has(input:checked) .fp-triage-all {
+    opacity: 1; box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px rgba(67,97,238,.15);
+}
+.fp-triage-opt:has(input:checked) .fp-triage-all {
+    background: var(--ink); color: #fff; box-shadow: none;
+}
+.fp-select {
+    width: 100%; padding: 9px 11px;
+    border: 1px solid var(--line-strong, #c8d0e3); border-radius: 8px;
+    font-size: 14px; color: var(--ink); background: #fff;
+    outline: none; cursor: pointer; box-sizing: border-box;
+    transition: border-color .15s, box-shadow .15s;
+    appearance: auto;
+}
+.fp-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(67,97,238,.12); }
+.fp-actions {
+    padding: 14px 20px 20px; border-top: 1px solid var(--line, #dde3ef);
+    display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
+}
+.fp-apply { width: 100%; text-align: center; justify-content: center; }
+.fp-clear-link {
+    text-align: center; font-size: 13px; color: var(--muted);
+    text-decoration: none; display: block;
+}
+.fp-clear-link:hover { color: var(--ink); }
+
+/* ── Filter button badge ─────────────────────────────────── */
+.fp-btn-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    background: var(--accent); color: #fff;
+    font-size: 9px; font-weight: 700; border-radius: 99px;
+    margin-left: 4px; vertical-align: middle; line-height: 1;
+}
+
+/* ── Active filter chips ─────────────────────────────────── */
+.fp-chips-row {
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+    padding: 0 0 14px;
+}
+.fp-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px 3px 11px;
+    background: var(--blue-bg, #eef2f7); border: 1px solid var(--line, #dde3ef);
+    border-radius: 99px; font-size: 12px; font-weight: 620;
+    color: var(--accent-ink, #1e3a5f); text-decoration: none;
+    transition: border-color .12s, background .12s;
+}
+.fp-chip:hover { background: #e0e9ff; border-color: var(--accent); }
+.fp-chip-x { font-size: 14px; line-height: 1; color: var(--muted); }
+.fp-chip:hover .fp-chip-x { color: var(--ink); }
+.fp-chips-clear { font-size: 12px; color: var(--muted); text-decoration: none; }
+.fp-chips-clear:hover { color: var(--ink); }
+</style>
 
 <section class="panel queue-panel">
     <div class="panel-heading">
@@ -40,7 +191,12 @@
             <p>{{ $sub }}</p>
         </div>
         <div class="queue-actions">
-            <button type="button" class="button-secondary">Filters</button>
+            <button type="button" class="button-secondary" id="filterToggle">
+                <i class="bi bi-funnel"></i> Filters
+                @if($filterCount > 0)
+                    <span class="fp-btn-badge">{{ $filterCount }}</span>
+                @endif
+            </button>
             <button type="button" class="button-primary" id="preflight" disabled>Run batch preflight (<span id="pfCount">0</span>)</button>
         </div>
     </div>
@@ -55,6 +211,21 @@
             <label class="select-all"><input type="checkbox" id="selectAll" /> Select batch-eligible Green cases</label>
         </div>
     </div>
+
+    @if($filterCount > 0)
+    <div class="fp-chips-row">
+        @php
+            $chipLabels = ['search' => 'Name', 'triage' => 'Triage', 'state' => 'State'];
+        @endphp
+        @foreach($filterActive as $key => $val)
+            <a href="{{ $removeFilter($key) }}" class="fp-chip">
+                {{ $chipLabels[$key] ?? $key }}: {{ $val }}
+                <span class="fp-chip-x">&times;</span>
+            </a>
+        @endforeach
+        <a href="{{ $clearAllUrl }}" class="fp-chips-clear">Clear all</a>
+    </div>
+    @endif
 
     <div class="review-grid-scroll">
         <table class="review-grid compact" id="reviewGrid">
@@ -167,6 +338,80 @@
         </table>
     </div>
 </section>
+
+{{-- Filter drawer --}}
+<div class="fp-backdrop" id="fpBackdrop"></div>
+<aside class="fp-drawer" id="fpDrawer" aria-label="Filters" role="dialog">
+    <div class="fp-drawer-header">
+        <span class="fp-drawer-title">
+            <i class="bi bi-funnel"></i> Filters
+            @if($filterCount > 0)
+                <span class="fp-badge">{{ $filterCount }}</span>
+            @endif
+        </span>
+        <button type="button" class="fp-close" id="fpClose" aria-label="Close filters">&times;</button>
+    </div>
+
+    <form class="fp-form" method="GET" action="{{ $filterBaseUrl }}" id="fpForm">
+        @foreach($tabParam as $k => $v)
+            <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+        @endforeach
+
+        {{-- Search --}}
+        <div class="fp-section">
+            <div class="fp-section-label">Patient name</div>
+            <input type="text" name="search" class="fp-input"
+                   placeholder="Search by name…"
+                   value="{{ request('search') }}"
+                   autocomplete="off">
+        </div>
+
+        {{-- Triage --}}
+        <div class="fp-section">
+            <div class="fp-section-label">Triage priority</div>
+            <div class="fp-triage-group">
+                <label class="fp-triage-opt">
+                    <input type="radio" name="triage" value="" {{ !request('triage') ? 'checked' : '' }}>
+                    <span class="fp-triage-all">All</span>
+                </label>
+                <label class="fp-triage-opt">
+                    <input type="radio" name="triage" value="red" {{ request('triage') === 'red' ? 'checked' : '' }}>
+                    <span class="pill red">Red</span>
+                </label>
+                <label class="fp-triage-opt">
+                    <input type="radio" name="triage" value="yellow" {{ request('triage') === 'yellow' ? 'checked' : '' }}>
+                    <span class="pill yellow">Yellow</span>
+                </label>
+                <label class="fp-triage-opt">
+                    <input type="radio" name="triage" value="green" {{ request('triage') === 'green' ? 'checked' : '' }}>
+                    <span class="pill green">Green</span>
+                </label>
+            </div>
+        </div>
+
+        @if($isQueueRoute)
+        {{-- State (queue only) --}}
+        <div class="fp-section">
+            <div class="fp-section-label">Patient state</div>
+            <select name="state" class="fp-select">
+                <option value="">All states</option>
+                @foreach($usStates as $abbr => $stateName)
+                    <option value="{{ $abbr }}" {{ request('state') === $abbr ? 'selected' : '' }}>
+                        {{ $stateName }} ({{ $abbr }})
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        @endif
+    </form>
+
+    <div class="fp-actions">
+        <button type="submit" form="fpForm" class="button-primary fp-apply">Apply filters</button>
+        @if($filterCount > 0)
+            <a href="{{ $clearAllUrl }}" class="fp-clear-link">Clear all filters</a>
+        @endif
+    </div>
+</aside>
 
 {{-- Quick review below the grid, the preview's renderDrawer. Each visible case's
      data is built once below and embedded as JSON; the panel renders the top
@@ -602,6 +847,37 @@
             grid.classList.toggle('compact', compact.checked);
         });
         refresh();
+    })();
+</script>
+
+{{-- Filter drawer open/close --}}
+<script>
+    (function () {
+        var btn      = document.getElementById('filterToggle');
+        var backdrop = document.getElementById('fpBackdrop');
+        var drawer   = document.getElementById('fpDrawer');
+        var closeBtn = document.getElementById('fpClose');
+        var searchIn = drawer ? drawer.querySelector('input[name="search"]') : null;
+        if (!btn || !drawer) return;
+
+        function openDrawer() {
+            backdrop.classList.add('open');
+            drawer.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            if (searchIn) setTimeout(function () { searchIn.focus(); }, 260);
+        }
+        function closeDrawer() {
+            backdrop.classList.remove('open');
+            drawer.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        btn.addEventListener('click', openDrawer);
+        closeBtn.addEventListener('click', closeDrawer);
+        backdrop.addEventListener('click', closeDrawer);
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+        });
     })();
 </script>
 
