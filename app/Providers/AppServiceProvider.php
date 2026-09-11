@@ -19,9 +19,11 @@ use App\Models\StateVisitRequirement;
 use App\Models\User;
 use App\Observers\AuditObserver;
 use App\Services\Karen\MockKarenService;
+use App\Mail\Transport\SendgridApiTransport;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;
@@ -59,6 +61,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Mail::extend('sendgrid-api', function () {
+            return new SendgridApiTransport(config('services.sendgrid.key', ''));
+        });
+
         Paginator::useBootstrapFive();
 
         Passport::tokensExpireIn(now()->addDays(1));
