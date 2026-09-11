@@ -12,6 +12,7 @@
         "laravel/passport": "^13.7",
         "laravel/reverb": "^1.10",
         "laravel/tinker": "^2.10.1",
+        "sendgrid/sendgrid": "*",
         "spatie/laravel-permission": "^6.25"
     },
     "require-dev": {
