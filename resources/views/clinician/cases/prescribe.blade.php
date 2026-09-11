@@ -34,7 +34,7 @@
         'levels' => $o->levels ?? [],
         // Effective SIG: use partner-level sig_override from the pivot when set,
         // otherwise fall back to the global offering sig.
-        'sig' => (($o->pivot->sig_override ?? '') !== '') ? $o->pivot->sig_override : ($o->sig ?? ''),
+        'sig' => (($o->pivot?->sig_override ?? '') !== '') ? $o->pivot->sig_override : ($o->sig ?? ''),
     ])->values();
 
     $usStates = [
@@ -760,6 +760,8 @@
                 }
                 if (fTarget) {
                     list.querySelectorAll('[data-f="med"]').forEach(function (sel) {
+                        // Skip bundle rows — they have a specific per-item offering pre-selected.
+                        if (sel.closest('[data-bundle-group]')) return;
                         if (String(sel.value) !== String(fTarget.id)) {
                             sel.value = String(fTarget.id);
                             sel.dispatchEvent(new Event('change'));
