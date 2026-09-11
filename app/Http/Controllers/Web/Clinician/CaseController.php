@@ -512,24 +512,41 @@ class CaseController extends Controller
                 ->with('info', 'A draft prescription is waiting for your review.');
         }
 
-        // Filter offerings by categories already on the case; if none, show all
-        $categoryIds = $case->caseOfferings
+        // Filter offerings by categories already on the case; if none, show all.
+        // Always include offerings directly on the case even if their category_id is
+        // null — a bundle's second medication would otherwise be excluded from the
+        // dropdown and render with no pre-selected value.
+        $categoryIds      = $case->caseOfferings
             ->pluck('offering.category_id')
             ->filter()
             ->unique()
             ->values();
+        $caseOfferingIds  = $case->caseOfferings
+            ->pluck('offering_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $offeringColumns = ['offerings.id', 'offerings.name', 'offerings.internal_name', 'offerings.compound_formula',
+            'offerings.refills', 'offerings.quantity', 'offerings.days_supply', 'offerings.dispense_unit',
+            'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels', 'offerings.sig',
+            'offerings.category_id', 'offerings.formulation_type'];
 
         $offerings = $case->partner
             ->accessibleOfferings()
             ->with('category')
             ->where('offerings.is_active', true)
             ->approved()
-            ->when($categoryIds->count(), fn ($q) => $q->whereIn('offerings.category_id', $categoryIds))
+            ->where(function ($q) use ($categoryIds, $caseOfferingIds) {
+                if ($categoryIds->count()) {
+                    $q->whereIn('offerings.category_id', $categoryIds);
+                }
+                if ($caseOfferingIds->count()) {
+                    $q->orWhereIn('offerings.id', $caseOfferingIds);
+                }
+            })
             ->orderBy('offerings.name')
-            ->get(['offerings.id', 'offerings.name', 'offerings.internal_name', 'offerings.compound_formula',
-                'offerings.refills', 'offerings.quantity', 'offerings.days_supply', 'offerings.dispense_unit',
-                'offerings.days_until_dispense', 'offerings.directions', 'offerings.levels', 'offerings.sig',
-                'offerings.category_id', 'offerings.formulation_type']);
+            ->get($offeringColumns);
 
         $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
 
