@@ -548,6 +548,17 @@ class CaseController extends Controller
             ->orderBy('offerings.name')
             ->get($offeringColumns);
 
+        // The accessibleOfferings() JOIN excludes any offering not in the partner's pivot
+        // (e.g. NAD+, Tesamorelin on a bundle case whose catalog changed after submission).
+        // Fetch those missing offerings directly so the dropdown always pre-selects correctly.
+        $missingIds = $caseOfferingIds->diff($offerings->pluck('id'));
+        if ($missingIds->isNotEmpty()) {
+            $missing = Offering::with('category')
+                ->whereIn('id', $missingIds)
+                ->get($offeringColumns);
+            $offerings = $offerings->merge($missing)->sortBy('name')->values();
+        }
+
         $medicalNecessityPreset = \App\Models\Setting::get('medical_necessity_preset', '');
 
         // C9: auto-populate ICD-10 suggestions from the case's clinical intake
