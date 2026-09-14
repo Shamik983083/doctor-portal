@@ -854,10 +854,13 @@
             }
             if (!targetOffering) return; // matching formulation not in OFFERINGS — leave as-is
 
-            // Apply to all med dropdowns (overrides pre-selection if ID differs).
-            // For bundle rows whose dropdown is filtered to a different family, setting a
-            // non-existent value is a silent no-op, so those rows are unaffected.
+            // Apply only to dropdowns that actually contain the target offering.
+            // Bundle rows filtered to a different drug family won't have the option;
+            // setting a non-existent value resets select.value to "" in all browsers
+            // and fires change, which wipes the row — not a silent no-op.
             list.querySelectorAll('[data-f="med"]').forEach(function (sel) {
+                var optExists = Array.from(sel.options).some(function (o) { return String(o.value) === String(targetOffering.id); });
+                if (!optExists) return;
                 if (String(sel.value) !== String(targetOffering.id)) {
                     sel.value = String(targetOffering.id);
                     sel.dispatchEvent(new Event('change')); // → syncMed → renderMonths → autoFillMonths
