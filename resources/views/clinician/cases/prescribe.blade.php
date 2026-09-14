@@ -760,12 +760,11 @@
                 }
                 if (fTarget) {
                     list.querySelectorAll('[data-f="med"]').forEach(function (sel) {
-                        // Skip bundle rows — they have a specific per-item offering pre-selected.
-                        if (sel.closest('[data-bundle-group]')) return;
-                        if (String(sel.value) !== String(fTarget.id)) {
-                            sel.value = String(fTarget.id);
-                            sel.dispatchEvent(new Event('change'));
-                        }
+                        // Skip any dropdown already pre-selected from case offerings data
+                        // (both standalone and bundle rows). Only apply to empty new rows.
+                        if (sel.value) return;
+                        sel.value = String(fTarget.id);
+                        sel.dispatchEvent(new Event('change'));
                     });
                 }
                 return;
