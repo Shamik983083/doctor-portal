@@ -411,6 +411,8 @@
             if (n.indexOf('tirzepatide') > -1) return 'tirzepatide';
             if (n.indexOf('zofran') > -1 || n.indexOf('ondansetron') > -1) return 'zofran';
             if (n.indexOf('nad') > -1) return 'nad';
+            if (n.indexOf('tesamorelin') > -1) return 'tesamorelin';
+            if (n.indexOf('bpc-157') > -1 || n.indexOf('bpc157') > -1) return 'bpc157';
             return null;
         }
         function monthsIn(term) { var t = TERMS.filter(function (x) { return x.v === term; })[0]; return t ? t.n : 1; }
@@ -432,6 +434,8 @@
             if (k.indexOf('tirzepatide') > -1) return 'tirzepatide';
             if (k.indexOf('nad')         > -1) return 'nad';
             if (k.indexOf('zofran')      > -1 || k.indexOf('ondansetron') > -1) return 'zofran';
+            if (k.indexOf('tesamorelin') > -1) return 'tesamorelin';
+            if (k.indexOf('bpc')         > -1) return 'bpc157';
             return null;
         }
 
