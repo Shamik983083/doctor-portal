@@ -570,8 +570,12 @@ Content-Type: application/json
   "case_id":        "case-uuid",
   "external_id":    "your-order-id",
   "patient_id":     "patient-uuid",
-  "clinician_name": "Dr. Jane Smith",
-  "clinician_npi":  "1234567890",
+  "clinician_name":           "Dr. Jane Smith",
+  "clinician_npi":            "1234567890",
+  "clinician_license_state":  "CA",
+  "clinician_license_number": "G12345",
+  "clinician_phone":          "+1 555-123-4567",
+  "clinician_email":          "dr.smith@clinic.com",
   "diagnoses": [
     { "code": "E66.01", "description": "Morbid (severe) obesity due to excess calories" }
   ],

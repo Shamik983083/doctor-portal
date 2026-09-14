@@ -632,8 +632,12 @@ def webhook():
   "case_id":         "9d2f1c3e-...",
   "external_id":     "order-wl-20240701-001",   // your reference ID
   "patient_id":      "a1b2c3d4-...",
-  "clinician_name":  "Dr. Sarah Johnson, MD",
-  "clinician_npi":   "1234567890",
+  "clinician_name":           "Dr. Sarah Johnson, MD",
+  "clinician_npi":            "1234567890",
+  "clinician_license_state":  "CA",
+  "clinician_license_number": "G12345",
+  "clinician_phone":          "+1 555-123-4567",
+  "clinician_email":          "dr.johnson@clinic.com",
 
   // Structured ICD-10-CM codes (Phase 2+). Always an array.
   // Falls back to a plain string on legacy prescriptions written before Phase 2.
