@@ -899,12 +899,16 @@ class CaseController extends Controller
         $prescription->loadMissing('medications.offering');
         $coByOffering = $case->caseOfferings->keyBy('offering_id');
         $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
-            'case_id'         => $case->uuid,
-            'external_id'     => $case->external_id,
-            'patient_id'      => $case->patient->uuid ?? null,
-            'clinician_name'  => $clinician->full_name,
-            'clinician_npi'   => $clinician->npi,
-            'diagnoses'       => $prescription->diagnosesCodes->map(fn ($d) => [
+            'case_id'                  => $case->uuid,
+            'external_id'              => $case->external_id,
+            'patient_id'               => $case->patient->uuid ?? null,
+            'clinician_name'           => $clinician->full_name,
+            'clinician_npi'            => $clinician->npi,
+            'clinician_license_state'  => $clinician->license_state,
+            'clinician_license_number' => $clinician->license_number,
+            'clinician_phone'          => $clinician->phone,
+            'clinician_email'          => Auth::user()->email,
+            'diagnoses'                => $prescription->diagnosesCodes->map(fn ($d) => [
                 'code'        => $d->icd_code,
                 'description' => $d->description,
             ])->toArray() ?: $prescription->diagnoses,
@@ -1855,12 +1859,16 @@ class CaseController extends Controller
                 $prescription->load('medications.offering');
                 $coByOffering = $case->caseOfferings->keyBy('offering_id');
                 $this->webhooks->dispatch($case->partner_id, 'prescription_written', [
-                    'case_id'         => $case->uuid,
-                    'external_id'     => $case->external_id,
-                    'patient_id'      => $case->patient->uuid ?? null,
-                    'clinician_name'  => $clinician->full_name,
-                    'clinician_npi'   => $clinician->npi,
-                    'diagnoses'       => $prescription->diagnoses,
+                    'case_id'                  => $case->uuid,
+                    'external_id'              => $case->external_id,
+                    'patient_id'               => $case->patient->uuid ?? null,
+                    'clinician_name'           => $clinician->full_name,
+                    'clinician_npi'            => $clinician->npi,
+                    'clinician_license_state'  => $clinician->license_state,
+                    'clinician_license_number' => $clinician->license_number,
+                    'clinician_phone'          => $clinician->phone,
+                    'clinician_email'          => Auth::user()->email,
+                    'diagnoses'                => $prescription->diagnoses,
                     'meds_prescribed' => $prescription->medications->map(function ($m) use ($coByOffering) {
                         $co = $coByOffering->get($m->offering_id);
                         return [
