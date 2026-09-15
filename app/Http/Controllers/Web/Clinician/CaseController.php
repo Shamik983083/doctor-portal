@@ -902,18 +902,14 @@ class CaseController extends Controller
             'case_id'                  => $case->uuid,
             'external_id'              => $case->external_id,
             'patient_id'               => $case->patient->uuid ?? null,
-            'clinician_name'             => $clinician->full_name,
-            'clinician_npi'              => $clinician->npi,
-            'clinician_license_state'    => $clinician->license_state,
-            'clinician_license_number'   => $clinician->license_number,
-            'clinician_licensed_states'  => array_values(array_map(fn ($l) => [
-                'state'          => $l['state'] ?? null,
-                'license_number' => $l['license_number'] ?? null,
-                'expiry_date'    => $l['expiry_date'] ?? null,
-            ], $clinician->licensed_states ?? [])),
-            'clinician_phone'            => $clinician->phone,
-            'clinician_email'            => Auth::user()->email,
-            'diagnoses'                  => $prescription->diagnosesCodes->map(fn ($d) => [
+            'clinician_name'           => $clinician->full_name,
+            'clinician_npi'            => $clinician->npi,
+            'clinician_license_state'  => $case->patient_state,
+            'clinician_license_number' => collect($clinician->licensed_states ?? [])
+                ->firstWhere('state', $case->patient_state)['license_number'] ?? $clinician->license_number,
+            'clinician_phone'          => $clinician->phone,
+            'clinician_email'          => Auth::user()->email,
+            'diagnoses'                => $prescription->diagnosesCodes->map(fn ($d) => [
                 'code'        => $d->icd_code,
                 'description' => $d->description,
             ])->toArray() ?: $prescription->diagnoses,
@@ -1867,18 +1863,14 @@ class CaseController extends Controller
                     'case_id'                  => $case->uuid,
                     'external_id'              => $case->external_id,
                     'patient_id'               => $case->patient->uuid ?? null,
-                    'clinician_name'             => $clinician->full_name,
-                    'clinician_npi'              => $clinician->npi,
-                    'clinician_license_state'    => $clinician->license_state,
-                    'clinician_license_number'   => $clinician->license_number,
-                    'clinician_licensed_states'  => array_values(array_map(fn ($l) => [
-                        'state'          => $l['state'] ?? null,
-                        'license_number' => $l['license_number'] ?? null,
-                        'expiry_date'    => $l['expiry_date'] ?? null,
-                    ], $clinician->licensed_states ?? [])),
-                    'clinician_phone'            => $clinician->phone,
-                    'clinician_email'            => Auth::user()->email,
-                    'diagnoses'                  => $prescription->diagnoses,
+                    'clinician_name'           => $clinician->full_name,
+                    'clinician_npi'            => $clinician->npi,
+                    'clinician_license_state'  => $case->patient_state,
+                    'clinician_license_number' => collect($clinician->licensed_states ?? [])
+                        ->firstWhere('state', $case->patient_state)['license_number'] ?? $clinician->license_number,
+                    'clinician_phone'          => $clinician->phone,
+                    'clinician_email'          => Auth::user()->email,
+                    'diagnoses'                => $prescription->diagnoses,
                     'meds_prescribed' => $prescription->medications->map(function ($m) use ($coByOffering) {
                         $co = $coByOffering->get($m->offering_id);
                         return [

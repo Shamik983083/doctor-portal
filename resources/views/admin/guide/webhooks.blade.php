@@ -634,12 +634,8 @@ def webhook():
   "patient_id":      "a1b2c3d4-...",
   "clinician_name":           "Dr. Sarah Johnson, MD",
   "clinician_npi":            "1234567890",
-  "clinician_license_state":  "CA",
-  "clinician_license_number": "G12345",
-  "clinician_licensed_states": [
-    { "state": "CA", "license_number": "G12345", "expiry_date": "2026-12-31" },
-    { "state": "TX", "license_number": "TX98765", "expiry_date": "2027-06-30" }
-  ],
+  "clinician_license_state":  "CA",             // patient's state at time of prescription
+  "clinician_license_number": "G12345",         // clinician's license number for that state
   "clinician_phone":          "+1 555-123-4567",
   "clinician_email":          "dr.johnson@clinic.com",
 

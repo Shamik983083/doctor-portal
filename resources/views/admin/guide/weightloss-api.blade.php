@@ -572,12 +572,8 @@ Content-Type: application/json
   "patient_id":     "patient-uuid",
   "clinician_name":           "Dr. Jane Smith",
   "clinician_npi":            "1234567890",
-  "clinician_license_state":  "CA",
-  "clinician_license_number": "G12345",
-  "clinician_licensed_states": [
-    { "state": "CA", "license_number": "G12345", "expiry_date": "2026-12-31" },
-    { "state": "TX", "license_number": "TX98765", "expiry_date": "2027-06-30" }
-  ],
+  "clinician_license_state":  "CA",             // patient's state at time of prescription
+  "clinician_license_number": "G12345",         // clinician's license number for that state
   "clinician_phone":          "+1 555-123-4567",
   "clinician_email":          "dr.smith@clinic.com",
   "diagnoses": [
