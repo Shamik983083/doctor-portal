@@ -47,6 +47,11 @@ class User extends Authenticatable
         return $this->hasOne(Clinician::class);
     }
 
+    public function supervisorPhysician()
+    {
+        return $this->hasOne(SupervisorPhysician::class);
+    }
+
     public function partner()
     {
         return $this->belongsTo(Partner::class);
