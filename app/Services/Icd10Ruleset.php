@@ -413,6 +413,66 @@ final class Icd10Ruleset
     }
 
     /**
+     * Build the "Diagnosis: ..." line appended to GLP-1 charting notes.
+     *
+     * Uses the client-mandated code set (distinct from the form-dropdown codes
+     * produced by for()). Called only when a GLP-1 medication is present.
+     *
+     * Always included : Z72.4, E88.9
+     * BMI 26.0–29.9   : E66.3 Overweight
+     * BMI ≥ 30.0      : E66  Obesity
+     * Comorbidities   : mapped via COMORBIDITY_MAP (same fragments as for())
+     */
+    public static function glpNoteBlock(PatientCase $case): string
+    {
+        $case->loadMissing('patient');
+
+        $bmi        = self::resolveBmi($case);
+        $conditions = self::extractConditions($case->clinical_intake ?? []);
+
+        $codes = [];
+        $seen  = [];
+
+        // Always-present codes
+        self::pushNote($codes, $seen, 'Z72.4', 'Inappropriate diet and eating habits');
+        self::pushNote($codes, $seen, 'E88.9', 'Metabolic disorder, unspecified');
+
+        // BMI-based obesity / overweight code
+        if ($bmi !== null) {
+            if ($bmi >= 30.0) {
+                self::pushNote($codes, $seen, 'E66', 'Obesity');
+            } elseif ($bmi >= 26.0) {
+                self::pushNote($codes, $seen, 'E66.3', 'Overweight');
+            }
+        }
+
+        // Comorbidity codes from intake (same matching logic as for())
+        foreach ($conditions as $condition) {
+            $normalised = strtolower(trim($condition));
+            foreach (self::COMORBIDITY_MAP as $fragment => $mapping) {
+                if (str_contains($normalised, $fragment)) {
+                    self::pushNote($codes, $seen, $mapping['code'], $mapping['description']);
+                    break; // one match per condition string
+                }
+            }
+        }
+
+        $parts = array_map(fn ($c) => $c['code'] . ' ' . $c['description'], $codes);
+
+        return 'Diagnosis: ' . implode(', ', $parts);
+    }
+
+    /** Deduplicating push for glpNoteBlock (no sort_order / auto_populated needed). */
+    private static function pushNote(array &$codes, array &$seen, string $code, string $description): void
+    {
+        if (isset($seen[$code])) {
+            return;
+        }
+        $seen[$code] = true;
+        $codes[]     = ['code' => $code, 'description' => $description];
+    }
+
+    /**
      * Resolve BMI from the patient record.
      * Falls back to a weight/height calculation if bmi is null.
      * Returns null when insufficient data is available.
