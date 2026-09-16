@@ -21,6 +21,11 @@ class SupervisorPhysician extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function clinicianAssignments()
+    {
+        return $this->hasMany(ClinicianSupervisorAssignment::class);
+    }
+
     public function getNameAttribute(): string
     {
         return $this->user->name ?? '';

@@ -169,6 +169,7 @@ class Clinician extends Model
     public function clinicalNotes() { return $this->hasMany(ClinicalNote::class); }
     public function messages() { return $this->hasMany(Message::class); }
     public function healthieMappings() { return $this->hasMany(ClinicianHealthieMapping::class); }
+    public function supervisorAssignments() { return $this->hasMany(ClinicianSupervisorAssignment::class); }
 
     /** Sub-storefronts this clinician is explicitly assigned to for routing. */
     public function subStorefronts() { return $this->belongsToMany(SubStorefront::class, 'clinician_sub_storefront')->withTimestamps(); }
