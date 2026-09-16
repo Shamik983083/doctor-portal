@@ -1002,18 +1002,19 @@ class CaseController extends Controller
                 'timestamp' => now()->timestamp,
             ]);
 
+            // PAUSED by client request — re-enable by uncommenting the block below.
             // Email copy to patient — non-fatal, queued, skipped when no address or opt-out.
-            $patient = $case->patient;
-            if ($patient?->email && $patient->email_opt_in) {
-                try {
-                    Mail::to($patient->email)->queue(new PrescriptionApprovalMail($case, $message));
-                } catch (\Throwable $e) {
-                    Log::warning('C12: Prescription approval email failed to queue.', [
-                        'case_id' => $case->id,
-                        'error'   => $e->getMessage(),
-                    ]);
-                }
-            }
+            // $patient = $case->patient;
+            // if ($patient?->email && $patient->email_opt_in) {
+            //     try {
+            //         Mail::to($patient->email)->queue(new PrescriptionApprovalMail($case, $message));
+            //     } catch (\Throwable $e) {
+            //         Log::warning('C12: Prescription approval email failed to queue.', [
+            //             'case_id' => $case->id,
+            //             'error'   => $e->getMessage(),
+            //         ]);
+            //     }
+            // }
         } else {
             Log::warning('C12: prescribeConfirm skipped approval message — case has no patient_id.', [
                 'case_id' => $case->id,
