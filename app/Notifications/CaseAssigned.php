@@ -20,7 +20,7 @@ class CaseAssigned extends Notification
     public function toDatabase(object $notifiable): array
     {
         $patient   = $this->case->patient;
-        $clinician = $this->case->clinician?->user?->name ?? 'a clinician';
+        $clinician = $this->case->clinician?->full_name ?? 'a clinician';
 
         return [
             'type'     => 'case_assigned',

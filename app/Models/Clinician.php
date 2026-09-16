@@ -176,7 +176,7 @@ class Clinician extends Model
 
     public function getFullNameAttribute(): string
     {
-        return trim(($this->credentials ? $this->credentials . ' ' : '') . $this->user->name);
+        return trim($this->user->name . ($this->credentials ? ', ' . $this->credentials : ''));
     }
 
     /**
