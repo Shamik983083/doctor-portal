@@ -32,6 +32,13 @@ foreach ($clinician->licensed_states ?? [] as $lic) {
 }
 $licenseInfo = old('license_info', $existingLicenses);
 $hasLicenses = count($licenseInfo) > 0;
+
+// Supervisor assignments: state => supervisor_physician_id (from controller)
+$supervisorAssignments = $supervisorAssignments ?? [];
+// Restore old() input after a validation failure
+if (old('supervisor_assignments')) {
+    $supervisorAssignments = old('supervisor_assignments');
+}
 @endphp
 
 @section('content')
@@ -305,6 +312,7 @@ $hasLicenses = count($licenseInfo) > 0;
                                     <th style="width:130px;">State</th>
                                     <th>License Number <span class="text-danger">*</span></th>
                                     <th style="width:180px;">Expiry Date <span class="text-danger">*</span></th>
+                                    <th style="width:220px;">Supervising Physician</th>
                                 </tr>
                             </thead>
                             <tbody id="license-tbody">
@@ -335,6 +343,18 @@ $hasLicenses = count($licenseInfo) > 0;
                                         @error("license_info.{$abbr}.expiry")
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
+                                    </td>
+                                    <td>
+                                        <select name="supervisor_assignments[{{ $abbr }}]"
+                                                class="form-select form-select-sm">
+                                            <option value="">— None —</option>
+                                            @foreach($supervisorsByState[$abbr] ?? [] as $sp)
+                                                <option value="{{ $sp['id'] }}"
+                                                    {{ ($supervisorAssignments[$abbr] ?? null) == $sp['id'] ? 'selected' : '' }}>
+                                                    {{ $sp['name'] }}
+                                                </option>
+                                            @endforeach
+                                        </select>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -439,7 +459,8 @@ $hasLicenses = count($licenseInfo) > 0;
 @section('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var stateNames = <?php echo json_encode($usStates); ?>;
+    var stateNames       = <?php echo json_encode($usStates); ?>;
+    var supervisorsByState = <?php echo json_encode($supervisorsByState ?? []); ?>;
 
     var checkboxes   = document.querySelectorAll('.state-checkbox');
     var countBadge   = document.getElementById('state-count');
@@ -463,7 +484,20 @@ document.addEventListener('DOMContentLoaded', function () {
         emptyMsg.classList.remove('d-none');
     }
 
-    function addLicenseRow(abbr, existingNumber, existingExpiry) {
+    function buildSupervisorSelect(abbr, selectedId) {
+        var supervisors = supervisorsByState[abbr] || [];
+        var html = '<select name="supervisor_assignments[' + abbr + ']" class="form-select form-select-sm">'
+                 + '<option value="">— None —</option>';
+        for (var i = 0; i < supervisors.length; i++) {
+            var sp = supervisors[i];
+            var sel = (selectedId && parseInt(selectedId) === sp.id) ? ' selected' : '';
+            html += '<option value="' + sp.id + '"' + sel + '>' + sp.name + '</option>';
+        }
+        html += '</select>';
+        return html;
+    }
+
+    function addLicenseRow(abbr, existingNumber, existingExpiry, existingSupervisorId) {
         if (document.getElementById('license-row-' + abbr)) return;
         var name = stateNames[abbr] || abbr;
         var tr = document.createElement('tr');
@@ -484,7 +518,8 @@ document.addEventListener('DOMContentLoaded', function () {
             +   '<input type="date" name="license_info[' + abbr + '][expiry]"'
             +          ' class="form-control form-control-sm"'
             +          ' value="' + (existingExpiry || '') + '" required>'
-            + '</td>';
+            + '</td>'
+            + '<td>' + buildSupervisorSelect(abbr, existingSupervisorId || null) + '</td>';
         tbody.appendChild(tr);
         showTable();
     }

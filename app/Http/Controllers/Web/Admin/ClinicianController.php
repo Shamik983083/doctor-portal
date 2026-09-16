@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProvisionClinicianInHealthieJob;
 use App\Models\Clinician;
 use App\Models\ClinicianHealthieMapping;
+use App\Models\ClinicianSupervisorAssignment;
 use App\Models\PartnerEhrSetting;
 use App\Models\PatientCase;
+use App\Models\SupervisorPhysician;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -103,7 +105,7 @@ class ClinicianController extends Controller
     public function edit(int $id)
     {
         $clinician = Clinician::visibleTo(auth()->user())
-            ->with(['user', 'acceptedCategories', 'healthieMappings.partner', 'healthieMappings.subStorefront'])
+            ->with(['user', 'acceptedCategories', 'healthieMappings.partner', 'healthieMappings.subStorefront', 'supervisorAssignments'])
             ->findOrFail($id);
 
         // The eligibility gate's doctor side (Devin msg 2308). Only active
@@ -122,11 +124,30 @@ class ClinicianController extends Controller
                 : $map->partner !== null;
         });
 
+        // Build a map of state => [[id, name], ...] for active supervisor physicians.
+        // Passed as JSON to the view's JS so the dropdown is populated dynamically.
+        $supervisorsByState = SupervisorPhysician::with('user')
+            ->whereHas('user', fn ($q) => $q->where(fn ($q) => $q->where('is_active', true)->orWhereNull('is_active')))
+            ->get()
+            ->reduce(function ($carry, $sp) {
+                foreach ($sp->licensed_states ?? [] as $state) {
+                    $carry[$state][] = ['id' => $sp->id, 'name' => $sp->user->name ?? ''];
+                }
+                return $carry;
+            }, []);
+
+        // Existing assignments: state => supervisor_physician_id
+        $supervisorAssignments = $clinician->supervisorAssignments
+            ->pluck('supervisor_physician_id', 'state')
+            ->all();
+
         return view('admin.clinicians.edit', [
-            'clinician'            => $clinician,
-            'categories'           => $categories,
-            'acceptedCategoryIds'  => $clinician->acceptedCategories->pluck('id')->all(),
-            'healthieMappings'     => $healthieMappings,
+            'clinician'             => $clinician,
+            'categories'            => $categories,
+            'acceptedCategoryIds'   => $clinician->acceptedCategories->pluck('id')->all(),
+            'healthieMappings'      => $healthieMappings,
+            'supervisorsByState'    => $supervisorsByState,
+            'supervisorAssignments' => $supervisorAssignments,
         ]);
     }
 
@@ -177,10 +198,12 @@ class ClinicianController extends Controller
             'accepts_async_visits'  => 'nullable|boolean',
             'accepts_sync_visits'   => 'nullable|boolean',
             'scheduling_link'       => 'nullable|url|max:500',
-            'license_info'         => 'required|array|min:1',
-            'license_info.*.state' => 'required|string|size:2',
-            'license_info.*.number'=> 'required|string|max:100',
-            'license_info.*.expiry'=> 'required|date',
+            'license_info'                       => 'required|array|min:1',
+            'license_info.*.state'               => 'required|string|size:2',
+            'license_info.*.number'              => 'required|string|max:100',
+            'license_info.*.expiry'              => 'required|date',
+            'supervisor_assignments'             => 'nullable|array',
+            'supervisor_assignments.*'           => 'nullable|integer|exists:supervisor_physicians,id',
         ]);
 
         $userUpdate = ['name' => $data['name'], 'email' => $data['email']];
@@ -229,6 +252,30 @@ class ClinicianController extends Controller
          * fail-closed reading, matching how blank licensure now behaves.
          */
         $clinician->acceptedCategories()->sync($data['accepted_categories'] ?? []);
+
+        // Save supervisor physician assignments — one per licensed state.
+        // Only states that actually have a supervisor selected are upserted;
+        // states with no selection have their assignment removed.
+        $incomingAssignments = $request->input('supervisor_assignments', []);
+        $validStates = array_column($licensedStates, 'state');
+
+        // Remove assignments for states no longer licensed or cleared to none.
+        ClinicianSupervisorAssignment::where('clinician_id', $clinician->id)
+            ->whereNotIn('state', array_filter(array_keys($incomingAssignments), fn ($s) => !empty($incomingAssignments[$s])))
+            ->delete();
+
+        foreach ($incomingAssignments as $state => $spId) {
+            if (empty($spId) || ! in_array(strtoupper($state), $validStates)) {
+                ClinicianSupervisorAssignment::where('clinician_id', $clinician->id)
+                    ->where('state', strtoupper($state))
+                    ->delete();
+                continue;
+            }
+            ClinicianSupervisorAssignment::updateOrCreate(
+                ['clinician_id' => $clinician->id, 'state' => strtoupper($state)],
+                ['supervisor_physician_id' => (int) $spId]
+            );
+        }
 
         // Re-provision into Healthie in case is_global changed or new partners
         // were configured since the last sync. Skips already-synced mappings.
