@@ -48,8 +48,8 @@ $oldStates = old('licensed_states', []);
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">NPI <span class="text-muted fw-normal">(optional)</span></label>
-                        <input type="text" name="npi" class="form-control @error('npi') is-invalid @enderror" value="{{ old('npi') }}" maxlength="20" placeholder="10-digit NPI">
+                        <label class="form-label">NPI <span class="text-danger">*</span></label>
+                        <input type="text" name="npi" class="form-control @error('npi') is-invalid @enderror" value="{{ old('npi') }}" maxlength="20" placeholder="10-digit NPI" required>
                         @error('npi')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 

@@ -33,7 +33,7 @@ class SupervisorPhysicianController extends Controller
         $data = $request->validate([
             'name'                  => 'required|string|max:255',
             'email'                 => 'required|email|unique:users,email',
-            'npi'                   => 'nullable|string|max:20',
+            'npi'                   => 'required|string|max:20',
             'licensed_states'       => 'required|array|min:1',
             'licensed_states.*'     => 'string|size:2',
             'password'              => 'required|string|min:8|confirmed',
@@ -74,7 +74,7 @@ class SupervisorPhysicianController extends Controller
             ->findOrFail($id);
 
         $data = $request->validate([
-            'npi'               => 'nullable|string|max:20',
+            'npi'               => 'required|string|max:20',
             'licensed_states'   => 'required|array|min:1',
             'licensed_states.*' => 'string|size:2',
         ]);
