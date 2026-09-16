@@ -416,6 +416,23 @@ class CaseController extends Controller
      * exists and the clinician needs to know why they are being stopped, otherwise
      * this reads as a broken link and generates a support ticket.
      */
+    /**
+     * True when any medication name contains a GLP-1 drug family identifier.
+     * Mirrors the JS family() logic: semaglutide or tirzepatide substring match.
+     *
+     * @param string[] $medNames
+     */
+    private function isGlpPrescription(array $medNames): bool
+    {
+        foreach ($medNames as $name) {
+            $n = strtolower((string) $name);
+            if (str_contains($n, 'semaglutide') || str_contains($n, 'tirzepatide')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function assertLicensedForCase(PatientCase $case): void
     {
         $user = Auth::user();
@@ -797,12 +814,21 @@ class CaseController extends Controller
             }
 
             // C8: charting note (provider's clinical rationale) → ClinicalNote, not directions column.
-            if ($request->filled('directions')) {
+            // GLP-1 prescriptions always get a "Diagnosis:" line appended; the guard
+            // str_contains(..., 'Diagnosis:') prevents a double-append if the provider
+            // typed their own diagnosis block or clicked save twice.
+            $medNames = collect($request->input('medications', []))->pluck('name')->filter()->all();
+            $noteText = trim((string) $request->input('directions', ''));
+            if ($this->isGlpPrescription($medNames) && ! str_contains($noteText, 'Diagnosis:')) {
+                $block    = Icd10Ruleset::glpNoteBlock($case);
+                $noteText = $noteText !== '' ? $noteText . "\n\n" . $block : $block;
+            }
+            if ($noteText !== '') {
                 ClinicalNote::create([
                     'case_id'      => $case->id,
                     'clinician_id' => $clinician->id,
                     'type'         => 'charting',
-                    'note'         => $request->input('directions'),
+                    'note'         => $noteText,
                     'is_private'   => true,
                 ]);
             }
@@ -870,20 +896,30 @@ class CaseController extends Controller
             ->latest()
             ->firstOrFail();
 
+        // Append the GLP-1 diagnosis block before persisting the charting note.
+        // The guard on 'Diagnosis:' prevents double-append when the provider
+        // already typed a diagnosis block on the initial prescribe form (step 1).
+        $medNames  = $prescription->medications->pluck('name')->filter()->all();
+        $noteText  = trim((string) $request->input('charting_note', ''));
+        if ($this->isGlpPrescription($medNames) && ! str_contains($noteText, 'Diagnosis:')) {
+            $block    = Icd10Ruleset::glpNoteBlock($case);
+            $noteText = $noteText !== '' ? $noteText . "\n\n" . $block : $block;
+        }
+
         $clinicalNote = null;
-        DB::transaction(function () use ($request, $case, $clinician, $prescription, &$clinicalNote) {
+        DB::transaction(function () use ($noteText, $case, $clinician, $prescription, &$clinicalNote) {
             $prescription->update([
                 'review_status' => CasePrescription::REVIEW_CONFIRMED,
-                'charting_note' => $request->input('charting_note'),
+                'charting_note' => $noteText ?: null,
             ]);
 
             // C12: persist the charting note as a ClinicalNote on confirmation.
-            if ($request->filled('charting_note')) {
+            if ($noteText !== '') {
                 $clinicalNote = ClinicalNote::create([
                     'case_id'      => $case->id,
                     'clinician_id' => $clinician->id,
                     'type'         => 'charting',
-                    'note'         => $request->input('charting_note'),
+                    'note'         => $noteText,
                     'is_private'   => true,
                 ]);
             }
