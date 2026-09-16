@@ -450,6 +450,17 @@ Route::prefix('admin')->middleware(['auth', 'mfa', 'force.reset', 'role:admin|su
         Route::post('/sla', [\App\Http\Controllers\Web\Admin\RoutingOperationsController::class, 'storeSla'])->name('sla.store');
     });
 
+    // Supervisor Physicians (Super Admin only)
+    Route::prefix('supervisor-physicians')->name('supervisor-physicians.')->middleware('role:super_admin')->group(function () {
+        Route::get('/',          [\App\Http\Controllers\Web\Admin\SupervisorPhysicianController::class, 'index'])->name('index');
+        Route::get('/create',    [\App\Http\Controllers\Web\Admin\SupervisorPhysicianController::class, 'create'])->name('create');
+        Route::post('/',         [\App\Http\Controllers\Web\Admin\SupervisorPhysicianController::class, 'store'])->name('store');
+        Route::get('/{id}',      [\App\Http\Controllers\Web\Admin\SupervisorPhysicianController::class, 'show'])->name('show');
+        Route::put('/{id}',      [\App\Http\Controllers\Web\Admin\SupervisorPhysicianController::class, 'update'])->name('update');
+        Route::patch('/{id}/toggle-active', [\App\Http\Controllers\Web\Admin\SupervisorPhysicianController::class, 'toggleActive'])->name('toggle-active');
+        Route::delete('/{id}',   [\App\Http\Controllers\Web\Admin\SupervisorPhysicianController::class, 'destroy'])->name('destroy');
+    });
+
     // Admin Users (Super Admin only)
     Route::prefix('admins')->name('admins.')->middleware('role:super_admin')->group(function () {
         Route::get('/',         [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'index'])->name('index');

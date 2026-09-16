@@ -10,7 +10,7 @@
     );
     $apiActive   = request()->routeIs('admin.guide.*', 'admin.webhooks.*', 'admin.ehr-records.*', 'guide.healthie-ehr', 'admin.guide.partner-api');
     $cfgActive   = request()->routeIs('admin.settings*', 'admin.triage-rules.*', 'admin.routing.index', 'admin.routing.visit-requirements*', 'admin.ai.*');
-    $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*', 'admin.users.*');
+    $superActive = request()->routeIs('admin.admins.*', 'admin.audit-log.*', 'admin.users.*', 'admin.supervisor-physicians.*');
 @endphp
 
 <div class="mt-1 pb-3">
@@ -267,6 +267,10 @@
         <a class="nav-link sub {{ request()->routeIs('admin.admins.*') ? 'active' : '' }}"
            href="{{ route('admin.admins.index') }}">
             <i class="bi bi-shield-lock"></i> Admin Users
+        </a>
+        <a class="nav-link sub {{ request()->routeIs('admin.supervisor-physicians.*') ? 'active' : '' }}"
+           href="{{ route('admin.supervisor-physicians.index') }}">
+            <i class="bi bi-person-badge"></i> Supervisor Physicians
         </a>
         <a class="nav-link {{ request()->routeIs('admin.audit-log.*') ? 'active' : '' }}"
            href="{{ route('admin.audit-log.index') }}">
