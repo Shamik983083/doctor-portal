@@ -31,7 +31,17 @@ class ClinicianController extends Controller
 
     public function create()
     {
-        return view('admin.clinicians.create');
+        $supervisorsByState = SupervisorPhysician::with('user')
+            ->whereHas('user', fn ($q) => $q->where(fn ($q) => $q->where('is_active', true)->orWhereNull('is_active')))
+            ->get()
+            ->reduce(function ($carry, $sp) {
+                foreach ($sp->licensed_states ?? [] as $state) {
+                    $carry[$state][] = ['id' => $sp->id, 'name' => $sp->user->name ?? ''];
+                }
+                return $carry;
+            }, []);
+
+        return view('admin.clinicians.create', compact('supervisorsByState'));
     }
 
     public function store(Request $request)
@@ -45,10 +55,12 @@ class ClinicianController extends Controller
             'specialty'                 => 'nullable|string',
             'credentials'               => 'required|in:MD,DO,NP,PA',
             'is_global'                 => 'nullable|boolean',
-            'license_info'              => 'required|array|min:1',
-            'license_info.*.state'      => 'required|string|size:2',
-            'license_info.*.number'     => 'required|string|max:100',
-            'license_info.*.expiry'     => 'required|date',
+            'license_info'               => 'required|array|min:1',
+            'license_info.*.state'       => 'required|string|size:2',
+            'license_info.*.number'      => 'required|string|max:100',
+            'license_info.*.expiry'      => 'required|date',
+            'supervisor_assignments'     => 'nullable|array',
+            'supervisor_assignments.*'   => 'nullable|integer|exists:supervisor_physicians,id',
         ]);
 
         $user = User::create([
@@ -77,6 +89,16 @@ class ClinicianController extends Controller
             'licensed_states' => $licensedStates,
             'is_global'       => $request->boolean('is_global', true),
         ]);
+
+        // Save supervisor physician assignments for this new clinician.
+        foreach ($request->input('supervisor_assignments', []) as $state => $spId) {
+            if (empty($spId)) continue;
+            ClinicianSupervisorAssignment::create([
+                'clinician_id'           => $clinician->id,
+                'supervisor_physician_id' => (int) $spId,
+                'state'                  => strtoupper($state),
+            ]);
+        }
 
         /*
          * A Doctor Admin who creates a doctor is put over them immediately.

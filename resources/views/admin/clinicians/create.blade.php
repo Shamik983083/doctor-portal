@@ -19,8 +19,10 @@ $usStates = [
     'UT' => 'Utah',          'VT' => 'Vermont',         'VA' => 'Virginia',       'WA' => 'Washington',
     'WV' => 'West Virginia', 'WI' => 'Wisconsin',       'WY' => 'Wyoming',
 ];
-$oldLicenseInfo  = old('license_info', []);
-$hasOldLicenses  = count($oldLicenseInfo) > 0;
+$oldLicenseInfo      = old('license_info', []);
+$hasOldLicenses      = count($oldLicenseInfo) > 0;
+$supervisorsByState  = $supervisorsByState ?? [];
+$oldSupervisors      = old('supervisor_assignments', []);
 @endphp
 
 @section('content')
@@ -153,6 +155,7 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
                                     <th style="width:130px;">State</th>
                                     <th>License Number <span class="text-danger">*</span></th>
                                     <th style="width:180px;">Expiry Date <span class="text-danger">*</span></th>
+                                    <th style="width:220px;">Supervising Physician</th>
                                 </tr>
                             </thead>
                             <tbody id="license-tbody">
@@ -185,6 +188,18 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </td>
+                                    <td>
+                                        <select name="supervisor_assignments[{{ $abbr }}]"
+                                                class="form-select form-select-sm">
+                                            <option value="">— None —</option>
+                                            @foreach($supervisorsByState[$abbr] ?? [] as $sp)
+                                                <option value="{{ $sp['id'] }}"
+                                                    {{ ($oldSupervisors[$abbr] ?? null) == $sp['id'] ? 'selected' : '' }}>
+                                                    {{ $sp['name'] }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
                                 </tr>
                                 @endforeach
                             </tbody>
@@ -208,7 +223,8 @@ $hasOldLicenses  = count($oldLicenseInfo) > 0;
 @section('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var stateNames = <?php echo json_encode($usStates); ?>;
+    var stateNames        = <?php echo json_encode($usStates); ?>;
+    var supervisorsByState = <?php echo json_encode($supervisorsByState ?? []); ?>;
 
     var checkboxes   = document.querySelectorAll('.state-checkbox');
     var countBadge   = document.getElementById('state-count');
@@ -234,6 +250,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var today = new Date().toISOString().split('T')[0];
 
+    function buildSupervisorSelect(abbr) {
+        var supervisors = supervisorsByState[abbr] || [];
+        var html = '<select name="supervisor_assignments[' + abbr + ']" class="form-select form-select-sm">'
+                 + '<option value="">— None —</option>';
+        for (var i = 0; i < supervisors.length; i++) {
+            html += '<option value="' + supervisors[i].id + '">' + supervisors[i].name + '</option>';
+        }
+        html += '</select>';
+        return html;
+    }
+
     function addLicenseRow(abbr) {
         if (document.getElementById('license-row-' + abbr)) return;
         var name = stateNames[abbr] || abbr;
@@ -253,7 +280,8 @@ document.addEventListener('DOMContentLoaded', function () {
             + '<td>'
             +   '<input type="date" name="license_info[' + abbr + '][expiry]"'
             +          ' class="form-control form-control-sm" min="' + today + '" required>'
-            + '</td>';
+            + '</td>'
+            + '<td>' + buildSupervisorSelect(abbr) + '</td>';
         tbody.appendChild(tr);
         showTable();
     }
