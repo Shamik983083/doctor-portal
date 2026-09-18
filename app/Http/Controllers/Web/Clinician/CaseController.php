@@ -1167,11 +1167,16 @@ class CaseController extends Controller
             $request->input('provider_text')
         );
 
-        $clinicianName  = $case->clinician?->full_name ?? '';
+        // Use the logged-in clinician as the prescriber (case may not be formally
+        // assigned yet at the prescribe-review stage).
+        $authClinician  = auth()->user()?->clinician;
+        $clinicianName  = $authClinician?->full_name ?? $case->clinician?->full_name ?? '';
         $patientState   = strtoupper(trim((string) ($case->patient?->state ?? '')));
         $supervisorName = '';
-        if ($patientState && $case->clinician) {
-            $assignment = $case->clinician->supervisorAssignments
+        $activeClinician = $authClinician ?? $case->clinician;
+        if ($patientState && $activeClinician) {
+            $activeClinician->load('supervisorAssignments.supervisorPhysician.user');
+            $assignment = $activeClinician->supervisorAssignments
                 ->where('state', $patientState)->first();
             if ($assignment?->supervisorPhysician?->user) {
                 $supervisorName = $assignment->supervisorPhysician->user->name;
