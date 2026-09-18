@@ -1014,7 +1014,14 @@
                         var text = d.text;
                         var clinician = @json($__prescribedBy);
                         var supervisor = @json($__supervisorName);
+                        // Blank line before each SECTION header
                         text = text.replace(/\n(SECTION\s+\d+)/g, '\n\n$1');
+                        // Strip any existing separator lines from prior generations
+                        text = text.replace(/^[─━═]{10,}$/gm, '');
+                        // Add separator line under each section header
+                        text = text.replace(/^(SECTION\s+\d+.+)$/gm, '$1\n' + '─'.repeat(50));
+                        // Collapse triple+ blank lines
+                        text = text.replace(/\n{3,}/g, '\n\n');
                         text = text.replace(/^PRESCRIBED BY:.*$/im, '').replace(/^SUPERVISING PHYSICIAN:.*$/im, '').trimEnd();
                         text += '\n\nPRESCRIBED BY: ' + (clinician || '');
                         if (supervisor) { text += '\nSUPERVISING PHYSICIAN: ' + supervisor; }
