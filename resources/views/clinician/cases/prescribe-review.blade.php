@@ -186,25 +186,22 @@
             .then(function (d) {
                 if (d && d.text) {
                     var text = d.text;
-
-                    // Add blank line before each SECTION header for visual separation
-                    text = text.replace(/\n(SECTION\s+\d+\s*[—-])/g, '\n\n$1');
-
-                    // Fix PRESCRIBED BY — replace blank line or fill in name
                     var clinician = (d.clinician_name || '').trim();
                     var supervisor = (d.supervisor_name || '').trim();
-                    if (clinician) {
-                        // Replace "PRESCRIBED BY:" with nothing after it, or "PRESCRIBED BY: null"
-                        text = text.replace(/PRESCRIBED BY:\s*(null)?\s*$/im, 'PRESCRIBED BY: ' + clinician);
-                    }
-                    // Add SUPERVISING PHYSICIAN line after PRESCRIBED BY if not already present
-                    if (supervisor && text.indexOf('SUPERVISING PHYSICIAN') === -1) {
-                        text = text.replace(/(PRESCRIBED BY:[^\n]*)/i, '$1\nSUPERVISING PHYSICIAN: ' + supervisor);
-                    } else if (supervisor) {
-                        text = text.replace(/SUPERVISING PHYSICIAN:\s*(null|None assigned)?\s*$/im, 'SUPERVISING PHYSICIAN: ' + supervisor);
+
+                    // Add blank line before each SECTION header for visual separation
+                    text = text.replace(/\n(SECTION\s+\d+)/g, '\n\n$1');
+
+                    // Strip any AI-generated PRESCRIBED BY / SUPERVISING PHYSICIAN lines
+                    // (they may be blank or wrong), then re-append with guaranteed values
+                    text = text.replace(/^PRESCRIBED BY:.*$/im, '').replace(/^SUPERVISING PHYSICIAN:.*$/im, '').trimEnd();
+
+                    text += '\n\nPRESCRIBED BY: ' + (clinician || '');
+                    if (supervisor) {
+                        text += '\nSUPERVISING PHYSICIAN: ' + supervisor;
                     }
 
-                    noteArea.value = text;
+                    noteArea.value = text.trim();
                 }
                 if (notice && d && d.notice) { notice.textContent = d.notice; notice.removeAttribute('hidden'); }
                 genNote.textContent = 'Regenerate';
