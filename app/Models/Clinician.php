@@ -29,6 +29,7 @@ class Clinician extends Model
         'pool_cooldown_until',
         // Healthie provisioning: global clinicians are synced into every enabled sub-org automatically.
         'is_global',
+        'is_supervisor',
         // Required by Healthie signUp/createOrganizationMembership for provider accounts.
         'phone',
     ];
@@ -41,7 +42,8 @@ class Clinician extends Model
         'accepts_sync_visits' => 'boolean',
         'pool_cooldown_until' => 'datetime',
         'cases_last_viewed_at' => 'datetime',
-        'is_global' => 'boolean',
+        'is_global'      => 'boolean',
+        'is_supervisor'  => 'boolean',
     ];
 
     /**

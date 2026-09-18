@@ -103,7 +103,7 @@ if (old('supervisor_assignments')) {
             <div class="row">
                 <div class="col-md-3 mb-3">
                     <label class="form-label fw-semibold">Credentials <span class="text-danger">*</span></label>
-                    <select name="credentials" class="form-select @error('credentials') is-invalid @enderror" required>
+                    <select name="credentials" id="credentialsSelect" class="form-select @error('credentials') is-invalid @enderror" required>
                         @foreach(['MD','DO','NP','PA'] as $c)
                         <option value="{{ $c }}" {{ old('credentials', $clinician->credentials) === $c ? 'selected' : '' }}>{{ $c }}</option>
                         @endforeach
@@ -312,7 +312,7 @@ if (old('supervisor_assignments')) {
                                     <th style="width:130px;">State</th>
                                     <th>License Number <span class="text-danger">*</span></th>
                                     <th style="width:180px;">Expiry Date <span class="text-danger">*</span></th>
-                                    <th style="width:220px;">Supervising Physician</th>
+                                    <th style="width:220px;" class="supervisor-col {{ $clinician->credentials === 'MD' ? 'd-none' : '' }}">Supervising Physician</th>
                                 </tr>
                             </thead>
                             <tbody id="license-tbody">
@@ -344,7 +344,7 @@ if (old('supervisor_assignments')) {
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </td>
-                                    <td>
+                                    <td class="supervisor-col {{ $clinician->credentials === 'MD' ? 'd-none' : '' }}">
                                         <select name="supervisor_assignments[{{ $abbr }}]"
                                                 class="form-select form-select-sm">
                                             <option value="">— None —</option>
@@ -365,6 +365,22 @@ if (old('supervisor_assignments')) {
                 <p id="license-empty" @class(['text-muted', 'small', 'mb-0', 'mt-1', 'd-none' => $hasLicenses])>
                     <i class="bi bi-info-circle me-1"></i>Select states above to enter license details.
                 </p>
+            </div>
+
+            {{-- Supervisor role --}}
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Supervisor Role</label>
+                <div class="form-check">
+                    <input type="hidden" name="is_supervisor" value="0">
+                    <input class="form-check-input" type="checkbox" name="is_supervisor" value="1" id="is_supervisor"
+                        {{ old('is_supervisor', $isSupervisor ? '1' : '0') === '1' ? 'checked' : '' }}>
+                    <label class="form-check-label" for="is_supervisor">
+                        This clinician can also act as a supervising physician for other clinicians
+                    </label>
+                </div>
+                <div class="form-text text-muted">
+                    When checked, this clinician appears as a supervisor option for other clinicians in the same licensed states.
+                </div>
             </div>
 
             {{-- Healthie provisioning scope --}}
@@ -484,6 +500,20 @@ document.addEventListener('DOMContentLoaded', function () {
         emptyMsg.classList.remove('d-none');
     }
 
+    var credentialsSel = document.getElementById('credentialsSelect');
+    function isMD() {
+        return credentialsSel && credentialsSel.value === 'MD';
+    }
+    function refreshSupervisorCols() {
+        var hide = isMD();
+        document.querySelectorAll('.supervisor-col').forEach(function (el) {
+            el.classList.toggle('d-none', hide);
+        });
+    }
+    if (credentialsSel) {
+        credentialsSel.addEventListener('change', refreshSupervisorCols);
+    }
+
     function buildSupervisorSelect(abbr, selectedId) {
         var supervisors = supervisorsByState[abbr] || [];
         var html = '<select name="supervisor_assignments[' + abbr + ']" class="form-select form-select-sm">'
@@ -519,7 +549,9 @@ document.addEventListener('DOMContentLoaded', function () {
             +          ' class="form-control form-control-sm"'
             +          ' value="' + (existingExpiry || '') + '" required>'
             + '</td>'
-            + '<td>' + buildSupervisorSelect(abbr, existingSupervisorId || null) + '</td>';
+            + '<td class="supervisor-col' + (isMD() ? ' d-none' : '') + '">'
+            +   buildSupervisorSelect(abbr, existingSupervisorId || null)
+            + '</td>';
         tbody.appendChild(tr);
         showTable();
     }
