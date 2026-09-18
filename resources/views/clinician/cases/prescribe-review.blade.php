@@ -148,6 +148,22 @@
 @endsection
 
 @section('scripts')
+@php
+    $__authUser      = auth()->user();
+    $__authClinician = $__authUser?->clinician;
+    $__credentials   = $__authClinician?->credentials ? ', ' . $__authClinician->credentials : '';
+    $__prescribedBy  = trim(($__authUser?->name ?? '') . $__credentials);
+
+    $__patientState    = strtoupper(trim($case->patient?->state ?? ''));
+    $__supervisorName  = '';
+    if ($__patientState && $__authClinician) {
+        $__spAssignment = $__authClinician->supervisorAssignments()
+            ->with('supervisorPhysician.user')
+            ->where('state', $__patientState)
+            ->first();
+        $__supervisorName = $__spAssignment?->supervisorPhysician?->user?->name ?? '';
+    }
+@endphp
 <script>
     (function () {
         var form       = document.querySelector('form');
@@ -186,8 +202,9 @@
             .then(function (d) {
                 if (d && d.text) {
                     var text = d.text;
-                    var clinician = (d.clinician_name || '').trim();
-                    var supervisor = (d.supervisor_name || '').trim();
+                    // Names injected from PHP at page render — never empty
+                    var clinician = @json($__prescribedBy);
+                    var supervisor = @json($__supervisorName);
 
                     // Add blank line before each SECTION header for visual separation
                     text = text.replace(/\n(SECTION\s+\d+)/g, '\n\n$1');
