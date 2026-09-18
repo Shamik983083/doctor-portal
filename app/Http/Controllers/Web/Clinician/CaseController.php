@@ -1169,13 +1169,18 @@ class CaseController extends Controller
 
         // Use the logged-in clinician as the prescriber (case may not be formally
         // assigned yet at the prescribe-review stage).
-        $authUser       = auth()->user();
-        $authClinician  = $authUser?->clinician;
-        // Set the already-loaded auth user so full_name accessor doesn't make an extra query
+        $authUser      = auth()->user();
+        $authClinician = $authUser?->clinician;
         if ($authClinician) {
             $authClinician->setRelation('user', $authUser);
         }
-        $clinicianName   = $authClinician?->full_name ?? $case->clinician?->full_name ?? '';
+
+        // Build clinician display name: prefer full_name (includes credentials),
+        // fall back to auth user's plain name so it is never empty.
+        $credentials   = $authClinician?->credentials ? ', ' . $authClinician->credentials : '';
+        $clinicianName = trim(($authUser?->name ?? '') . $credentials)
+            ?: ($case->clinician?->full_name ?? '');
+
         $patientState    = strtoupper(trim((string) ($case->patient?->state ?? '')));
         $supervisorName  = '';
         $activeClinician = $authClinician ?? $case->clinician;
