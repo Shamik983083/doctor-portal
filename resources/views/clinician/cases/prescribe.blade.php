@@ -286,6 +286,22 @@
 @endsection
 
 @section('scripts')
+@php
+    $__authUser      = auth()->user();
+    $__authClinician = $__authUser?->clinician;
+    $__credentials   = $__authClinician?->credentials ? ', ' . $__authClinician->credentials : '';
+    $__prescribedBy  = trim(($__authUser?->name ?? '') . $__credentials);
+
+    $__patientState    = strtoupper(trim($case->patient?->state ?? ''));
+    $__supervisorName  = '';
+    if ($__patientState && $__authClinician) {
+        $__spAssignment = $__authClinician->supervisorAssignments()
+            ->with('supervisorPhysician.user')
+            ->where('state', $__patientState)
+            ->first();
+        $__supervisorName = $__spAssignment?->supervisorPhysician?->user?->name ?? '';
+    }
+@endphp
 <script>
     var OFFERINGS = @json($offeringData);
     var CASE_OFFERINGS_DATA = @json($caseOfferingsData);
@@ -994,7 +1010,17 @@
                 })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
-                    if (d && d.text) { noteArea.value = d.text; refresh(); }
+                    if (d && d.text) {
+                        var text = d.text;
+                        var clinician = @json($__prescribedBy);
+                        var supervisor = @json($__supervisorName);
+                        text = text.replace(/\n(SECTION\s+\d+)/g, '\n\n$1');
+                        text = text.replace(/^PRESCRIBED BY:.*$/im, '').replace(/^SUPERVISING PHYSICIAN:.*$/im, '').trimEnd();
+                        text += '\n\nPRESCRIBED BY: ' + (clinician || '');
+                        if (supervisor) { text += '\nSUPERVISING PHYSICIAN: ' + supervisor; }
+                        noteArea.value = text.trim();
+                        refresh();
+                    }
                     if (notice && d && d.notice) { notice.textContent = d.notice; notice.removeAttribute('hidden'); }
                     genNote.textContent = 'Regenerate';
                     genNote.disabled = false;
