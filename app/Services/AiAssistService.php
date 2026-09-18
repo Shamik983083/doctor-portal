@@ -275,8 +275,13 @@ class AiAssistService
         $lines   = [];
 
         $lines[] = 'PATIENT RECORD';
+        $lines[] = 'Name: ' . (trim($patient->first_name . ' ' . $patient->last_name) ?: 'not recorded');
+        $lines[] = 'DOB: ' . ($patient->date_of_birth ? $patient->date_of_birth->format('Y-m-d') : 'not recorded');
         $lines[] = 'Age: ' . ($patient->age ?? 'not recorded');
         $lines[] = 'Sex: ' . ($patient->gender ?? 'not recorded');
+        $lines[] = 'State: ' . ($patient->state ?? 'not recorded');
+        $lines[] = 'Height: ' . ($patient->height ?? 'not recorded');
+        $lines[] = 'Weight: ' . ($patient->weight ?? 'not recorded');
         $lines[] = 'BMI: ' . ($patient->bmi ?? 'not recorded');
         $lines[] = 'Identity verified: ' . ($patient->id_verified_status ?? 'not recorded');
         $lines[] = 'Visit type: ' . ($case->visit_type ?? 'not recorded');
