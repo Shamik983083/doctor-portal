@@ -1158,7 +1158,8 @@ class CaseController extends Controller
             'decisions'     => 'nullable|array',
         ]);
 
-        $case = PatientCase::with(['patient', 'partner'])->where('uuid', $uuid)->firstOrFail();
+        $case = PatientCase::with(['patient', 'partner', 'clinician.user', 'clinician.supervisorAssignments.supervisorPhysician.user'])
+            ->where('uuid', $uuid)->firstOrFail();
 
         $draft = $this->aiAssist->draftClinicalNote(
             $case,
@@ -1166,10 +1167,23 @@ class CaseController extends Controller
             $request->input('provider_text')
         );
 
+        $clinicianName  = $case->clinician?->full_name ?? '';
+        $patientState   = strtoupper(trim((string) ($case->patient?->state ?? '')));
+        $supervisorName = '';
+        if ($patientState && $case->clinician) {
+            $assignment = $case->clinician->supervisorAssignments
+                ->where('state', $patientState)->first();
+            if ($assignment?->supervisorPhysician?->user) {
+                $supervisorName = $assignment->supervisorPhysician->user->name;
+            }
+        }
+
         return response()->json([
-            'text'   => $draft['text'],
-            'source' => $draft['source'],   // 'model' or 'local', so the UI can be honest about which
-            'notice' => $draft['notice'],
+            'text'            => $draft['text'],
+            'source'          => $draft['source'],
+            'notice'          => $draft['notice'],
+            'clinician_name'  => $clinicianName,
+            'supervisor_name' => $supervisorName,
         ]);
     }
 
