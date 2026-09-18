@@ -245,7 +245,7 @@
                         <span class="pill neutral">AI draft · provider edits and signs</span></div>
                         <button type="button" class="button-secondary" id="genNote">Draft with AI</button>
                     </div>
-                    <textarea name="directions" class="note-area" id="noteArea" rows="3" placeholder="Write your clinical rationale here. This charting note is private — it will not be visible to the patient or the partner." required>{{ old('directions') }}</textarea>
+                    <textarea name="directions" class="note-area" id="noteArea" rows="14" placeholder="Write your clinical rationale here. This charting note is private — it will not be visible to the patient or the partner." required style="font-family:monospace;font-size:13px;line-height:1.6">{{ old('directions') }}</textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
 
                     {{-- C9: ICD-10 structured code editor — sits above Medical Necessity --}}
