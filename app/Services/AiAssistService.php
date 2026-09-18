@@ -305,6 +305,25 @@ class AiAssistService
             $lines[] = '- ' . $this->decisionLine($d);
         }
 
+        // Provider identity — used by the model for the signature section
+        $lines[] = '';
+        $lines[] = 'PROVIDER';
+        $clinicianName = $case->clinician?->full_name ?? 'Not recorded';
+        $lines[] = 'Prescribing clinician: ' . $clinicianName;
+
+        $patientState = strtoupper(trim((string) ($case->patient?->state ?? '')));
+        $supervisorName = 'None assigned';
+        if ($patientState && $case->clinician) {
+            $assignment = $case->clinician->supervisorAssignments()
+                ->with('supervisorPhysician.user')
+                ->where('state', $patientState)
+                ->first();
+            if ($assignment?->supervisorPhysician?->user) {
+                $supervisorName = $assignment->supervisorPhysician->user->name;
+            }
+        }
+        $lines[] = 'Supervising physician (' . ($patientState ?: 'state unknown') . '): ' . $supervisorName;
+
         if ($providerText !== '') {
             $lines[] = '';
             $lines[] = 'WHAT THE PROVIDER HAS ALREADY WRITTEN. Keep these words, build around them, '
@@ -383,6 +402,26 @@ class AiAssistService
         }
 
         $lines[] = 'Patient advised to report severe or persistent side effects and to contact the clinic with any concerns.';
+
+        $clinicianName = $case->clinician?->full_name ?? '';
+        $patientState  = strtoupper(trim((string) ($case->patient?->state ?? '')));
+        $supervisorName = '';
+        if ($patientState && $case->clinician) {
+            $assignment = $case->clinician->supervisorAssignments()
+                ->with('supervisorPhysician.user')
+                ->where('state', $patientState)
+                ->first();
+            if ($assignment?->supervisorPhysician?->user) {
+                $supervisorName = $assignment->supervisorPhysician->user->name;
+            }
+        }
+
+        if ($clinicianName) {
+            $lines[] = "\nPRESCRIBED BY: " . $clinicianName;
+        }
+        if ($supervisorName) {
+            $lines[] = 'SUPERVISING PHYSICIAN: ' . $supervisorName;
+        }
 
         $own = trim($providerText);
         $fresh = array_values(array_filter($lines, fn ($l) => $own === '' || ! str_contains($own, $l)));

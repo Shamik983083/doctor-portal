@@ -122,7 +122,8 @@
                         </div>
                         <button type="button" class="button-secondary" id="genNote">Draft with AI</button>
                     </div>
-                    <textarea name="charting_note" class="note-area" id="noteArea" rows="8" required
+                    <textarea name="charting_note" class="note-area" id="noteArea" rows="18" required
+                        style="font-family:monospace;font-size:13px;line-height:1.6"
                         placeholder="Review the prescription summary, then draft a charting note with AI or write your own. Your note is saved as an internal record."></textarea>
                     <p class="ai-honesty" id="noteNotice" hidden></p>
                 </div>
