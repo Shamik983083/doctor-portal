@@ -61,6 +61,7 @@ class ClinicianController extends Controller
             'license_info.*.expiry'      => 'required|date',
             'supervisor_assignments'     => 'nullable|array',
             'supervisor_assignments.*'   => 'nullable|integer|exists:supervisor_physicians,id',
+            'is_supervisor'              => 'nullable|boolean',
         ]);
 
         $user = User::create([
@@ -90,14 +91,25 @@ class ClinicianController extends Controller
             'is_global'       => $request->boolean('is_global', true),
         ]);
 
-        // Save supervisor physician assignments for this new clinician.
-        foreach ($request->input('supervisor_assignments', []) as $state => $spId) {
-            if (empty($spId)) continue;
-            ClinicianSupervisorAssignment::create([
-                'clinician_id'           => $clinician->id,
-                'supervisor_physician_id' => (int) $spId,
-                'state'                  => strtoupper($state),
+        // Create supervisor_physician record if this clinician can act as one.
+        if ($request->boolean('is_supervisor')) {
+            SupervisorPhysician::create([
+                'user_id'         => $user->id,
+                'npi'             => $data['npi'] ?? null,
+                'licensed_states' => array_column($licensedStates, 'state'),
             ]);
+        }
+
+        // Save supervisor physician assignments — skip for MD (independent physician).
+        if ($data['credentials'] !== 'MD') {
+            foreach ($request->input('supervisor_assignments', []) as $state => $spId) {
+                if (empty($spId)) continue;
+                ClinicianSupervisorAssignment::create([
+                    'clinician_id'            => $clinician->id,
+                    'supervisor_physician_id' => (int) $spId,
+                    'state'                   => strtoupper($state),
+                ]);
+            }
         }
 
         /*
