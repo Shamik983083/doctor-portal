@@ -743,6 +743,16 @@ Content-Type: application/json
         </div>
     </div>
 </div>
+<div class="alert alert-warning border-0 small mt-3 mb-2 py-2">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Admin setup required for the check-in answers panel.</strong>
+    The clinician's prescribe screen shows a green <em>"Check-in answers"</em> panel only when the questionnaire's
+    <strong>Purpose</strong> is set to <code>check_in</code> in the admin panel
+    (Admin → Questionnaires → edit questionnaire → Purpose field).
+    If the questionnaire purpose is left as <code>clinical</code>, the answers are still stored and the
+    dose-hint auto-selection still works — but the structured Q&amp;A panel will not appear for the clinician.
+</div>
+
 <h6 class="fw-semibold mt-3 mb-2">Minimal Refill Payload</h6>
 <p class="small text-muted mb-2">Send the same <code>POST /api/partner/cases</code> endpoint with <code>"is_refill": true</code>. You only need to include fields that have changed — patient demographics, offerings, and answers. The portal will match the patient by <code>external_id</code> (or email + DOB) and link this as a follow-up to their prior visit.</p>
 <pre id="code-refill-example">POST {{ $base }}/api/partner/cases
