@@ -181,6 +181,19 @@
 .fp-chip:hover .fp-chip-x { color: var(--ink); }
 .fp-chips-clear { font-size: 12px; color: var(--muted); text-decoration: none; }
 .fp-chips-clear:hover { color: var(--ink); }
+
+/* ── Video visit badge (patient name cell) ───────────────────────── */
+.video-visit-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #ede9fe; color: #6d28d9;
+    font-size: 10px; font-weight: 750; letter-spacing: .02em;
+    padding: 2px 7px; border-radius: 99px;
+    margin-left: 5px; white-space: nowrap; vertical-align: middle;
+}
+.video-visit-badge i { font-size: 10px; }
+
+/* ── Video required pill (Video Visit column) ────────────────────── */
+.pill.video-pill { background: #ede9fe; color: #6d28d9; }
 </style>
 
 <section class="panel queue-panel">
@@ -261,6 +274,8 @@
                         $clin = $case->queueClinical();
                         $idv  = strtolower($case->patient?->id_verified_status ?? '') === 'verified';
                         $planLabel = ['Titration' => 'Titrate', 'Hold' => 'Hold'][$clin['plan']] ?? $clin['plan'];
+                        $isVideoCase = str_contains(strtolower($case->visit_type ?? ''), 'sync')
+                                    || ($case->clinician?->accepts_sync_visits ?? false);
 
                         $eligible = $case->triage === 'green'
                             && in_array($case->status, ['waiting', 'assigned'])
@@ -291,6 +306,11 @@
                         <td class="pin pin-name">
                             {{-- Button, not a link: clicking the row updates the quick review below. --}}
                             <button type="button" class="patient-link">{{ $case->patient?->full_name ?? 'Unknown' }}</button>
+                            @if($isVideoCase)
+                                <span class="video-visit-badge" title="Synchronous video visit required">
+                                    <i class="bi bi-camera-video-fill"></i> Video
+                                </span>
+                            @endif
                         </td>
                         <td><span class="pill {{ $idv ? 'green' : 'red' }}">{{ $idv ? 'Y' : 'N' }}</span></td>
                         <td>{{ strtoupper(substr($case->patient?->gender ?? '-', 0, 1)) }}</td>
@@ -325,7 +345,17 @@
                             @endif
                         </td>
                         <td>{{ $clin['zofran'] }}</td>
-                        <td><span class="pill {{ strtolower($clin['video']) === 'clear' ? 'green' : ($clin['video'] === '-' ? 'neutral' : 'yellow') }}">{{ $clin['video'] }}</span></td>
+                        <td>
+                            @if(strtolower($clin['video']) === 'clear')
+                                <span class="pill green">Clear</span>
+                            @elseif($clin['video'] !== '-')
+                                <span class="pill yellow">{{ $clin['video'] }}</span>
+                            @elseif($isVideoCase)
+                                <span class="pill video-pill">Req.</span>
+                            @else
+                                <span class="pill neutral">-</span>
+                            @endif
+                        </td>
                         <td class="batch-cell">
                             <span class="pill {{ $batchTone }}">{{ $batchLabel }}</span>
                             @if($batchReason)<div class="batch-reason">{{ $batchReason }}</div>@endif
