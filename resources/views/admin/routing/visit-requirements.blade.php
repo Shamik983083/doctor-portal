@@ -65,14 +65,35 @@
 
             {{-- Row 1: State + Scope --}}
             <div class="row g-3 mb-3">
-                <div class="col-sm-4 col-lg-2">
+                <div class="col-sm-5 col-lg-3">
                     <label class="sv-label" for="state">State</label>
-                    <input type="text" id="state" name="state"
-                           class="form-control sv-input sv-state-input @error('state') is-invalid @enderror"
-                           maxlength="2" required
-                           placeholder="TX"
-                           value="{{ old('state') }}"
-                           oninput="this.value = this.value.toUpperCase()">
+                    <select id="state" name="state"
+                            class="form-select sv-input @error('state') is-invalid @enderror"
+                            required>
+                        <option value="">— select —</option>
+                        @php
+                        $usStates = [
+                            'AL'=>'Alabama','AK'=>'Alaska','AZ'=>'Arizona','AR'=>'Arkansas',
+                            'CA'=>'California','CO'=>'Colorado','CT'=>'Connecticut','DE'=>'Delaware',
+                            'DC'=>'District of Columbia','FL'=>'Florida','GA'=>'Georgia','HI'=>'Hawaii',
+                            'ID'=>'Idaho','IL'=>'Illinois','IN'=>'Indiana','IA'=>'Iowa',
+                            'KS'=>'Kansas','KY'=>'Kentucky','LA'=>'Louisiana','ME'=>'Maine',
+                            'MD'=>'Maryland','MA'=>'Massachusetts','MI'=>'Michigan','MN'=>'Minnesota',
+                            'MS'=>'Mississippi','MO'=>'Missouri','MT'=>'Montana','NE'=>'Nebraska',
+                            'NV'=>'Nevada','NH'=>'New Hampshire','NJ'=>'New Jersey','NM'=>'New Mexico',
+                            'NY'=>'New York','NC'=>'North Carolina','ND'=>'North Dakota','OH'=>'Ohio',
+                            'OK'=>'Oklahoma','OR'=>'Oregon','PA'=>'Pennsylvania','RI'=>'Rhode Island',
+                            'SC'=>'South Carolina','SD'=>'South Dakota','TN'=>'Tennessee','TX'=>'Texas',
+                            'UT'=>'Utah','VT'=>'Vermont','VA'=>'Virginia','WA'=>'Washington',
+                            'WV'=>'West Virginia','WI'=>'Wisconsin','WY'=>'Wyoming',
+                        ];
+                        @endphp
+                        @foreach($usStates as $abbr => $name)
+                            <option value="{{ $abbr }}" {{ old('state') === $abbr ? 'selected' : '' }}>
+                                {{ $abbr }} — {{ $name }}
+                            </option>
+                        @endforeach
+                    </select>
                     @error('state')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-sm-8 col-lg-4">
@@ -217,10 +238,16 @@
                             $active = !$ended && (!$rule->effective_from || $rule->effective_from->isPast());
                         @endphp
                         <tr class="{{ $ended ? 'sv-row-ended' : '' }}">
+                            @php
+                                $stateNames = ['AL'=>'Alabama','AK'=>'Alaska','AZ'=>'Arizona','AR'=>'Arkansas','CA'=>'California','CO'=>'Colorado','CT'=>'Connecticut','DE'=>'Delaware','DC'=>'District of Columbia','FL'=>'Florida','GA'=>'Georgia','HI'=>'Hawaii','ID'=>'Idaho','IL'=>'Illinois','IN'=>'Indiana','IA'=>'Iowa','KS'=>'Kansas','KY'=>'Kentucky','LA'=>'Louisiana','ME'=>'Maine','MD'=>'Maryland','MA'=>'Massachusetts','MI'=>'Michigan','MN'=>'Minnesota','MS'=>'Mississippi','MO'=>'Missouri','MT'=>'Montana','NE'=>'Nebraska','NV'=>'Nevada','NH'=>'New Hampshire','NJ'=>'New Jersey','NM'=>'New Mexico','NY'=>'New York','NC'=>'North Carolina','ND'=>'North Dakota','OH'=>'Ohio','OK'=>'Oklahoma','OR'=>'Oregon','PA'=>'Pennsylvania','RI'=>'Rhode Island','SC'=>'South Carolina','SD'=>'South Dakota','TN'=>'Tennessee','TX'=>'Texas','UT'=>'Utah','VT'=>'Vermont','VA'=>'Virginia','WA'=>'Washington','WV'=>'West Virginia','WI'=>'Wisconsin','WY'=>'Wyoming'];
+                            @endphp
                             <td>
-                                <span class="sv-state-chip {{ $ended ? 'sv-state-chip--dim' : ($rule->requires_synchronous ? 'sv-state-chip--video' : 'sv-state-chip--async') }}">
-                                    {{ $rule->state }}
-                                </span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="sv-state-chip {{ $ended ? 'sv-state-chip--dim' : ($rule->requires_synchronous ? 'sv-state-chip--video' : 'sv-state-chip--async') }}">
+                                        {{ $rule->state }}
+                                    </span>
+                                    <span class="sv-state-name">{{ $stateNames[$rule->state] ?? $rule->state }}</span>
+                                </div>
                             </td>
                             <td>
                                 <span class="sv-scope-label">{{ $rule->scopeLabel() }}</span>
@@ -392,11 +419,6 @@ document.addEventListener('DOMContentLoaded', function () {
     border-color:#4361ee !important;
     box-shadow:0 0 0 3px #4361ee18 !important;
 }
-.sv-state-input {
-    text-transform:uppercase; text-align:center;
-    font-size:1.1rem !important; font-weight:700 !important;
-    letter-spacing:.08em;
-}
 
 /* ─── Toggle block ───────────────────────────────────────────────────────── */
 .sv-toggle-block {
@@ -448,6 +470,9 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-state-chip--video { background:#ffc1071a; color:#9a6e00; }
 .sv-state-chip--async { background:#6c757d14; color:#495057; }
 .sv-state-chip--dim   { background:#f0f1f3; color:#adb5bd; }
+
+/* State name in table ── */
+.sv-state-name { font-size:.78rem; color:#6c757d; white-space:nowrap; }
 
 /* Scope cell ── */
 .sv-scope-label { display:block; font-size:.82rem; font-weight:600; color:#2c3040; }
