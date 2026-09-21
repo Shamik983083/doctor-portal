@@ -743,6 +743,63 @@ Content-Type: application/json
         </div>
     </div>
 </div>
+<h6 class="fw-semibold mt-3 mb-2">Minimal Refill Payload</h6>
+<p class="small text-muted mb-2">Send the same <code>POST /api/partner/cases</code> endpoint with <code>"is_refill": true</code>. You only need to include fields that have changed — patient demographics, offerings, and answers. The portal will match the patient by <code>external_id</code> (or email + DOB) and link this as a follow-up to their prior visit.</p>
+<pre id="code-refill-example">POST {{ $base }}/api/partner/cases
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "patient": {
+    "first_name":    "Jane",
+    "last_name":     "Doe",
+    "email":         "jane.doe@example.com",
+    "date_of_birth": "1990-06-15",
+    "height":        65.0,
+    "weight":        182.0,          // updated current weight
+    "bmi":           30.3,
+    "state":         "TX",
+    "external_id":   "portal-user-1001"   // must match the original case's patient external_id
+  },
+  "patient_state":  "TX",
+  "external_id":    "order-glp-refill-001",  // new unique order ID for this visit
+  "visit_type":     "asynchronous",
+  "is_chargeable":  true,
+  "hold_status":    false,
+  "is_refill":      true,            // ← this is the key flag
+
+  "offerings": [
+    { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  ],
+
+  // ── Check-in answers (questionnaire configured as purpose=check_in) ───────────
+  // Use the same slug format as the initial intake. Only send what changed.
+  "answers": [
+    { "slug": "current_weight",          "answer": "182" },
+    { "slug": "side_effects",            "answer": "Mild nausea first week, resolved" },
+    { "slug": "last_dose_date",          "answer": "2026-09-01" },
+    { "slug": "dose_continuation",       "answer": "Continue current dose" },
+    { "slug": "medication_effectiveness","answer": "Lost 8 lbs over 3 months" }
+  ]
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-refill-example')">Copy</button>
+
+<h6 class="fw-semibold mt-3 mb-2">What changes vs. a new case</h6>
+<div class="table-responsive">
+<table class="table table-sm table-bordered small mb-3">
+<thead class="table-light"><tr><th>Field</th><th>New case</th><th>Refill case</th></tr></thead>
+<tbody>
+<tr><td><code>is_refill</code></td><td><code>false</code> (or omit)</td><td><code>true</code></td></tr>
+<tr><td><code>external_id</code></td><td>First order ID</td><td>New unique ID for this visit</td></tr>
+<tr><td><code>patient.external_id</code></td><td>Set here</td><td>Same value — used to match prior visit</td></tr>
+<tr><td><code>patient.weight</code> / <code>bmi</code></td><td>Initial</td><td>Current (updated)</td></tr>
+<tr><td><code>answers</code></td><td>Full intake questionnaire</td><td>Check-in questionnaire (configured per-offering or category)</td></tr>
+<tr><td>Routing</td><td>Assigned by routing policy</td><td>Continuity — goes to same clinician as prior visit</td></tr>
+<tr><td><code>external_id</code> duplicate check</td><td>Returns 409 if duplicate</td><td>Skipped — same patient can have multiple refill orders</td></tr>
+</tbody>
+</table>
+</div>
+
 <div class="alert alert-success border-0 small mt-3 mb-0 py-2">
     <i class="bi bi-check-circle me-1"></i>
     <strong>No breaking changes.</strong> Omitting <code>is_refill</code> or sending <code>false</code> behaves exactly as before. Existing integrations require no updates.

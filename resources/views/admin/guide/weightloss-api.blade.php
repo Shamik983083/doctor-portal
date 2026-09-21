@@ -498,6 +498,48 @@ Content-Type: application/json
 </table>
 </div>
 
+<h6 class="fw-semibold mt-3 mb-2">Minimal Refill Payload Example</h6>
+<p class="small text-muted mb-2">Same endpoint as a new case. Only include fields that have changed — the platform matches the patient by <code>patient.external_id</code> (or email + DOB) and links this visit to their prior completed case.</p>
+<pre id="code-refill">POST {{ $base }}/api/partner/cases
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "patient": {
+    "first_name":    "Jane",
+    "last_name":     "Doe",
+    "email":         "jane.doe@example.com",
+    "date_of_birth": "1990-06-15",
+    "height":        65.0,
+    "weight":        182.0,          // current weight (updated)
+    "bmi":           30.3,
+    "state":         "TX",
+    "external_id":   "portal-user-1001"   // must match the original patient external_id
+  },
+  "patient_state":  "TX",
+  "external_id":    "order-glp-refill-20260901-001",  // new unique order ID for this visit
+  "visit_type":     "asynchronous",
+  "is_chargeable":  true,
+  "hold_status":    false,
+  "is_refill":      true,            // ← marks this as a follow-up visit
+
+  "offerings": [
+    { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
+  ],
+
+  // ── Check-in answers ─────────────────────────────────────────────────────────
+  // If no check-in questionnaire is configured, you may send the same initial intake slugs.
+  // If a check-in questionnaire is configured, use its slugs (GET /api/partner/questionnaires/{uuid}).
+  "answers": [
+    { "slug": "current_weight",           "answer": "182" },
+    { "slug": "side_effects",             "answer": "Mild nausea first week, resolved" },
+    { "slug": "last_dose_date",           "answer": "2026-09-01" },
+    { "slug": "dose_continuation",        "answer": "Continue current dose" },
+    { "slug": "medication_effectiveness", "answer": "Lost 8 lbs over 3 months" }
+  ]
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-refill')">Copy</button>
+
 <div class="alert alert-success border-0 small mt-3 mb-0 py-2">
     <i class="bi bi-check-circle me-1"></i>
     <strong>No breaking changes.</strong> Omitting <code>is_refill</code> or sending <code>false</code> behaves exactly as before. Existing integrations require no updates unless you want to start submitting refill cases.

@@ -387,6 +387,48 @@ Content-Type: application/json
     </div>
 </div>
 
+<h6 class="fw-semibold mt-3 mb-2">Minimal NAD+ Refill Payload Example</h6>
+<p class="small text-muted mb-2">Same endpoint as a new case — just set <code>"is_refill": true</code> and send a new <code>external_id</code>. The patient is matched by <code>patient.external_id</code> (or email + DOB) to link this visit to their prior completed case.</p>
+<pre id="code-nad-refill">POST {{ $base }}/api/partner/cases
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "patient": {
+    "first_name":    "John",
+    "last_name":     "Smith",
+    "email":         "john.smith@example.com",
+    "date_of_birth": "1978-03-22",
+    "height":        70.0,
+    "weight":        183.0,          // current weight (updated)
+    "bmi":           26.3,
+    "state":         "TX",
+    "external_id":   "portal-user-9003"   // must match the original patient external_id
+  },
+  "patient_state":  "TX",
+  "external_id":    "order-nad-refill-20260901-001",  // new unique order ID for this visit
+  "visit_type":     "asynchronous",
+  "is_chargeable":  true,
+  "hold_status":    false,
+  "is_refill":      true,            // ← marks this as a follow-up NAD+ visit
+
+  "offerings": [
+    { "product_key": "nad", "month_frequency": 1, "quantity": 1, "formulation": "injectable" }
+  ],
+
+  // ── Check-in answers ─────────────────────────────────────────────────────────
+  // If no check-in questionnaire is configured, you may send the same initial intake slugs.
+  // If a check-in questionnaire is configured, use its slugs (GET /api/partner/questionnaires/{uuid}).
+  "answers": [
+    { "slug": "current_weight",           "answer": "183" },
+    { "slug": "side_effects",             "answer": "None" },
+    { "slug": "last_dose_date",           "answer": "2026-08-15" },
+    { "slug": "dose_continuation",        "answer": "Continue current dose" },
+    { "slug": "energy_improvement",       "answer": "Yes, significant improvement" }
+  ]
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-nad-refill')">Copy</button>
+
 <div class="alert alert-success border-0 small mt-3 mb-0 py-2">
     <i class="bi bi-check-circle me-1"></i>
     <strong>No breaking changes.</strong> Omitting <code>is_refill</code> or sending <code>false</code> behaves exactly as before. Existing integrations require no updates unless you want to start submitting refill cases.

@@ -441,6 +441,48 @@ Content-Type: application/json
 </table>
 </div>
 
+<h6 class="fw-semibold mt-3 mb-2">Minimal Anti-Aging Refill Payload Example</h6>
+<p class="small text-muted mb-2">Same endpoint as a new case — just set <code>"is_refill": true</code> and send a new <code>external_id</code>. The patient is matched by <code>patient.external_id</code> (or email + DOB) to link this visit to their prior completed case.</p>
+<pre id="code-aa-refill">POST {{ $base }}/api/partner/cases
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "patient": {
+    "first_name":    "Jane",
+    "last_name":     "Doe",
+    "email":         "jane.doe@example.com",
+    "date_of_birth": "1980-04-10",
+    "height":        64.0,
+    "weight":        140.0,
+    "bmi":           24.0,
+    "state":         "CA",
+    "external_id":   "portal-user-5001"   // must match the original patient external_id
+  },
+  "patient_state":  "CA",
+  "external_id":    "order-aa-refill-20260901-001",  // new unique order ID for this visit
+  "visit_type":     "asynchronous",
+  "is_chargeable":  true,
+  "hold_status":    false,
+  "is_refill":      true,            // ← marks this as a follow-up visit
+
+  "offerings": [
+    { "offering_id": "YOUR_AA_OFFERING_UUID", "quantity": 1 }
+    // or use product_key if configured: { "product_key": "antiaging", "month_frequency": 1, "quantity": 1 }
+  ],
+
+  // ── Check-in answers ─────────────────────────────────────────────────────────
+  // If no check-in questionnaire is configured, send the same initial intake slugs.
+  // If a check-in questionnaire is configured, use its slugs (GET /api/partner/questionnaires/{uuid}).
+  "answers": [
+    { "slug": "side_effects",          "answer": "None" },
+    { "slug": "last_dose_date",        "answer": "2026-08-20" },
+    { "slug": "dose_continuation",     "answer": "Continue current dose" },
+    { "slug": "treatment_response",    "answer": "Improved energy and skin tone" }
+  ]
+}</pre>
+<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-aa-refill')">Copy</button>
+
 <div class="alert alert-success border-0 small mt-3 mb-0 py-2">
     <i class="bi bi-check-circle me-1"></i>
     <strong>No breaking changes.</strong> Omitting <code>is_refill</code> or sending <code>false</code> behaves exactly as before. Existing integrations require no updates unless you want to start submitting refill cases.
