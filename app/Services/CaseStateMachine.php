@@ -143,6 +143,10 @@ class CaseStateMachine
             ]);
         }
 
+        // Push a case_assigned_to_clinician webhook so the partner receives the new
+        // clinician's booking_link. Without this the partner is blind to reassignments.
+        $this->dispatchWebhookEvent($case, PatientCase::STATUS_ASSIGNED);
+
         return $case;
     }
 
@@ -335,6 +339,13 @@ class CaseStateMachine
             'sub_storefront_id' => $case->subStorefront?->uuid,
             'timestamp'         => now()->timestamp,
         ];
+
+        if ($status === PatientCase::STATUS_ASSIGNED) {
+            $clinician = $case->relationLoaded('clinician') ? $case->clinician : $case->clinician()->first();
+            $payload['booking_link'] = ($clinician?->accepts_sync_visits && $clinician->hasSchedulingLink())
+                ? $clinician->scheduling_link
+                : null;
+        }
 
         if ($status === PatientCase::STATUS_SUPPORT) {
             $payload['escalation_target'] = $case->escalation_target;

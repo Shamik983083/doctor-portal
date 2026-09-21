@@ -422,25 +422,59 @@ def webhook():
 <div id="ev-case-assigned" class="card mb-3 section-anchor">
 <div class="card-header py-2 d-flex align-items-center gap-2">
     <span class="event-badge">case_assigned_to_clinician</span>
-    <span class="text-muted small">Fired when a clinician is assigned (auto-assignment or manual)</span>
+    <span class="text-muted small">Fired when a clinician is assigned (auto-assignment, pool claim, or admin reassignment)</span>
 </div>
 <div class="card-body">
+<p class="small text-muted mb-2">This event fires on every assignment — including when an admin reassigns the case to a different clinician. Always process the latest event to get the current clinician's booking link.</p>
 <pre id="code-ev-assigned">{
-  "case_id":    "9d2f1c3e-...",
-  "patient_id": "a1b2c3d4-...",
-  "status":     "assigned",
-  "visit_type": "asynchronous",
-  "timestamp":  1751539260
+  "case_id":      "9d2f1c3e-...",
+  "patient_id":   "a1b2c3d4-...",
+  "status":       "assigned",
+  "visit_type":   "asynchronous",
+  "booking_link": null,
+  "timestamp":    1751539260
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-ev-assigned')">Copy</button>
-<div class="alert alert-warning mt-3 mb-2 small">
+
+<h6 class="fw-semibold mt-3 mb-2" style="font-size:.82rem">Fields</h6>
+<div class="table-responsive mb-3">
+<table class="table table-sm table-bordered small mb-0">
+<thead class="table-light"><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>case_id</code></td><td>string (UUID)</td><td>The case this event is for</td></tr>
+<tr><td><code>patient_id</code></td><td>string (UUID)</td><td>The patient on the case</td></tr>
+<tr><td><code>status</code></td><td>string</td><td>Always <code>"assigned"</code></td></tr>
+<tr><td><code>visit_type</code></td><td>string / null</td><td>Partner-supplied visit type string (e.g. <code>"synchronous"</code>)</td></tr>
+<tr>
+    <td><code>booking_link</code></td>
+    <td>string / null</td>
+    <td>
+        <strong>Non-null only for synchronous video cases.</strong>
+        The clinician's booking URL (e.g. Calendly). Direct your patient to this link to schedule the video appointment before the clinician reviews the case.
+        <code>null</code> for asynchronous cases — no action required.
+    </td>
+</tr>
+<tr><td><code>timestamp</code></td><td>integer</td><td>Unix timestamp (seconds)</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="alert alert-info mt-2 mb-2 small">
+    <i class="bi bi-camera-video me-1"></i>
+    <strong>Synchronous (video) case flow:</strong>
+    When <code>booking_link</code> is non-null, notify your patient immediately so they can book the video appointment.
+    The clinician will review and prescribe after the visit is completed.
+    If the booking link ever changes (e.g. admin reassigns to a different clinician), you will receive a new <code>case_assigned_to_clinician</code> event with the updated link.
+</div>
+
+<div class="alert alert-warning mt-2 mb-2 small">
     <i class="bi bi-exclamation-triangle me-1"></i>
-    <strong>Clinician details are NOT in this payload.</strong> The payload only confirms the status change. To display the clinician's name, NPI, and credentials to your patient, call GET after receiving this event.
+    <strong>Clinician name and NPI are NOT in this payload.</strong> Call GET to retrieve the clinician's name, credentials, and the live booking link (useful if it changes after assignment).
 </div>
 <div class="endpoint-row">
     <span class="method-pill method-get">GET</span>
     <code>{{ $base }}/api/partner/cases/{case_id}</code>
-    <span class="text-muted" style="font-size:.75rem">— retrieve assigned clinician name, NPI, and credentials</span>
+    <span class="text-muted" style="font-size:.75rem">— returns <code>clinician.scheduling_link</code> (always the live value), plus name, NPI, and credentials</span>
 </div>
 </div>
 </div>
