@@ -650,6 +650,7 @@ class CaseController extends Controller
             'offering_id'  => $co->offering_id,
             'bundle_group' => $co->bundle_group,
             'product_key'  => $co->product_key,
+            'formulation'  => $co->formulation,
         ])->values();
 
         // Formulation hint from the partner API payload — drives offering auto-select

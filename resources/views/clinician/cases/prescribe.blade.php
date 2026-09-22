@@ -455,16 +455,25 @@
             return null;
         }
 
-        // offeringOptions(selId, bundleProductKey)
-        // bundleProductKey: when set, filters the list to that drug family only.
+        // offeringOptions(selId, bundleProductKey, formulationFilter)
+        // bundleProductKey:  when set, filters the list to that drug family only.
+        // formulationFilter: when set, further filters by formulation_type (e.g. "injectable").
+        //                    Applied only if the filtered result is non-empty — prevents
+        //                    empty dropdowns when admin hasn't set formulation_type yet.
         // null / undefined → show all offerings (existing behaviour).
-        function offeringOptions(selId, bundleProductKey) {
+        function offeringOptions(selId, bundleProductKey, formulationFilter) {
             var fam  = bundleProductKey ? pkFamily(bundleProductKey) : null;
             var list = fam
                 ? OFFERINGS.filter(function (o) { return family(o.name) === fam; })
                 : OFFERINGS;
             if (!list.length) {
                 list = OFFERINGS; // safety fallback: unknown family → show all
+            }
+            if (formulationFilter) {
+                var byFormulation = list.filter(function (o) {
+                    return o.formulation_type && o.formulation_type.toLowerCase() === formulationFilter.toLowerCase();
+                });
+                if (byFormulation.length) list = byFormulation; // only apply when result is non-empty
             }
             return '<option value="">Select medication</option>' + list.map(function (o) {
                 return '<option value="' + o.id + '"' + (String(o.id) === String(selId) ? ' selected' : '') + '>' + esc(o.name) + '</option>';
@@ -482,7 +491,7 @@
         }
 
         // Render a single offering as a sub-row inside a bundle wrapper.
-        function addBundleMedRow(container, offeringId, bgKey, productKey, sharedTermEl) {
+        function addBundleMedRow(container, offeringId, bgKey, productKey, formulation, sharedTermEl) {
             var i = idx++;
             var row = document.createElement('div');
             row.className = 'med-decision bundle-med-row';
@@ -495,7 +504,7 @@
                 '<div class="field-row">'
                 + '<div class="field"><label>Medication <span class="req">*</span></label>'
                 + '<select data-f="med" name="medications[' + i + '][offering_id]" required>'
-                + offeringOptions(offeringId, productKey) + '</select></div>'
+                + offeringOptions(offeringId, productKey, formulation || null) + '</select></div>'
                 + '<div class="field"><label>Administration frequency <span class="req">*</span></label>'
                 + '<select name="medications[' + i + '][frequency]" required>' + optionList(FREQUENCIES, 'Weekly') + '</select></div>'
                 + '<div class="field"><label>Refills <span class="req">*</span></label>'
@@ -558,7 +567,7 @@
             });
 
             bundleItems.forEach(function (co) {
-                addBundleMedRow(medsContainer, co.offering_id, bgKey, co.product_key, sharedTerm);
+                addBundleMedRow(medsContainer, co.offering_id, bgKey, co.product_key, co.formulation || null, sharedTerm);
             });
 
             // When shared duration changes, push the new value into every sub-row
@@ -884,14 +893,16 @@
             });
         }
 
-        // addRow(offeringId, bundleGroup, productKey)
+        // addRow(offeringId, bundleGroup, productKey, formulation)
         //   bundleGroup  — non-null string means this row is part of a bundle.
         //                  The dropdown is filtered to the drug family of productKey,
         //                  and Remove atomically removes all rows in the same group.
         //   productKey   — partner's product_key (e.g. "semaglutide") used to derive
         //                  the family filter for the bundle dropdown.
-        //   Both null    — standalone row, existing behaviour (full dropdown).
-        function addRow(offeringId, bundleGroup, productKey) {
+        //   formulation  — partner's formulation hint (e.g. "injectable") used to further
+        //                  filter the dropdown to matching formulation_type offerings.
+        //   All null     — standalone row, existing behaviour (full dropdown).
+        function addRow(offeringId, bundleGroup, productKey, formulation) {
             var i = idx++;
             var isBundle = !!bundleGroup;
             var row = document.createElement('div');
@@ -915,7 +926,7 @@
                 + '<button type="button" class="button-secondary" data-f="remove" style="padding:4px 10px;margin-left:auto">' + removeLabel + '</button></div>'
                 + '<div class="field-row">'
                 + '<div class="field"><label>Medication <span class="req">*</span></label>'
-                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>' + offeringOptions(offeringId, isBundle ? productKey : null) + '</select></div>'
+                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>' + offeringOptions(offeringId, isBundle ? productKey : null, formulation || null) + '</select></div>'
                 + '<div class="field"><label>Duration <span class="req">*</span></label>'
                 + '<select data-f="term" name="medications[' + i + '][term]" required>' + optionList(TERMS, defaultTerm) + '</select></div>'
                 + '</div>'
@@ -1083,9 +1094,10 @@
             Object.keys(bundleGroups).forEach(function (bgKey) {
                 addBundleGroup(bundleGroups[bgKey], bgKey);
             });
-            // Render standalone rows (existing behaviour, full dropdown).
+            // Render standalone rows — pass product_key + formulation so the
+            // dropdown is filtered to the partner-supplied formulation where set.
             standalone.forEach(function (co) {
-                addRow(co.offering_id, null, null);
+                addRow(co.offering_id, null, co.product_key || null, co.formulation || null);
             });
         }());
 
