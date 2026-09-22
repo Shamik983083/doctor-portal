@@ -926,7 +926,7 @@
                 + '<button type="button" class="button-secondary" data-f="remove" style="padding:4px 10px;margin-left:auto">' + removeLabel + '</button></div>'
                 + '<div class="field-row">'
                 + '<div class="field"><label>Medication <span class="req">*</span></label>'
-                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>' + offeringOptions(offeringId, isBundle ? productKey : null, formulation || null) + '</select></div>'
+                + '<select data-f="med" name="medications[' + i + '][offering_id]" required>' + offeringOptions(offeringId, productKey || null, formulation || null) + '</select></div>'
                 + '<div class="field"><label>Duration <span class="req">*</span></label>'
                 + '<select data-f="term" name="medications[' + i + '][term]" required>' + optionList(TERMS, defaultTerm) + '</select></div>'
                 + '</div>'
