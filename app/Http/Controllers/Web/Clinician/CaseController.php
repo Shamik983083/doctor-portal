@@ -739,7 +739,11 @@ class CaseController extends Controller
             ->keyBy('id');
 
         // C9: build a comma-joined string for the legacy diagnoses column.
-        $diagnosesArray = $request->input('diagnoses', []);
+        // Deduplicate by code so duplicate ICD-10 chips can't reach the DB or webhook.
+        $diagnosesArray = collect($request->input('diagnoses', []))
+            ->unique('code')
+            ->values()
+            ->all();
         $diagnosesLegacy = collect($diagnosesArray)->map(fn ($d) => $d['code'])->implode(', ');
 
         // C12: discard any existing draft for this case before creating a fresh one.
@@ -949,7 +953,7 @@ class CaseController extends Controller
             'diagnoses'                => $prescription->diagnosesCodes->map(fn ($d) => [
                 'code'        => $d->icd_code,
                 'description' => $d->description,
-            ])->toArray() ?: $prescription->diagnoses,
+            ])->unique('code')->values()->toArray() ?: $prescription->diagnoses,
             'meds_prescribed' => $prescription->medications->map(function ($m) use ($coByOffering) {
                 $co = $coByOffering->get($m->offering_id);
                 return [
