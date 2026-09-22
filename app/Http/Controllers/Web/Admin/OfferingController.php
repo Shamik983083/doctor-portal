@@ -91,6 +91,7 @@ class OfferingController extends Controller
             'available_states.*'      => 'string|size:2',
             'video_required_states'   => 'nullable|array',
             'video_required_states.*' => 'string|size:2',
+            'formulation_type'        => 'nullable|in:injectable,oral',
             'is_active'               => 'boolean',
             'is_controlled_substance' => 'boolean',
             'questionnaire_ids'       => 'required|array|min:1',
@@ -277,6 +278,7 @@ class OfferingController extends Controller
             'available_states.*'      => 'string|size:2',
             'video_required_states'   => 'nullable|array',
             'video_required_states.*' => 'string|size:2',
+            'formulation_type'        => 'nullable|in:injectable,oral',
             'is_active'               => 'boolean',
             'is_controlled_substance' => 'boolean',
         ]);

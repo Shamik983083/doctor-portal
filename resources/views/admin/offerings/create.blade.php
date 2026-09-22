@@ -293,7 +293,19 @@
                         @endforeach
                     </div>
 
-                    <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Flags</h6>
+                    <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">Formulation &amp; Flags</h6>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Formulation Type</label>
+                            <select name="formulation_type" class="form-select">
+                                <option value="">— Not set —</option>
+                                <option value="injectable" {{ old('formulation_type') === 'injectable' ? 'selected' : '' }}>Injectable</option>
+                                <option value="oral"       {{ old('formulation_type') === 'oral'       ? 'selected' : '' }}>Oral</option>
+                            </select>
+                            <div class="form-text">Used to filter the medication dropdown in the prescribe form when the partner specifies a formulation in their API payload.</div>
+                        </div>
+                    </div>
 
                     <div class="d-flex gap-4 mb-4">
                         <div class="form-check form-switch">
