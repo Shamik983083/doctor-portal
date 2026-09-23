@@ -871,8 +871,6 @@
         var approvedBtn  = document.getElementById('approvedDoneBtn');
         if (!overlay || !frame) return;
 
-        var pendingApproval = false;
-
         function openReview(url) {
             frame.src = url;
             overlay.removeAttribute('hidden');
@@ -884,6 +882,7 @@
         }
         function showApprovedModal() {
             closeReview();
+            document.body.style.overflow = '';
             if (approved) approved.removeAttribute('hidden');
         }
 
@@ -891,27 +890,20 @@
             var link = e.target.closest('[data-review-url]');
             if (!link) return;
             e.preventDefault();
-            pendingApproval = false;
             openReview(link.getAttribute('data-review-url'));
         });
 
         window.addEventListener('message', function (e) {
             if (e.data === 'close-review') { closeReview(); document.body.style.overflow = ''; }
-            if (e.data === 'case-approved') { pendingApproval = true; }
         });
 
-        // After the iframe navigates away (post-approval redirect), show the success modal.
+        // When the iframe navigates away from a modal=1 URL to a clinician case URL,
+        // it means the prescription was confirmed (cancel buttons use postMessage instead).
         frame.addEventListener('load', function () {
             var href; try { href = frame.contentWindow.location.href; } catch (err) { return; }
             if (!href || href === 'about:blank') return;
             if (href.indexOf('modal=1') === -1 && href.indexOf('/clinician/cases/') !== -1) {
-                document.body.style.overflow = '';
-                if (pendingApproval) {
-                    showApprovedModal();
-                } else {
-                    closeReview();
-                    window.location.reload();
-                }
+                showApprovedModal();
             }
         });
 
