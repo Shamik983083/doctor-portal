@@ -343,7 +343,7 @@ class OfferingController extends Controller
 
         // Keep offering_partner.is_active in sync when the offering's active
         // flag changes, so the accessible offering gate stays consistent.
-        if ($offering->partner_id) {
+        if ($offering->partner_id && $offering->partner) {
             $offering->partner->accessibleOfferings()->syncWithoutDetaching([
                 $offering->id => ['is_active' => (bool) $data['is_active']],
             ]);
