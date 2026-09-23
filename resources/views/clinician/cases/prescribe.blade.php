@@ -605,8 +605,12 @@
             var defaultSig = (offering && offering.sig) ? offering.sig : '';
 
             var slots = dosingCount(term);
-            // Fall back to the offering-level quantity when a level doesn't carry its own.
-            var defaultQty = (offering && offering.quantity != null) ? String(offering.quantity) : '';
+            // Default quantity by formulation type; per-level quantity overrides this on level select.
+            var defaultQty = offering
+                ? (offering.formulation_type === 'injectable' ? '1'
+                 : offering.formulation_type === 'oral'       ? '30'
+                 : (offering.quantity != null ? String(offering.quantity) : ''))
+                : '';
             var head = '<div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
                 + '<span class="months-note">' + n + ' month term · ' + slots + ' level' + (slots > 1 ? 's' : '') + '</span></div>';
             var cells = '';
