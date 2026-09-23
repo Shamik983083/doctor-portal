@@ -694,7 +694,6 @@ def webhook():
       "sig":                 "Inject subcutaneously once weekly",
 
       "refills":             "3",
-      "quantity":            "1",
       "days_supply":         "30",
       "dispense_unit":       "vial",
       "days_until_dispense": 7,
@@ -794,15 +793,14 @@ function formulaForLevel(array $med, int $levelIndex): ?string {
     <strong>Using <code>dosing.quantities[]</code> for per-level dispense quantities:</strong>
     <code>dosing.quantities</code> is an array parallel to <code>dosing.months</code>, <code>dosing.sigs</code>, and <code>dosing.formulas</code>. Each entry is the numeric dispense quantity for that dose level, configured on the offering by the admin and auto-filled by the clinician at prescription time.
     <ul class="mb-1 mt-2">
-        <li><code>dosing.quantities</code> is <code>null</code> when no per-level quantities have been configured on the offering. Fall back to the top-level <code>quantity</code> field in that case.</li>
+        <li><code>dosing.quantities</code> is <code>null</code> when no per-level quantities have been configured on the offering.</li>
         <li>Individual entries may be <code>null</code> or <code>""</code> when only some levels have a quantity set — guard each entry before using.</li>
         <li>The array is parallel to <code>months[]</code> — <code>quantities[0]</code> is the quantity for M1, <code>quantities[1]</code> for M2, and so on.</li>
     </ul>
     <pre style="background:#f8fafc;color:#1f2937;border:1px solid #e2e8f0;border-radius:6px;padding:.5rem .75rem;font-size:.8rem;margin-top:.4rem;overflow-x:auto">// PHP — resolve dispense quantity for a given dose level
-function quantityForLevel(array $med, int $levelIndex): string {
-    $perLevel = $med['dosing']['quantities'][$levelIndex] ?? null;
-    if ($perLevel !== null && $perLevel !== '') return (string) $perLevel;
-    return $med['quantity'] ?? '1';   // top-level offering quantity fallback
+function quantityForLevel(array $med, int $levelIndex): ?string {
+    $qty = $med['dosing']['quantities'][$levelIndex] ?? null;
+    return ($qty !== null && $qty !== '') ? (string) $qty : null;
 }</pre>
 </div>
 
