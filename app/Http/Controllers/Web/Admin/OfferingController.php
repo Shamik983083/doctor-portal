@@ -241,10 +241,22 @@ class OfferingController extends Controller
     {
         $offering = Offering::findOrFail($id);
         $name = $offering->name;
+
+        $planCount = \App\Models\PartnerProductPlan::where('offering_id', $offering->id)->count();
+
         $offering->delete();
 
+        if ($planCount > 0) {
+            \App\Models\PartnerProductPlan::where('offering_id', $offering->id)->delete();
+        }
+
+        $msg = "Offering \"{$name}\" deleted.";
+        if ($planCount > 0) {
+            $msg .= " {$planCount} product plan row(s) were also removed.";
+        }
+
         return redirect()->route('admin.offerings.index')
-            ->with('success', "Offering \"{$name}\" deleted.");
+            ->with('success', $msg);
     }
 
     public function update(Request $request, int $id)
