@@ -274,7 +274,8 @@
                         $clin = $case->queueClinical();
                         $idv  = strtolower($case->patient?->id_verified_status ?? '') === 'verified';
                         $planLabel = ['Titration' => 'Titrate', 'Hold' => 'Hold'][$clin['plan']] ?? $clin['plan'];
-                        $isVideoCase = str_contains(strtolower($case->visit_type ?? ''), 'sync')
+                        $vt = strtolower($case->visit_type ?? '');
+                        $isVideoCase = (!str_contains($vt, 'async') && str_contains($vt, 'sync'))
                                     || ($case->clinician?->accepts_sync_visits ?? false);
 
                         $eligible = $case->triage === 'green'
