@@ -64,14 +64,22 @@ class PartnerProductPlanSeeder extends Seeder
             return;
         }
 
-        // Pre-load offering IDs by name to avoid N+1 lookups.
+        // Pre-load offerings grouped by (partner_id, name) so same-named offerings
+        // across different partners resolve to the correct per-partner ID.
         $allOfferingNames = collect(self::PLANS)->flatten()->unique()->values()->all();
-        $offeringMap = Offering::whereIn('name', $allOfferingNames)
-            ->pluck('id', 'name');
+        $allOfferings = Offering::whereIn('name', $allOfferingNames)
+            ->get(['id', 'name', 'partner_id']);
 
-        $missing = array_diff($allOfferingNames, $offeringMap->keys()->all());
-        if ($missing) {
-            $this->command->warn('Some offerings not found (run GlpOfferingsSeeder / NadOfferingsSeeder first): ' . implode(', ', $missing));
+        // $offeringsByPartner[partner_id][name] = offering_id
+        // $globalOfferings[name] = offering_id  (partner_id IS NULL — shared)
+        $offeringsByPartner = [];
+        $globalOfferings    = [];
+        foreach ($allOfferings as $o) {
+            if ($o->partner_id) {
+                $offeringsByPartner[$o->partner_id][$o->name] = $o->id;
+            } else {
+                $globalOfferings[$o->name] = $o->id;
+            }
         }
 
         $created = 0;
@@ -85,10 +93,15 @@ class PartnerProductPlanSeeder extends Seeder
             // does it for admin-created offerings but not seeded ones.
             $partnerOfferingIds = [];
 
+            // Resolve offering: prefer partner-specific row, fall back to global.
+            $partnerOfferingsForThisPartner = $offeringsByPartner[$partner->id] ?? [];
+
             foreach (self::PLANS as $productKey => $offeringNames) {
                 foreach (self::FREQUENCIES as $freq) {
                     foreach ($offeringNames as $offeringName) {
-                        $offeringId = $offeringMap->get($offeringName);
+                        $offeringId = $partnerOfferingsForThisPartner[$offeringName]
+                            ?? $globalOfferings[$offeringName]
+                            ?? null;
                         if (! $offeringId) {
                             continue;
                         }
