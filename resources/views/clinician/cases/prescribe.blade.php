@@ -605,6 +605,8 @@
             var defaultSig = (offering && offering.sig) ? offering.sig : '';
 
             var slots = dosingCount(term);
+            // Fall back to the offering-level quantity when a level doesn't carry its own.
+            var defaultQty = (offering && offering.quantity != null) ? String(offering.quantity) : '';
             var head = '<div class="months-head"><label>Dosage by month <span class="req">*</span></label>'
                 + '<span class="months-note">' + n + ' month term · ' + slots + ' level' + (slots > 1 ? 's' : '') + '</span></div>';
             var cells = '';
@@ -637,9 +639,10 @@
                     + ' value="" class="level-formula-input">';
                 var quantityInput = '<input type="number"'
                     + ' name="medications[' + i + '][quantities][]"'
-                    + ' value=""'
+                    + ' value="' + esc(defaultQty) + '"'
                     + ' min="0" step="0.01"'
                     + ' placeholder="Qty"'
+                    + ' required'
                     + ' class="level-quantity-input"'
                     + ' style="margin-top:4px;width:100%;font-size:11px;padding:4px 7px;'
                     + 'border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);">';
@@ -658,11 +661,11 @@
                         var sigInp      = this.parentElement.querySelector('input[name$="[sigs][]"]');
                         var formulaInp  = this.parentElement.querySelector('input.level-formula-input');
                         var quantityInp = this.parentElement.querySelector('input.level-quantity-input');
-                        if (sigInp)      sigInp.value      = sig;
-                        if (formulaInp)  formulaInp.value  = formula;
-                        // Only override quantity when the level has a per-level value set;
-                        // otherwise leave the offering-level quantity (from [data-f="quantity"]) untouched.
-                        if (quantityInp) quantityInp.value = quantity;
+                        if (sigInp)     sigInp.value     = sig;
+                        if (formulaInp) formulaInp.value = formula;
+                        // Only override quantity when the level carries its own value;
+                        // otherwise keep the offering-level default already in the input.
+                        if (quantityInp && quantity !== '') quantityInp.value = quantity;
                         if (quantity && quantityInp) {
                             var rowQtyInp = sel.closest('.med-row, .bundle-med-row, tr') &&
                                 sel.closest('.med-row, .bundle-med-row, tr').querySelector('[data-f="quantity"]');
