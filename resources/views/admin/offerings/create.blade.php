@@ -171,12 +171,13 @@
                                    value="{{ old('refills') }}" placeholder="0" required>
                             @error('refills')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-3" id="globalQuantityCol">
                             <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
-                            <input type="number" name="quantity" min="0" step="0.01" class="form-control @error('quantity') is-invalid @enderror"
+                            <input type="number" name="quantity" id="globalQuantityInput" min="0" step="0.01" class="form-control @error('quantity') is-invalid @enderror"
                                    value="{{ old('quantity') }}" placeholder="1.00" required>
                             @error('quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
+                        <input type="hidden" name="quantity" id="globalQuantityHidden" value="1" disabled>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
                             <input type="number" name="days_supply" min="0" class="form-control"
@@ -409,6 +410,17 @@
         });
     });
 
+    /* ── Global quantity visibility ── */
+    function syncQuantityVisibility() {
+        var hasLevels = levelsContainer.querySelectorAll('.level-row').length > 0;
+        var col    = document.getElementById('globalQuantityCol');
+        var inp    = document.getElementById('globalQuantityInput');
+        var hidden = document.getElementById('globalQuantityHidden');
+        col.style.display    = hasLevels ? 'none' : '';
+        inp.required         = !hasLevels;
+        hidden.disabled      = !hasLevels;
+    }
+
     /* ── Dose Levels ── */
     var levelsContainer = document.getElementById('levelsContainer');
 
@@ -469,6 +481,7 @@
         var row = buildLevelRow(idx);
         levelsContainer.appendChild(row);
         row.querySelector('.level-label-input').focus();
+        syncQuantityVisibility();
     });
 
     levelsContainer.addEventListener('click', function (e) {
@@ -476,7 +489,11 @@
         if (!btn) return;
         btn.closest('.level-row').remove();
         renumberLevels();
+        syncQuantityVisibility();
     });
+
+    // Run once on page load in case old() repopulated level rows (validation failure).
+    syncQuantityVisibility();
 
     /* ── Product key / plan frequencies toggle ── */
     document.getElementById('productKeySelect').addEventListener('change', function () {

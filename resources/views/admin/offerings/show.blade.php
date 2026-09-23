@@ -350,11 +350,15 @@
                             <input type="number" name="refills" min="0" class="form-control"
                                    value="{{ old('refills', $offering->refills) }}" placeholder="0" required>
                         </div>
+                        @if(empty($offering->levels))
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
                             <input type="number" name="quantity" min="0" step="0.01" class="form-control"
                                    value="{{ old('quantity', $offering->quantity) }}" placeholder="1.00" required>
                         </div>
+                        @else
+                        <input type="hidden" name="quantity" value="{{ $offering->quantity ?: 1 }}">
+                        @endif
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Days Supply <span class="text-muted fw-normal">(opt)</span></label>
                             <input type="number" name="days_supply" min="0" class="form-control"
