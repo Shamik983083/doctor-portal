@@ -634,10 +634,15 @@
                 var formulaHidden = '<input type="hidden"'
                     + ' name="medications[' + i + '][formulas][]"'
                     + ' value="" class="level-formula-input">';
-                var quantityHidden = '<input type="hidden"'
+                var quantityInput = '<input type="number"'
                     + ' name="medications[' + i + '][quantities][]"'
-                    + ' value="" class="level-quantity-input">';
-                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + formulaHidden + quantityHidden + '</div>';
+                    + ' value=""'
+                    + ' min="0" step="0.01"'
+                    + ' placeholder="Qty"'
+                    + ' class="level-quantity-input"'
+                    + ' style="margin-top:4px;width:100%;font-size:11px;padding:4px 7px;'
+                    + 'border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);">';
+                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + formulaHidden + quantityInput + '</div>';
             }
             wrap.innerHTML = '<div class="months">' + head + '<div class="months-grid">' + cells + '</div></div>';
 
