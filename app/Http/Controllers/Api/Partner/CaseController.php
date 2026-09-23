@@ -153,10 +153,17 @@ class CaseController extends Controller
             // per submitted entry. The clinician's prescribe form dropdown lets them
             // switch to any offering in the same drug family.
             if (!empty($offeringData['product_key']) && !empty($offeringData['month_frequency'])) {
-                $plan = PartnerProductPlan::where('partner_id', $partner->id)
+                $requestedFormulation = $offeringData['formulation'] ?? null;
+                $planBase = PartnerProductPlan::where('partner_id', $partner->id)
                     ->where('product_key', $offeringData['product_key'])
-                    ->where('month_frequency', (int) $offeringData['month_frequency'])
-                    ->first();
+                    ->where('month_frequency', (int) $offeringData['month_frequency']);
+
+                // When formulation is provided, prefer a plan whose offering's
+                // formulation_type matches. Fall back to first plan if none match.
+                $plan = ($requestedFormulation
+                    ? $planBase->clone()->whereHas('offering', fn($q) => $q->where('formulation_type', $requestedFormulation))->first()
+                    : null)
+                    ?? $planBase->first();
 
                 if (!$plan) {
                     return response()->json([
@@ -168,6 +175,25 @@ class CaseController extends Controller
                 $offering = $partner->accessibleOfferings()
                     ->where('offerings.id', $plan->offering_id)
                     ->first();
+
+                // If the plan's offering formulation_type doesn't match the requested
+                // formulation (e.g. plan points to SNAC but partner sent "injectable"),
+                // search across ALL plans for this product_key to find an accessible
+                // offering with the correct formulation_type.
+                if ($offering && $requestedFormulation && $offering->formulation_type !== $requestedFormulation) {
+                    $familyOfferingIds = PartnerProductPlan::where('partner_id', $partner->id)
+                        ->where('product_key', $offeringData['product_key'])
+                        ->pluck('offering_id');
+
+                    $betterOffering = $partner->accessibleOfferings()
+                        ->whereIn('offerings.id', $familyOfferingIds)
+                        ->where('offerings.formulation_type', $requestedFormulation)
+                        ->first();
+
+                    if ($betterOffering) {
+                        $offering = $betterOffering;
+                    }
+                }
 
                 if (!$offering) {
                     return response()->json([
