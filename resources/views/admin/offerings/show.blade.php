@@ -383,24 +383,35 @@
                             </p>
                             <div class="d-flex flex-column gap-2">
                                 @foreach($offeringLevels as $idx => $level)
-                                <div class="d-flex align-items-center gap-3 p-2 rounded border"
-                                     style="background:var(--bs-gray-100,#f8f9fa)">
-                                    <div style="min-width:160px;flex-shrink:0">
-                                        <div class="fw-bold text-primary" style="font-size:.875rem">{{ $level['label'] ?? 'Level '.($idx+1) }}</div>
-                                        <div class="text-muted" style="font-size:.75rem">{{ $level['formula'] ?? '' }}</div>
+                                <div class="p-2 rounded border" style="background:var(--bs-gray-100,#f8f9fa)">
+                                    <div class="fw-bold text-primary mb-2" style="font-size:.875rem">{{ $level['label'] ?? 'Level '.($idx+1) }}</div>
+                                    <div class="row g-2">
+                                        <div class="col-md-4">
+                                            <input type="text"
+                                                   name="levels_formulas[{{ $idx }}]"
+                                                   class="form-control form-control-sm"
+                                                   value="{{ old('levels_formulas.'.$idx, $level['formula'] ?? '') }}"
+                                                   placeholder="e.g. 0.25mg/0.5mL (2mL)">
+                                            <div class="form-text" style="font-size:.7rem">Compound formula</div>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <input type="text"
+                                                   name="levels_sigs[{{ $idx }}]"
+                                                   class="form-control form-control-sm"
+                                                   value="{{ old('levels_sigs.'.$idx, $level['sig'] ?? '') }}"
+                                                   placeholder="e.g. Inject 0.25 mL subcutaneously once weekly">
+                                            <div class="form-text" style="font-size:.7rem">SIG instruction</div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <input type="number"
+                                                   name="levels_quantities[{{ $idx }}]"
+                                                   class="form-control form-control-sm"
+                                                   value="{{ old('levels_quantities.'.$idx, $level['quantity'] ?? '') }}"
+                                                   placeholder="Qty"
+                                                   min="0" step="0.01">
+                                            <div class="form-text" style="font-size:.7rem">Quantity</div>
+                                        </div>
                                     </div>
-                                    <input type="text"
-                                           name="levels_sigs[{{ $idx }}]"
-                                           class="form-control form-control-sm"
-                                           value="{{ old('levels_sigs.'.$idx, $level['sig'] ?? '') }}"
-                                           placeholder="e.g. Inject 0.25 mL subcutaneously once weekly">
-                                    <input type="number"
-                                           name="levels_quantities[{{ $idx }}]"
-                                           class="form-control form-control-sm"
-                                           style="max-width:90px"
-                                           value="{{ old('levels_quantities.'.$idx, $level['quantity'] ?? '') }}"
-                                           placeholder="Qty"
-                                           min="0" step="0.01">
                                 </div>
                                 @endforeach
                             </div>
@@ -506,6 +517,53 @@
                         </div>
                     </div>
 
+                    <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-2">
+                        Partner Product Plans
+                        <span class="fw-normal" style="text-transform:none;font-size:.8rem;">— partner API routing</span>
+                    </h6>
+
+                    {{-- Existing plan rows --}}
+                    @if($existingPlans->isNotEmpty())
+                    <div class="mb-3">
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach($existingPlans as $plan)
+                            <span class="badge bg-light text-dark border" style="font-size:.78rem;font-weight:500">
+                                <code>{{ $plan->product_key }}</code> · {{ $plan->month_frequency }}M
+                            </span>
+                            @endforeach
+                        </div>
+                        <div class="form-text mt-1">Existing plan entries pointing to this offering.</div>
+                    </div>
+                    @else
+                    <p class="text-muted small mb-3">No product plan entries yet.</p>
+                    @endif
+
+                    {{-- Add new plan entries --}}
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small">Add Product Key</label>
+                            <select name="product_key" class="form-select form-select-sm" id="editProductKeySelect">
+                                <option value="">— None —</option>
+                                @foreach(['semaglutide','tirzepatide','nad','nad_glutathione','bpc157','low_dose_naltrexone'] as $pk)
+                                <option value="{{ $pk }}" {{ old('product_key') === $pk ? 'selected' : '' }}>{{ $pk }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-8" id="editPlanFrequenciesWrapper" style="{{ old('product_key') ? '' : 'opacity:.4;pointer-events:none' }}">
+                            <label class="form-label fw-semibold small">Month Frequencies</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                @foreach([1,2,3,4,5,6,12] as $mo)
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="plan_frequencies[]" value="{{ $mo }}"
+                                           id="epf_{{ $mo }}" {{ in_array($mo, old('plan_frequencies', [])) ? 'checked' : '' }}>
+                                    <label class="form-check-label small" for="epf_{{ $mo }}">{{ $mo }}M</label>
+                                </div>
+                                @endforeach
+                            </div>
+                            <div class="form-text">Uses <code>updateOrCreate</code> — safe to re-run on existing entries.</div>
+                        </div>
+                    </div>
+
                     </fieldset>
 
                     @role('super_admin')
@@ -597,6 +655,21 @@
         navigator.clipboard.writeText(input.value).then(function () {
             icon.className = 'bi bi-check-lg text-success';
             setTimeout(function () { icon.className = 'bi bi-copy'; }, 1800);
+        });
+    }
+
+    var editPkSelect = document.getElementById('editProductKeySelect');
+    if (editPkSelect) {
+        editPkSelect.addEventListener('change', function () {
+            var wrapper = document.getElementById('editPlanFrequenciesWrapper');
+            if (this.value) {
+                wrapper.style.opacity = '1';
+                wrapper.style.pointerEvents = 'auto';
+            } else {
+                wrapper.style.opacity = '.4';
+                wrapper.style.pointerEvents = 'none';
+                wrapper.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+            }
         });
     }
 </script>

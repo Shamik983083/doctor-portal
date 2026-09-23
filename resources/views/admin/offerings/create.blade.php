@@ -202,7 +202,7 @@
                             <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 level-badge mt-1 flex-shrink-0" style="font-size:.72rem;min-width:42px;text-align:center">LVL{{ $li + 1 }}</span>
                             <div class="flex-grow-1">
                                 <div class="row g-2">
-                                    <div class="col-md-5">
+                                    <div class="col-md-4">
                                         <input type="text" name="levels[{{ $li }}][label]"
                                                class="form-control form-control-sm @error('levels.'.$li.'.label') is-invalid @enderror"
                                                value="{{ $lv['label'] ?? '' }}"
@@ -210,7 +210,14 @@
                                         @error('levels.'.$li.'.label')<div class="invalid-feedback" style="font-size:.75rem">{{ $message }}</div>@enderror
                                         <div class="form-text" style="font-size:.7rem">Level label</div>
                                     </div>
-                                    <div class="col-md-5">
+                                    <div class="col-md-3">
+                                        <input type="text" name="levels[{{ $li }}][formula]"
+                                               class="form-control form-control-sm"
+                                               value="{{ $lv['formula'] ?? '' }}"
+                                               placeholder="e.g. 0.25mg/0.5mL (2mL)">
+                                        <div class="form-text" style="font-size:.7rem">Compound formula</div>
+                                    </div>
+                                    <div class="col-md-3">
                                         <input type="text" name="levels[{{ $li }}][sig]"
                                                class="form-control form-control-sm @error('levels.'.$li.'.sig') is-invalid @enderror"
                                                value="{{ $lv['sig'] ?? '' }}"
@@ -329,6 +336,37 @@
                         </div>
                     </div>
 
+                    <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2 mt-4">
+                        Partner Product Plans
+                        <span class="fw-normal" style="text-transform:none;font-size:.8rem;">— optional auto-setup</span>
+                    </h6>
+                    <p class="text-muted small mb-3">If this offering maps to a partner API <code>product_key</code>, select it and check the month frequencies to auto-create the product plan entries on save.</p>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Product Key</label>
+                            <select name="product_key" class="form-select form-select-sm" id="productKeySelect">
+                                <option value="">— None —</option>
+                                @foreach(['semaglutide','tirzepatide','nad','nad_glutathione','bpc157','low_dose_naltrexone'] as $pk)
+                                <option value="{{ $pk }}" {{ old('product_key') === $pk ? 'selected' : '' }}>{{ $pk }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-8" id="planFrequenciesWrapper" style="{{ old('product_key') ? '' : 'opacity:.4;pointer-events:none' }}">
+                            <label class="form-label fw-semibold">Month Frequencies</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                @foreach([1,2,3,4,5,6,12] as $mo)
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="plan_frequencies[]" value="{{ $mo }}"
+                                           id="pf_{{ $mo }}" {{ in_array($mo, old('plan_frequencies', [])) ? 'checked' : '' }}>
+                                    <label class="form-check-label small" for="pf_{{ $mo }}">{{ $mo }}M</label>
+                                </div>
+                                @endforeach
+                            </div>
+                            <div class="form-text">Creates one <code>partner_product_plans</code> row per checked frequency for this partner.</div>
+                        </div>
+                    </div>
+
                     <div class="d-flex gap-2 pt-2 border-top">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-plus-circle me-1"></i>Create Offering
@@ -376,9 +414,11 @@
 
     function renumberLevels() {
         levelsContainer.querySelectorAll('.level-row').forEach(function (row, i) {
-            row.querySelector('.level-badge').textContent         = 'LVL' + (i + 1);
-            row.querySelector('.level-label-input').name          = 'levels[' + i + '][label]';
-            row.querySelector('.level-sig-input').name            = 'levels[' + i + '][sig]';
+            row.querySelector('.level-badge').textContent = 'LVL' + (i + 1);
+            row.querySelector('.level-label-input').name   = 'levels[' + i + '][label]';
+            var fmlInp = row.querySelector('.level-formula-input');
+            if (fmlInp) fmlInp.name = 'levels[' + i + '][formula]';
+            row.querySelector('.level-sig-input').name     = 'levels[' + i + '][sig]';
             var qtyInp = row.querySelector('.level-quantity-input');
             if (qtyInp) qtyInp.name = 'levels[' + i + '][quantity]';
         });
@@ -392,13 +432,19 @@
             '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 level-badge mt-1 flex-shrink-0" style="font-size:.72rem;min-width:42px;text-align:center">LVL' + (idx + 1) + '</span>' +
             '<div class="flex-grow-1">' +
                 '<div class="row g-2">' +
-                    '<div class="col-md-5">' +
+                    '<div class="col-md-4">' +
                         '<input type="text" name="levels[' + idx + '][label]"' +
                                ' class="form-control form-control-sm level-label-input"' +
                                ' placeholder="e.g. LVL1 – 1MG (0.25mg/wk)" required>' +
                         '<div class="form-text" style="font-size:.7rem">Level label</div>' +
                     '</div>' +
-                    '<div class="col-md-5">' +
+                    '<div class="col-md-3">' +
+                        '<input type="text" name="levels[' + idx + '][formula]"' +
+                               ' class="form-control form-control-sm level-formula-input"' +
+                               ' placeholder="e.g. 0.25mg/0.5mL (2mL)">' +
+                        '<div class="form-text" style="font-size:.7rem">Compound formula</div>' +
+                    '</div>' +
+                    '<div class="col-md-3">' +
                         '<input type="text" name="levels[' + idx + '][sig]"' +
                                ' class="form-control form-control-sm level-sig-input"' +
                                ' placeholder="e.g. Inject 0.25 mL subcutaneously once weekly" required>' +
@@ -430,6 +476,19 @@
         if (!btn) return;
         btn.closest('.level-row').remove();
         renumberLevels();
+    });
+
+    /* ── Product key / plan frequencies toggle ── */
+    document.getElementById('productKeySelect').addEventListener('change', function () {
+        var wrapper = document.getElementById('planFrequenciesWrapper');
+        if (this.value) {
+            wrapper.style.opacity = '1';
+            wrapper.style.pointerEvents = 'auto';
+        } else {
+            wrapper.style.opacity = '.4';
+            wrapper.style.pointerEvents = 'none';
+            wrapper.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+        }
     });
 
     /* ── Form submit guard ── */

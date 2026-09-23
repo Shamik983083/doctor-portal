@@ -107,7 +107,7 @@ class OfferingController extends Controller
         if (!empty($rawLevels)) {
             $data['levels'] = array_map(fn($l) => [
                 'label'    => trim($l['label']),
-                'formula'  => '',
+                'formula'  => trim($l['formula'] ?? ''),
                 'sig'      => trim($l['sig'] ?? ''),
                 'quantity' => isset($l['quantity']) && trim((string) $l['quantity']) !== '' ? (float) $l['quantity'] : null,
             ], $rawLevels);
@@ -131,6 +131,22 @@ class OfferingController extends Controller
             $offering->partner->accessibleOfferings()->syncWithoutDetaching([
                 $offering->id => ['is_active' => (bool) $data['is_active']],
             ]);
+        }
+
+        // Auto-create PartnerProductPlan rows when a product_key + frequencies were selected.
+        $productKey = trim((string) $request->input('product_key', ''));
+        $planFreqs  = array_filter(array_map('intval', $request->input('plan_frequencies', [])));
+        if ($productKey !== '' && !empty($planFreqs) && $offering->partner_id) {
+            foreach ($planFreqs as $freq) {
+                \App\Models\PartnerProductPlan::updateOrCreate(
+                    [
+                        'partner_id'      => $offering->partner_id,
+                        'product_key'     => $productKey,
+                        'month_frequency' => $freq,
+                    ],
+                    ['offering_id' => $offering->id]
+                );
+            }
         }
 
         try {
@@ -165,7 +181,9 @@ class OfferingController extends Controller
         $usStates          = $this->usStates;
         $categories        = OfferingCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $allQuestionnaires = $this->attachableQuestionnaires();
-        return view('admin.offerings.show', compact('offering', 'usStates', 'categories', 'allQuestionnaires'));
+        $existingPlans     = \App\Models\PartnerProductPlan::where('offering_id', $offering->id)
+                                ->orderBy('product_key')->orderBy('month_frequency')->get();
+        return view('admin.offerings.show', compact('offering', 'usStates', 'categories', 'allQuestionnaires', 'existingPlans'));
     }
 
     public function attachQuestionnaire(Request $request, int $id)
@@ -300,14 +318,16 @@ class OfferingController extends Controller
         $data['is_controlled_substance'] = $request->boolean('is_controlled_substance');
         $data['category_id']             = $request->input('category_id') ?: null;
 
-        // Merge per-level SIG instructions into the levels JSON column.
+        // Merge per-level SIG/formula/quantity into the levels JSON column.
         $currentLevels = $offering->levels;
         if (!empty($currentLevels) && is_array($currentLevels)) {
             $levelsSigs       = $request->input('levels_sigs', []);
+            $levelsFormulas   = $request->input('levels_formulas', []);
             $levelsQuantities = $request->input('levels_quantities', []);
             $updatedLevels = [];
             foreach ($currentLevels as $idx => $level) {
-                $level['sig'] = trim((string) ($levelsSigs[$idx] ?? ''));
+                $level['formula']  = trim((string) ($levelsFormulas[$idx] ?? $level['formula'] ?? ''));
+                $level['sig']      = trim((string) ($levelsSigs[$idx] ?? ''));
                 $qty = trim((string) ($levelsQuantities[$idx] ?? ''));
                 $level['quantity'] = $qty !== '' ? (float) $qty : null;
                 $updatedLevels[] = $level;
@@ -327,6 +347,22 @@ class OfferingController extends Controller
             $offering->partner->accessibleOfferings()->syncWithoutDetaching([
                 $offering->id => ['is_active' => (bool) $data['is_active']],
             ]);
+        }
+
+        // Add new PartnerProductPlan rows if product_key + frequencies were submitted.
+        $productKey = trim((string) $request->input('product_key', ''));
+        $planFreqs  = array_filter(array_map('intval', $request->input('plan_frequencies', [])));
+        if ($productKey !== '' && !empty($planFreqs) && $offering->partner_id) {
+            foreach ($planFreqs as $freq) {
+                \App\Models\PartnerProductPlan::updateOrCreate(
+                    [
+                        'partner_id'      => $offering->partner_id,
+                        'product_key'     => $productKey,
+                        'month_frequency' => $freq,
+                    ],
+                    ['offering_id' => $offering->id]
+                );
+            }
         }
 
         return back()->with('success', 'Offering updated.');
