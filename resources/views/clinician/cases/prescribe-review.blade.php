@@ -174,6 +174,10 @@
                 confirmBtn.classList.add('btn-loading');
                 confirmBtn.disabled = true;
                 confirmBtn.innerHTML = '<span class="btn-spin"></span>Approving…';
+                // Notify parent frame to show the approval success modal.
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage('case-approved', '*');
+                }
             });
         }
     })();

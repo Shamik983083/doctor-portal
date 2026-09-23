@@ -690,6 +690,21 @@
     </div>
 </div>
 
+{{-- Case-approved success modal --}}
+<div id="approvedOverlay" hidden aria-modal="true" role="dialog" aria-label="Case approved">
+    <div id="approvedCard">
+        <div id="approvedIconWrap">
+            <svg id="approvedCheck" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle class="check-circle" cx="26" cy="26" r="24" stroke="#16a34a" stroke-width="2.5"/>
+                <polyline class="check-tick" points="14,27 22,35 38,18" stroke="#16a34a" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <h2 id="approvedTitle">Case Approved</h2>
+        <p id="approvedDesc">The prescription has been confirmed and sent to the pharmacy. The patient will be notified shortly.</p>
+        <button id="approvedDoneBtn" type="button">Done</button>
+    </div>
+</div>
+
 {{-- Review-and-approve modal host (same pop-up as the grid) --}}
 <div class="modal-back" id="reviewOverlay" hidden>
     <div class="modal" style="width:min(1080px,94vw);height:88vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
@@ -712,6 +727,59 @@
     .chat .chat-scroll { border-radius:0; }
     #note-fields-general[hidden], #note-fields-soap[hidden], #note-fields-progress[hidden] { display:none; }
     .note-hint { text-transform:none; letter-spacing:0; font-weight:400; font-size:10px; color:var(--muted); margin-left:5px; }
+    /* ── Case-approved success modal ───────────────────────────── */
+    #approvedOverlay {
+        position:fixed;inset:0;z-index:10500;
+        display:flex;align-items:center;justify-content:center;padding:20px;
+        background:rgba(0,0,0,.45);backdrop-filter:blur(3px);
+        animation:approvedFadeIn .2s ease;
+    }
+    #approvedOverlay[hidden] { display:none; }
+    @keyframes approvedFadeIn { from{opacity:0} to{opacity:1} }
+    #approvedCard {
+        background:#fff;border-radius:24px;
+        box-shadow:0 32px 80px rgba(0,0,0,.22),0 2px 8px rgba(0,0,0,.08);
+        max-width:400px;width:100%;padding:44px 36px 36px;
+        text-align:center;
+        animation:approvedSlideUp .28s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes approvedSlideUp { from{transform:translateY(28px);opacity:0} to{transform:translateY(0);opacity:1} }
+    #approvedIconWrap {
+        display:flex;align-items:center;justify-content:center;
+        width:72px;height:72px;border-radius:50%;
+        background:linear-gradient(135deg,#dcfce7 0%,#bbf7d0 100%);
+        margin:0 auto 22px;
+    }
+    #approvedCheck { width:44px;height:44px; }
+    .check-circle {
+        stroke-dasharray:151;stroke-dashoffset:151;
+        animation:drawCircle .5s .1s cubic-bezier(.65,0,.35,1) forwards;
+    }
+    .check-tick {
+        stroke-dasharray:30;stroke-dashoffset:30;
+        animation:drawTick .35s .5s cubic-bezier(.65,0,.35,1) forwards;
+    }
+    @keyframes drawCircle { to{stroke-dashoffset:0} }
+    @keyframes drawTick   { to{stroke-dashoffset:0} }
+    #approvedTitle {
+        font-size:1.25rem;font-weight:750;letter-spacing:-.025em;
+        color:#0f172a;margin:0 0 10px;
+    }
+    #approvedDesc {
+        font-size:.875rem;color:#64748b;line-height:1.55;margin:0 0 28px;
+    }
+    #approvedDoneBtn {
+        display:inline-flex;align-items:center;justify-content:center;gap:7px;
+        background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;
+        font-size:.9rem;font-weight:650;letter-spacing:-.01em;
+        border:none;border-radius:12px;padding:11px 36px;cursor:pointer;
+        box-shadow:0 4px 14px rgba(22,163,74,.35);
+        transition:transform .13s,box-shadow .13s;
+        width:100%;
+    }
+    #approvedDoneBtn:hover { transform:translateY(-1px);box-shadow:0 6px 20px rgba(22,163,74,.4); }
+    #approvedDoneBtn:active { transform:translateY(0);box-shadow:0 2px 8px rgba(22,163,74,.3); }
+
     /* ── Forward-to-support modal ───────────────────────────────── */
     .fwd-modal-overlay { position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px; }
     .fwd-modal-box { background:var(--surface,#fff);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.18);max-width:520px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden; }
@@ -797,23 +865,71 @@
 
     // Review-and-approve modal (iframe of the prescribe form, bare).
     (function () {
-        var overlay = document.getElementById('reviewOverlay');
-        var frame   = document.getElementById('reviewFrame');
+        var overlay      = document.getElementById('reviewOverlay');
+        var frame        = document.getElementById('reviewFrame');
+        var approved     = document.getElementById('approvedOverlay');
+        var approvedBtn  = document.getElementById('approvedDoneBtn');
         if (!overlay || !frame) return;
-        function open(url) { frame.src = url; overlay.removeAttribute('hidden'); document.body.style.overflow = 'hidden'; }
-        function close(reload) { overlay.setAttribute('hidden', ''); frame.src = 'about:blank'; document.body.style.overflow = ''; if (reload) window.location.reload(); }
+
+        var pendingApproval = false;
+
+        function openReview(url) {
+            frame.src = url;
+            overlay.removeAttribute('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeReview() {
+            overlay.setAttribute('hidden', '');
+            frame.src = 'about:blank';
+        }
+        function showApprovedModal() {
+            closeReview();
+            if (approved) approved.removeAttribute('hidden');
+        }
+
         document.addEventListener('click', function (e) {
-            var link = e.target.closest('[data-review-url]'); if (!link) return;
-            e.preventDefault(); open(link.getAttribute('data-review-url'));
+            var link = e.target.closest('[data-review-url]');
+            if (!link) return;
+            e.preventDefault();
+            pendingApproval = false;
+            openReview(link.getAttribute('data-review-url'));
         });
-        window.addEventListener('message', function (e) { if (e.data === 'close-review') close(false); });
+
+        window.addEventListener('message', function (e) {
+            if (e.data === 'close-review') { closeReview(); document.body.style.overflow = ''; }
+            if (e.data === 'case-approved') { pendingApproval = true; }
+        });
+
+        // After the iframe navigates away (post-approval redirect), show the success modal.
         frame.addEventListener('load', function () {
             var href; try { href = frame.contentWindow.location.href; } catch (err) { return; }
             if (!href || href === 'about:blank') return;
-            if (href.indexOf('modal=1') === -1 && href.indexOf('/clinician/cases/') !== -1) close(true);
+            if (href.indexOf('modal=1') === -1 && href.indexOf('/clinician/cases/') !== -1) {
+                document.body.style.overflow = '';
+                if (pendingApproval) {
+                    showApprovedModal();
+                } else {
+                    closeReview();
+                    window.location.reload();
+                }
+            }
         });
-        document.getElementById('reviewClose').addEventListener('click', function () { close(false); });
-        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false); });
+
+        document.getElementById('reviewClose').addEventListener('click', function () {
+            closeReview();
+            document.body.style.overflow = '';
+        });
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) { closeReview(); document.body.style.overflow = ''; }
+        });
+
+        // Done button — reload the case page to reflect approved status.
+        if (approvedBtn) {
+            approvedBtn.addEventListener('click', function () {
+                if (approved) approved.setAttribute('hidden', '');
+                window.location.reload();
+            });
+        }
     })();
 </script>
 
