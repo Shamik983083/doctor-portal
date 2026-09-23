@@ -788,15 +788,20 @@ class CaseController extends Controller
                 $formulas = array_values(array_map(fn ($f) => trim((string) $f), $rawFormulas));
                 $formulasHaveContent = collect($formulas)->contains(fn ($f) => $f !== '');
 
+                $rawQuantities = $med['quantities'] ?? [];
+                $quantities = array_values(array_map(fn ($q) => trim((string) $q), $rawQuantities));
+                $quantitiesHaveContent = collect($quantities)->contains(fn ($q) => $q !== '');
+
                 $dosing = null;
                 if (filled($med['frequency'] ?? null) || filled($med['term'] ?? null) || $months !== []) {
                     $dosing = [
-                        'medication' => $med['name'],
-                        'frequency'  => $med['frequency'] ?? null,
-                        'term'       => $med['term'] ?? null,
-                        'months'     => $months,
-                        'sigs'       => $sigsHaveContent ? $sigs : null,
-                        'formulas'   => $formulasHaveContent ? $formulas : null,
+                        'medication'  => $med['name'],
+                        'frequency'   => $med['frequency'] ?? null,
+                        'term'        => $med['term'] ?? null,
+                        'months'      => $months,
+                        'sigs'        => $sigsHaveContent ? $sigs : null,
+                        'formulas'    => $formulasHaveContent ? $formulas : null,
+                        'quantities'  => $quantitiesHaveContent ? $quantities : null,
                     ];
                 }
 

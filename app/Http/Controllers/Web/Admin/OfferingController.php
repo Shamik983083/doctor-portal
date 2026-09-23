@@ -302,10 +302,13 @@ class OfferingController extends Controller
         // Merge per-level SIG instructions into the levels JSON column.
         $currentLevels = $offering->levels;
         if (!empty($currentLevels) && is_array($currentLevels)) {
-            $levelsSigs = $request->input('levels_sigs', []);
+            $levelsSigs       = $request->input('levels_sigs', []);
+            $levelsQuantities = $request->input('levels_quantities', []);
             $updatedLevels = [];
             foreach ($currentLevels as $idx => $level) {
                 $level['sig'] = trim((string) ($levelsSigs[$idx] ?? ''));
+                $qty = trim((string) ($levelsQuantities[$idx] ?? ''));
+                $level['quantity'] = $qty !== '' ? (float) $qty : null;
                 $updatedLevels[] = $level;
             }
             $data['levels'] = $updatedLevels;

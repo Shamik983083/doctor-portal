@@ -610,11 +610,11 @@
             for (var m = 0; m < slots; m++) {
                 var control;
                 if (levels) {
-                    var opts = '<option value="" data-sig="" data-formula="">Select level</option>'
+                    var opts = '<option value="" data-sig="" data-formula="" data-quantity="">Select level</option>'
                         + levels.map(function (lvl) {
                             // formula stored in data-formula and submitted to pharmacy,
                             // but NOT shown to the prescriber in the dropdown display.
-                            return '<option value="' + esc(lvl.label) + '" data-sig="' + esc(lvl.sig || '') + '" data-formula="' + esc(lvl.formula || '') + '">'
+                            return '<option value="' + esc(lvl.label) + '" data-sig="' + esc(lvl.sig || '') + '" data-formula="' + esc(lvl.formula || '') + '" data-quantity="' + esc(lvl.quantity != null ? String(lvl.quantity) : '') + '">'
                                 + esc(lvl.label) + '</option>';
                         }).join('');
                     control = '<select name="medications[' + i + '][months][]" required class="level-select">' + opts + '</select>';
@@ -634,21 +634,34 @@
                 var formulaHidden = '<input type="hidden"'
                     + ' name="medications[' + i + '][formulas][]"'
                     + ' value="" class="level-formula-input">';
-                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + formulaHidden + '</div>';
+                var quantityHidden = '<input type="hidden"'
+                    + ' name="medications[' + i + '][quantities][]"'
+                    + ' value="" class="level-quantity-input">';
+                cells += '<div class="field"><label>M' + (m + 1) + '</label>' + control + sigInput + formulaHidden + quantityHidden + '</div>';
             }
             wrap.innerHTML = '<div class="months">' + head + '<div class="months-grid">' + cells + '</div></div>';
 
-            // Wire level→SIG and level→formula auto-fill after DOM is set
+            // Wire level→SIG, level→formula, and level→quantity auto-fill after DOM is set
             if (levels) {
                 wrap.querySelectorAll('.level-select').forEach(function (sel) {
                     sel.addEventListener('change', function () {
                         var opt = this.options[this.selectedIndex];
-                        var sig     = opt ? (opt.getAttribute('data-sig')     || '') : '';
-                        var formula = opt ? (opt.getAttribute('data-formula') || '') : '';
-                        var sigInp     = this.parentElement.querySelector('input[name$="[sigs][]"]');
-                        var formulaInp = this.parentElement.querySelector('input.level-formula-input');
-                        if (sigInp)     sigInp.value     = sig;
-                        if (formulaInp) formulaInp.value = formula;
+                        var sig      = opt ? (opt.getAttribute('data-sig')      || '') : '';
+                        var formula  = opt ? (opt.getAttribute('data-formula')  || '') : '';
+                        var quantity = opt ? (opt.getAttribute('data-quantity') || '') : '';
+                        var sigInp      = this.parentElement.querySelector('input[name$="[sigs][]"]');
+                        var formulaInp  = this.parentElement.querySelector('input.level-formula-input');
+                        var quantityInp = this.parentElement.querySelector('input.level-quantity-input');
+                        if (sigInp)      sigInp.value      = sig;
+                        if (formulaInp)  formulaInp.value  = formula;
+                        // Only override quantity when the level has a per-level value set;
+                        // otherwise leave the offering-level quantity (from [data-f="quantity"]) untouched.
+                        if (quantityInp) quantityInp.value = quantity;
+                        if (quantity && quantityInp) {
+                            var rowQtyInp = sel.closest('.med-row, .bundle-med-row, tr') &&
+                                sel.closest('.med-row, .bundle-med-row, tr').querySelector('[data-f="quantity"]');
+                            if (rowQtyInp) rowQtyInp.value = quantity;
+                        }
                     });
                 });
                 // Auto-select levels from check-in dose hint

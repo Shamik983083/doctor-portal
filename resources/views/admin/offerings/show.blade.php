@@ -379,7 +379,7 @@
                                       style="font-size:.65rem;font-weight:600">{{ count($offeringLevels) }} levels</span>
                             </label>
                             <p class="form-text mb-2">
-                                Enter patient-facing SIG instructions for each dosing level. When a clinician selects a level in the prescribe form, the corresponding SIG will auto-fill.
+                                Enter patient-facing SIG instructions and quantity for each dosing level. When a clinician selects a level in the prescribe form, the corresponding SIG and quantity will auto-fill.
                             </p>
                             <div class="d-flex flex-column gap-2">
                                 @foreach($offeringLevels as $idx => $level)
@@ -394,6 +394,13 @@
                                            class="form-control form-control-sm"
                                            value="{{ old('levels_sigs.'.$idx, $level['sig'] ?? '') }}"
                                            placeholder="e.g. Inject 0.25 mL subcutaneously once weekly">
+                                    <input type="number"
+                                           name="levels_quantities[{{ $idx }}]"
+                                           class="form-control form-control-sm"
+                                           style="max-width:90px"
+                                           value="{{ old('levels_quantities.'.$idx, $level['quantity'] ?? '') }}"
+                                           placeholder="Qty"
+                                           min="0" step="0.01">
                                 </div>
                                 @endforeach
                             </div>
