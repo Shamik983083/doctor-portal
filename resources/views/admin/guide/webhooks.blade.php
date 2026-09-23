@@ -658,10 +658,10 @@ def webhook():
 <div id="ev-prescription-written" class="card mb-3 section-anchor border-success">
 <div class="card-header py-2 d-flex align-items-center gap-2 bg-success bg-opacity-10">
     <span class="event-badge" style="background:#d1fae5;border-color:#6ee7b7;color:#065f46">prescription_written</span>
-    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, full medication details with <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, per-month SIG instructions inside <code>dosing.sigs[]</code>, and compound variant details inside <code>dosing.formulas[]</code></span>
+    <span class="text-muted small">Fired when a clinician confirms a prescription — includes structured diagnoses, full medication details with <code>offering_id</code>, <code>product_key</code>, <code>month_frequency</code>, per-month SIG instructions inside <code>dosing.sigs[]</code>, compound variant details inside <code>dosing.formulas[]</code>, and per-level dispense quantities inside <code>dosing.quantities[]</code></span>
 </div>
 <div class="card-body">
-<p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is a structured array of ICD-10-CM codes and each medication includes both a flat <code>sig</code> (offering default, resolved per partner) and per-month <code>dosing.sigs[]</code> overrides set by the clinician at prescription time. <strong>As of Phase 3</strong> — <code>dosing.formulas[]</code> contains the compound variant detail string for each dose level (e.g. the exact concentration/volume specification for compounding or dispensing), parallel to <code>months[]</code> and <code>sigs[]</code>.</p>
+<p class="small text-muted mb-2"><strong>As of Phase 2</strong> — <code>diagnoses</code> is a structured array of ICD-10-CM codes and each medication includes both a flat <code>sig</code> (offering default, resolved per partner) and per-month <code>dosing.sigs[]</code> overrides set by the clinician at prescription time. <strong>As of Phase 3</strong> — <code>dosing.formulas[]</code> contains the compound variant detail string for each dose level (e.g. the exact concentration/volume specification for compounding or dispensing), parallel to <code>months[]</code> and <code>sigs[]</code>. <strong>As of Phase 4</strong> — <code>dosing.quantities[]</code> contains the dispense quantity for each dose level, set per-level on the offering and auto-filled by the clinician at prescription time.</p>
 <pre id="code-ev-rx">{
   "case_id":         "9d2f1c3e-...",
   "external_id":     "order-wl-20240701-001",   // your reference ID
@@ -728,7 +728,13 @@ def webhook():
           "0.5mg/0.5mg/0.5mL (2mL)",
           "1mg/1mg/0.5mL (2mL)",
           "1.7mg/1mg/0.5mL (2mL)"
-        ]
+        ],
+
+        // quantities[]: dispense quantity for each dose level, set on the offering per-level.
+        // Parallel to months[], sigs[], and formulas[] — quantities[0] is the qty for months[0].
+        // null (or absent) when no per-level quantities have been configured on the offering.
+        // Individual entries may be null or "" when only some levels have a quantity set.
+        "quantities": [0.5, 0.5, 1.0, 1.0]
       }
     }
   ],
@@ -780,6 +786,23 @@ function sigForLevel(array $med, int $levelIndex): string {
     <pre style="background:#f8fafc;color:#1f2937;border:1px solid #e2e8f0;border-radius:6px;padding:.5rem .75rem;font-size:.8rem;margin-top:.4rem;overflow-x:auto">// PHP — resolve compound formula for a given dose level
 function formulaForLevel(array $med, int $levelIndex): ?string {
     return $med['dosing']['formulas'][$levelIndex] ?? null;
+}</pre>
+</div>
+
+<div class="alert alert-info mt-0 mb-2 small">
+    <i class="bi bi-123 me-1"></i>
+    <strong>Using <code>dosing.quantities[]</code> for per-level dispense quantities:</strong>
+    <code>dosing.quantities</code> is an array parallel to <code>dosing.months</code>, <code>dosing.sigs</code>, and <code>dosing.formulas</code>. Each entry is the numeric dispense quantity for that dose level, configured on the offering by the admin and auto-filled by the clinician at prescription time.
+    <ul class="mb-1 mt-2">
+        <li><code>dosing.quantities</code> is <code>null</code> when no per-level quantities have been configured on the offering. Fall back to the top-level <code>quantity</code> field in that case.</li>
+        <li>Individual entries may be <code>null</code> or <code>""</code> when only some levels have a quantity set — guard each entry before using.</li>
+        <li>The array is parallel to <code>months[]</code> — <code>quantities[0]</code> is the quantity for M1, <code>quantities[1]</code> for M2, and so on.</li>
+    </ul>
+    <pre style="background:#f8fafc;color:#1f2937;border:1px solid #e2e8f0;border-radius:6px;padding:.5rem .75rem;font-size:.8rem;margin-top:.4rem;overflow-x:auto">// PHP — resolve dispense quantity for a given dose level
+function quantityForLevel(array $med, int $levelIndex): string {
+    $perLevel = $med['dosing']['quantities'][$levelIndex] ?? null;
+    if ($perLevel !== null && $perLevel !== '') return (string) $perLevel;
+    return $med['quantity'] ?? '1';   // top-level offering quantity fallback
 }</pre>
 </div>
 
