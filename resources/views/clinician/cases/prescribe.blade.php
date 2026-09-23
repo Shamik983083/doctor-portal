@@ -89,7 +89,8 @@
                             : false;
                         $defaultVt = strtolower($clin['video']) === 'required' ? 'synchronous' : 'asynchronous';
                         $rawVt = strtolower((string) ($case->visit_type ?? ''));
-                        $currentVt = str_contains($rawVt, 'sync') ? 'synchronous' : ($rawVt !== '' ? 'asynchronous' : $defaultVt);
+                        // Check 'async' before 'sync' — "asynchronous" contains "sync" as a substring.
+                        $currentVt = str_contains($rawVt, 'async') ? 'asynchronous' : (str_contains($rawVt, 'sync') ? 'synchronous' : ($rawVt !== '' ? 'asynchronous' : $defaultVt));
                     @endphp
                     <div>
                         <dt>Visit type</dt>
