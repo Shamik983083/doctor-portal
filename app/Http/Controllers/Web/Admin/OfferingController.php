@@ -106,9 +106,10 @@ class OfferingController extends Controller
         $rawLevels = array_values(array_filter($request->input('levels', []), fn($l) => trim($l['label'] ?? '') !== ''));
         if (!empty($rawLevels)) {
             $data['levels'] = array_map(fn($l) => [
-                'label'   => trim($l['label']),
-                'formula' => '',
-                'sig'     => trim($l['sig'] ?? ''),
+                'label'    => trim($l['label']),
+                'formula'  => '',
+                'sig'      => trim($l['sig'] ?? ''),
+                'quantity' => isset($l['quantity']) && trim((string) $l['quantity']) !== '' ? (float) $l['quantity'] : null,
             ], $rawLevels);
             $data['sig'] = null;
         } else {

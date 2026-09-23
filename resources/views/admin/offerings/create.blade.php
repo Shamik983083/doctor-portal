@@ -210,13 +210,20 @@
                                         @error('levels.'.$li.'.label')<div class="invalid-feedback" style="font-size:.75rem">{{ $message }}</div>@enderror
                                         <div class="form-text" style="font-size:.7rem">Level label</div>
                                     </div>
-                                    <div class="col-md-7">
+                                    <div class="col-md-5">
                                         <input type="text" name="levels[{{ $li }}][sig]"
                                                class="form-control form-control-sm @error('levels.'.$li.'.sig') is-invalid @enderror"
                                                value="{{ $lv['sig'] ?? '' }}"
                                                placeholder="e.g. Inject 0.25 mL subcutaneously once weekly" required>
                                         @error('levels.'.$li.'.sig')<div class="invalid-feedback" style="font-size:.75rem">{{ $message }}</div>@enderror
                                         <div class="form-text" style="font-size:.7rem">SIG instruction</div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" name="levels[{{ $li }}][quantity]"
+                                               class="form-control form-control-sm level-quantity-input"
+                                               value="{{ $lv['quantity'] ?? '' }}"
+                                               placeholder="Qty" min="0" step="0.01">
+                                        <div class="form-text" style="font-size:.7rem">Quantity</div>
                                     </div>
                                 </div>
                             </div>
@@ -369,9 +376,11 @@
 
     function renumberLevels() {
         levelsContainer.querySelectorAll('.level-row').forEach(function (row, i) {
-            row.querySelector('.level-badge').textContent = 'LVL' + (i + 1);
-            row.querySelector('.level-label-input').name  = 'levels[' + i + '][label]';
-            row.querySelector('.level-sig-input').name    = 'levels[' + i + '][sig]';
+            row.querySelector('.level-badge').textContent         = 'LVL' + (i + 1);
+            row.querySelector('.level-label-input').name          = 'levels[' + i + '][label]';
+            row.querySelector('.level-sig-input').name            = 'levels[' + i + '][sig]';
+            var qtyInp = row.querySelector('.level-quantity-input');
+            if (qtyInp) qtyInp.name = 'levels[' + i + '][quantity]';
         });
     }
 
@@ -389,11 +398,17 @@
                                ' placeholder="e.g. LVL1 – 1MG (0.25mg/wk)" required>' +
                         '<div class="form-text" style="font-size:.7rem">Level label</div>' +
                     '</div>' +
-                    '<div class="col-md-7">' +
+                    '<div class="col-md-5">' +
                         '<input type="text" name="levels[' + idx + '][sig]"' +
                                ' class="form-control form-control-sm level-sig-input"' +
                                ' placeholder="e.g. Inject 0.25 mL subcutaneously once weekly" required>' +
                         '<div class="form-text" style="font-size:.7rem">SIG instruction</div>' +
+                    '</div>' +
+                    '<div class="col-md-2">' +
+                        '<input type="number" name="levels[' + idx + '][quantity]"' +
+                               ' class="form-control form-control-sm level-quantity-input"' +
+                               ' placeholder="Qty" min="0" step="0.01">' +
+                        '<div class="form-text" style="font-size:.7rem">Quantity</div>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
