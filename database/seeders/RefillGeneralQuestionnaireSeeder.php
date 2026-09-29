@@ -14,8 +14,8 @@ use Illuminate\Database\Seeder;
  * and dose continuation preference — each with a conditional free-text follow-up.
  *
  * After creating the questionnaire the seeder also wires it as the default check-in
- * questionnaire for the "Weight Loss" offering category so refill cases in that
- * category automatically display it in the prescribe view.
+ * questionnaire for ALL offering categories that do not already have one configured,
+ * so refill cases across every program automatically display it in the prescribe view.
  *
  * PURPOSE:    check_in  (recognised by the platform's refill resolution logic)
  * MODE:       single    (one step — no multi-step wizard)
@@ -194,11 +194,12 @@ class RefillGeneralQuestionnaireSeeder extends Seeder
     }
 
     /**
-     * Set this questionnaire as the default check-in questionnaire on offering
-     * categories that have no check-in questionnaire configured yet.
+     * Set this questionnaire as the default check-in questionnaire on ALL active
+     * offering categories that do not already have one configured.
      *
-     * Currently targets: "Weight Loss"
-     * Add more category names to the array to cover additional programs.
+     * This is a general refill questionnaire — not program-specific — so every
+     * category gets it by default. Categories that already have a dedicated
+     * check-in questionnaire are left untouched.
      */
     private function wireToCategories(?Questionnaire $q = null): void
     {
@@ -207,28 +208,26 @@ class RefillGeneralQuestionnaireSeeder extends Seeder
             if (!$q) return;
         }
 
-        $targetCategories = ['Weight Loss'];
+        $categories = OfferingCategory::all();
 
-        foreach ($targetCategories as $categoryName) {
-            $category = OfferingCategory::where('name', $categoryName)->first();
+        if ($categories->isEmpty()) {
+            $this->command->warn('  skipped  no offering categories found — run offering seeders first.');
+            return;
+        }
 
-            if (!$category) {
-                $this->command->warn("  skipped  category [{$categoryName}] not found — run offering seeder first.");
-                continue;
-            }
-
+        foreach ($categories as $category) {
             if ($category->check_in_questionnaire_id && $category->check_in_questionnaire_id !== $q->id) {
-                $this->command->line("  skipped  category [{$categoryName}] already has a check-in questionnaire (id={$category->check_in_questionnaire_id}) — not overwriting.");
+                $this->command->line("  skipped  category [{$category->name}] already has a check-in questionnaire (id={$category->check_in_questionnaire_id}) — not overwriting.");
                 continue;
             }
 
             if ($category->check_in_questionnaire_id === $q->id) {
-                $this->command->line("  skipped  category [{$categoryName}] already wired to this questionnaire.");
+                $this->command->line("  skipped  category [{$category->name}] already wired to this questionnaire.");
                 continue;
             }
 
             $category->update(['check_in_questionnaire_id' => $q->id]);
-            $this->command->info("  wired    category [{$categoryName}] → check-in questionnaire [{$q->name}] (id={$q->id})");
+            $this->command->info("  wired    category [{$category->name}] → check-in questionnaire [{$q->name}] (id={$q->id})");
         }
     }
 }
