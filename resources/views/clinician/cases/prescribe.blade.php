@@ -108,6 +108,92 @@
                     <div><dt>ID verified</dt><dd>{{ $idv ? 'Yes' : 'No' }}</dd></div>
                 </dl>
 
+                {{-- Weight progress chart (GLP refill — populated from metadata.weight_history) --}}
+                @php
+                    $weightHistory = $case->metadata['weight_history'] ?? null;
+                @endphp
+                @if($case->isRefillRequest() && !empty($weightHistory) && is_array($weightHistory) && count($weightHistory) >= 2)
+                    <div style="margin-bottom:14px;border:1px solid rgba(23,131,78,.25);border-radius:12px;overflow:hidden">
+                        <div style="padding:10px 14px;background:var(--green-bg);display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700">
+                            <span style="flex:1">Weight progress</span>
+                            <span class="pill green" style="font-size:10px">Chart</span>
+                        </div>
+                        <div style="padding:12px 14px">
+                            <canvas id="weightChartCanvas" height="120" style="width:100%;max-width:100%"></canvas>
+                            <div style="display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--muted)">
+                                @php
+                                    $firstEntry = collect($weightHistory)->first();
+                                    $lastEntry  = collect($weightHistory)->last();
+                                    $startWt    = $firstEntry['weight'] ?? null;
+                                    $currWt     = $lastEntry['weight']  ?? null;
+                                    $wtChange   = ($startWt && $currWt) ? round($currWt - $startWt, 1) : null;
+                                @endphp
+                                @if($startWt !== null)<span>Start: <strong>{{ $startWt }} lbs</strong></span>@endif
+                                @if($currWt !== null)<span>Current: <strong>{{ $currWt }} lbs</strong></span>@endif
+                                @if($wtChange !== null)
+                                    <span style="color:{{ $wtChange < 0 ? 'var(--green,#17834e)' : 'var(--red,#c0392f)' }}">
+                                        Change: <strong>{{ $wtChange > 0 ? '+' : '' }}{{ $wtChange }} lbs</strong>
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                    (function () {
+                        var history = @json($weightHistory);
+                        var labels  = history.map(function(e){ return e.label || e.date || ''; });
+                        var data    = history.map(function(e){ return parseFloat(e.weight) || 0; });
+                        var canvas  = document.getElementById('weightChartCanvas');
+                        if (!canvas) return;
+                        var ctx = canvas.getContext('2d');
+                        var w = canvas.offsetWidth || 400, h = canvas.height || 120;
+                        canvas.width = w;
+                        var pad = {t:14, r:16, b:36, l:44};
+                        var minW = Math.min.apply(null, data), maxW = Math.max.apply(null, data);
+                        var range = maxW - minW || 10;
+                        minW -= range * 0.1; maxW += range * 0.1; range = maxW - minW;
+                        var pts = data.map(function(v, i){
+                            return {
+                                x: pad.l + (i / (data.length - 1 || 1)) * (w - pad.l - pad.r),
+                                y: pad.t + (1 - (v - minW) / range) * (h - pad.t - pad.b)
+                            };
+                        });
+                        // Grid lines
+                        var style = getComputedStyle(document.documentElement);
+                        var lineCol = style.getPropertyValue('--line') || '#e0e0e0';
+                        var textCol = style.getPropertyValue('--muted') || '#888';
+                        var greenCol = style.getPropertyValue('--green') || '#17834e';
+                        ctx.strokeStyle = lineCol; ctx.lineWidth = 1;
+                        for (var t = 0; t <= 4; t++) {
+                            var gy = pad.t + (t / 4) * (h - pad.t - pad.b);
+                            ctx.beginPath(); ctx.moveTo(pad.l, gy); ctx.lineTo(w - pad.r, gy); ctx.stroke();
+                            var lbl = Math.round(maxW - (t / 4) * range);
+                            ctx.fillStyle = textCol; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+                            ctx.fillText(lbl, pad.l - 4, gy + 4);
+                        }
+                        // Fill area
+                        ctx.beginPath();
+                        ctx.moveTo(pts[0].x, h - pad.b);
+                        pts.forEach(function(p){ ctx.lineTo(p.x, p.y); });
+                        ctx.lineTo(pts[pts.length - 1].x, h - pad.b);
+                        ctx.closePath();
+                        ctx.fillStyle = 'rgba(23,131,78,0.08)'; ctx.fill();
+                        // Line
+                        ctx.beginPath();
+                        pts.forEach(function(p, i){ i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); });
+                        ctx.strokeStyle = greenCol; ctx.lineWidth = 2; ctx.stroke();
+                        // Dots + labels
+                        pts.forEach(function(p, i){
+                            ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                            ctx.fillStyle = greenCol; ctx.fill();
+                            ctx.fillStyle = textCol; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+                            ctx.fillText(labels[i], p.x, h - pad.b + 14);
+                            ctx.fillText(data[i] + ' lbs', p.x, p.y - 8);
+                        });
+                    })();
+                    </script>
+                @endif
+
                 {{-- Check-in answers for the current refill visit --}}
                 @if($case->isRefillRequest() && $checkInResponses->isNotEmpty())
                     @foreach($checkInResponses as $checkInResp)

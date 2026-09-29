@@ -537,20 +537,35 @@ Content-Type: application/json
     { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
   ],
 
-  // ── Check-in answers — Refill General Check-In questionnaire ───────────────
-  // Slugs below match the "Refill General Check-In" questionnaire (purpose=check_in)
-  // wired to the Weight Loss category. Conditional follow-up fields only need to be
-  // sent when their parent answer applies.
+  // ── Weight history chart data (optional — doctor portal renders a line chart) ─
+  // Compile the patient's weight from all visits: starting weight + each check-in.
+  // Pass in metadata.weight_history as an array sorted oldest→newest.
+  "metadata": {
+    "weight_history": [
+      { "label": "Start",      "date": "2026-01-15", "weight": 220 },
+      { "label": "Refill #1",  "date": "2026-04-15", "weight": 212 },
+      { "label": "Refill #2",  "date": "2026-07-15", "weight": 205 }
+    ]
+  },
+
+  // ── Check-in answers — Refill GLP Check-In questionnaire ─────────────────────
+  // Slugs below match the "Refill GLP Check-In" questionnaire (purpose=check_in)
+  // wired to the GLP offering category. Send only the fields that apply:
+  // — last_dose_semaglutide OR last_dose_tirzepatide (whichever the patient is on)
+  // — side_effects_list and side_effects_other_details only when side_effects_experienced = yes
+  // — weight_loss_dissatisfied_reason only when weight_loss_satisfied = no
+  // — dosage_request_details only when dosage_request = yes
   // Retrieve the exact slugs via: GET /api/partner/questionnaires/{uuid}
   "answers": [
-    { "slug": "medication_tolerance",    "answer": "mild_side_effects" },
-    { "slug": "side_effects",            "answer": "Mild nausea in the mornings, resolved after week 2" },
-    { "slug": "weight_change",           "answer": "lost_weight" },
-    { "slug": "weight_change_details",   "answer": "Lost approximately 8 lbs over 3 months" },
-    { "slug": "new_medications",         "answer": "no" },
-    { "slug": "new_conditions",          "answer": "no" },
-    { "slug": "dose_continuation",       "answer": "same_dose" },
-    { "slug": "additional_notes",        "answer": "Feeling great overall." }
+    { "slug": "current_weight",              "answer": "205" },
+    { "slug": "glp_medication_type",         "answer": "semaglutide" },
+    { "slug": "last_dose_semaglutide",       "answer": "sema_1" },
+    { "slug": "last_dose_date",              "answer": "8_14_days" },
+    { "slug": "side_effects_experienced",    "answer": "yes" },
+    { "slug": "side_effects_list",           "answer": ["nausea", "constipation"] },
+    { "slug": "weight_loss_satisfied",       "answer": "yes" },
+    { "slug": "dosage_request",              "answer": "yes" },
+    { "slug": "dosage_request_details",      "answer": "I would like to increase to the next dose level if possible." }
   ]
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-refill')">Copy</button>
