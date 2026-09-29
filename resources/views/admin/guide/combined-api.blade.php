@@ -782,14 +782,19 @@ Content-Type: application/json
     { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
   ],
 
-  // ── Check-in answers (questionnaire configured as purpose=check_in) ───────────
-  // Use the same slug format as the initial intake. Only send what changed.
+  // ── Check-in answers — Refill General Check-In questionnaire ───────────────
+  // Slugs below match the "Refill General Check-In" questionnaire (purpose=check_in).
+  // Conditional follow-up fields only need to be sent when their parent answer applies.
+  // Retrieve the exact slugs via: GET /api/partner/questionnaires/{uuid}
   "answers": [
-    { "slug": "current_weight",          "answer": "182" },
-    { "slug": "side_effects",            "answer": "Mild nausea first week, resolved" },
-    { "slug": "last_dose_date",          "answer": "2026-09-01" },
-    { "slug": "dose_continuation",       "answer": "Continue current dose" },
-    { "slug": "medication_effectiveness","answer": "Lost 8 lbs over 3 months" }
+    { "slug": "medication_tolerance",    "answer": "mild_side_effects" },
+    { "slug": "side_effects",            "answer": "Mild nausea in the mornings, resolved after week 2" },
+    { "slug": "weight_change",           "answer": "lost_weight" },
+    { "slug": "weight_change_details",   "answer": "Lost approximately 8 lbs over 3 months" },
+    { "slug": "new_medications",         "answer": "no" },
+    { "slug": "new_conditions",          "answer": "no" },
+    { "slug": "dose_continuation",       "answer": "same_dose" },
+    { "slug": "additional_notes",        "answer": "Feeling great overall, energy levels improved." }
   ]
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-refill-example')">Copy</button>
