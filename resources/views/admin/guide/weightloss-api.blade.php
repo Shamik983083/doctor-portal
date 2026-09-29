@@ -548,15 +548,18 @@ Content-Type: application/json
     ]
   },
 
-  // ── Check-in answers — Refill GLP Check-In questionnaire ─────────────────────
-  // Slugs below match the "Refill GLP Check-In" questionnaire (purpose=check_in)
-  // wired to the GLP offering category. Send only the fields that apply:
+  // GLP-1 uses both questionnaires — send all slugs in one answers array.
+  // Conditional fields only need to be sent when their parent answer triggers them:
   // — last_dose_semaglutide OR last_dose_tirzepatide (whichever the patient is on)
-  // — side_effects_list and side_effects_other_details only when side_effects_experienced = yes
+  // — side_effects_list / side_effects_other_details only when side_effects_experienced = yes
   // — weight_loss_dissatisfied_reason only when weight_loss_satisfied = no
   // — dosage_request_details only when dosage_request = yes
-  // Retrieve the exact slugs via: GET /api/partner/questionnaires/{uuid}
+  // — side_effects (text) only when medication_tolerance != well
+  // — weight_change_details only when weight_change = gained
+  // — new_medications_list only when new_medications = yes
+  // — new_conditions_details only when new_conditions = yes
   "answers": [
+    // ── Refill GLP Check-In ───────────────────────────────────────────────────
     { "slug": "current_weight",              "answer": "205" },
     { "slug": "glp_medication_type",         "answer": "semaglutide" },
     { "slug": "last_dose_semaglutide",       "answer": "sema_1" },
@@ -565,7 +568,14 @@ Content-Type: application/json
     { "slug": "side_effects_list",           "answer": ["nausea", "constipation"] },
     { "slug": "weight_loss_satisfied",       "answer": "yes" },
     { "slug": "dosage_request",              "answer": "yes" },
-    { "slug": "dosage_request_details",      "answer": "I would like to increase to the next dose level if possible." }
+    { "slug": "dosage_request_details",      "answer": "I would like to increase to the next dose level if possible." },
+
+    // ── Refill General Check-In (also required for GLP) ───────────────────────
+    { "slug": "medication_tolerance",        "answer": "well" },
+    { "slug": "weight_change",               "answer": "lost" },
+    { "slug": "new_medications",             "answer": "no" },
+    { "slug": "new_conditions",              "answer": "no" },
+    { "slug": "dose_continuation",           "answer": "increase" }
   ]
 }</pre>
 <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-refill')">Copy</button>

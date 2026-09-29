@@ -754,8 +754,8 @@ Content-Type: application/json
 <tbody>
     <tr>
         <td><span class="badge" style="background:#e8f5e9;color:#2e7d32">GLP-1 (Weight Loss)</span></td>
-        <td><strong>Refill GLP Check-In</strong></td>
-        <td>Drug-specific dose ladder (Sema vs Tirze), side-effect multi-select, weight loss satisfaction, dosage requests, weight progress chart</td>
+        <td><strong>Refill GLP Check-In</strong> <span class="text-muted">+</span> <strong>Refill General Check-In</strong></td>
+        <td>Both questionnaires apply — send all slugs from both in the same <code>answers</code> array. GLP adds: drug-specific dose ladder, side-effect multi-select, weight loss satisfaction, dosage requests, weight progress chart.</td>
     </tr>
     <tr>
         <td><span class="badge" style="background:#e3f2fd;color:#1565c0">NAD+</span> · <span class="badge bg-secondary">Anti-Aging</span> · <span class="badge bg-secondary">Peptides</span> · <span class="badge bg-secondary">ED</span> · <span class="badge bg-secondary">LDN</span></td>
@@ -795,7 +795,7 @@ Content-Type: application/json
 
     {{-- GLP tab --}}
     <div class="tab-pane fade show active" id="refill-glp" role="tabpanel">
-        <p class="small text-muted mb-2">Uses <strong>Refill GLP Check-In</strong> questionnaire. Send drug-specific dose slug (<code>last_dose_semaglutide</code> or <code>last_dose_tirzepatide</code>) and include <code>metadata.weight_history</code> so the doctor portal renders the weight progress chart.</p>
+        <p class="small text-muted mb-2">GLP-1 uses <strong>both</strong> questionnaires — send all slugs in one <code>answers</code> array. Include <code>metadata.weight_history</code> so the doctor portal renders the weight progress chart. Send <code>last_dose_semaglutide</code> <em>or</em> <code>last_dose_tirzepatide</code> depending on the patient's drug.</p>
         <pre id="code-refill-glp">POST {{ $base }}/api/partner/cases
 Authorization: Bearer &lt;access_token&gt;
 Content-Type: application/json
@@ -833,10 +833,9 @@ Content-Type: application/json
     ]
   },
 
-  // ── Check-in answers — Refill GLP Check-In questionnaire ────────────────────
-  // Send last_dose_semaglutide OR last_dose_tirzepatide (whichever applies).
-  // Conditional fields only need to be sent when their parent answer triggers them.
   "answers": [
+    // ── Refill GLP Check-In slugs ─────────────────────────────────────────────
+    // Send last_dose_semaglutide OR last_dose_tirzepatide (whichever applies).
     { "slug": "current_weight",           "answer": "205" },
     { "slug": "glp_medication_type",      "answer": "semaglutide" },
     { "slug": "last_dose_semaglutide",    "answer": "sema_1" },
@@ -845,7 +844,14 @@ Content-Type: application/json
     { "slug": "side_effects_list",        "answer": ["nausea", "constipation"] },
     { "slug": "weight_loss_satisfied",    "answer": "yes" },
     { "slug": "dosage_request",           "answer": "yes" },
-    { "slug": "dosage_request_details",   "answer": "I would like to increase to the next dose level." }
+    { "slug": "dosage_request_details",   "answer": "I would like to increase to the next dose level." },
+
+    // ── Refill General Check-In slugs (also required for GLP) ─────────────────
+    { "slug": "medication_tolerance",     "answer": "well" },
+    { "slug": "weight_change",            "answer": "lost" },
+    { "slug": "new_medications",          "answer": "no" },
+    { "slug": "new_conditions",           "answer": "no" },
+    { "slug": "dose_continuation",        "answer": "increase" }
   ]
 }</pre>
         <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:4px" onclick="copyCode('code-refill-glp')">Copy</button>
