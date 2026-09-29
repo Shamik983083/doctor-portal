@@ -714,7 +714,7 @@ Content-Type: application/json
 {{-- ── 5. REFILL / CHECK-IN ────────────────────────────────── --}}
 <div id="refill" class="card mb-4 section-anchor">
 <div class="card-header fw-semibold">
-    <i class="bi bi-arrow-repeat me-2 text-warning"></i>Refill / Check-in Cases <span class="text-muted fw-normal small">(same for GLP-1 and NAD+)</span>
+    <i class="bi bi-arrow-repeat me-2 text-warning"></i>Refill / Check-in Cases
 </div>
 <div class="card-body">
 <p class="mb-3">Set <code>"is_refill": true</code> when a patient is returning for a follow-up visit. The platform handles three things automatically.</p>
@@ -743,19 +743,60 @@ Content-Type: application/json
         </div>
     </div>
 </div>
-<div class="alert alert-warning border-0 small mt-3 mb-2 py-2">
+
+{{-- ── Which questionnaire is used? ───────────────────────────────────────── --}}
+<h6 class="fw-semibold mt-3 mb-2">Which check-in questionnaire is used?</h6>
+<div class="table-responsive mb-3">
+<table class="table table-sm table-bordered small">
+<thead class="table-light">
+    <tr><th>Category / Program</th><th>Check-in questionnaire</th><th>Key difference</th></tr>
+</thead>
+<tbody>
+    <tr>
+        <td><span class="badge" style="background:#e8f5e9;color:#2e7d32">GLP-1 (Weight Loss)</span></td>
+        <td><strong>Refill GLP Check-In</strong></td>
+        <td>Drug-specific dose ladder (Sema vs Tirze), side-effect multi-select, weight loss satisfaction, dosage requests, weight progress chart</td>
+    </tr>
+    <tr>
+        <td><span class="badge" style="background:#e3f2fd;color:#1565c0">NAD+</span> · <span class="badge bg-secondary">Anti-Aging</span> · <span class="badge bg-secondary">Peptides</span> · <span class="badge bg-secondary">ED</span> · <span class="badge bg-secondary">LDN</span></td>
+        <td><strong>Refill General Check-In</strong></td>
+        <td>Medication tolerance, weight change, new medications/conditions, dose continuation preference</td>
+    </tr>
+</tbody>
+</table>
+</div>
+
+<div class="alert alert-warning border-0 small mb-3 py-2">
     <i class="bi bi-exclamation-triangle me-1"></i>
     <strong>Admin setup required for the check-in answers panel.</strong>
     The clinician's prescribe screen shows a green <em>"Check-in answers"</em> panel only when the questionnaire's
     <strong>Purpose</strong> is set to <code>check_in</code> in the admin panel
     (Admin → Questionnaires → edit questionnaire → Purpose field).
-    If the questionnaire purpose is left as <code>clinical</code>, the answers are still stored and the
-    dose-hint auto-selection still works — but the structured Q&amp;A panel will not appear for the clinician.
+    Both questionnaires above are already seeded with <code>purpose = check_in</code>.
 </div>
 
-<h6 class="fw-semibold mt-3 mb-2">Minimal Refill Payload</h6>
-<p class="small text-muted mb-2">Send the same <code>POST /api/partner/cases</code> endpoint with <code>"is_refill": true</code>. You only need to include fields that have changed — patient demographics, offerings, and answers. The portal will match the patient by <code>external_id</code> (or email + DOB) and link this as a follow-up to their prior visit.</p>
-<pre id="code-refill-example">POST {{ $base }}/api/partner/cases
+{{-- ── Program tabs ─────────────────────────────────────────────────────── --}}
+<h6 class="fw-semibold mt-3 mb-2">Refill Payload Examples</h6>
+<p class="small text-muted mb-2">Same <code>POST /api/partner/cases</code> endpoint with <code>"is_refill": true</code>. The <code>answers</code> slugs differ per program.</p>
+
+<ul class="nav nav-tabs mb-0" id="refillTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="refill-glp-tab" data-bs-toggle="tab" data-bs-target="#refill-glp" type="button" role="tab">
+            <i class="bi bi-capsule me-1 text-success"></i>GLP-1 (Weight Loss)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="refill-general-tab" data-bs-toggle="tab" data-bs-target="#refill-general" type="button" role="tab">
+            <i class="bi bi-clipboard2-check me-1 text-primary"></i>NAD+ / Other Programs
+        </button>
+    </li>
+</ul>
+<div class="tab-content border border-top-0 rounded-bottom p-3 mb-3" id="refillTabContent">
+
+    {{-- GLP tab --}}
+    <div class="tab-pane fade show active" id="refill-glp" role="tabpanel">
+        <p class="small text-muted mb-2">Uses <strong>Refill GLP Check-In</strong> questionnaire. Send drug-specific dose slug (<code>last_dose_semaglutide</code> or <code>last_dose_tirzepatide</code>) and include <code>metadata.weight_history</code> so the doctor portal renders the weight progress chart.</p>
+        <pre id="code-refill-glp">POST {{ $base }}/api/partner/cases
 Authorization: Bearer &lt;access_token&gt;
 Content-Type: application/json
 
@@ -766,38 +807,107 @@ Content-Type: application/json
     "email":         "jane.doe@example.com",
     "date_of_birth": "1990-06-15",
     "height":        65.0,
-    "weight":        182.0,          // updated current weight
-    "bmi":           30.3,
+    "weight":        205.0,          // current weight (updated each visit)
+    "bmi":           34.1,
     "state":         "TX",
-    "external_id":   "portal-user-1001"   // must match the original case's patient external_id
+    "external_id":   "portal-user-1001"
   },
   "patient_state":  "TX",
-  "external_id":    "order-glp-refill-001",  // new unique order ID for this visit
+  "external_id":    "order-glp-refill-20260901-001",
   "visit_type":     "asynchronous",
   "is_chargeable":  true,
   "hold_status":    false,
-  "is_refill":      true,            // ← this is the key flag
+  "is_refill":      true,
 
   "offerings": [
     { "product_key": "semaglutide", "month_frequency": 3, "quantity": 1, "formulation": "injectable" }
   ],
 
-  // ── Check-in answers — Refill General Check-In questionnaire ───────────────
-  // Slugs below match the "Refill General Check-In" questionnaire (purpose=check_in).
-  // Conditional follow-up fields only need to be sent when their parent answer applies.
-  // Retrieve the exact slugs via: GET /api/partner/questionnaires/{uuid}
+  // ── Weight history chart (compiled by tenant from all visits) ────────────────
+  // Doctor portal renders this as a line chart. Sort oldest → newest.
+  "metadata": {
+    "weight_history": [
+      { "label": "Start",     "date": "2026-01-15", "weight": 220 },
+      { "label": "Refill #1", "date": "2026-04-15", "weight": 212 },
+      { "label": "Refill #2", "date": "2026-07-15", "weight": 205 }
+    ]
+  },
+
+  // ── Check-in answers — Refill GLP Check-In questionnaire ────────────────────
+  // Send last_dose_semaglutide OR last_dose_tirzepatide (whichever applies).
+  // Conditional fields only need to be sent when their parent answer triggers them.
   "answers": [
-    { "slug": "medication_tolerance",    "answer": "mild_side_effects" },
-    { "slug": "side_effects",            "answer": "Mild nausea in the mornings, resolved after week 2" },
-    { "slug": "weight_change",           "answer": "lost_weight" },
-    { "slug": "weight_change_details",   "answer": "Lost approximately 8 lbs over 3 months" },
+    { "slug": "current_weight",           "answer": "205" },
+    { "slug": "glp_medication_type",      "answer": "semaglutide" },
+    { "slug": "last_dose_semaglutide",    "answer": "sema_1" },
+    { "slug": "last_dose_date",           "answer": "8_14_days" },
+    { "slug": "side_effects_experienced", "answer": "yes" },
+    { "slug": "side_effects_list",        "answer": ["nausea", "constipation"] },
+    { "slug": "weight_loss_satisfied",    "answer": "yes" },
+    { "slug": "dosage_request",           "answer": "yes" },
+    { "slug": "dosage_request_details",   "answer": "I would like to increase to the next dose level." }
+  ]
+}</pre>
+        <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:4px" onclick="copyCode('code-refill-glp')">Copy</button>
+
+        <p class="small text-muted mt-3 mb-1"><strong>Available dose slugs:</strong></p>
+        <div class="row g-2">
+            <div class="col-md-6">
+                <div class="p-2 border rounded small"><strong>Semaglutide</strong> (<code>glp_medication_type = "semaglutide"</code>)<br>
+                <code>sema_0_25</code> · <code>sema_0_50</code> · <code>sema_1</code> · <code>sema_1_5</code> · <code>sema_2</code> · <code>sema_2_5</code></div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-2 border rounded small"><strong>Tirzepatide</strong> (<code>glp_medication_type = "tirzepatide"</code>)<br>
+                <code>tirze_2_5</code> · <code>tirze_5</code> · <code>tirze_7_5</code> · <code>tirze_10</code> · <code>tirze_12_5</code> · <code>tirze_15</code></div>
+            </div>
+        </div>
+    </div>
+
+    {{-- General / NAD tab --}}
+    <div class="tab-pane fade" id="refill-general" role="tabpanel">
+        <p class="small text-muted mb-2">Uses <strong>Refill General Check-In</strong> questionnaire — applies to NAD+, Anti-Aging, Peptides, ED, LDN, and any other non-GLP category.</p>
+        <pre id="code-refill-general">POST {{ $base }}/api/partner/cases
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "patient": {
+    "first_name":    "John",
+    "last_name":     "Smith",
+    "email":         "john.smith@example.com",
+    "date_of_birth": "1978-03-22",
+    "height":        70.0,
+    "weight":        183.0,
+    "bmi":           26.3,
+    "state":         "TX",
+    "external_id":   "portal-user-9003"
+  },
+  "patient_state":  "TX",
+  "external_id":    "order-nad-refill-20260901-001",
+  "visit_type":     "asynchronous",
+  "is_chargeable":  true,
+  "hold_status":    false,
+  "is_refill":      true,
+
+  "offerings": [
+    { "product_key": "nad", "month_frequency": 1, "quantity": 1, "formulation": "injectable" }
+  ],
+
+  // ── Check-in answers — Refill General Check-In questionnaire ────────────────
+  // Conditional follow-up fields only need to be sent when their parent triggers them.
+  "answers": [
+    { "slug": "medication_tolerance",    "answer": "well" },
+    { "slug": "weight_change",           "answer": "no_change" },
     { "slug": "new_medications",         "answer": "no" },
     { "slug": "new_conditions",          "answer": "no" },
     { "slug": "dose_continuation",       "answer": "same_dose" },
-    { "slug": "additional_notes",        "answer": "Feeling great overall, energy levels improved." }
+    { "slug": "additional_notes",        "answer": "Energy levels significantly improved." }
   ]
 }</pre>
-<button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:-4px" onclick="copyCode('code-refill-example')">Copy</button>
+        <button class="btn btn-sm btn-outline-secondary copy-btn" style="position:relative;top:auto;right:auto;margin-top:4px" onclick="copyCode('code-refill-general')">Copy</button>
+    </div>
+
+</div>{{-- /tab-content --}}
 
 <h6 class="fw-semibold mt-3 mb-2">What changes vs. a new case</h6>
 <div class="table-responsive">
@@ -808,7 +918,8 @@ Content-Type: application/json
 <tr><td><code>external_id</code></td><td>First order ID</td><td>New unique ID for this visit</td></tr>
 <tr><td><code>patient.external_id</code></td><td>Set here</td><td>Same value — used to match prior visit</td></tr>
 <tr><td><code>patient.weight</code> / <code>bmi</code></td><td>Initial</td><td>Current (updated)</td></tr>
-<tr><td><code>answers</code></td><td>Full intake questionnaire</td><td>Check-in questionnaire (configured per-offering or category)</td></tr>
+<tr><td><code>answers</code></td><td>Full intake questionnaire</td><td>Check-in questionnaire (GLP-specific or General)</td></tr>
+<tr><td><code>metadata.weight_history</code></td><td>—</td><td>GLP only — array of <code>{label, date, weight}</code> for the weight chart</td></tr>
 <tr><td>Routing</td><td>Assigned by routing policy</td><td>Continuity — goes to same clinician as prior visit</td></tr>
 <tr><td><code>external_id</code> duplicate check</td><td>Returns 409 if duplicate</td><td>Skipped — same patient can have multiple refill orders</td></tr>
 </tbody>
