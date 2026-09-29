@@ -312,7 +312,7 @@ class RefillGlpQuestionnaireSeeder extends Seeder
             return;
         }
 
-        $offerings = Offering::where('offering_category_id', $category->id)->get();
+        $offerings = Offering::where('category_id', $category->id)->get();
 
         if ($offerings->isEmpty()) {
             $this->command->warn('  skipped  no offerings found in GLP category.');
