@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Offering;
 use App\Models\OfferingCategory;
 use App\Models\Questionnaire;
 use Illuminate\Database\Seeder;
@@ -254,6 +255,7 @@ class RefillGlpQuestionnaireSeeder extends Seeder
         $this->command->info("  created  {$count} questions (8 main + 5 conditional)");
 
         $this->wireToGlp($q);
+        $this->attachGeneralToGlpOfferings();
     }
 
     /**
@@ -286,5 +288,44 @@ class RefillGlpQuestionnaireSeeder extends Seeder
 
         $category->update(['check_in_questionnaire_id' => $q->id]);
         $this->command->info("  wired    category [GLP] → [{$q->name}] (id={$q->id}){$previous}");
+    }
+
+    /**
+     * Attach "Refill General Check-In" to every GLP offering via the
+     * offering_questionnaire pivot so both check-in questionnaires are
+     * indexed when a GLP refill case is processed.
+     */
+    private function attachGeneralToGlpOfferings(): void
+    {
+        $generalQ = Questionnaire::where('name', 'Refill General Check-In')->first();
+
+        if (!$generalQ) {
+            $this->command->warn('  skipped  "Refill General Check-In" not found — run RefillGeneralQuestionnaireSeeder first.');
+            return;
+        }
+
+        $category = OfferingCategory::where('name', self::TARGET_CATEGORY)->first();
+
+        if (!$category) {
+            $this->command->warn('  skipped  GLP category not found — cannot attach general questionnaire to GLP offerings.');
+            return;
+        }
+
+        $offerings = Offering::where('offering_category_id', $category->id)->get();
+
+        if ($offerings->isEmpty()) {
+            $this->command->warn('  skipped  no offerings found in GLP category.');
+            return;
+        }
+
+        $attached = 0;
+        foreach ($offerings as $offering) {
+            $offering->questionnaires()->syncWithoutDetaching([
+                $generalQ->id => ['is_required' => false, 'sort_order' => 99],
+            ]);
+            $attached++;
+        }
+
+        $this->command->info("  attached [Refill General Check-In] (id={$generalQ->id}) to {$attached} GLP offering(s) via pivot.");
     }
 }
