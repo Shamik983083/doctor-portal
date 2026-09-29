@@ -66,6 +66,7 @@ class RefillGlpQuestionnaireSeeder extends Seeder
         if (Questionnaire::where('name', self::QUESTIONNAIRE_NAME)->exists()) {
             $this->command->info(self::QUESTIONNAIRE_NAME . ' already seeded — skipping creation.');
             $this->wireToGlp();
+            $this->attachGlpToGlpOfferings();
             $this->attachGeneralToGlpOfferings();
             return;
         }
@@ -256,6 +257,7 @@ class RefillGlpQuestionnaireSeeder extends Seeder
         $this->command->info("  created  {$count} questions (8 main + 5 conditional)");
 
         $this->wireToGlp($q);
+        $this->attachGlpToGlpOfferings($q);
         $this->attachGeneralToGlpOfferings();
     }
 
@@ -289,6 +291,40 @@ class RefillGlpQuestionnaireSeeder extends Seeder
 
         $category->update(['check_in_questionnaire_id' => $q->id]);
         $this->command->info("  wired    category [GLP] → [{$q->name}] (id={$q->id}){$previous}");
+    }
+
+    /**
+     * Attach "Refill GLP Check-In" to every GLP offering via the pivot
+     * so it is visible in the admin offering panel (sort_order=10, required).
+     */
+    private function attachGlpToGlpOfferings(?Questionnaire $q = null): void
+    {
+        if ($q === null) {
+            $q = Questionnaire::where('name', self::QUESTIONNAIRE_NAME)->first();
+            if (!$q) return;
+        }
+
+        $category = OfferingCategory::where('name', self::TARGET_CATEGORY)->first();
+
+        if (!$category) {
+            return;
+        }
+
+        $offerings = Offering::where('category_id', $category->id)->get();
+
+        if ($offerings->isEmpty()) {
+            return;
+        }
+
+        $attached = 0;
+        foreach ($offerings as $offering) {
+            $offering->questionnaires()->syncWithoutDetaching([
+                $q->id => ['is_required' => true, 'sort_order' => 10],
+            ]);
+            $attached++;
+        }
+
+        $this->command->info("  attached [Refill GLP Check-In] (id={$q->id}) to {$attached} GLP offering(s) via pivot.");
     }
 
     /**
