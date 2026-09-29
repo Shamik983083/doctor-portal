@@ -66,6 +66,7 @@ class RefillGlpQuestionnaireSeeder extends Seeder
         if (Questionnaire::where('name', self::QUESTIONNAIRE_NAME)->exists()) {
             $this->command->info(self::QUESTIONNAIRE_NAME . ' already seeded — skipping creation.');
             $this->wireToGlp();
+            $this->attachGeneralToGlpOfferings();
             return;
         }
 
