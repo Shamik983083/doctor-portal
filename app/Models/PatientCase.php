@@ -17,7 +17,7 @@ class PatientCase extends Model
         'uuid', 'partner_id', 'sub_storefront_id', 'patient_id', 'clinician_id', 'external_id',
         'status', 'hold_status', 'is_chargeable', 'charge_amount',
         'support_note', 'support_at', 'cancellation_reason', 'patient_state', 'visit_type',
-        'is_refill',
+        'is_refill', 'is_auto_renewal',
         'assigned_at', 'approved_at', 'processing_at', 'completed_at', 'cancelled_at',
         'metadata', 'clinical_intake',
         'triage', 'triage_reasons', 'triage_ruleset', 'triaged_at',
@@ -30,7 +30,8 @@ class PatientCase extends Model
     protected $casts = [
         'hold_status' => 'boolean',
         'is_chargeable' => 'boolean',
-        'is_refill' => 'boolean',
+        'is_refill'        => 'boolean',
+        'is_auto_renewal'  => 'boolean',
         'clinical_intake' => 'array',
         'support_at' => 'datetime',
         'assigned_at' => 'datetime',

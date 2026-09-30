@@ -27,3 +27,8 @@ Schedule::command('case:check-deadlines')->everyFiveMinutes();
 // Healthie response from stacking a second instance on top of a still-running
 // sweep. Only runs when EHR_ENABLED=true — the command guards internally too.
 Schedule::command('ehr:retry')->everyFifteenMinutes()->withoutOverlapping();
+
+// GLP dose titration auto-renewal: finds completed monthly GLP injectable cases
+// where completed_at was 28–32 days ago, creates a renewal case with the next
+// dose level pre-prescribed, and fires a case_auto_renewed webhook.
+Schedule::command('glp:auto-renew')->dailyAt('08:30')->withoutOverlapping();

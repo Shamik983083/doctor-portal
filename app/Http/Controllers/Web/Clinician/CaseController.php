@@ -600,6 +600,25 @@ class CaseController extends Controller
                 ->values();
         }
 
+        // GLP dose titration hint — next level pre-fill for refill cases.
+        $nextDoseLevelHint = null;
+        if ($case->isRefillRequest()) {
+            $titration = app(\App\Services\GlpDoseTitrationService::class);
+            foreach ($offerings as $off) {
+                if ($titration->isTitratable($off)) {
+                    $next = $titration->nextLevel($case->patient_id, $off);
+                    $nextDoseLevelHint = [
+                        'offering_id'  => $off->id,
+                        'next_level'   => $next,
+                        'next_index'   => $titration->nextLevelIndex($case->patient_id, $off),
+                        'is_max_dose'  => $titration->isAtMaxDose($case->patient_id, $off),
+                        'offering_name'=> $off->name,
+                    ];
+                    break;
+                }
+            }
+        }
+
         // Extract dose hint so the prescribe form can auto-select medication + month levels.
         // Searches ALL completed questionnaire responses (any purpose) so it works for both
         // new cases (intake form may include prior-dose questions) and refill cases.
@@ -660,7 +679,7 @@ class CaseController extends Controller
         return view('clinician.cases.prescribe', compact(
             'case', 'offerings', 'medicalNecessityPreset', 'icd10Suggestions',
             'priorCase', 'checkInResponses', 'checkInDoseHint', 'requestedMonthFrequency',
-            'caseOfferingsData', 'formulationHint'
+            'caseOfferingsData', 'formulationHint', 'nextDoseLevelHint'
         ));
     }
 
@@ -809,11 +828,29 @@ class CaseController extends Controller
                 $offering = $offeringsMap->get($med['offering_id'] ?? '');
                 $sig = $offering ? $offering->effectiveSig($case->partner) : null;
 
+                // Resolve which level index was prescribed so titration logic can
+                // look it up later without re-matching formula strings.
+                $levelIndex = null;
+                if ($offering && is_array($offering->levels) && filled($med['compound_formula'] ?? null)) {
+                    $needle = strtolower(trim($med['compound_formula']));
+                    foreach ($offering->levels as $idx => $lvl) {
+                        if (strtolower(trim($lvl['formula'] ?? '')) === $needle) {
+                            $levelIndex = $idx;
+                            break;
+                        }
+                    }
+                    // -1 means formula was set but didn't match any level (custom/override).
+                    if ($levelIndex === null && filled($med['compound_formula'] ?? null)) {
+                        $levelIndex = -1;
+                    }
+                }
+
                 $prescription->medications()->create([
                     'offering_id'         => $med['offering_id'] ?? null,
                     'name'                => $med['name'],
                     'compound_formula'    => $med['compound_formula'] ?? null,
                     'dosing'              => $dosing,
+                    'level_index'         => $levelIndex,
                     'refills'             => $med['refills'] ?? null,
                     'quantity'            => $med['quantity'] ?? null,
                     'days_supply'         => $med['days_supply'] ?? null,

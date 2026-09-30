@@ -194,6 +194,22 @@
                     </script>
                 @endif
 
+                {{-- GLP dose titration banner — shown for GLP refill cases --}}
+                @if(!empty($nextDoseLevelHint))
+                    @if($nextDoseLevelHint['is_max_dose'])
+                        <div style="margin-bottom:14px;border:1px solid rgba(192,57,47,.3);border-radius:10px;padding:10px 14px;background:rgba(192,57,47,.06);font-size:12px;display:flex;align-items:center;gap:8px">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c0392f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span><strong>Max dose reached</strong> — {{ $nextDoseLevelHint['offering_name'] }} is already at the highest level in the titration ladder. Maintain current dose or make a manual adjustment.</span>
+                        </div>
+                    @elseif(!empty($nextDoseLevelHint['next_level']))
+                        <div id="glp-titration-banner" style="margin-bottom:14px;border:1px solid rgba(23,131,78,.3);border-radius:10px;padding:10px 14px;background:rgba(23,131,78,.06);font-size:12px;display:flex;align-items:center;gap:8px">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#17834e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                            <span style="flex:1"><strong>Next dose pre-selected:</strong> {{ $nextDoseLevelHint['next_level']['label'] ?? '' }} — based on prior prescription. Review before submitting.</span>
+                            <span style="color:var(--muted);font-weight:500">{{ $nextDoseLevelHint['offering_name'] }}</span>
+                        </div>
+                    @endif
+                @endif
+
                 {{-- Check-in answers for the current refill visit --}}
                 @if($case->isRefillRequest() && $checkInResponses->isNotEmpty())
                     @foreach($checkInResponses as $checkInResp)
@@ -395,6 +411,7 @@
     var ICD10_SUGGESTIONS = @json($icd10Suggestions ?? []);
     var CHECK_IN_DOSE_HINT = @json($checkInDoseHint);
     var FORMULATION_HINT = @json($formulationHint ?? null);
+    var NEXT_DOSE_LEVEL_HINT = @json($nextDoseLevelHint ?? null);
 </script>
 <script>
     // C9: ICD-10 chip editor
@@ -763,8 +780,12 @@
                         }
                     });
                 });
-                // Auto-select levels from check-in dose hint
-                autoFillMonths(wrap, levels);
+                // Titration hint (from prescription records) takes priority over
+                // the questionnaire text parsing in autoFillMonths().
+                var offeringId = offering ? offering.id : null;
+                if (!autoFillFromTitrationHint(wrap, levels, offeringId)) {
+                    autoFillMonths(wrap, levels);
+                }
             }
         }
 
@@ -863,6 +884,28 @@
                 sel.selectedIndex = targetIdx + 1;
                 sel.dispatchEvent(new Event('change')); // triggers SIG auto-fill
             });
+        }
+
+        // GLP dose titration pre-select — uses the server-resolved next level index
+        // from NEXT_DOSE_LEVEL_HINT (derived from actual prescription records) which
+        // is more reliable than the questionnaire text parsing in autoFillMonths().
+        // Sets all month slots to the same next level (M1=M2=M3 = next dose).
+        // Returns true when it applied so the caller can skip autoFillMonths().
+        function autoFillFromTitrationHint(wrap, levels, offeringId) {
+            if (!NEXT_DOSE_LEVEL_HINT) return false;
+            if (NEXT_DOSE_LEVEL_HINT.is_max_dose) return true; // max dose — leave selects blank
+            if (NEXT_DOSE_LEVEL_HINT.next_index === null || NEXT_DOSE_LEVEL_HINT.next_index === undefined) return false;
+            if (NEXT_DOSE_LEVEL_HINT.offering_id && offeringId && NEXT_DOSE_LEVEL_HINT.offering_id != offeringId) return false;
+
+            var targetIdx = parseInt(NEXT_DOSE_LEVEL_HINT.next_index, 10);
+            if (isNaN(targetIdx) || targetIdx < 0 || targetIdx >= levels.length) return false;
+
+            wrap.querySelectorAll('.level-select').forEach(function (sel) {
+                sel.selectedIndex = targetIdx + 1; // +1 for blank placeholder option
+                sel.dispatchEvent(new Event('change')); // triggers SIG/formula auto-fill
+            });
+
+            return true;
         }
 
         // Auto-select the medication dropdown from the patient's last dose formulation.

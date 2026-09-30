@@ -12,7 +12,7 @@ class CasePrescriptionMedication extends Model
 
     protected $fillable = [
         'case_prescription_id', 'offering_id', 'name',
-        'compound_formula', 'dosing', 'refills', 'quantity',
+        'compound_formula', 'dosing', 'level_index', 'refills', 'quantity',
         'days_supply', 'dispense_unit', 'days_until_dispense', 'sig',
     ];
 

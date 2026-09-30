@@ -50,6 +50,7 @@ jobs:
             $PHP artisan db:seed --class="Database\\Seeders\\GlpOfferingsSeeder"          --force
             $PHP artisan db:seed --class="Database\\Seeders\\NadOfferingsSeeder"          --force
             $PHP artisan db:seed --class="Database\\Seeders\\AttachQuestionnairesToOfferingsSeeder" --force
+            $PHP artisan db:seed --class="Database\\Seeders\\RefillGlpQuestionnaireSeeder"          --force
             $PHP artisan db:seed --class="Database\\Seeders\\PartnerProductPlanSeeder"    --force
             $PHP artisan db:seed --class="Database\\Seeders\\SettingsSeeder"              --force
             $PHP artisan db:seed --class="Database\\Seeders\\AiInstructionSetsSeeder"     --force
